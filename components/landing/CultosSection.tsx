@@ -35,7 +35,7 @@ const programacao = [
     dia: "Domingo",
     abrev: "DOM",
     eventos: [
-      { nome: "Culto", horario: "18h30", destaque: true, cor: "ouro" as const },
+      { nome: "Culto", horario: "18h30", detalhe: "1º dom. do mês: 10h00", destaque: true, cor: "default" as const },
     ],
   },
 ];

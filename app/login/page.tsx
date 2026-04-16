@@ -4,8 +4,8 @@ import { useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import Link from "next/link";
-import LogoMark from "@/components/LogoMark";
-import { Eye, EyeOff, ChevronDown } from "lucide-react";
+import Image from "next/image";
+import { Eye, EyeOff } from "lucide-react";
 
 type Tab = "entrar" | "cadastrar";
 
@@ -60,10 +60,16 @@ export default function LoginPage() {
         {/* Logo / branding */}
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex flex-col items-center gap-2 group">
-            <LogoMark className="w-10 h-auto text-vine-700 group-hover:text-vine-900 transition" />
-            <div className="leading-none">
-              <span className="text-[9px] tracking-[0.35em] uppercase text-vine-400 font-light">Igreja</span>
-              <p className="text-2xl font-serif font-semibold text-vine-900 tracking-wide mt-0.5">Ramo da Vida</p>
+            <div className="bg-vine-950 rounded-2xl px-6 py-4">
+              <Image
+                src="/logo.png"
+                alt="Igreja Ramo da Vida"
+                width={160}
+                height={54}
+                priority
+                className="w-[140px] h-auto"
+                style={{ filter: "invert(1)", mixBlendMode: "screen" }}
+              />
             </div>
           </Link>
         </div>

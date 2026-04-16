@@ -1,5 +1,4 @@
 ﻿import Image from "next/image";
-import Link from "next/link";
 import { ArrowDown } from "lucide-react";
 
 export default function HeroSection() {
@@ -62,13 +61,6 @@ export default function HeroSection() {
           >
             Programação
           </a>
-          <Link
-            href="/login"
-            className="border border-white/20 text-white/85 font-medium px-9 py-3.5 rounded-full
-                       hover:bg-white/[0.07] hover:border-white/35 transition text-[14px] tracking-wide"
-          >
-            Entrar
-          </Link>
         </div>
       </div>
 

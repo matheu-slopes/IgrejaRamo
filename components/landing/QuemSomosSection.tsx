@@ -13,15 +13,16 @@ export default function QuemSomosSection() {
             </h2>
             <div className="space-y-4 text-vine-200 leading-relaxed text-[15px]">
               <p>
-                A <strong className="text-white">Igreja Ramo da Vida</strong> nasceu dentro
-                de um lar — a partir de um altar de família e amigos que se reuniram ao
-                redor da Palavra de Deus com fé simples e coração aberto.
+                A comunidade cristã <strong className="text-white">Ramo da Vida</strong> nasceu
+                no coração de Deus e se manifesta através da comunhão nos cultos, bem como em
+                ações sociais e também fora da igreja, manifestando Jesus e Seu amor às pessoas
+                através do testemunho pessoal e coletivo de seus membros, líderes e simpatizantes
+                do mesmo propósito.
               </p>
               <p>
-                Fundada em <strong className="text-gold-400">2019</strong> em Campinas, nossa
-                comunidade cresceu unida em torno da oração, do louvor e do serviço ao
-                próximo. Do lar para as ruas, do altar da família para os ministérios que
-                hoje alcançam crianças, jovens e adultos.
+                Nosso intuito e missão é manifestar o caráter de Cristo, seu amor, ensino e exemplo
+                de maneira simples, prática e verdadeira, a fim de pregar a salvação por meio da fé
+                até que <strong className="text-white">ELE venha!</strong>
               </p>
               <p className="font-serif italic text-lg text-vine-300 leading-relaxed border-l-2 border-gold-600/40 pl-4">
                 "Eu sou a videira; vós sois os ramos. Quem permanece em mim e eu nele,

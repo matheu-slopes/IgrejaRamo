@@ -199,36 +199,6 @@ export default function DashboardPage() {
         </section>
       </div>
 
-      {/* ── Quick access ministry cards ──────────────────────── */}
-      <section>
-        <h2 className="text-sm font-bold uppercase tracking-widest text-gray-400 mb-3">
-          Meus Ministérios
-        </h2>
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
-          {(["Louvor", "Mídias", "Ensino", "Infantil", "Ação Social"] as const).map(
-            (min) => {
-              const active = user.ministerios.includes(min);
-              return (
-                <Link
-                  key={min}
-                  href={`/dashboard/mural?min=${min}`}
-                  className={[
-                    "flex flex-col items-center justify-center gap-2 rounded-2xl p-4 text-center text-sm font-semibold transition border",
-                    active
-                      ? "bg-vine-700 text-white border-vine-700 shadow-md"
-                      : "bg-white text-gray-500 border-gray-100 hover:border-vine-200 hover:text-vine-700",
-                  ].join(" ")}
-                >
-                  <span className="text-xl">
-                    {min === "Louvor" ? "🎸" : min === "Mídias" ? "📹" : min === "Ensino" ? "📖" : min === "Infantil" ? "🧒" : "🤝"}
-                  </span>
-                  {min}
-                </Link>
-              );
-            }
-          )}
-        </div>
-      </section>
     </div>
   );
 }
