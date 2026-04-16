@@ -1,0 +1,108 @@
+/**
+ * lib/permissions.ts
+ * ─────────────────────────────────────────────────────────────────
+ * Central de permissões do sistema.
+ *
+ * Como funciona:
+ *  1. Cada role tem um conjunto padrão de permissões (DEFAULTS_POR_ROLE).
+ *  2. O admin pode sobrescrever qualquer permissão individualmente,
+ *     gravando um array `permissoes` no objeto User.
+ *  3. Se User.permissoes estiver definido, ele substitui o default do role.
+ *  4. A função `temPermissao(user, permissao)` encapsula essa lógica
+ *     e é usada em toda a UI para decidir o que mostrar/habilitar.
+ * ─────────────────────────────────────────────────────────────────
+ */
+
+import { Permissao, Role, User } from "@/types";
+
+// ─── Permissões padrão por role ───────────────────────────────────
+
+export const DEFAULTS_POR_ROLE: Record<Role, Permissao[]> = {
+  admin: [
+    "gerenciar_usuarios",
+    "atribuir_permissoes",
+    "criar_evento",
+    "editar_evento",
+    "criar_escala",
+    "gerenciar_membros_ministerio",
+    "bloquear_chat",
+    "enviar_chat",
+    "fixar_mensagem",
+    "criar_aviso",
+    "ver_relatorios",
+    "ver_dashboard",
+  ],
+  pastor: [
+    "criar_evento",
+    "editar_evento",
+    "criar_escala",
+    "gerenciar_membros_ministerio",
+    "bloquear_chat",
+    "enviar_chat",
+    "fixar_mensagem",
+    "criar_aviso",
+    "ver_relatorios",
+    "ver_dashboard",
+  ],
+  lider: [
+    "criar_evento",
+    "editar_evento",
+    "criar_escala",
+    "gerenciar_membros_ministerio",
+    "bloquear_chat",
+    "enviar_chat",
+    "fixar_mensagem",
+    "criar_aviso",
+    "ver_dashboard",
+  ],
+  voluntario: [
+    "enviar_chat",
+    "ver_dashboard",
+  ],
+  membro: [
+    "enviar_chat",
+    "ver_dashboard",
+  ],
+};
+
+// ─── Labels legíveis para a UI do painel admin ────────────────────
+
+export const PERMISSAO_LABEL: Record<Permissao, { label: string; descricao: string; grupo: string }> = {
+  gerenciar_usuarios:           { label: "Gerenciar usuários",      descricao: "Acessar painel admin e criar/editar/desativar usuários",    grupo: "Administração" },
+  atribuir_permissoes:          { label: "Atribuir permissões",     descricao: "Alterar o role e as permissões de outros usuários",          grupo: "Administração" },
+  ver_relatorios:               { label: "Ver relatórios",          descricao: "Acessar estatísticas e relatórios internos",                 grupo: "Administração" },
+  criar_aviso:                  { label: "Criar avisos",            descricao: "Publicar notificações e avisos para o grupo",                grupo: "Comunicação"   },
+  bloquear_chat:                { label: "Bloquear chat",           descricao: "Travar/destravar o chat de um canal de ministério",          grupo: "Comunicação"   },
+  enviar_chat:                  { label: "Enviar mensagens",        descricao: "Enviar mensagens nos canais de ministério",                  grupo: "Comunicação"   },
+  fixar_mensagem:               { label: "Fixar mensagens",         descricao: "Fixar mensagens importantes no topo do chat",               grupo: "Comunicação"   },
+  criar_evento:                 { label: "Criar eventos",           descricao: "Criar novos eventos na agenda do ministério",                grupo: "Agenda"        },
+  editar_evento:                { label: "Editar/remover eventos",  descricao: "Editar e excluir eventos existentes",                       grupo: "Agenda"        },
+  criar_escala:                 { label: "Criar escalas",           descricao: "Criar e editar escalas de serviço",                         grupo: "Agenda"        },
+  gerenciar_membros_ministerio: { label: "Gerenciar membros",       descricao: "Adicionar, remover e editar membros de um ministério",       grupo: "Ministério"    },
+  ver_dashboard:                { label: "Acessar dashboard",       descricao: "Entrar na área interna do sistema",                         grupo: "Acesso"        },
+};
+
+export const TODAS_PERMISSOES = Object.keys(PERMISSAO_LABEL) as Permissao[];
+
+export const GRUPOS_PERMISSAO = ["Administração", "Comunicação", "Agenda", "Ministério", "Acesso"] as const;
+
+// ─── Função principal ─────────────────────────────────────────────
+
+/**
+ * Verifica se um usuário tem determinada permissão.
+ * Se o usuário tiver `permissoes` definidas (customização pelo admin),
+ * usa esse array. Caso contrário, usa o default do role.
+ */
+export function temPermissao(user: User | null, permissao: Permissao): boolean {
+  if (!user) return false;
+  const lista = user.permissoes ?? DEFAULTS_POR_ROLE[user.role];
+  return lista.includes(permissao);
+}
+
+/**
+ * Retorna as permissões efetivas de um usuário
+ * (customizadas ou default do role).
+ */
+export function permissoesEfetivas(user: User): Permissao[] {
+  return user.permissoes ?? DEFAULTS_POR_ROLE[user.role];
+}

@@ -38,7 +38,7 @@ export default function CadastroPage() {
               placeholder="Buscar membro..."
               value={busca}
               onChange={(e) => setBusca(e.target.value)}
-              className="pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+              className="pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-vine-400"
             />
           </div>
         </div>
@@ -74,7 +74,7 @@ function MemberRow({ member }: { member: User }) {
   const roleColors: Record<string, string> = {
     admin: "bg-purple-100 text-purple-700",
     pastor: "bg-blue-100 text-blue-700",
-    lider: "bg-indigo-100 text-indigo-700",
+    lider: "bg-vine-100 text-vine-700",
     voluntario: "bg-green-100 text-green-700",
     membro: "bg-gray-100 text-gray-600",
   };

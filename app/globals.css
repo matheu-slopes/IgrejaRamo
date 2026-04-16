@@ -1,3 +1,56 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+  body {
+    font-feature-settings: "kern" 1, "liga" 1, "calt" 1;
+  }
+}
+
+/* ─── Logo: animação de "desenhar" a cruz ─────────────────────────────── */
+.logo-draw-1 {
+  stroke-dasharray: 33;
+  stroke-dashoffset: 33;
+  animation: logoDraw 0.45s cubic-bezier(0.4,0,0.2,1) forwards 0.3s;
+}
+.logo-draw-2 {
+  stroke-dasharray: 48;
+  stroke-dashoffset: 48;
+  animation: logoDraw 0.5s  cubic-bezier(0.4,0,0.2,1) forwards 0.65s;
+}
+.logo-draw-3 {
+  stroke-dasharray: 56;
+  stroke-dashoffset: 56;
+  animation: logoDraw 0.65s cubic-bezier(0.4,0,0.2,1) forwards 1.0s;
+}
+
+@keyframes logoDraw {
+  to { stroke-dashoffset: 0; }
+}
+
+/* ─── Logo: folhas surgem após a haste ser desenhada ─────────────────── */
+.logo-leaf-1 { opacity:0; animation: logoLeaf 0.4s ease forwards 1.55s; }
+.logo-leaf-2 { opacity:0; animation: logoLeaf 0.4s ease forwards 1.75s; }
+.logo-leaf-3 { opacity:0; animation: logoLeaf 0.4s ease forwards 1.95s; }
+.logo-leaf-4 { opacity:0; animation: logoLeaf 0.4s ease forwards 2.15s; }
+
+@keyframes logoLeaf {
+  from { opacity: 0; transform: scale(0.5); transform-box: fill-box; transform-origin: center; }
+  to   { opacity: 1; transform: scale(1);   transform-box: fill-box; transform-origin: center; }
+}
+
+/* ─── Hero: texto entra em cascata após animação do logo ─────────────── */
+.hero-t1 { opacity:0; animation: heroUp 0.65s ease forwards 1.8s;  }
+.hero-t2 { opacity:0; animation: heroUp 0.65s ease forwards 2.15s; }
+.hero-t3 { opacity:0; animation: heroUp 0.65s ease forwards 2.5s;  }
+.hero-t4 { opacity:0; animation: heroUp 0.65s ease forwards 2.85s; }
+.hero-t5 { opacity:0; animation: heroUp 0.5s  ease forwards 3.2s;  }
+
+@keyframes heroUp {
+  from { opacity: 0; transform: translateY(18px); }
+  to   { opacity: 1; transform: translateY(0);     }
+}

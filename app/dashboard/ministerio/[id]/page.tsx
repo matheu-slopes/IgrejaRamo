@@ -1,0 +1,1113 @@
+"use client";
+
+import { useState, useRef, useEffect } from "react";
+import { useParams } from "next/navigation";
+import { useAuth } from "@/contexts/AuthContext";
+import {
+  MessageSquare, Users, CalendarDays, Send, Lock, Unlock,
+  Plus, Trash2, Pencil, X, Check, Calendar, ExternalLink,
+  Pin, ChevronDown, ShieldCheck, ChevronUp,
+  Star, Mic, Square, Image as ImageIcon, Grid3x3, Link2,
+  Phone, Video as VideoIcon, MoreVertical, PhoneOff,
+} from "lucide-react";
+import clsx from "clsx";
+import { Ministerio, MuralMensagem, MembroMinisterio, Evento, FuncaoMinisterio } from "@/types";
+import {
+  mockMuralMensagens, mockMembrosMinisterio, mockEventos, mockCanais,
+} from "@/lib/mockData";
+import { downloadICS, linkGoogleCalendar, formatarData, diaSemana } from "@/lib/calendarUtils";
+
+type Tab = "chat" | "membros" | "eventos";
+
+const corMap: Record<string, string> = {
+  grape: "bg-grape-800",
+  vine:  "bg-vine-800",
+  bark:  "bg-bark-700",
+  gold:  "bg-gold-500",
+};
+
+export default function CanalMinisterioPage() {
+  const params = useParams();
+  const slug = decodeURIComponent(params.id as string) as Ministerio;
+  const { user, temPermissao } = useAuth();
+
+  // ── estado global ─────────────────────────────────────────────────────
+  const [tab, setTab] = useState<Tab>("chat");
+  const canalBase = mockCanais.find((c) => c.ministerio === slug);
+  const [chatBloqueado, setChatBloqueado] = useState(canalBase?.chatBloqueado ?? false);
+
+  // ── permissão ─────────────────────────────────────────────────────
+  const podeBloquearChat    = temPermissao("bloquear_chat");
+  const podeGerenciarMembros = temPermissao("gerenciar_membros_ministerio");
+  const podeCriarEvento     = temPermissao("criar_evento");
+  const podeEditarEvento    = temPermissao("editar_evento");  const podeAtribuirPermissoes = temPermissao("atribuir_permissoes");
+  if (!canalBase) {
+    return (
+      <div className="flex items-center justify-center h-60 text-gray-400">
+        Canal não encontrado.
+      </div>
+    );
+  }
+
+  const corBg = corMap[canalBase.cor] ?? "bg-vine-800";
+  const [chamada, setChamada] = useState<"audio" | "video" | null>(null);
+
+  return (
+    <div className="space-y-0">
+      {/* Header do canal */}
+      <div className={clsx("rounded-2xl px-6 py-5 mb-6 text-white", corBg)}>
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-xs uppercase tracking-widest opacity-60 mb-0.5">Canal</p>
+            <h1 className="text-2xl font-serif font-semibold">{slug}</h1>
+            <p className="text-sm opacity-70 mt-1">{canalBase.descricao}</p>
+          </div>
+          <div className="flex items-center gap-2">
+            {/* Chamadas */}
+            <button
+              onClick={() => setChamada("audio")}
+              className="flex items-center gap-1.5 text-sm font-medium px-3 py-2 rounded-full border border-white/30 text-white/80 hover:bg-white/10 transition"
+              title="Chamada de áudio em grupo"
+            >
+              <Phone className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setChamada("video")}
+              className="flex items-center gap-1.5 text-sm font-medium px-3 py-2 rounded-full border border-white/30 text-white/80 hover:bg-white/10 transition"
+              title="Chamada de vídeo em grupo"
+            >
+              <VideoIcon className="w-4 h-4" />
+            </button>
+            {tab === "chat" && (
+              <button
+                onClick={() => podeBloquearChat && setChatBloqueado(!chatBloqueado)}
+                disabled={!podeBloquearChat}
+                className={clsx(
+                  "flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-full border transition",
+                  !podeBloquearChat && "opacity-40 cursor-not-allowed",
+                  chatBloqueado
+                    ? "border-white/40 text-white bg-white/20 hover:bg-white/30"
+                    : "border-white/30 text-white/80 hover:bg-white/10"
+                )}
+              >
+                {chatBloqueado ? (<><Lock className="w-4 h-4" /> Chat bloqueado</>) : (<><Unlock className="w-4 h-4" /> Chat livre</>)}
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Tabs */}
+        <div className="flex items-center gap-1 mt-5 border-t border-white/20 pt-4">
+          {([
+            { id: "chat",    label: "Chat",    icon: MessageSquare },
+            { id: "membros", label: "Membros", icon: Users         },
+            { id: "eventos", label: "Eventos", icon: CalendarDays  },
+          ] as { id: Tab; label: string; icon: React.ElementType }[]).map(({ id, label, icon: Icon }) => (
+            <button
+              key={id}
+              onClick={() => setTab(id)}
+              className={clsx(
+                "flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-medium transition",
+                tab === id
+                  ? "bg-white text-gray-900"
+                  : "text-white/70 hover:text-white hover:bg-white/10"
+              )}
+            >
+              <Icon className="w-3.5 h-3.5" />
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Conteúdo da tab */}
+      {tab === "chat"    && <ChatTab ministerio={slug} chatBloqueado={chatBloqueado} podeEnviar={temPermissao("enviar_chat")} podeFixar={temPermissao("fixar_mensagem")} user={user} />}
+      {tab === "membros" && <MembrosTab ministerio={slug} isLider={podeGerenciarMembros} podeAtribuirPermissoes={podeAtribuirPermissoes} />}
+      {tab === "eventos" && <EventosTab ministerio={slug} isLider={podeCriarEvento} podeEditar={podeEditarEvento} />}
+
+      {/* Modal de chamada */}
+      {chamada && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className={clsx("rounded-3xl p-8 flex flex-col items-center gap-6 shadow-2xl text-white w-80", corBg)}>
+            <div className="w-16 h-16 rounded-full bg-white/20 flex items-center justify-center">
+              {chamada === "audio" ? <Phone className="w-7 h-7" /> : <VideoIcon className="w-7 h-7" />}
+            </div>
+            <div className="text-center">
+              <p className="font-serif text-xl font-semibold">{slug}</p>
+              <p className="text-white/70 text-sm mt-1">
+                {chamada === "audio" ? "Chamada de áudio em grupo" : "Chamada de vídeo em grupo"}
+              </p>
+            </div>
+            <div className="flex items-center gap-2 bg-white/10 rounded-full px-4 py-2">
+              <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+              <span className="text-sm text-white/80">Conectando membros do canal…</span>
+            </div>
+            <p className="text-xs text-white/50 text-center">
+              Funcionalidade de chamada em grupo disponível com integração WebRTC / servidor de sinalização.
+            </p>
+            <button
+              onClick={() => setChamada(null)}
+              className="flex items-center gap-2 bg-red-500 hover:bg-red-600 text-white font-semibold px-6 py-3 rounded-full transition"
+            >
+              <PhoneOff className="w-4 h-4" /> Encerrar chamada
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── TAB: CHAT ────────────────────────────────────────────────────────────────
+
+type InfoPanel = "midia" | "links" | "favoritos" | null;
+
+function detectarLinks(texto: string): string[] {
+  return Array.from(texto.matchAll(/https?:\/\/[^\s]+/g)).map((m) => m[0]);
+}
+
+function renderTextoComLinks(texto: string, isMe: boolean) {
+  const urlRegex = /https?:\/\/[^\s]+/g;
+  const parts = texto.split(urlRegex);
+  const urls = texto.match(urlRegex) ?? [];
+  return parts.flatMap((part, i) => [
+    part,
+    urls[i] ? (
+      <a
+        key={`link-${i}`}
+        href={urls[i]}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={clsx("underline break-all", isMe ? "text-white/80 hover:text-white" : "text-vine-600 hover:text-vine-800")}
+      >
+        {urls[i]}
+      </a>
+    ) : null,
+  ]);
+}
+
+function ChatTab({
+  ministerio, chatBloqueado, podeEnviar: podeEnviarProp, podeFixar, user,
+}: {
+  ministerio: Ministerio;
+  chatBloqueado: boolean;
+  podeEnviar: boolean;
+  podeFixar: boolean;
+  user: { id?: string; nome: string; role: string } | null;
+}) {
+  const [msgs, setMsgs] = useState<MuralMensagem[]>(
+    mockMuralMensagens.filter((m) => m.ministerio === ministerio)
+  );
+  const [texto, setTexto] = useState("");
+  const bottomRef = useRef<HTMLDivElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  // Audio recording
+  const [gravando, setGravando] = useState(false);
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [tempoGravacao, setTempoGravacao] = useState(0);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<BlobPart[]>([]);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Image
+  const [imagemPreview, setImagemPreview] = useState<string | null>(null);
+
+  // Favorites & menu
+  const [favoritos, setFavoritos] = useState<string[]>([]);
+  const [menuId, setMenuId] = useState<string | null>(null);
+
+  // Right info panel
+  const [infoPanel, setInfoPanel] = useState<InfoPanel>(null);
+
+  const podeEnviar = (podeEnviarProp && !chatBloqueado) || podeFixar;
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [msgs]);
+  useEffect(() => () => { if (timerRef.current) clearInterval(timerRef.current); }, []);
+
+  // Computed
+  const fixadas = msgs.filter((m) => m.fixada);
+  const midiaMsgs = msgs.filter((m) => m.tipo === "imagem" && m.mediaUrl);
+  const linksMsgs: { url: string; autorNome: string; criadoEm: string }[] = msgs.flatMap((m) =>
+    detectarLinks(m.conteudo).map((url) => ({ url, autorNome: m.autorNome, criadoEm: m.criadoEm }))
+  );
+  const favoritosMsgs = msgs.filter((m) => favoritos.includes(m.id));
+
+  function enviar(tipo: MuralMensagem["tipo"] = "texto", mediaUrl?: string) {
+    if (!user) return;
+    if (tipo === "texto" && !texto.trim()) return;
+    const nova: MuralMensagem = {
+      id: `m${Date.now()}`,
+      ministerio,
+      autorId: "me",
+      autorNome: user.nome,
+      autorRole: user.role as MuralMensagem["autorRole"],
+      conteudo: tipo === "texto" ? texto.trim() : tipo === "imagem" ? "📷 Imagem" : "🎙️ Áudio",
+      criadoEm: new Date().toISOString(),
+      fixada: false,
+      tipo,
+      mediaUrl,
+    };
+    setMsgs((prev) => [...prev, nova]);
+    setTexto("");
+    setImagemPreview(null);
+    setAudioUrl(null);
+  }
+
+  function handleImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => setImagemPreview(ev.target?.result as string);
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  }
+
+  async function iniciarGravacao() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mr = new MediaRecorder(stream);
+      chunksRef.current = [];
+      mr.ondataavailable = (e) => chunksRef.current.push(e.data);
+      mr.onstop = () => {
+        const blob = new Blob(chunksRef.current, { type: "audio/webm" });
+        setAudioUrl(URL.createObjectURL(blob));
+        stream.getTracks().forEach((t) => t.stop());
+      };
+      mr.start();
+      mediaRecorderRef.current = mr;
+      setGravando(true);
+      setTempoGravacao(0);
+      timerRef.current = setInterval(() => setTempoGravacao((t) => t + 1), 1000);
+    } catch { alert("Permissão de microfone negada."); }
+  }
+
+  function pararGravacao() {
+    mediaRecorderRef.current?.stop();
+    if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+    setGravando(false);
+  }
+
+  function toggleFavorito(id: string) {
+    setFavoritos((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
+    setMenuId(null);
+  }
+
+  function toggleFixar(id: string) {
+    setMsgs((prev) => prev.map((m) => m.id === id ? { ...m, fixada: !m.fixada } : m));
+    setMenuId(null);
+  }
+
+  const temMidia = !!imagemPreview || !!audioUrl;
+
+  return (
+    <div className="flex gap-4 h-[calc(100vh-300px)] min-h-[400px]">
+      {/* ── Área principal do chat ── */}
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* Mensagem fixada */}
+        {fixadas.length > 0 && (
+          <div className="mb-3 bg-gold-50 border border-gold-200 rounded-xl px-4 py-2 flex items-start gap-2">
+            <Pin className="w-3.5 h-3.5 text-gold-600 shrink-0 mt-0.5" />
+            <div className="flex-1 min-w-0">
+              <p className="text-[11px] font-semibold text-gold-700 mb-0.5">Fixada</p>
+              <p className="text-xs text-gold-800 line-clamp-1">{fixadas[0].conteudo}</p>
+              <p className="text-[10px] text-gold-500 mt-0.5">— {fixadas[0].autorNome}</p>
+            </div>
+          </div>
+        )}
+
+        {chatBloqueado && !podeEnviar && (
+          <div className="mb-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5 flex items-center gap-2 text-amber-700 text-xs">
+            <Lock className="w-3.5 h-3.5" />
+            <span>Chat bloqueado. Apenas líderes podem enviar mensagens.</span>
+          </div>
+        )}
+
+        {/* Atalhos Mídia / Links / Favoritos */}
+        <div className="flex gap-1.5 mb-2">
+          {([
+            { id: "midia" as InfoPanel,     label: `Mídia (${midiaMsgs.length})`,    icon: Grid3x3 },
+            { id: "links" as InfoPanel,     label: `Links (${linksMsgs.length})`,    icon: Link2   },
+            { id: "favoritos" as InfoPanel, label: `Favoritos (${favoritosMsgs.length})`, icon: Star },
+          ]).map(({ id, label, icon: Icon }) => (
+            <button
+              key={id}
+              onClick={() => setInfoPanel(infoPanel === id ? null : id)}
+              className={clsx(
+                "flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-xl border transition",
+                infoPanel === id
+                  ? "bg-vine-700 text-white border-vine-700"
+                  : "bg-white text-gray-500 border-gray-200 hover:border-vine-300 hover:text-vine-700"
+              )}
+            >
+              <Icon className="w-3.5 h-3.5" /> {label}
+            </button>
+          ))}
+        </div>
+
+        {/* Lista de mensagens */}
+        <div
+          className="flex-1 overflow-y-auto bg-gray-50 rounded-xl p-4 space-y-3 border border-gray-100"
+          onClick={() => setMenuId(null)}
+        >
+          {msgs.filter((m) => !m.fixada).map((m) => {
+            const isMe = m.autorId === "me" || user?.nome === m.autorNome;
+            const isFav = favoritos.includes(m.id);
+            return (
+              <div
+                key={m.id}
+                className={clsx("flex group", isMe ? "justify-end" : "justify-start")}
+              >
+                <div className="relative">
+                  {/* Context menu button */}
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setMenuId(menuId === m.id ? null : m.id); }}
+                    className={clsx(
+                      "absolute top-2 z-10 p-0.5 rounded-full bg-white/90 text-gray-400 hover:text-gray-700 shadow border border-gray-100 transition opacity-0 group-hover:opacity-100",
+                      isMe ? "-left-7" : "-right-7"
+                    )}
+                  >
+                    <MoreVertical className="w-3 h-3" />
+                  </button>
+
+                  {/* Context menu dropdown */}
+                  {menuId === m.id && (
+                    <>
+                      <div className="fixed inset-0 z-10" onClick={() => setMenuId(null)} />
+                      <div className={clsx(
+                        "absolute top-6 z-20 bg-white border border-gray-100 rounded-xl shadow-lg overflow-hidden w-40",
+                        isMe ? "right-0" : "left-0"
+                      )}>
+                        <button
+                          onClick={() => toggleFavorito(m.id)}
+                          className="w-full flex items-center gap-2 px-3 py-2.5 text-xs text-gray-700 hover:bg-gray-50 transition text-left"
+                        >
+                          <Star className={clsx("w-3.5 h-3.5", isFav ? "text-amber-400 fill-amber-400" : "text-gray-400")} />
+                          {isFav ? "Remover favorito" : "Favoritar"}
+                        </button>
+                        {podeFixar && (
+                          <button
+                            onClick={() => toggleFixar(m.id)}
+                            className="w-full flex items-center gap-2 px-3 py-2.5 text-xs text-gray-700 hover:bg-gray-50 transition text-left border-t border-gray-50"
+                          >
+                            <Pin className="w-3.5 h-3.5 text-gray-400" />
+                            {m.fixada ? "Desafixar" : "Fixar mensagem"}
+                          </button>
+                        )}
+                      </div>
+                    </>
+                  )}
+
+                  <div className={clsx(
+                    "max-w-[75%] min-w-[80px] rounded-2xl text-sm shadow-sm relative",
+                    (!m.tipo || m.tipo === "texto")
+                      ? clsx("px-4 py-2.5", isMe ? "bg-vine-700 text-white rounded-tr-sm" : "bg-white text-gray-800 rounded-tl-sm border border-gray-100")
+                      : "overflow-hidden border border-gray-200 bg-white"
+                  )}>
+                    {!isMe && (!m.tipo || m.tipo === "texto") && (
+                      <p className={clsx("text-[10px] font-semibold mb-1",
+                        m.autorRole === "lider" || m.autorRole === "pastor" ? "text-gold-500" : "text-vine-500"
+                      )}>
+                        {m.autorNome}
+                      </p>
+                    )}
+
+                    {/* Conteúdo */}
+                    {(!m.tipo || m.tipo === "texto") && (
+                      <p className="leading-relaxed">{renderTextoComLinks(m.conteudo, isMe)}</p>
+                    )}
+                    {m.tipo === "imagem" && m.mediaUrl && (
+                      <img src={m.mediaUrl} alt="imagem" className="max-w-[240px] max-h-[280px] object-cover" />
+                    )}
+                    {m.tipo === "audio" && m.mediaUrl && (
+                      <div className="px-3 py-2">
+                        <audio controls src={m.mediaUrl} className="h-9 w-52" />
+                      </div>
+                    )}
+
+                    {/* Rodapé da mensagem */}
+                    {(!m.tipo || m.tipo === "texto") && (
+                      <div className={clsx("flex items-center gap-1.5 justify-end mt-1")}>
+                        {isFav && <Star className="w-3 h-3 text-amber-400 fill-amber-400" />}
+                        {m.fixada && <Pin className="w-3 h-3 text-gold-500" />}
+                        <p className={clsx("text-[10px]", isMe ? "text-white/50" : "text-gray-400")}>
+                          {new Date(m.criadoEm).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                        </p>
+                      </div>
+                    )}
+
+                    {m.reacoes && m.reacoes.length > 0 && (
+                      <div className="flex gap-1.5 px-2 pb-2 flex-wrap">
+                        {m.reacoes.map((r) => (
+                          <span key={r.emoji} className="text-xs bg-gray-100 rounded-full px-1.5 py-0.5 cursor-pointer hover:bg-vine-100">
+                            {r.emoji} {r.count}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+          <div ref={bottomRef} />
+        </div>
+
+        {/* Preview de imagem */}
+        {imagemPreview && !audioUrl && (
+          <div className="mt-2 bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 flex items-center gap-3">
+            <img src={imagemPreview} alt="preview" className="h-14 w-14 object-cover rounded-lg border border-gray-200" />
+            <div className="flex-1 text-sm text-gray-600">Imagem pronta para enviar</div>
+            <button onClick={() => setImagemPreview(null)} className="text-gray-400 hover:text-red-400"><X className="w-4 h-4" /></button>
+            <button
+              onClick={() => enviar("imagem", imagemPreview!)}
+              className="bg-vine-700 text-white text-sm font-semibold px-4 py-2 rounded-xl hover:bg-vine-600 flex items-center gap-1.5"
+            >
+              <Send className="w-3.5 h-3.5" /> Enviar
+            </button>
+          </div>
+        )}
+
+        {/* Preview de áudio */}
+        {audioUrl && (
+          <div className="mt-2 bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 flex items-center gap-3">
+            <audio controls src={audioUrl} className="h-9 flex-1" />
+            <button onClick={() => { URL.revokeObjectURL(audioUrl); setAudioUrl(null); }} className="text-gray-400 hover:text-red-400"><X className="w-4 h-4" /></button>
+            <button
+              onClick={() => enviar("audio", audioUrl!)}
+              className="bg-vine-700 text-white text-sm font-semibold px-4 py-2 rounded-xl hover:bg-vine-600 flex items-center gap-1.5"
+            >
+              <Send className="w-3.5 h-3.5" /> Enviar
+            </button>
+          </div>
+        )}
+
+        {/* Gravando */}
+        {gravando && (
+          <div className="mt-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3 flex items-center gap-3">
+            <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
+            <span className="text-sm text-red-700 font-medium flex-1">
+              Gravando… {Math.floor(tempoGravacao / 60).toString().padStart(2, "0")}:{(tempoGravacao % 60).toString().padStart(2, "0")}
+            </span>
+            <button
+              onClick={pararGravacao}
+              className="flex items-center gap-1.5 bg-red-500 text-white text-sm font-semibold px-3 py-1.5 rounded-xl hover:bg-red-600"
+            >
+              <Square className="w-3.5 h-3.5 fill-white" /> Parar
+            </button>
+          </div>
+        )}
+
+        {/* Compose bar */}
+        {!temMidia && !gravando && (
+          <div className="mt-3 flex gap-2">
+            <input
+              value={texto}
+              onChange={(e) => setTexto(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && (e.preventDefault(), podeEnviar && enviar())}
+              disabled={!podeEnviar}
+              placeholder={podeEnviar ? "Mensagem…" : "Chat bloqueado para membros"}
+              className={clsx(
+                "flex-1 rounded-xl border px-4 py-2.5 text-sm outline-none transition",
+                podeEnviar
+                  ? "border-gray-200 focus:border-vine-400 focus:ring-1 focus:ring-vine-200"
+                  : "bg-gray-100 text-gray-400 cursor-not-allowed"
+              )}
+            />
+            {podeEnviar && (
+              <>
+                <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleImageSelect} />
+                <button
+                  onClick={() => fileRef.current?.click()}
+                  className="p-2.5 rounded-xl border border-gray-200 bg-white text-gray-500 hover:text-vine-700 hover:border-vine-300 transition"
+                  title="Enviar imagem"
+                ><ImageIcon className="w-5 h-5" /></button>
+                <button
+                  onClick={iniciarGravacao}
+                  className="p-2.5 rounded-xl border border-gray-200 bg-white text-gray-500 hover:text-vine-700 hover:border-vine-300 transition"
+                  title="Gravar áudio"
+                ><Mic className="w-5 h-5" /></button>
+              </>
+            )}
+            <button
+              onClick={() => enviar()}
+              disabled={!podeEnviar || !texto.trim()}
+              className={clsx("p-2.5 rounded-xl transition",
+                podeEnviar && texto.trim()
+                  ? "bg-vine-700 text-white hover:bg-vine-600"
+                  : "bg-gray-100 text-gray-300 cursor-not-allowed"
+              )}
+            ><Send className="w-4 h-4" /></button>
+          </div>
+        )}
+      </div>
+
+      {/* ── Painel lateral: Mídia / Links / Favoritos ── */}
+      {infoPanel && (
+        <div className="w-72 shrink-0 bg-white rounded-2xl border border-gray-100 shadow-sm flex flex-col overflow-hidden">
+          <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+            <p className="text-sm font-semibold text-gray-800">
+              {infoPanel === "midia" && "Galeria de Mídia"}
+              {infoPanel === "links" && "Links compartilhados"}
+              {infoPanel === "favoritos" && "Mensagens favoritas"}
+            </p>
+            <button onClick={() => setInfoPanel(null)} className="text-gray-400 hover:text-gray-600"><X className="w-4 h-4" /></button>
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-3">
+            {/* MÍDIA */}
+            {infoPanel === "midia" && (
+              midiaMsgs.length === 0
+                ? <p className="text-xs text-gray-400 text-center mt-8">Nenhuma imagem enviada ainda.</p>
+                : <div className="grid grid-cols-3 gap-1.5">
+                    {midiaMsgs.map((m) => (
+                      <a key={m.id} href={m.mediaUrl} target="_blank" rel="noopener noreferrer">
+                        <img
+                          src={m.mediaUrl}
+                          alt="mídia"
+                          className="w-full aspect-square object-cover rounded-lg hover:opacity-90 transition"
+                        />
+                      </a>
+                    ))}
+                  </div>
+            )}
+
+            {/* LINKS */}
+            {infoPanel === "links" && (
+              linksMsgs.length === 0
+                ? <p className="text-xs text-gray-400 text-center mt-8">Nenhum link compartilhado ainda.</p>
+                : <div className="space-y-2">
+                    {linksMsgs.map((l, i) => (
+                      <a
+                        key={i}
+                        href={l.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-start gap-2.5 p-3 rounded-xl border border-gray-100 hover:border-vine-200 hover:bg-vine-50 transition group"
+                      >
+                        <div className="w-8 h-8 rounded-lg bg-vine-100 flex items-center justify-center shrink-0">
+                          <ExternalLink className="w-3.5 h-3.5 text-vine-700" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs font-medium text-vine-700 group-hover:underline break-all line-clamp-2">{l.url}</p>
+                          <p className="text-[10px] text-gray-400 mt-0.5">por {l.autorNome}</p>
+                        </div>
+                      </a>
+                    ))}
+                  </div>
+            )}
+
+            {/* FAVORITOS */}
+            {infoPanel === "favoritos" && (
+              favoritosMsgs.length === 0
+                ? <p className="text-xs text-gray-400 text-center mt-8">Nenhuma mensagem favoritada ainda.</p>
+                : <div className="space-y-2">
+                    {favoritosMsgs.map((m) => (
+                      <div key={m.id} className="p-3 bg-amber-50 border border-amber-100 rounded-xl">
+                        <p className="text-xs font-semibold text-amber-700 mb-1">{m.autorNome}</p>
+                        {(!m.tipo || m.tipo === "texto") && (
+                          <p className="text-xs text-gray-700 leading-relaxed line-clamp-3">{m.conteudo}</p>
+                        )}
+                        {m.tipo === "imagem" && m.mediaUrl && (
+                          <img src={m.mediaUrl} alt="" className="w-full rounded-lg object-cover max-h-32" />
+                        )}
+                        {m.tipo === "audio" && m.mediaUrl && (
+                          <audio controls src={m.mediaUrl} className="w-full h-8" />
+                        )}
+                        <p className="text-[10px] text-amber-400 mt-1.5">
+                          {new Date(m.criadoEm).toLocaleString("pt-BR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+                        </p>
+                        <button
+                          onClick={() => toggleFavorito(m.id)}
+                          className="flex items-center gap-1 text-[10px] text-amber-600 hover:text-amber-800 mt-1 transition"
+                        >
+                          <Star className="w-3 h-3 fill-amber-400" /> Remover favorito
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── TAB: MEMBROS ─────────────────────────────────────────────────────────────
+
+const funcoes: FuncaoMinisterio[] = ["Líder", "Sub-líder", "Membro", "Visitante"];
+
+// Permissões que fazem sentido no contexto de um canal de ministério
+const PERMISSOES_CANAL = [
+  { key: "enviar_chat"                 as const, label: "Enviar no chat",         desc: "Pode enviar mensagens no chat deste canal" },
+  { key: "fixar_mensagem"              as const, label: "Fixar mensagens",         desc: "Pode fixar mensagens importantes" },
+  { key: "criar_evento"               as const, label: "Criar eventos",            desc: "Pode criar novos eventos para o ministério" },
+  { key: "editar_evento"              as const, label: "Editar/remover eventos",   desc: "Pode editar e excluir eventos" },
+  { key: "gerenciar_membros_ministerio" as const, label: "Gerenciar membros",     desc: "Pode adicionar, editar e remover membros" },
+  { key: "bloquear_chat"              as const, label: "Bloquear chat",            desc: "Pode bloquear/desbloquear o chat do canal" },
+];
+
+function MembrosTab({
+  ministerio, isLider, podeAtribuirPermissoes,
+}: {
+  ministerio: Ministerio;
+  isLider: boolean;
+  podeAtribuirPermissoes: boolean;
+}) {
+  const [membros, setMembros] = useState<MembroMinisterio[]>(
+    mockMembrosMinisterio.filter((m) => m.ministerio === ministerio)
+  );
+  const [editandoId, setEditandoId] = useState<string | null>(null);
+  const [novaFuncao, setNovaFuncao] = useState<FuncaoMinisterio>("Membro");
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState({ nome: "", email: "", telefone: "", funcao: "Membro" as FuncaoMinisterio });
+  // Per-member canal permissions
+  const [permissoesMembro, setPermissoesMembro] = useState<Record<string, string[]>>({});
+  const [permExpandido, setPermExpandido] = useState<string | null>(null);
+
+  function togglePermCanal(membroId: string, perm: string) {
+    setPermissoesMembro((prev) => {
+      const atual = prev[membroId] ?? [];
+      const nova = atual.includes(perm)
+        ? atual.filter((p) => p !== perm)
+        : [...atual, perm];
+      return { ...prev, [membroId]: nova };
+    });
+  }
+
+  function permAtivaParaMembro(membroId: string, perm: string): boolean {
+    return (permissoesMembro[membroId] ?? []).includes(perm);
+  }
+
+  function salvarEdicao(id: string) {
+    setMembros((prev) => prev.map((m) => m.id === id ? { ...m, funcao: novaFuncao } : m));
+    setEditandoId(null);
+  }
+
+  function remover(id: string) {
+    setMembros((prev) => prev.filter((m) => m.id !== id));
+  }
+
+  function adicionar() {
+    if (!form.nome || !form.email) return;
+    const novo: MembroMinisterio = {
+      id: `new-${Date.now()}`,
+      nome: form.nome,
+      email: form.email,
+      telefone: form.telefone || undefined,
+      funcao: form.funcao,
+      ministerio,
+      ativo: true,
+      dataEntrada: new Date().toISOString().split("T")[0],
+    };
+    setMembros((prev) => [...prev, novo]);
+    setForm({ nome: "", email: "", telefone: "", funcao: "Membro" });
+    setShowForm(false);
+  }
+
+  const funcaoCor: Record<FuncaoMinisterio, string> = {
+    "Líder":     "bg-gold-100 text-gold-800",
+    "Sub-líder": "bg-vine-100 text-vine-800",
+    "Membro":    "bg-gray-100 text-gray-700",
+    "Visitante": "bg-amber-50 text-amber-700",
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-gray-500">{membros.length} pessoa{membros.length !== 1 ? "s" : ""} neste ministério</p>
+        {isLider && (
+          <button
+            onClick={() => setShowForm(true)}
+            className="flex items-center gap-1.5 bg-vine-700 text-white text-sm font-medium px-4 py-2 rounded-xl hover:bg-vine-600 transition"
+          >
+            <Plus className="w-4 h-4" /> Adicionar
+          </button>
+        )}
+      </div>
+
+      {/* Formulário de adição */}
+      {showForm && (
+        <div className="bg-vine-50 border border-vine-200 rounded-2xl p-4 space-y-3">
+          <p className="text-sm font-semibold text-vine-800">Novo membro</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <input
+              value={form.nome}
+              onChange={(e) => setForm({ ...form, nome: e.target.value })}
+              placeholder="Nome completo *"
+              className="border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-vine-400"
+            />
+            <input
+              value={form.email}
+              onChange={(e) => setForm({ ...form, email: e.target.value })}
+              placeholder="E-mail *"
+              className="border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-vine-400"
+            />
+            <input
+              value={form.telefone}
+              onChange={(e) => setForm({ ...form, telefone: e.target.value })}
+              placeholder="Telefone"
+              className="border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-vine-400"
+            />
+            <select
+              value={form.funcao}
+              onChange={(e) => setForm({ ...form, funcao: e.target.value as FuncaoMinisterio })}
+              className="border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-vine-400 bg-white"
+            >
+              {funcoes.map((f) => <option key={f}>{f}</option>)}
+            </select>
+          </div>
+          <div className="flex gap-2 justify-end mt-1">
+            <button onClick={() => setShowForm(false)} className="text-sm text-gray-500 px-4 py-1.5 rounded-xl hover:bg-gray-100 transition">Cancelar</button>
+            <button onClick={adicionar} className="text-sm bg-vine-700 text-white px-4 py-1.5 rounded-xl hover:bg-vine-600 transition">
+              Adicionar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Tabela */}
+      <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-gray-100 bg-gray-50 text-gray-500 text-xs uppercase tracking-wider">
+              <th className="text-left px-4 py-3">Nome</th>
+              <th className="text-left px-4 py-3">Contato</th>
+              <th className="text-left px-4 py-3">Função</th>
+              {(isLider || podeAtribuirPermissoes) && <th className="px-4 py-3" />}
+            </tr>
+          </thead>
+          <tbody>
+            {membros.map((m) => (
+              <>
+                <tr key={m.id} className="border-b border-gray-50 hover:bg-gray-50 transition">
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-7 h-7 bg-vine-100 text-vine-800 rounded-full flex items-center justify-center font-bold text-xs">
+                        {m.nome.charAt(0)}
+                      </div>
+                      <span className="font-medium text-gray-800">{m.nome}</span>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-gray-500">
+                    <span>{m.email}</span>
+                    {m.telefone && <span className="block text-xs text-gray-400">{m.telefone}</span>}
+                  </td>
+                  <td className="px-4 py-3">
+                    {editandoId === m.id ? (
+                      <div className="flex items-center gap-2">
+                        <select
+                          value={novaFuncao}
+                          onChange={(e) => setNovaFuncao(e.target.value as FuncaoMinisterio)}
+                          className="border border-vine-300 rounded-lg text-xs px-2 py-1 outline-none bg-white"
+                          autoFocus
+                        >
+                          {funcoes.map((f) => <option key={f}>{f}</option>)}
+                        </select>
+                        <button onClick={() => salvarEdicao(m.id)} className="text-green-600 hover:text-green-700">
+                          <Check className="w-3.5 h-3.5" />
+                        </button>
+                        <button onClick={() => setEditandoId(null)} className="text-gray-400 hover:text-gray-600">
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ) : (
+                      <span className={clsx("text-xs font-semibold px-2 py-0.5 rounded-full", funcaoCor[m.funcao])}>
+                        {m.funcao}
+                      </span>
+                    )}
+                  </td>
+                  {(isLider || podeAtribuirPermissoes) && (
+                    <td className="px-4 py-3">
+                      <div className="flex gap-2 justify-end">
+                        {podeAtribuirPermissoes && (
+                          <button
+                            onClick={() => setPermExpandido(permExpandido === m.id ? null : m.id)}
+                            className={clsx(
+                              "flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-lg border transition",
+                              permExpandido === m.id
+                                ? "bg-vine-700 text-white border-vine-700"
+                                : "text-vine-600 border-vine-200 hover:bg-vine-50"
+                            )}
+                            title="Gerenciar permissões deste membro no canal"
+                          >
+                            <ShieldCheck className="w-3.5 h-3.5" />
+                            {permExpandido === m.id ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                          </button>
+                        )}
+                        {isLider && (
+                          <>
+                            <button
+                              onClick={() => { setEditandoId(m.id); setNovaFuncao(m.funcao); }}
+                              className="text-gray-400 hover:text-vine-600 transition"
+                              title="Editar função"
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => remover(m.id)}
+                              className="text-gray-400 hover:text-red-500 transition"
+                              title="Remover do ministério"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </td>
+                  )}
+                </tr>
+                {/* Painel de permissões do canal para este membro */}
+                {permExpandido === m.id && (
+                  <tr key={`${m.id}-perms`} className="bg-vine-50 border-b border-vine-100">
+                    <td colSpan={isLider || podeAtribuirPermissoes ? 4 : 3} className="px-6 py-4">
+                      <div>
+                        <p className="text-xs font-semibold text-vine-800 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                          <ShieldCheck className="w-3.5 h-3.5" />
+                          Permissões de {m.nome.split(" ")[0]} neste canal
+                        </p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                          {PERMISSOES_CANAL.map((perm) => {
+                            const ativa = permAtivaParaMembro(m.id, perm.key);
+                            return (
+                              <button
+                                key={perm.key}
+                                onClick={() => togglePermCanal(m.id, perm.key)}
+                                className={clsx(
+                                  "flex items-center gap-2.5 px-3 py-2.5 rounded-xl border text-left transition text-xs",
+                                  ativa
+                                    ? "bg-vine-100 border-vine-300 text-vine-800"
+                                    : "bg-white border-gray-200 text-gray-500 hover:border-vine-200 hover:bg-vine-50"
+                                )}
+                              >
+                                <div className={clsx(
+                                  "w-4 h-4 rounded flex items-center justify-center shrink-0 border transition",
+                                  ativa ? "bg-vine-700 border-vine-700 text-white" : "border-gray-300 bg-white"
+                                )}>
+                                  {ativa && <Check className="w-2.5 h-2.5" />}
+                                </div>
+                                <div className="min-w-0">
+                                  <p className="font-semibold leading-tight">{perm.label}</p>
+                                  <p className="text-[10px] text-gray-400 mt-0.5 leading-tight">{perm.desc}</p>
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                        <p className="text-[10px] text-vine-500 mt-3">
+                          Essas permissões valem apenas dentro deste canal e sobrescrevem as permissões globais do usuário.
+                        </p>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </>
+            ))}
+            {membros.length === 0 && (
+              <tr>
+                <td colSpan={(isLider || podeAtribuirPermissoes) ? 4 : 3} className="py-12 text-center text-gray-400 text-sm">
+                  Nenhum membro neste ministério.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ─── TAB: EVENTOS ─────────────────────────────────────────────────────────────
+
+function EventosTab({ ministerio, isLider, podeEditar }: { ministerio: Ministerio; isLider: boolean; podeEditar: boolean }) {
+  const [eventos, setEventos] = useState<Evento[]>(
+    mockEventos.filter((e) => e.ministerio === ministerio || !e.ministerio)
+      .filter((e) => e.ministerio === ministerio)
+  );
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState<Omit<Evento, "id" | "criadoPor">>({
+    titulo: "", descricao: "", data: "", horario: "", local: "", publico: false, ministerio,
+  });
+  const [calendarMenu, setCalendarMenu] = useState<string | null>(null);
+
+  function criarEvento() {
+    if (!form.titulo || !form.data || !form.horario || !form.local) return;
+    const novo: Evento = { ...form, id: `ev-${Date.now()}`, criadoPor: "me", ministerio };
+    setEventos((prev) => [...prev, novo]);
+    setForm({ titulo: "", descricao: "", data: "", horario: "", local: "", publico: false, ministerio });
+    setShowForm(false);
+  }
+
+  function removerEvento(id: string) {
+    setEventos((prev) => prev.filter((e) => e.id !== id));
+  }
+
+  const hoje = new Date().toISOString().split("T")[0];
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-gray-500">{eventos.length} evento{eventos.length !== 1 ? "s" : ""}</p>
+        {isLider && (
+          <button
+            onClick={() => setShowForm(true)}
+            className="flex items-center gap-1.5 bg-gold-500 text-vine-950 text-sm font-semibold px-4 py-2 rounded-xl hover:bg-gold-400 transition"
+          >
+            <Plus className="w-4 h-4" /> Novo evento
+          </button>
+        )}
+      </div>
+
+      {/* Formulário */}
+      {showForm && (
+        <div className="bg-gold-50 border border-gold-200 rounded-2xl p-5 space-y-3">
+          <p className="text-sm font-semibold text-vine-800">Novo evento</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <input
+              value={form.titulo}
+              onChange={(e) => setForm({ ...form, titulo: e.target.value })}
+              placeholder="Título do evento *"
+              className="col-span-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-gold-400"
+            />
+            <input
+              type="date"
+              value={form.data}
+              onChange={(e) => setForm({ ...form, data: e.target.value })}
+              className="border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-gold-400 bg-white"
+            />
+            <input
+              type="time"
+              value={form.horario}
+              onChange={(e) => setForm({ ...form, horario: e.target.value })}
+              className="border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-gold-400 bg-white"
+            />
+            <input
+              value={form.local}
+              onChange={(e) => setForm({ ...form, local: e.target.value })}
+              placeholder="Local *"
+              className="border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-gold-400"
+            />
+            <textarea
+              value={form.descricao}
+              onChange={(e) => setForm({ ...form, descricao: e.target.value })}
+              placeholder="Descrição"
+              rows={2}
+              className="col-span-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-gold-400 resize-none"
+            />
+            <label className="col-span-full flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={form.publico}
+                onChange={(e) => setForm({ ...form, publico: e.target.checked })}
+                className="accent-vine-700 w-4 h-4 rounded"
+              />
+              Visível na página pública
+            </label>
+          </div>
+          <div className="flex gap-2 justify-end">
+            <button onClick={() => setShowForm(false)} className="text-sm text-gray-500 px-4 py-1.5 rounded-xl hover:bg-gray-100 transition">Cancelar</button>
+            <button onClick={criarEvento} className="text-sm bg-gold-500 text-vine-950 font-semibold px-4 py-1.5 rounded-xl hover:bg-gold-400 transition">
+              Criar evento
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Lista de eventos */}
+      <div className="space-y-3">
+        {eventos.length === 0 && (
+          <div className="py-16 text-center text-gray-400 text-sm bg-gray-50 rounded-2xl">
+            Nenhum evento para este ministério.
+          </div>
+        )}
+        {eventos.map((e) => {
+          const passado = e.data < hoje;
+          return (
+            <div
+              key={e.id}
+              className={clsx(
+                "bg-white rounded-2xl border p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition",
+                passado ? "border-gray-100 opacity-60" : "border-gray-200 hover:border-gold-300 hover:shadow-sm"
+              )}
+            >
+              <div className="flex items-start gap-4">
+                {/* Data visual */}
+                <div className="shrink-0 w-12 text-center">
+                  <p className="text-xs text-gray-400 uppercase">{diaSemana(e.data).slice(0, 3)}</p>
+                  <p className="text-2xl font-serif font-bold text-vine-800 leading-none">{e.data.split("-")[2]}</p>
+                  <p className="text-xs text-gray-400">{formatarData(e.data).split(" ").slice(1).join(" ")}</p>
+                </div>
+                <div>
+                  <h3 className="font-semibold text-gray-800">{e.titulo}</h3>
+                  {e.descricao && <p className="text-sm text-gray-500 mt-0.5 line-clamp-1">{e.descricao}</p>}
+                  <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1.5 text-xs text-gray-400">
+                    <span>🕐 {e.horario}</span>
+                    <span>📍 {e.local}</span>
+                    {e.publico && <span className="text-green-600 font-medium">• Público</span>}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0">
+                {/* Botão calendário */}
+                <div className="relative">
+                  <button
+                    onClick={() => setCalendarMenu(calendarMenu === e.id ? null : e.id)}
+                    className="flex items-center gap-1.5 text-xs font-medium bg-vine-50 text-vine-700 border border-vine-200 px-3 py-1.5 rounded-xl hover:bg-vine-100 transition"
+                  >
+                    <Calendar className="w-3.5 h-3.5" />
+                    Calendário
+                    <ChevronDown className="w-3 h-3" />
+                  </button>
+                  {calendarMenu === e.id && (
+                    <>
+                      <div className="fixed inset-0 z-10" onClick={() => setCalendarMenu(null)} />
+                      <div className="absolute right-0 top-9 z-20 bg-white border border-gray-100 rounded-xl shadow-lg overflow-hidden w-52">
+                        <button
+                          onClick={() => { downloadICS(e); setCalendarMenu(null); }}
+                          className="w-full flex items-center gap-2.5 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition text-left"
+                        >
+                          <Calendar className="w-4 h-4 text-gray-500" />
+                          <div>
+                            <p className="font-medium">Baixar .ics</p>
+                            <p className="text-xs text-gray-400">Apple / Outlook / qualquer app</p>
+                          </div>
+                        </button>
+                        <a
+                          href={linkGoogleCalendar(e)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={() => setCalendarMenu(null)}
+                          className="w-full flex items-center gap-2.5 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition border-t border-gray-50"
+                        >
+                          <ExternalLink className="w-4 h-4 text-blue-500" />
+                          <div>
+                            <p className="font-medium">Google Calendar</p>
+                            <p className="text-xs text-gray-400">Abre no Google Calendar</p>
+                          </div>
+                        </a>
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                {podeEditar && (
+                  <button
+                    onClick={() => removerEvento(e.id)}
+                    className="text-gray-300 hover:text-red-400 transition p-1.5 rounded-lg hover:bg-red-50"
+                    title="Remover evento"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
