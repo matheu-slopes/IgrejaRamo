@@ -24,8 +24,8 @@ export default function ParticleHero() {
   });
 
   return (
-    <section ref={sectionRef} className="relative h-[200vh]">
-      <div className="sticky top-0 h-screen overflow-hidden bg-black flex items-center justify-center">
+    <section ref={sectionRef} className="relative h-screen">
+      <div className="h-screen overflow-hidden bg-black flex items-center justify-center">
 
         {/* Video background */}
         <video

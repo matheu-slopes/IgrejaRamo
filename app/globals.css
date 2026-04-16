@@ -4,7 +4,7 @@
 
 @layer base {
   html {
-    /* Smooth scroll handled by Lenis on landing page */
+    scroll-behavior: smooth;
   }
   body {
     font-feature-settings: "kern" 1, "liga" 1, "calt" 1;

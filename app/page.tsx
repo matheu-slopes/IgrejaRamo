@@ -3,8 +3,6 @@
 import dynamic from "next/dynamic";
 import ImmersiveNav from "@/components/landing/ImmersiveNav";
 import FloatingCTA from "@/components/FloatingCTA";
-import SmoothScroll from "@/components/landing/SmoothScroll";
-import MouseFollower from "@/components/landing/MouseFollower";
 import ParticleHero from "@/components/landing/ParticleHero";
 
 // Lazy load seções abaixo do fold
@@ -18,8 +16,7 @@ const ImmersiveFooter = dynamic(() => import("@/components/landing/ImmersiveFoot
 
 export default function HomePage() {
   return (
-    <SmoothScroll>
-      <MouseFollower />
+    <>
       <ImmersiveNav />
       <main>
         {/* 1. Portal — partículas + "A experiência começa agora" */}
@@ -51,6 +48,6 @@ export default function HomePage() {
       </main>
       <ImmersiveFooter />
       <FloatingCTA />
-    </SmoothScroll>
+    </>
   );
 }
