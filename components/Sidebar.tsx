@@ -27,9 +27,9 @@ import { useState } from "react";
 const navMain = [
   { href: "/dashboard",          label: "Dashboard",  icon: LayoutDashboard },
   { href: "/dashboard/escalas",  label: "Escalas",     icon: CalendarCheck   },
-  { href: "/dashboard/mural",    label: "Conversas",  icon: MessageSquare   },
+  { href: "/dashboard/chat",     label: "Conversas",  icon: MessageSquare   },
   { href: "/dashboard/eventos",  label: "Eventos",    icon: CalendarDays    },
-  { href: "/cadastro",           label: "Membros",    icon: UserPlus        },
+  { href: "/dashboard/membros",  label: "Membros",    icon: UserPlus        },
 ];
 
 const ministerios = [

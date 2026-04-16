@@ -151,6 +151,8 @@ export interface MuralMensagem {
   tipo?: TipoMensagem;   // default "texto"
   mediaUrl?: string;     // base64 data URL para imagem/áudio
   reacoes?: { emoji: string; count: number }[];
+  editadoEm?: string;
+  respostaA?: { id: string; autorNome: string; conteudo: string };
 }
 
 // ─────────────────────────────────────────────
@@ -219,7 +221,10 @@ export interface MensagemConversa {
   tipo?: TipoMensagem;    // default "texto"
   mediaUrl?: string;
   criadoEm: string;       // ISO datetime
+  editadoEm?: string;     // ISO datetime — preenchido após edição
   lida?: boolean;
+  reacoes?: { emoji: string; count: number }[];
+  respostaA?: { id: string; autorNome: string; conteudo: string };
 }
 
 /** Conversa direta (1:1) entre dois usuários */
@@ -230,7 +235,39 @@ export interface ConversaDireta {
   mensagens: MensagemConversa[];
 }
 
-/** Chat coletivo vinculado a um culto / evento */
+/** Tipo de grupo de conversa */
+export type TipoGrupo = "geral" | "lideranca" | "ministerio" | "culto" | "evento";
+
+/**
+ * Grupo de conversa unificado — substitui ChatCulto para grupos de culto/evento
+ * e representa também grupos gerais, de liderança e de ministério.
+ */
+export interface Grupo {
+  id: string;
+  nome: string;
+  tipo: TipoGrupo;
+  emoji: string;
+  cor: string;            // classe tailwind bg (ex: "bg-vine-700")
+  descricao?: string;
+  ministerio?: Ministerio; // preenchido quando tipo === "ministerio"
+  eventoId?: string;       // ref a Evento.id para tipo "culto" | "evento"
+  data?: string;           // ISO date — para cultos e eventos especiais
+  horario?: string;
+  /** Se true, somente pastores/admin/líderes podem enviar mensagens */
+  somenteAdmin?: boolean;
+  /** IDs dos usuários que fazem parte deste grupo */
+  membros: string[];
+  /** ID do criador/admin do grupo */
+  adminId?: string;
+  /**
+   * Se true, grupo institucional (ministério, geral, culto).
+   * Usuários não podem sair nem excluir — só o admin remove membros.
+   */
+  institucional?: boolean;
+  mensagens: MensagemConversa[];
+}
+
+/** Chat coletivo vinculado a um culto / evento (mantido por compatibilidade) */
 export interface ChatCulto {
   id: string;
   eventoId?: string;   // ref a Evento.id (opcional)

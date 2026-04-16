@@ -10,6 +10,7 @@ import {
   Star, Mic, Square, Image as ImageIcon, Grid3x3, Link2,
   Phone, Video as VideoIcon, MoreVertical, PhoneOff,
   Music2, ChevronUp as ArrowUp, ChevronDown as ArrowDown, Save, Eye, EyeOff, UserCheck,
+  Reply,
 } from "lucide-react";
 import clsx from "clsx";
 import { Local, Ministerio, MuralMensagem, MembroMinisterio, Evento, FuncaoMinisterio, Escala, EscalaMusica, Musica, FuncaoEscala, ItemEscala } from "@/types";
@@ -190,6 +191,8 @@ function renderTextoComLinks(texto: string, isMe: boolean) {
   ]);
 }
 
+const QUICK_REACTIONS = ["❤️", "😂", "😮", "😢", "👏", "🙏"];
+
 function ChatTab({
   ministerio, chatBloqueado, podeEnviar: podeEnviarProp, podeFixar, user,
 }: {
@@ -220,9 +223,16 @@ function ChatTab({
   // Favorites & menu
   const [favoritos, setFavoritos] = useState<string[]>([]);
   const [menuId, setMenuId] = useState<string | null>(null);
+  const [emojiMenuId, setEmojiMenuId] = useState<string | null>(null);
 
   // Right info panel
   const [infoPanel, setInfoPanel] = useState<InfoPanel>(null);
+
+  // Edit / Reply / Reactions
+  const [editandoId, setEditandoId] = useState<string | null>(null);
+  const [editTexto, setEditTexto] = useState("");
+  const [respostaA, setRespostaA] = useState<{ id: string; autorNome: string; conteudo: string } | null>(null);
+  const [myReacoes, setMyReacoes] = useState<Set<string>>(new Set());
 
   const podeEnviar = (podeEnviarProp && !chatBloqueado) || podeFixar;
 
@@ -253,11 +263,13 @@ function ChatTab({
       fixada: false,
       tipo,
       mediaUrl,
+      respostaA: respostaA ?? undefined,
     };
     setMsgs((prev) => [...prev, nova]);
     setTexto("");
     setImagemPreview(null);
     setAudioUrl(null);
+    setRespostaA(null);
   }
 
   function handleImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
@@ -302,6 +314,27 @@ function ChatTab({
   function toggleFixar(id: string) {
     setMsgs((prev) => prev.map((m) => m.id === id ? { ...m, fixada: !m.fixada } : m));
     setMenuId(null);
+  }
+
+  function toggleReacao(msgId: string, emoji: string) {
+    const key = `${msgId}_${emoji}`;
+    const already = myReacoes.has(key);
+    setMyReacoes((prev) => { const next = new Set(prev); already ? next.delete(key) : next.add(key); return next; });
+    setMsgs((prev) => prev.map((m) => {
+      if (m.id !== msgId) return m;
+      const reacoes = m.reacoes ?? [];
+      if (already) return { ...m, reacoes: reacoes.map((r) => r.emoji === emoji ? { ...r, count: r.count - 1 } : r).filter((r) => r.count > 0) };
+      const ex = reacoes.find((r) => r.emoji === emoji);
+      return { ...m, reacoes: ex ? reacoes.map((r) => r.emoji === emoji ? { ...r, count: r.count + 1 } : r) : [...reacoes, { emoji, count: 1 }] };
+    }));
+    setMenuId(null);
+  }
+
+  function salvarEdicao(msgId: string) {
+    if (!editTexto.trim()) return;
+    setMsgs((prev) => prev.map((m) => m.id === msgId ? { ...m, conteudo: editTexto.trim(), editadoEm: new Date().toISOString() } : m));
+    setEditandoId(null);
+    setEditTexto("");
   }
 
   const temMidia = !!imagemPreview || !!audioUrl;
@@ -354,7 +387,7 @@ function ChatTab({
         {/* Lista de mensagens */}
         <div
           className="flex-1 overflow-y-auto bg-gray-50 rounded-xl p-4 space-y-3 border border-gray-100"
-          onClick={() => setMenuId(null)}
+          onClick={() => { setMenuId(null); setEmojiMenuId(null); }}
         >
           {msgs.filter((m) => !m.fixada).map((m) => {
             const isMe = m.autorId === "me" || user?.nome === m.autorNome;
@@ -365,28 +398,73 @@ function ChatTab({
                 className={clsx("flex group", isMe ? "justify-end" : "justify-start")}
               >
                 <div className="relative">
-                  {/* Context menu button */}
-                  <button
-                    onClick={(e) => { e.stopPropagation(); setMenuId(menuId === m.id ? null : m.id); }}
-                    className={clsx(
-                      "absolute top-2 z-10 p-0.5 rounded-full bg-white/90 text-gray-400 hover:text-gray-700 shadow border border-gray-100 transition opacity-0 group-hover:opacity-100",
-                      isMe ? "-left-7" : "-right-7"
-                    )}
-                  >
-                    <MoreVertical className="w-3 h-3" />
-                  </button>
+                  {/* Action buttons: MoreVertical + Emoji reaction */}
+                  <div className={clsx(
+                    "absolute top-2 z-10 flex flex-col gap-0.5 opacity-0 group-hover:opacity-100 transition",
+                    isMe ? "-left-7" : "-right-7"
+                  )}>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setMenuId(menuId === m.id ? null : m.id); setEmojiMenuId(null); }}
+                      className="p-0.5 rounded-full bg-white/90 text-gray-400 hover:text-gray-700 shadow border border-gray-100 transition"
+                    >
+                      <MoreVertical className="w-3 h-3" />
+                    </button>
+                    <div className="relative">
+                      {emojiMenuId === m.id && <div className="fixed inset-0 z-20" onClick={() => setEmojiMenuId(null)} />}
+                      {emojiMenuId === m.id && (
+                        <div className={clsx(
+                          "absolute bottom-full mb-1 z-30 bg-white border border-gray-200 rounded-full shadow-lg px-1.5 py-1 flex gap-0.5",
+                          isMe ? "right-0" : "left-0"
+                        )}>
+                          {QUICK_REACTIONS.map((emoji) => (
+                            <button
+                              key={emoji}
+                              onClick={() => { toggleReacao(m.id, emoji); setEmojiMenuId(null); }}
+                              className={clsx(
+                                "text-lg w-8 h-8 rounded-full flex items-center justify-center hover:bg-gray-100 transition",
+                                myReacoes.has(`${m.id}_${emoji}`) && "bg-vine-50 ring-1 ring-vine-300"
+                              )}
+                            >
+                              {emoji}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setEmojiMenuId(emojiMenuId === m.id ? null : m.id); setMenuId(null); }}
+                        className="p-0.5 rounded-full bg-white/90 text-[12px] shadow border border-gray-100 hover:border-vine-300 transition"
+                        title="Reagir"
+                      >
+                        😊
+                      </button>
+                    </div>
+                  </div>
 
                   {/* Context menu dropdown */}
                   {menuId === m.id && (
                     <>
                       <div className="fixed inset-0 z-10" onClick={() => setMenuId(null)} />
                       <div className={clsx(
-                        "absolute top-6 z-20 bg-white border border-gray-100 rounded-xl shadow-lg overflow-hidden w-40",
+                        "absolute top-6 z-20 bg-white border border-gray-100 rounded-xl shadow-lg overflow-hidden w-44",
                         isMe ? "right-0" : "left-0"
                       )}>
                         <button
-                          onClick={() => toggleFavorito(m.id)}
+                          onClick={() => { setRespostaA({ id: m.id, autorNome: m.autorNome, conteudo: m.conteudo }); setMenuId(null); }}
                           className="w-full flex items-center gap-2 px-3 py-2.5 text-xs text-gray-700 hover:bg-gray-50 transition text-left"
+                        >
+                          <Reply className="w-3.5 h-3.5 text-gray-400" /> Responder
+                        </button>
+                        {isMe && (!m.tipo || m.tipo === "texto") && (
+                          <button
+                            onClick={() => { setEditandoId(m.id); setEditTexto(m.conteudo); setMenuId(null); }}
+                            className="w-full flex items-center gap-2 px-3 py-2.5 text-xs text-gray-700 hover:bg-gray-50 transition text-left border-t border-gray-50"
+                          >
+                            <Pencil className="w-3.5 h-3.5 text-gray-400" /> Editar
+                          </button>
+                        )}
+                        <button
+                          onClick={() => toggleFavorito(m.id)}
+                          className="w-full flex items-center gap-2 px-3 py-2.5 text-xs text-gray-700 hover:bg-gray-50 transition text-left border-t border-gray-50"
                         >
                           <Star className={clsx("w-3.5 h-3.5", isFav ? "text-amber-400 fill-amber-400" : "text-gray-400")} />
                           {isFav ? "Remover favorito" : "Favoritar"}
@@ -410,6 +488,17 @@ function ChatTab({
                       ? clsx("px-4 py-2.5", isMe ? "bg-vine-700 text-white rounded-tr-sm" : "bg-white text-gray-800 rounded-tl-sm border border-gray-100")
                       : "overflow-hidden border border-gray-200 bg-white"
                   )}>
+                    {/* Quoted reply */}
+                    {m.respostaA && (
+                      <div className={clsx(
+                        "mb-1.5 rounded-lg px-2.5 py-1.5 border-l-2",
+                        isMe ? "bg-vine-600/50 border-white/40" : "bg-gray-100 border-vine-400"
+                      )}>
+                        <p className={clsx("text-[10px] font-semibold", isMe ? "text-white/70" : "text-vine-600")}>{m.respostaA.autorNome}</p>
+                        <p className={clsx("text-xs truncate", isMe ? "text-white/60" : "text-gray-500")}>{m.respostaA.conteudo}</p>
+                      </div>
+                    )}
+
                     {!isMe && (!m.tipo || m.tipo === "texto") && (
                       <p className={clsx("text-[10px] font-semibold mb-1",
                         m.autorRole === "lider" || m.autorRole === "pastor" ? "text-gold-500" : "text-vine-500"
@@ -420,7 +509,27 @@ function ChatTab({
 
                     {/* Conteúdo */}
                     {(!m.tipo || m.tipo === "texto") && (
-                      <p className="leading-relaxed">{renderTextoComLinks(m.conteudo, isMe)}</p>
+                      editandoId === m.id ? (
+                        <div className="space-y-1.5">
+                          <textarea
+                            value={editTexto}
+                            onChange={(e) => setEditTexto(e.target.value)}
+                            rows={2}
+                            className={clsx(
+                              "w-full rounded-lg px-2 py-1 text-sm resize-none outline-none",
+                              isMe ? "bg-vine-600 text-white placeholder-white/50 focus:bg-vine-500" : "bg-gray-100 text-gray-800 focus:bg-white border border-gray-200"
+                            )}
+                            onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); salvarEdicao(m.id); } if (e.key === "Escape") { setEditandoId(null); setEditTexto(""); } }}
+                            autoFocus
+                          />
+                          <div className="flex items-center gap-1.5 justify-end">
+                            <button onClick={() => { setEditandoId(null); setEditTexto(""); }} className={clsx("text-[10px] px-2 py-0.5 rounded-full", isMe ? "text-white/60 hover:text-white" : "text-gray-400 hover:text-gray-600")}>Cancelar</button>
+                            <button onClick={() => salvarEdicao(m.id)} className={clsx("text-[10px] px-2 py-0.5 rounded-full font-semibold", isMe ? "bg-white/20 text-white hover:bg-white/30" : "bg-vine-100 text-vine-700 hover:bg-vine-200")}>Salvar</button>
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="leading-relaxed">{renderTextoComLinks(m.conteudo, isMe)}</p>
+                      )
                     )}
                     {m.tipo === "imagem" && m.mediaUrl && (
                       <img src={m.mediaUrl} alt="imagem" className="max-w-[240px] max-h-[280px] object-cover" />
@@ -445,9 +554,9 @@ function ChatTab({
                     {m.reacoes && m.reacoes.length > 0 && (
                       <div className="flex gap-1.5 px-2 pb-2 flex-wrap">
                         {m.reacoes.map((r) => (
-                          <span key={r.emoji} className="text-xs bg-gray-100 rounded-full px-1.5 py-0.5 cursor-pointer hover:bg-vine-100">
+                          <button key={r.emoji} onClick={() => toggleReacao(m.id, r.emoji)} className={clsx("text-xs rounded-full px-1.5 py-0.5 transition", myReacoes.has(`${m.id}_${r.emoji}`) ? "bg-vine-100 text-vine-700 font-semibold" : "bg-gray-100 hover:bg-vine-100")}>
                             {r.emoji} {r.count}
-                          </span>
+                          </button>
                         ))}
                       </div>
                     )}
@@ -501,6 +610,18 @@ function ChatTab({
             >
               <Square className="w-3.5 h-3.5 fill-white" /> Parar
             </button>
+          </div>
+        )}
+
+        {/* Reply preview bar */}
+        {respostaA && (
+          <div className="mt-2 flex items-center gap-2 bg-vine-50 border border-vine-100 rounded-xl px-3 py-2">
+            <div className="w-0.5 h-8 rounded-full bg-vine-500 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-[10px] font-semibold text-vine-700">{respostaA.autorNome}</p>
+              <p className="text-xs text-gray-500 truncate">{respostaA.conteudo}</p>
+            </div>
+            <button onClick={() => setRespostaA(null)} className="text-gray-400 hover:text-gray-600"><X className="w-4 h-4" /></button>
           </div>
         )}
 

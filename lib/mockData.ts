@@ -6,7 +6,7 @@
  * das queries correspondentes (ex: supabase.from('users').select()).
  * ─────────────────────────────────────────────────────────────────
  */
-import { User, Evento, Aviso, Escala, EscalaMusica, Musica, MuralMensagem, FotoGaleria, Notificacao, CanalMinisterio, MembroMinisterio, ConversaDireta, ChatCulto, Local } from "@/types";
+import { User, Evento, Aviso, Escala, EscalaMusica, Musica, MuralMensagem, FotoGaleria, Notificacao, CanalMinisterio, MembroMinisterio, ConversaDireta, ChatCulto, Grupo, Local } from "@/types";
 
 export const mockUsers: User[] = [
   {
@@ -21,11 +21,11 @@ export const mockUsers: User[] = [
   },
   {
     id: "2",
-    nome: "Admin Maria Costa",
+    nome: "Admin",
     email: "admin@ramo.church",
     telefone: "(11) 99999-0002",
     role: "admin",
-    ministerios: ["Mídias"],
+    ministerios: [],
     dataIngresso: "2019-06-15",
     ativo: true,
   },
@@ -251,10 +251,10 @@ export const mockEscalas: Escala[] = [
     culto: "Culto Domingo 18h30",
     itens: [
       { funcao: "Transmissão",    voluntarioId: "7", voluntarioNome: "Rafael Souza" },
-      { funcao: "Projeção/Letras",voluntarioId: "2", voluntarioNome: "Admin Maria Costa" },
+      { funcao: "Projeção/Letras",voluntarioId: "2", voluntarioNome: "Admin" },
       { funcao: "Fotografia",     voluntarioId: "5", voluntarioNome: "Lucas Ferreira", observacao: "Levar tripé" },
     ],
-    criadoPor: "Admin Maria Costa",
+    criadoPor: "Admin",
   },
   // ── Geral — Domingo 19/04
   {
@@ -267,7 +267,7 @@ export const mockEscalas: Escala[] = [
       { funcao: "Abertura/Oferta",   voluntarioId: "4", voluntarioNome: "Ana Rodrigues" },
       { funcao: "Escala de Limpeza", voluntarioId: "5", voluntarioNome: "Lucas Ferreira", observacao: "Após o culto" },
     ],
-    criadoPor: "Admin Maria Costa",
+    criadoPor: "Admin",
   },
   // ── Infantil — Domingo 19/04
   {
@@ -333,7 +333,7 @@ export const mockMuralMensagens: MuralMensagem[] = [
     id: "m5",
     ministerio: "Mídias",
     autorId: "2",
-    autorNome: "Admin Maria Costa",
+    autorNome: "Admin",
     autorRole: "lider",
     conteudo: "Rafael, lembrar de testar o stream antes do culto de domingo. Chegue às 17h30!",
     criadoEm: "2026-04-13T09:00:00",
@@ -435,7 +435,7 @@ export const mockMembrosMinisterio: MembroMinisterio[] = [
   { id: "5",  nome: "Lucas Ferreira",    email: "lucas@ramo.church",                               funcao: "Membro",     ministerio: "Louvor",      ativo: true,  dataEntrada: "2022-02-14" },
   { id: "1",  nome: "Pastor João Silva", email: "pastor@ramo.church", telefone: "(11) 99999-0001", funcao: "Membro",     ministerio: "Louvor",      ativo: true,  dataEntrada: "2018-03-10" },
   // Mídias
-  { id: "2",  nome: "Admin Maria Costa", email: "admin@ramo.church",  telefone: "(11) 99999-0002", funcao: "Líder",      ministerio: "Mídias",      ativo: true,  dataEntrada: "2019-06-15" },
+  { id: "2",  nome: "Admin", email: "admin@ramo.church",  telefone: "(11) 99999-0002", funcao: "Líder",      ministerio: "Mídias",      ativo: true,  dataEntrada: "2019-06-15" },
   { id: "7",  nome: "Rafael Souza",      email: "rafael@ramo.church",                              funcao: "Membro",     ministerio: "Mídias",      ativo: true,  dataEntrada: "2022-08-10" },
   // Infantil
   { id: "4",  nome: "Ana Rodrigues",     email: "ana@ramo.church",                                funcao: "Líder",      ministerio: "Infantil",    ativo: true,  dataEntrada: "2021-07-05" },
@@ -541,12 +541,12 @@ export const mockConversasDiretas: ConversaDireta[] = [
   {
     id: "dm2",
     participantes: ["2", "4"],
-    participantesNomes: ["Admin Maria Costa", "Ana Rodrigues"],
+    participantesNomes: ["Admin", "Ana Rodrigues"],
     mensagens: [
       {
         id: "dm2m1",
         autorId: "2",
-        autorNome: "Admin Maria Costa",
+        autorNome: "Admin",
         conteudo: "Ana, preciso confirmar: você vai conseguir estar na cantina E no infantil no domingo?",
         criadoEm: "2026-04-15T09:00:00",
         lida: true,
@@ -616,7 +616,7 @@ export const mockChatsCulto: ChatCulto[] = [
       {
         id: "cc1m4",
         autorId: "2",
-        autorNome: "Admin Maria Costa",
+        autorNome: "Admin",
         conteudo: "Transmissão ao vivo configurada. Link do YouTube ativo!",
         criadoEm: "2026-04-19T09:00:00",
         lida: false,
@@ -665,3 +665,246 @@ export const mockChatsCulto: ChatCulto[] = [
     ],
   },
 ];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Grupos unificados (estilo WhatsApp)
+// Tipos: "geral" | "lideranca" | "ministerio" | "culto" | "evento"
+// ─────────────────────────────────────────────────────────────────────────────
+export const mockGrupos: Grupo[] = [
+  // ── Gerais ────────────────────────────────────────────────────────────────
+  {
+    id: "g_geral",
+    nome: "Geral da Igreja",
+    tipo: "geral",
+    emoji: "🌿",
+    cor: "bg-vine-700",
+    descricao: "Informações e comunicados para toda a igreja",
+    somenteAdmin: false,
+    adminId: "2",
+    membros: ["1","2","3","4","5","6","7","8"],
+    institucional: true,
+    mensagens: [
+      {
+        id: "gg1",
+        autorId: "1",
+        autorNome: "Pastor João Silva",
+        conteudo: "Família Ramo! Reunião geral no sábado às 16h. Presença de todos é importante! 🙏",
+        criadoEm: "2026-04-14T08:00:00",
+        lida: true,
+      },
+      {
+        id: "gg2",
+        autorId: "2",
+        autorNome: "Admin",
+        conteudo: "Confirmados: culto de domingo começa às 10h00 (1º domingo do mês). Avisem a família!",
+        criadoEm: "2026-04-14T09:30:00",
+        lida: true,
+      },
+      {
+        id: "gg3",
+        autorId: "4",
+        autorNome: "Ana Rodrigues",
+        conteudo: "Alguém tem contato da Carla? Preciso confirmar o ministrante do infantil 😊",
+        criadoEm: "2026-04-15T10:00:00",
+        lida: false,
+      },
+    ],
+  },
+  {
+    id: "g_lideranca",
+    nome: "Pastores & Líderes",
+    tipo: "lideranca",
+    emoji: "👑",
+    cor: "bg-grape-800",
+    descricao: "Canal exclusivo entre pastores e líderes de ministério",
+    somenteAdmin: true,
+    adminId: "1",
+    membros: ["1","2","3","8"],
+    institucional: true,
+    mensagens: [
+      {
+        id: "gl1",
+        autorId: "1",
+        autorNome: "Pastor João Silva",
+        conteudo: "Líderes, reunião de alinhamento toda segunda às 19h (online). Pauta na semana! ✝️",
+        criadoEm: "2026-04-13T07:00:00",
+        lida: true,
+      },
+      {
+        id: "gl2",
+        autorId: "2",
+        autorNome: "Admin",
+        conteudo: "Relatório de membros do trimestre disponível. Verifiquem os números do ministério de vocês.",
+        criadoEm: "2026-04-13T10:00:00",
+        lida: true,
+      },
+      {
+        id: "gl3",
+        autorId: "1",
+        autorNome: "Pastor João Silva",
+        conteudo: "Treinamento de líderes confirmado para 03/05. Todos os líderes devem comparecer! 📖",
+        criadoEm: "2026-04-15T07:30:00",
+        lida: false,
+      },
+    ],
+  },
+  // ── Ministérios ───────────────────────────────────────────────────────────
+  {
+    id: "g_louvor",
+    nome: "Louvor",
+    tipo: "ministerio",
+    emoji: "🎸",
+    cor: "bg-grape-700",
+    ministerio: "Louvor",
+    descricao: "Time de louvor e adoração",
+    adminId: "8",
+    membros: ["1","3","5","6","8"],
+    institucional: true,
+    mensagens: [
+      {
+        id: "glo1",
+        autorId: "3",
+        autorNome: "Pedro Alves",
+        conteudo: "Galera, ensaio QUINTA às 19h confirmado! Quem não puder, avisar até amanhã 🙏",
+        criadoEm: "2026-04-14T10:30:00",
+        lida: true,
+      },
+      {
+        id: "glo2",
+        autorId: "6",
+        autorNome: "Carla Mendes",
+        conteudo: "Confirmo presença! Vou levar o cabo extra de guitarra.",
+        criadoEm: "2026-04-14T11:00:00",
+        lida: true,
+      },
+      {
+        id: "glo3",
+        autorId: "5",
+        autorNome: "Lucas Ferreira",
+        conteudo: "Estarei lá, mas saio às 21h, tudo bem?",
+        criadoEm: "2026-04-14T11:45:00",
+        lida: false,
+      },
+    ],
+  },
+  {
+    id: "g_midias",
+    nome: "Mídias",
+    tipo: "ministerio",
+    emoji: "📹",
+    cor: "bg-vine-700",
+    ministerio: "Mídias",
+    descricao: "Comunicação e transmissão",
+    adminId: "2",
+    membros: ["2","7"],
+    institucional: true,
+    mensagens: [
+      {
+        id: "gmi1",
+        autorId: "2",
+        autorNome: "Admin",
+        conteudo: "Rafael, chegue às 17h30 para testar a transmissão antes do culto de domingo. ✅",
+        criadoEm: "2026-04-13T09:00:00",
+        lida: true,
+      },
+      {
+        id: "gmi2",
+        autorId: "7",
+        autorNome: "Rafael Souza",
+        conteudo: "Confirmado! Faço o teste de câmera e stream assim que chegar.",
+        criadoEm: "2026-04-13T09:30:00",
+        lida: true,
+      },
+    ],
+  },
+  {
+    id: "g_infantil",
+    nome: "Infantil",
+    tipo: "ministerio",
+    emoji: "🧒",
+    cor: "bg-gold-500",
+    ministerio: "Infantil",
+    descricao: "Ministério de crianças e adolescentes",
+    adminId: "4",
+    membros: ["4","6"],
+    institucional: true,
+    mensagens: [
+      {
+        id: "gin1",
+        autorId: "4",
+        autorNome: "Ana Rodrigues",
+        conteudo: "Material da aula de domingo já está na pasta da sala! Tema: A Pesca Milagrosa 🐟",
+        criadoEm: "2026-04-12T08:00:00",
+        lida: true,
+      },
+    ],
+  },
+  {
+    id: "g_acaosocial",
+    nome: "Ação Social",
+    tipo: "ministerio",
+    emoji: "🤝",
+    cor: "bg-green-600",
+    ministerio: "Ação Social",
+    descricao: "Ações de solidariedade e alcance comunitário",
+    adminId: "5",
+    membros: ["4","5"],
+    institucional: true,
+    mensagens: [
+      {
+        id: "gas1",
+        autorId: "5",
+        autorNome: "Lucas Ferreira",
+        conteudo: "Ação do dia 27/04 confirmada! Precisamos de voluntários para ajudar na triagem. Alguém disponível?",
+        criadoEm: "2026-04-14T14:00:00",
+        lida: false,
+      },
+    ],
+  },
+  {
+    id: "g_cantina",
+    nome: "Cantina",
+    tipo: "ministerio",
+    emoji: "🍞",
+    cor: "bg-amber-700",
+    ministerio: "Cantina",
+    descricao: "Organização de lanches e cantina",
+    adminId: "4",
+    membros: ["4"],
+    institucional: true,
+    mensagens: [
+      {
+        id: "gca1",
+        autorId: "4",
+        autorNome: "Ana Rodrigues",
+        conteudo: "Domingo tem café da manhã antes do culto de 10h! Chegarem cedo 😄",
+        criadoEm: "2026-04-15T08:00:00",
+        lida: false,
+      },
+    ],
+  },
+  {
+    id: "g_ensino",
+    nome: "Ensino",
+    tipo: "ministerio",
+    emoji: "📖",
+    cor: "bg-purple-700",
+    ministerio: "Ensino",
+    descricao: "Estudos bíblicos e capacitação",
+    adminId: "1",
+    membros: ["1"],
+    institucional: true,
+    mensagens: [
+      {
+        id: "gen1",
+        autorId: "1",
+        autorNome: "Pastor João Silva",
+        conteudo: "Material do estudo de quinta disponível na pasta compartilhada. Leiam antes! 📚",
+        criadoEm: "2026-04-13T12:00:00",
+        lida: true,
+      },
+    ],
+  },
+  // ── Cultos ────────────────────────────────────────────────────────────────
+];
+
