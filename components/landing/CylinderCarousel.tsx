@@ -207,7 +207,7 @@ export default function CylinderCarousel() {
         </motion.p>
       </div>
 
-      {/* ── Expanded card overlay ───────────────────────────────── */}
+      {/* -- Expanded card overlay ----------------------------------------- */}
       <AnimatePresence>
         {expandedCard && (
           <motion.div

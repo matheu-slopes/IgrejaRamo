@@ -23,7 +23,7 @@ export default function ScrollyQuemSomos() {
       {/* Animated background */}
       <motion.div className="absolute inset-0 z-0" style={{ backgroundColor: bg1 }} />
 
-      {/* ── Part 1: Giant text reveal ─────────────────────────── */}
+      {/* -- Part 1: Giant text reveal ----------------------------------- */}
       <div className="relative z-10 min-h-screen flex items-center justify-center px-6">
         <div className="max-w-5xl mx-auto text-center py-32">
           <motion.p
@@ -49,7 +49,7 @@ export default function ScrollyQuemSomos() {
         </div>
       </div>
 
-      {/* ── Part 2: Story paragraphs ──────────────────────────── */}
+      {/* -- Part 2: Story paragraphs ------------------------------------ */}
       <div className="relative z-10 max-w-3xl mx-auto px-6 pb-32 space-y-12">
         <motion.p
           initial={{ opacity: 0, y: 30 }}

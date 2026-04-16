@@ -5,7 +5,7 @@ import Image from "next/image";
 import { motion, useScroll, useTransform, useMotionValue, useSpring } from "framer-motion";
 import { Play, BookOpen } from "lucide-react";
 
-/* ─── Tilt card component ───────────────────────────────────────── */
+/* --- Tilt card component ------------------------------------------ */
 function TiltCard({
   children,
   className = "",
@@ -57,7 +57,7 @@ function TiltCard({
   );
 }
 
-/* ─── Latest Culto Card ─────────────────────────────────────────── */
+/* --- Latest Culto Card -------------------------------------------- */
 function LatestCultoCard() {
   const [video, setVideo] = useState<{ title: string; url: string; thumbnail: string } | null>(null);
 
@@ -118,7 +118,7 @@ function LatestCultoCard() {
   );
 }
 
-/* ─── Devocional Card (vídeo loop) ───────────────────────────────── */
+/* --- Devocional Card (video loop) --------------------------------- */
 function DevocionalCard() {
   return (
     <TiltCard
@@ -165,7 +165,7 @@ function DevocionalCard() {
   );
 }
 
-/* ─── Main BentoGrid ────────────────────────────────────────────── */
+/* --- Main BentoGrid ----------------------------------------------- */
 export default function BentoGrid() {
   return (
     <section className="relative py-28 px-5 bg-[#0a140a] overflow-hidden">
@@ -187,10 +187,10 @@ export default function BentoGrid() {
         {/* Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
 
-          {/* ── Card 1: Assista nosso último culto ──── */}
+          {/* -- Card 1: Assista nosso ultimo culto ---- */}
           <LatestCultoCard />
 
-          {/* ── Card 2: Devocional Diário (vídeo loop) ──── */}
+          {/* -- Card 2: Devocional Diario (video loop) ---- */}
           <DevocionalCard />
         </div>
       </div>
