@@ -60,8 +60,7 @@ export const DEFAULTS_POR_ROLE: Record<Role, Permissao[]> = {
     "ver_dashboard",
   ],
   membro: [
-    "enviar_chat",
-    "ver_dashboard",
+    // Membros só acessam o portal de membro — sem acesso ao dashboard interno
   ],
 };
 

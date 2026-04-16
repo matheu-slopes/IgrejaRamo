@@ -6,7 +6,7 @@
  * das queries correspondentes (ex: supabase.from('users').select()).
  * ─────────────────────────────────────────────────────────────────
  */
-import { User, Evento, Aviso, Escala, MuralMensagem, FotoGaleria, Notificacao, CanalMinisterio, MembroMinisterio, ConversaDireta, ChatCulto } from "@/types";
+import { User, Evento, Aviso, Escala, EscalaMusica, Musica, MuralMensagem, FotoGaleria, Notificacao, CanalMinisterio, MembroMinisterio, ConversaDireta, ChatCulto, Local } from "@/types";
 
 export const mockUsers: User[] = [
   {
@@ -37,6 +37,16 @@ export const mockUsers: User[] = [
     role: "lider",
     ministerios: ["Jovens", "Louvor"],
     dataIngresso: "2020-01-20",
+    ativo: true,
+  },
+  {
+    id: "8",
+    nome: "Matheus Lopes",
+    email: "matheus@ramo.church",
+    telefone: "(11) 99999-0008",
+    role: "lider",
+    ministerios: ["Louvor"],
+    dataIngresso: "2021-05-10",
     ativo: true,
   },
   {
@@ -169,19 +179,39 @@ export const mockMinhaProximaEscala = {
 };
 
 // ─── Escalas ─────────────────────────────────────────────────────
+// ─── Repertório de músicas ────────────────────────────────────────────────────
+export const mockMusicas: Musica[] = [
+  { id: "m1",  titulo: "Hosana",                  artista: "Hillsong",        tom: "G",  estilo: "Contemporâneo" },
+  { id: "m2",  titulo: "Reckless Love",            artista: "Cory Asbury PT",  tom: "D",  estilo: "Contemporâneo" },
+  { id: "m3",  titulo: "Oceanos",                  artista: "Hillsong PT",     tom: "A",  estilo: "Contemporâneo" },
+  { id: "m4",  titulo: "Grande é o Senhor",        artista: "Fernandinho",     tom: "E",  estilo: "Gospel Pop" },
+  { id: "m5",  titulo: "É o Senhor",               artista: "Ministério Zoe",  tom: "C",  estilo: "Contemporâneo" },
+  { id: "m6",  titulo: "Fogo de Deus",             artista: "Lukas Agustinho", tom: "G",  estilo: "Gospel Pop" },
+  { id: "m7",  titulo: "Me Rendo",                 artista: "Ministério Zoe",  tom: "Bb", estilo: "Contemporâneo" },
+  { id: "m8",  titulo: "Digno é o Senhor",         artista: "Fernandinho",     tom: "D",  estilo: "Tradicional" },
+  { id: "m9",  titulo: "Nada Além do Sangue",      artista: "Ministério Zoe",  tom: "E",  estilo: "Contemporâneo" },
+  { id: "m10", titulo: "Teu Santo Nome",           artista: "Fernandinho",     tom: "G",  estilo: "Gospel Pop" },
+  { id: "m11", titulo: "Creio",                    artista: "Vineyard Brasil",  tom: "A",  estilo: "Contemporâneo" },
+  { id: "m12", titulo: "Quão Grande é o Meu Deus", artista: "Chris Tomlin PT", tom: "C",  estilo: "Tradicional" },
+  { id: "m13", titulo: "Bondade de Deus",          artista: "Bethel PT",       tom: "F",  estilo: "Contemporâneo" },
+  { id: "m14", titulo: "Ousado Amor",              artista: "Bethel PT",       tom: "D",  estilo: "Contemporâneo" },
+  { id: "m15", titulo: "Maranata",                 artista: "Vineyard Brasil",  tom: "G",  estilo: "Contemporâneo" },
+];
+
 export const mockEscalas: Escala[] = [
-  // ── Louvor — Domingo 19/04
   {
     id: "esc1",
     ministerio: "Louvor",
     data: "2026-04-19",
     horario: "18:30",
     culto: "Culto Domingo 18h30",
-    setlist: [
-      "Hosana (Hillsong)",
-      "Reckless Love (PT)",
-      "Oceanos",
-      "Grande é o Senhor",
+    visivel: true,
+    confirmacaoParticipantes: true,
+    musicas: [
+      { musicaId: "m1",  titulo: "Hosana",           artista: "Hillsong",        tom: "G" },
+      { musicaId: "m2",  titulo: "Reckless Love",    artista: "Cory Asbury PT",  tom: "D" },
+      { musicaId: "m3",  titulo: "Oceanos",           artista: "Hillsong PT",     tom: "A" },
+      { musicaId: "m4",  titulo: "Grande é o Senhor", artista: "Fernandinho",    tom: "E" },
     ],
     itens: [
       { funcao: "Ministro",         voluntarioId: "3", voluntarioNome: "Pedro Alves" },
@@ -191,16 +221,20 @@ export const mockEscalas: Escala[] = [
       { funcao: "Teclado",          voluntarioId: "1", voluntarioNome: "Pastor João Silva" },
       { funcao: "Backing Vocal",    voluntarioId: "6", voluntarioNome: "Carla Mendes" },
     ],
-    criadoPor: "Pedro Alves",
+    criadoPor: "Matheus Lopes",
   },
-  // ── Louvor — Quinta 17/04
   {
     id: "esc2",
     ministerio: "Louvor",
     data: "2026-04-17",
     horario: "20:00",
     culto: "Culto de Quinta 20h",
-    setlist: ["É o Senhor", "Fogo de Deus", "Me Rendo"],
+    visivel: true,
+    musicas: [
+      { musicaId: "m5",  titulo: "É o Senhor",  artista: "Ministério Zoe",  tom: "C" },
+      { musicaId: "m6",  titulo: "Fogo de Deus", artista: "Lukas Agustinho", tom: "G" },
+      { musicaId: "m7",  titulo: "Me Rendo",    artista: "Ministério Zoe",  tom: "Bb" },
+    ],
     itens: [
       { funcao: "Ministro",      voluntarioId: "6", voluntarioNome: "Carla Mendes" },
       { funcao: "Guitarra",      voluntarioId: "3", voluntarioNome: "Pedro Alves" },
@@ -395,8 +429,9 @@ export const mockCanais: CanalMinisterio[] = [
 // ─── Membros por ministério ───────────────────────────────────────
 export const mockMembrosMinisterio: MembroMinisterio[] = [
   // Louvor
-  { id: "3",  nome: "Pedro Alves",       email: "pedro@ramo.church",  telefone: "(11) 99999-0003", funcao: "Líder",      ministerio: "Louvor",      ativo: true,  dataEntrada: "2020-01-20" },
-  { id: "6",  nome: "Carla Mendes",      email: "carla@ramo.church",                               funcao: "Sub-líder",  ministerio: "Louvor",      ativo: true,  dataEntrada: "2021-03-01" },
+  { id: "8",  nome: "Matheus Lopes",    email: "matheus@ramo.church", telefone: "(11) 99999-0008", funcao: "Líder",      ministerio: "Louvor",      ativo: true,  dataEntrada: "2021-05-10" },
+  { id: "3",  nome: "Pedro Alves",       email: "pedro@ramo.church",  telefone: "(11) 99999-0003", funcao: "Sub-líder",  ministerio: "Louvor",      ativo: true,  dataEntrada: "2020-01-20" },
+  { id: "6",  nome: "Carla Mendes",      email: "carla@ramo.church",                               funcao: "Membro",     ministerio: "Louvor",      ativo: true,  dataEntrada: "2021-03-01" },
   { id: "5",  nome: "Lucas Ferreira",    email: "lucas@ramo.church",                               funcao: "Membro",     ministerio: "Louvor",      ativo: true,  dataEntrada: "2022-02-14" },
   { id: "1",  nome: "Pastor João Silva", email: "pastor@ramo.church", telefone: "(11) 99999-0001", funcao: "Membro",     ministerio: "Louvor",      ativo: true,  dataEntrada: "2018-03-10" },
   // Mídias
@@ -457,9 +492,20 @@ export const mockGaleria: FotoGaleria[] = [
   },
 ];
 
-// ─────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// Locais físicos
+// ─────────────────────────────────────────────────────────────────────────────
+export const mockLocais: Local[] = [
+  { id: "l1", nome: "Templo Principal",  descricao: "Salão principal de cultos" },
+  { id: "l2", nome: "Sala 3",            descricao: "Sala de reuniões pequenas" },
+  { id: "l3", nome: "Sala de Reuniões",  descricao: "Reuniões de liderança" },
+  { id: "l4", nome: "Praça Central",     descricao: "Espaço externo / ação social" },
+  { id: "l5", nome: "Salão de Ensaio",   descricao: "Ensaios do louvor e jovens" },
+];
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Conversas Diretas (DMs)
-// ─────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
 export const mockConversasDiretas: ConversaDireta[] = [
   {
     id: "dm1",

@@ -18,6 +18,10 @@ export default function DashboardLayout({
     if (!isLoading && !user) {
       router.push("/login");
     }
+    // Membros só acessam o portal de membro — sem dashboard interno
+    if (!isLoading && user && user.role === "membro") {
+      router.push("/membro");
+    }
   }, [user, isLoading, router]);
 
   if (isLoading || !user) {

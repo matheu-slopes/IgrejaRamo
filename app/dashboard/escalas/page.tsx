@@ -253,15 +253,15 @@ export default function EscalasPage() {
                                   </div>
                                 ))}
                               </div>
-                              {e.setlist && e.setlist.length > 0 && (
+                              {e.musicas && e.musicas.length > 0 && (
                                 <details className="mt-2">
                                   <summary className="text-xs text-gold-700 font-semibold cursor-pointer flex items-center gap-1 select-none">
                                     <Music className="w-3 h-3" /> Ver setlist
                                   </summary>
                                   <ol className="mt-1.5 list-decimal list-inside space-y-0.5 pl-1">
-                                    {e.setlist.map((s, i) => (
+                                    {e.musicas.map((m, i) => (
                                       <li key={i} className="text-xs text-gray-600">
-                                        {s}
+                                        {m.titulo} {m.tom && <span className="font-semibold">({m.tom})</span>}
                                       </li>
                                     ))}
                                   </ol>
@@ -436,15 +436,15 @@ export default function EscalasPage() {
                         })}
                       </div>
 
-                      {e.setlist && e.setlist.length > 0 && (
+                      {e.musicas && e.musicas.length > 0 && (
                         <details className="border-t border-gray-100">
                           <summary className="flex items-center gap-2 px-4 py-2.5 cursor-pointer text-xs font-semibold text-gold-700 hover:bg-gold-50 transition select-none">
-                            <Music className="w-3.5 h-3.5" /> Setlist ({e.setlist.length} músicas)
+                            <Music className="w-3.5 h-3.5" /> Setlist ({e.musicas.length} músicas)
                           </summary>
                           <ol className="list-decimal list-inside px-6 pb-3 pt-1 space-y-1">
-                            {e.setlist.map((s, i) => (
+                            {e.musicas.map((m, i) => (
                               <li key={i} className="text-xs text-gray-600">
-                                {s}
+                                {m.titulo} {m.tom && <span className="font-semibold">({m.tom})</span>}
                               </li>
                             ))}
                           </ol>
@@ -569,15 +569,15 @@ export default function EscalasPage() {
                     </table>
                   </div>
 
-                  {escala.setlist && escala.setlist.length > 0 && (
+                  {escala.musicas && escala.musicas.length > 0 && (
                     <div className="px-6 py-4 border-t border-gray-100 bg-gold-50">
                       <p className="flex items-center gap-2 text-sm font-bold text-gold-700 mb-2">
                         <Music className="w-4 h-4" /> Setlist do dia
                       </p>
                       <ol className="list-decimal list-inside space-y-1">
-                        {escala.setlist.map((musica, i) => (
+                        {escala.musicas.map((m, i) => (
                           <li key={i} className="text-sm text-vine-800">
-                            {musica}
+                            {m.titulo} {m.tom && <span className="font-semibold">({m.tom})</span>}
                           </li>
                         ))}
                       </ol>

@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   mockEventos,
@@ -15,6 +16,7 @@ import {
   ChevronRight,
   Megaphone,
   CalendarDays,
+  Pin,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -32,6 +34,15 @@ function formatDate(iso: string) {
 
 export default function DashboardPage() {
   const { user } = useAuth();
+  const [avisoFixado, setAvisoFixado] = useState<{ conteudo: string; ativo: boolean } | null>(null);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("ramo_aviso_fixado");
+      if (raw) setAvisoFixado(JSON.parse(raw));
+    } catch {}
+  }, []);
+
   if (!user) return null;
 
   const today = new Date().toISOString().split("T")[0];
@@ -61,6 +72,14 @@ export default function DashboardPage() {
           Aqui está um resumo da sua semana na igreja.
         </p>
       </div>
+
+      {/* ── Aviso Fixado ───────────────────────────────────── */}
+      {avisoFixado?.ativo && avisoFixado.conteudo && (
+        <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-2xl px-5 py-4">
+          <Pin className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+          <p className="text-sm text-amber-800 font-medium">{avisoFixado.conteudo}</p>
+        </div>
+      )}
 
       {/* ── Minha Próxima Escala ─────────────────────────────── */}
       <section>

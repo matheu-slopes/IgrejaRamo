@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { CalendarDays, Calendar, ExternalLink, ChevronDown, Filter, Plus } from "lucide-react";
 import clsx from "clsx";
 import { Evento, Ministerio } from "@/types";
-import { mockEventos } from "@/lib/mockData";
+import { mockEventos, mockLocais } from "@/lib/mockData";
+import type { Local } from "@/types";
 import { downloadICS, linkGoogleCalendar, formatarData, diaSemana } from "@/lib/calendarUtils";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -14,6 +15,15 @@ type Filtro = "Todos" | Ministerio;
 export default function EventosDashboardPage() {
   const { user, temPermissao } = useAuth();
   const isLider = temPermissao("criar_evento");
+
+  const [locais, setLocais] = useState<Local[]>(mockLocais);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("ramo_locais");
+      if (raw) setLocais(JSON.parse(raw));
+    } catch {}
+  }, []);
 
   const [eventos, setEventos] = useState<Evento[]>(mockEventos);
   const [filtro, setFiltro] = useState<Filtro>(TODOS);
@@ -73,9 +83,13 @@ export default function EventosDashboardPage() {
               className="border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-gold-400 bg-white" />
             <input type="time" value={form.horario} onChange={(e) => setForm({ ...form, horario: e.target.value })}
               className="border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-gold-400 bg-white" />
-            <input value={form.local} onChange={(e) => setForm({ ...form, local: e.target.value })}
-              placeholder="Local *"
-              className="border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-gold-400" />
+            <select value={form.local} onChange={(e) => setForm({ ...form, local: e.target.value })}
+              className="border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-gold-400 bg-white">
+              <option value="">Local *</option>
+              {locais.map((l) => (
+                <option key={l.id} value={l.nome}>{l.nome}</option>
+              ))}
+            </select>
             <select value={form.ministerio ?? ""} onChange={(e) => setForm({ ...form, ministerio: e.target.value as Ministerio || undefined })}
               className="border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-gold-400 bg-white">
               <option value="">Nenhum ministério</option>

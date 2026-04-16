@@ -101,6 +101,24 @@ export interface ItemEscala {
   observacao?: string;
 }
 
+// Música do repertório
+export interface Musica {
+  id: string;
+  titulo: string;
+  artista: string;
+  tom?: string;       // "C", "D#", "Bbm" etc.
+  estilo?: string;    // "Contemporâneo", "Tradicional", "Gospel Pop" etc.
+  linkYoutube?: string;
+}
+
+// Música dentro de uma escala (pode ter tom diferente do padrão)
+export interface EscalaMusica {
+  musicaId: string;
+  titulo: string;
+  artista: string;
+  tom?: string;       // tom usado nessa escala especificamente
+}
+
 export interface Escala {
   id: string;
   ministerio: Ministerio;
@@ -108,7 +126,11 @@ export interface Escala {
   horario: string;
   culto: string;       // ex: "Culto Domingo 18h30"
   itens: ItemEscala[];
-  setlist?: string[];  // somente para Louvor
+  musicas?: EscalaMusica[];
+  roteiro?: string[];  // ids de EscalaMusica em ordem de execução
+  observacoes?: string;
+  visivel?: boolean;   // publicada
+  confirmacaoParticipantes?: boolean;
   criadoPor: string;
 }
 
@@ -129,6 +151,24 @@ export interface MuralMensagem {
   tipo?: TipoMensagem;   // default "texto"
   mediaUrl?: string;     // base64 data URL para imagem/áudio
   reacoes?: { emoji: string; count: number }[];
+}
+
+// ─────────────────────────────────────────────
+// Locais físicos
+// ─────────────────────────────────────────────
+export interface Local {
+  id: string;
+  nome: string;
+  descricao?: string;
+}
+
+// ─────────────────────────────────────────────
+// Aviso fixado no dashboard
+// ─────────────────────────────────────────────
+export interface AvisoFixado {
+  conteudo: string;
+  ativo: boolean;
+  atualizadoEm: string; // ISO datetime
 }
 
 // ─────────────────────────────────────────────

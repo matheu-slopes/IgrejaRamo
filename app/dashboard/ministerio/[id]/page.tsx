@@ -9,15 +9,16 @@ import {
   Pin, ChevronDown, ShieldCheck, ChevronUp,
   Star, Mic, Square, Image as ImageIcon, Grid3x3, Link2,
   Phone, Video as VideoIcon, MoreVertical, PhoneOff,
+  Music2, ChevronUp as ArrowUp, ChevronDown as ArrowDown, Save, Eye, EyeOff, UserCheck,
 } from "lucide-react";
 import clsx from "clsx";
-import { Ministerio, MuralMensagem, MembroMinisterio, Evento, FuncaoMinisterio } from "@/types";
+import { Local, Ministerio, MuralMensagem, MembroMinisterio, Evento, FuncaoMinisterio, Escala, EscalaMusica, Musica, FuncaoEscala, ItemEscala } from "@/types";
 import {
-  mockMuralMensagens, mockMembrosMinisterio, mockEventos, mockCanais,
+  mockMuralMensagens, mockMembrosMinisterio, mockEventos, mockCanais, mockLocais, mockMusicas, mockEscalas,
 } from "@/lib/mockData";
 import { downloadICS, linkGoogleCalendar, formatarData, diaSemana } from "@/lib/calendarUtils";
 
-type Tab = "chat" | "membros" | "eventos";
+type Tab = "chat" | "membros" | "eventos" | "escalas";
 
 const corMap: Record<string, string> = {
   grape: "bg-grape-800",
@@ -41,6 +42,7 @@ export default function CanalMinisterioPage() {
   const podeGerenciarMembros = temPermissao("gerenciar_membros_ministerio");
   const podeCriarEvento     = temPermissao("criar_evento");
   const podeEditarEvento    = temPermissao("editar_evento");  const podeAtribuirPermissoes = temPermissao("atribuir_permissoes");
+
   if (!canalBase) {
     return (
       <div className="flex items-center justify-center h-60 text-gray-400">
@@ -102,6 +104,7 @@ export default function CanalMinisterioPage() {
             { id: "chat",    label: "Chat",    icon: MessageSquare },
             { id: "membros", label: "Membros", icon: Users         },
             { id: "eventos", label: "Eventos", icon: CalendarDays  },
+            { id: "escalas", label: "Escalas", icon: Music2        },
           ] as { id: Tab; label: string; icon: React.ElementType }[]).map(({ id, label, icon: Icon }) => (
             <button
               key={id}
@@ -124,6 +127,7 @@ export default function CanalMinisterioPage() {
       {tab === "chat"    && <ChatTab ministerio={slug} chatBloqueado={chatBloqueado} podeEnviar={temPermissao("enviar_chat")} podeFixar={temPermissao("fixar_mensagem")} user={user} />}
       {tab === "membros" && <MembrosTab ministerio={slug} isLider={podeGerenciarMembros} podeAtribuirPermissoes={podeAtribuirPermissoes} />}
       {tab === "eventos" && <EventosTab ministerio={slug} isLider={podeCriarEvento} podeEditar={podeEditarEvento} />}
+      {tab === "escalas" && <EscalasLouvorTab ministerio={slug} isLider={temPermissao("criar_escala")} />}
 
       {/* Modal de chamada */}
       {chamada && (
@@ -932,6 +936,14 @@ function EventosTab({ ministerio, isLider, podeEditar }: { ministerio: Ministeri
     titulo: "", descricao: "", data: "", horario: "", local: "", publico: false, ministerio,
   });
   const [calendarMenu, setCalendarMenu] = useState<string | null>(null);
+  const [locais, setLocais] = useState<Local[]>(mockLocais);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("ramo_locais");
+      if (raw) setLocais(JSON.parse(raw));
+    } catch {}
+  }, []);
 
   function criarEvento() {
     if (!form.titulo || !form.data || !form.horario || !form.local) return;
@@ -984,12 +996,16 @@ function EventosTab({ ministerio, isLider, podeEditar }: { ministerio: Ministeri
               onChange={(e) => setForm({ ...form, horario: e.target.value })}
               className="border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-gold-400 bg-white"
             />
-            <input
+            <select
               value={form.local}
               onChange={(e) => setForm({ ...form, local: e.target.value })}
-              placeholder="Local *"
-              className="border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-gold-400"
-            />
+              className="border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-gold-400 bg-white"
+            >
+              <option value="">Local *</option>
+              {locais.map((l) => (
+                <option key={l.id} value={l.nome}>{l.nome}</option>
+              ))}
+            </select>
             <textarea
               value={form.descricao}
               onChange={(e) => setForm({ ...form, descricao: e.target.value })}
@@ -1107,6 +1123,565 @@ function EventosTab({ ministerio, isLider, podeEditar }: { ministerio: Ministeri
             </div>
           );
         })}
+      </div>
+    </div>
+  );
+}
+// ─── TAB: ESCALAS DO LOUVOR ──────────────────────────────────────────────────
+
+const TONS = ["C","C#","Db","D","D#","Eb","E","F","F#","Gb","G","G#","Ab","A","A#","Bb","B",
+              "Cm","C#m","Dm","D#m","Ebm","Em","Fm","F#m","Gm","G#m","Am","A#m","Bbm","Bm"];
+
+const FUNCOES_LOUVOR: FuncaoEscala[] = [
+  "Ministro","Guitarra","Baixo","Bateria","Teclado","Backing Vocal",
+];
+
+const TEMPLATES_CULTO = [
+  { id: "quinta",   label: "Culto de Quinta",   horario: "20:00", diaSemana: 4 /* qui */, cor: "bg-grape-100 text-grape-800 border-grape-200" },
+  { id: "domingo",  label: "Culto de Domingo",  horario: "18:30", diaSemana: 0 /* dom */, cor: "bg-gold-100 text-gold-800 border-gold-200" },
+  { id: "especial", label: "Culto Especial",    horario: "19:00", diaSemana: null,          cor: "bg-blue-100 text-blue-800 border-blue-200" },
+];
+
+/** Retorna as próximas `qtd` datas de um dia da semana (0=Dom, 4=Qui) a partir de hoje */
+function proximasDatas(diaSemana: number, qtd = 5): string[] {
+  const datas: string[] = [];
+  const hoje = new Date();
+  hoje.setHours(0, 0, 0, 0);
+  const d = new Date(hoje);
+  // avança até o próximo dia alvo (ou hoje se for o dia)
+  while (d.getDay() !== diaSemana) d.setDate(d.getDate() + 1);
+  for (let i = 0; i < qtd; i++) {
+    datas.push(d.toISOString().split("T")[0]);
+    d.setDate(d.getDate() + 7);
+  }
+  return datas;
+}
+
+type EscalaSubTab = "detalhes" | "participantes" | "musicas" | "roteiro";
+
+interface EscalaForm {
+  culto: string;
+  data: string;
+  horario: string;
+  observacoes: string;
+  visivel: boolean;
+  confirmacaoParticipantes: boolean;
+  itens: ItemEscala[];
+  musicas: EscalaMusica[];
+}
+
+const EMPTY_FORM: EscalaForm = {
+  culto: "", data: "", horario: "", observacoes: "",
+  visivel: true, confirmacaoParticipantes: false,
+  itens: [], musicas: [],
+};
+
+function formatDateSimples(iso: string) {
+  if (!iso) return "";
+  const d = new Date(iso + "T00:00:00");
+  return d.toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "short" });
+}
+
+function EscalasLouvorTab({ ministerio, isLider }: { ministerio: Ministerio; isLider: boolean }) {
+  const membros = mockMembrosMinisterio.filter((m) => m.ministerio === ministerio);
+  const [escalas, setEscalas] = useState<Escala[]>(
+    () => mockEscalas.filter((e) => e.ministerio === ministerio)
+  );
+  const [modo, setModo] = useState<"lista" | "form">("lista");
+  const [editId, setEditId] = useState<string | null>(null);
+  const [subTab, setSubTab] = useState<EscalaSubTab>("detalhes");
+  const [form, setForm] = useState<EscalaForm>(EMPTY_FORM);
+
+  // Participantes — estado interno do sub-form
+  const [novoMembroId, setNovoMembroId] = useState("");
+  const [novaFuncao, setNovaFuncao] = useState<FuncaoEscala>("Ministro");
+  const [novaObs, setNovaObs] = useState("");
+
+  // Músicas — estado interno do sub-form
+  const [buscaMusica, setBuscaMusica] = useState("");
+  const [tomOverride, setTomOverride] = useState<Record<string, string>>({});
+
+  function abrirNova() {
+    setForm(EMPTY_FORM);
+    setEditId(null);
+    setSubTab("detalhes");
+    setModo("form");
+  }
+
+  function abrirEdicao(esc: Escala) {
+    setForm({
+      culto: esc.culto,
+      data: esc.data,
+      horario: esc.horario,
+      observacoes: esc.observacoes ?? "",
+      visivel: esc.visivel ?? true,
+      confirmacaoParticipantes: esc.confirmacaoParticipantes ?? false,
+      itens: [...esc.itens],
+      musicas: [...(esc.musicas ?? [])],
+    });
+    setEditId(esc.id);
+    setSubTab("detalhes");
+    setModo("form");
+  }
+
+  function salvar() {
+    if (!form.culto || !form.data || !form.horario) return;
+    if (editId) {
+      setEscalas((prev) => prev.map((e) =>
+        e.id === editId ? { ...e, ...form } : e
+      ));
+    } else {
+      const nova: Escala = {
+        id: `esc-${Date.now()}`,
+        ministerio,
+        criadoPor: "Matheus Lopes",
+        ...form,
+      };
+      setEscalas((prev) => [nova, ...prev]);
+    }
+    setModo("lista");
+  }
+
+  function excluir(id: string) {
+    setEscalas((prev) => prev.filter((e) => e.id !== id));
+  }
+
+  function addParticipante() {
+    if (!novoMembroId) return;
+    const membro = membros.find((m) => m.id === novoMembroId);
+    if (!membro) return;
+    if (form.itens.some((i) => i.voluntarioId === novoMembroId && i.funcao === novaFuncao)) return;
+    setForm((f) => ({
+      ...f,
+      itens: [...f.itens, {
+        funcao: novaFuncao,
+        voluntarioId: membro.id,
+        voluntarioNome: membro.nome,
+        observacao: novaObs.trim() || undefined,
+      }],
+    }));
+    setNovoMembroId(""); setNovaObs("");
+  }
+
+  function removeParticipante(idx: number) {
+    setForm((f) => ({ ...f, itens: f.itens.filter((_, i) => i !== idx) }));
+  }
+
+  const musicasFiltradas = mockMusicas.filter((m) =>
+    m.titulo.toLowerCase().includes(buscaMusica.toLowerCase()) ||
+    m.artista.toLowerCase().includes(buscaMusica.toLowerCase())
+  );
+
+  function addMusica(m: Musica) {
+    if (form.musicas.some((em) => em.musicaId === m.id)) return;
+    setForm((f) => ({
+      ...f,
+      musicas: [...f.musicas, {
+        musicaId: m.id,
+        titulo: m.titulo,
+        artista: m.artista,
+        tom: tomOverride[m.id] ?? m.tom ?? "",
+      }],
+    }));
+  }
+
+  function removeMusica(musicaId: string) {
+    setForm((f) => ({ ...f, musicas: f.musicas.filter((m) => m.musicaId !== musicaId) }));
+  }
+
+  function moverMusica(idx: number, dir: -1 | 1) {
+    const arr = [...form.musicas];
+    const target = idx + dir;
+    if (target < 0 || target >= arr.length) return;
+    [arr[idx], arr[target]] = [arr[target], arr[idx]];
+    setForm((f) => ({ ...f, musicas: arr }));
+  }
+
+  function atualizarTomNaEscala(musicaId: string, tom: string) {
+    setForm((f) => ({
+      ...f,
+      musicas: f.musicas.map((m) => m.musicaId === musicaId ? { ...m, tom } : m),
+    }));
+  }
+
+  // ── LISTA ────────────────────────────────────────────────────────────────
+  if (modo === "lista") {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-gray-500">{escalas.length} escala{escalas.length !== 1 ? "s" : ""}</p>
+          {isLider && (
+            <button onClick={abrirNova}
+              className="flex items-center gap-1.5 bg-gold-500 text-vine-950 text-sm font-semibold px-4 py-2 rounded-xl hover:bg-gold-400 transition">
+              <Plus className="w-4 h-4" /> Nova escala
+            </button>
+          )}
+        </div>
+
+        {escalas.length === 0 && (
+          <div className="py-16 text-center text-gray-400 text-sm">Nenhuma escala criada.</div>
+        )}
+
+        <div className="space-y-3">
+          {escalas.sort((a, b) => a.data.localeCompare(b.data)).map((esc) => (
+            <div key={esc.id} className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm">
+              <div className="flex items-start justify-between gap-3">
+                <div className="space-y-1 flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="font-semibold text-gray-900 text-sm">{esc.culto}</p>
+                    {esc.visivel
+                      ? <span className="text-[10px] bg-green-100 text-green-700 font-bold px-2 py-0.5 rounded-full">Publicada</span>
+                      : <span className="text-[10px] bg-gray-100 text-gray-500 font-bold px-2 py-0.5 rounded-full">Rascunho</span>}
+                  </div>
+                  <p className="text-xs text-gray-500">
+                    {formatDateSimples(esc.data)} às {esc.horario}
+                  </p>
+                  <div className="flex items-center gap-3 pt-1">
+                    <span className="flex items-center gap-1 text-xs text-gray-400">
+                      <Users className="w-3.5 h-3.5" /> {esc.itens.length} participantes
+                    </span>
+                    <span className="flex items-center gap-1 text-xs text-gray-400">
+                      <Music2 className="w-3.5 h-3.5" /> {(esc.musicas ?? []).length} músicas
+                    </span>
+                  </div>
+                  {/* Participantes */}
+                  {esc.itens.length > 0 && (
+                    <div className="flex flex-wrap gap-1 pt-1">
+                      {esc.itens.map((it, i) => (
+                        <span key={i} className="text-[11px] bg-grape-50 text-grape-800 px-2 py-0.5 rounded-full border border-grape-100">
+                          {it.funcao}: <strong>{it.voluntarioNome.split(" ")[0]}</strong>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  {/* Setlist preview */}
+                  {(esc.musicas ?? []).length > 0 && (
+                    <div className="flex flex-wrap gap-1 pt-1">
+                      {(esc.musicas ?? []).map((m, i) => (
+                        <span key={i} className="text-[11px] bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full border border-blue-100">
+                          {m.titulo} {m.tom && <span className="font-bold">({m.tom})</span>}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                {isLider && (
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button onClick={() => abrirEdicao(esc)}
+                      className="p-2 text-gray-400 hover:text-vine-700 hover:bg-vine-50 rounded-xl transition">
+                      <Pencil className="w-4 h-4" />
+                    </button>
+                    <button onClick={() => excluir(esc.id)}
+                      className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // ── FORMULÁRIO ───────────────────────────────────────────────────────────
+  const subTabs: { id: EscalaSubTab; label: string; count?: number }[] = [
+    { id: "detalhes",      label: "Detalhes" },
+    { id: "participantes", label: "Participantes", count: form.itens.length },
+    { id: "musicas",       label: "Músicas",       count: form.musicas.length },
+    { id: "roteiro",       label: "Roteiro" },
+  ];
+
+  return (
+    <div className="space-y-4">
+      {/* Header do form */}
+      <div className="flex items-center gap-3">
+        <button onClick={() => setModo("lista")}
+          className="p-2 rounded-xl text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition">
+          <X className="w-4 h-4" />
+        </button>
+        <h2 className="text-base font-semibold text-gray-900">
+          {editId ? "Editar escala" : "Nova escala"}
+        </h2>
+      </div>
+
+      {/* Sub-tabs */}
+      <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl">
+        {subTabs.map((t) => (
+          <button key={t.id} onClick={() => setSubTab(t.id)}
+            className={clsx(
+              "flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-xs font-semibold transition",
+              subTab === t.id ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
+            )}>
+            {t.label}
+            {t.count !== undefined && t.count > 0 && (
+              <span className={clsx("text-[10px] font-bold rounded-full px-1.5",
+                subTab === t.id ? "bg-vine-700 text-white" : "bg-gray-300 text-gray-600"
+              )}>{t.count}</span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {/* ── Detalhes ──────────────────────────────────────────────── */}
+      {subTab === "detalhes" && (
+        <div className="space-y-4">
+
+          {/* Templates rápidos */}
+          <div>
+            <p className="text-xs text-gray-400 mb-2 font-semibold uppercase tracking-widest">Tipo de culto</p>
+            <div className="flex gap-2 flex-wrap">
+              {TEMPLATES_CULTO.map((t) => (
+                <button key={t.id}
+                  onClick={() => {
+                    const primeiraData = t.diaSemana !== null ? proximasDatas(t.diaSemana, 1)[0] : "";
+                    setForm((f) => ({
+                      ...f,
+                      culto: t.label,
+                      horario: t.horario,
+                      data: f.data || primeiraData,
+                    }));
+                  }}
+                  className={clsx(
+                    "text-xs font-semibold px-3 py-1.5 rounded-full border transition hover:opacity-80",
+                    form.culto === t.label ? t.cor + " ring-2 ring-offset-1 ring-vine-400" : t.cor
+                  )}
+                >{t.label}</button>
+              ))}
+            </div>
+          </div>
+
+          {/* Datas rápidas (quintas + domingos) */}
+          {(form.culto === "Culto de Quinta" || form.culto === "Culto de Domingo") && (
+            <div>
+              <p className="text-xs text-gray-400 mb-2 font-semibold uppercase tracking-widest">Escolher data</p>
+              <div className="flex flex-wrap gap-2">
+                {proximasDatas(
+                  form.culto === "Culto de Quinta" ? 4 : 0, 6
+                ).map((iso) => (
+                  <button key={iso}
+                    onClick={() => setForm((f) => ({ ...f, data: iso }))}
+                    className={clsx(
+                      "text-xs font-semibold px-3 py-1.5 rounded-xl border transition",
+                      form.data === iso
+                        ? "bg-vine-700 text-white border-vine-700"
+                        : "bg-white text-gray-700 border-gray-200 hover:border-vine-400"
+                    )}
+                  >{formatDateSimples(iso)}</button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Campos manuais */}
+          <div className="space-y-3">
+            <input value={form.culto} onChange={(e) => setForm({ ...form, culto: e.target.value })}
+              placeholder="Título *  ex: Culto Domingo 18h30"
+              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-vine-400" />
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs text-gray-400 mb-1 block">Data</label>
+                <input type="date" value={form.data} onChange={(e) => setForm({ ...form, data: e.target.value })}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-vine-400 bg-white" />
+              </div>
+              <div>
+                <label className="text-xs text-gray-400 mb-1 block">Hora</label>
+                <input type="time" value={form.horario} onChange={(e) => setForm({ ...form, horario: e.target.value })}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-vine-400 bg-white" />
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <textarea value={form.observacoes}
+              onChange={(e) => setForm({ ...form, observacoes: e.target.value.slice(0, 500) })}
+              placeholder="Observações"
+              rows={3}
+              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-vine-400 resize-none" />
+            <p className="text-right text-[10px] text-gray-400">{form.observacoes.length}/500</p>
+          </div>
+          {/* Visibilidade */}
+          <div className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-xl px-4 py-3">
+            <div className="flex items-center gap-2">
+              {form.visivel ? <Eye className="w-4 h-4 text-green-600" /> : <EyeOff className="w-4 h-4 text-gray-400" />}
+              <div>
+                <p className="text-sm font-semibold text-gray-800">Visibilidade</p>
+                <p className="text-xs text-gray-500">{form.visivel ? "Publicada, visível para todos os membros." : "Rascunho, só você vê."}</p>
+              </div>
+            </div>
+            <button onClick={() => setForm({ ...form, visivel: !form.visivel })}
+              className={clsx("w-11 h-6 rounded-full transition relative",
+                form.visivel ? "bg-vine-700" : "bg-gray-300")}>
+              <span className={clsx("absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform",
+                form.visivel ? "translate-x-5" : "translate-x-0")} />
+            </button>
+          </div>
+          {/* Confirmação */}
+          <div className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-xl px-4 py-3">
+            <div className="flex items-center gap-2">
+              <UserCheck className="w-4 h-4 text-gray-500" />
+              <div>
+                <p className="text-sm font-semibold text-gray-800">Solicitar confirmação dos participantes</p>
+              </div>
+            </div>
+            <button onClick={() => setForm({ ...form, confirmacaoParticipantes: !form.confirmacaoParticipantes })}
+              className={clsx("w-11 h-6 rounded-full transition relative",
+                form.confirmacaoParticipantes ? "bg-vine-700" : "bg-gray-300")}>
+              <span className={clsx("absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform",
+                form.confirmacaoParticipantes ? "translate-x-5" : "translate-x-0")} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Participantes ─────────────────────────────────────────── */}
+      {subTab === "participantes" && (
+        <div className="space-y-4">
+          {/* Adicionar */}
+          <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 space-y-2">
+            <p className="text-xs font-semibold text-gray-600">Adicionar participante</p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <select value={novoMembroId} onChange={(e) => setNovoMembroId(e.target.value)}
+                className="border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-vine-400 bg-white col-span-1">
+                <option value="">Selecionar membro</option>
+                {membros.map((m) => <option key={m.id} value={m.id}>{m.nome}</option>)}
+              </select>
+              <select value={novaFuncao} onChange={(e) => setNovaFuncao(e.target.value as FuncaoEscala)}
+                className="border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-vine-400 bg-white">
+                {FUNCOES_LOUVOR.map((f) => <option key={f}>{f}</option>)}
+              </select>
+              <input value={novaObs} onChange={(e) => setNovaObs(e.target.value)}
+                placeholder="Observação (opcional)"
+                className="border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-vine-400" />
+            </div>
+            <button onClick={addParticipante}
+              className="flex items-center gap-1.5 bg-vine-700 text-white text-xs font-semibold px-4 py-2 rounded-xl hover:bg-vine-800 transition">
+              <Plus className="w-3.5 h-3.5" /> Adicionar
+            </button>
+          </div>
+          {/* Lista */}
+          <div className="space-y-2">
+            {form.itens.length === 0 && <p className="text-sm text-gray-400 text-center py-8">Nenhum participante adicionado.</p>}
+            {form.itens.map((it, i) => (
+              <div key={i} className="flex items-center justify-between bg-white border border-gray-100 rounded-xl px-4 py-3 shadow-sm">
+                <div>
+                  <p className="text-sm font-semibold text-gray-800">{it.voluntarioNome}</p>
+                  <p className="text-xs text-grape-700 font-medium">{it.funcao}</p>
+                  {it.observacao && <p className="text-xs text-gray-400 mt-0.5">{it.observacao}</p>}
+                </div>
+                <button onClick={() => removeParticipante(i)}
+                  className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Músicas ───────────────────────────────────────────────── */}
+      {subTab === "musicas" && (
+        <div className="space-y-4">
+          {/* Busca no repertório */}
+          <div className="space-y-2">
+            <input value={buscaMusica} onChange={(e) => setBuscaMusica(e.target.value)}
+              placeholder="Buscar no repertório..."
+              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-vine-400" />
+            <div className="max-h-52 overflow-y-auto space-y-1 border border-gray-100 rounded-xl p-1 bg-gray-50">
+              {musicasFiltradas.length === 0 && <p className="text-xs text-gray-400 text-center py-4">Nenhuma música encontrada.</p>}
+              {musicasFiltradas.map((m) => {
+                const jaAdicionada = form.musicas.some((em) => em.musicaId === m.id);
+                return (
+                  <div key={m.id} className="flex items-center justify-between bg-white rounded-lg px-3 py-2 border border-gray-100">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-gray-800 truncate">{m.titulo}</p>
+                      <p className="text-xs text-gray-400">{m.artista} {m.estilo && `· ${m.estilo}`}</p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0 ml-2">
+                      <select value={tomOverride[m.id] ?? m.tom ?? ""}
+                        onChange={(e) => setTomOverride((prev) => ({ ...prev, [m.id]: e.target.value }))}
+                        className="text-xs border border-gray-200 rounded-lg px-2 py-1 outline-none bg-white w-16">
+                        <option value="">Tom</option>
+                        {TONS.map((t) => <option key={t}>{t}</option>)}
+                      </select>
+                      <button onClick={() => addMusica(m)} disabled={jaAdicionada}
+                        className={clsx("text-xs font-bold px-3 py-1.5 rounded-lg transition",
+                          jaAdicionada ? "bg-gray-100 text-gray-400 cursor-not-allowed" : "bg-vine-700 text-white hover:bg-vine-800"
+                        )}>
+                        {jaAdicionada ? "✓" : "+ Add"}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+          {/* Músicas adicionadas */}
+          {form.musicas.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest">Na escala</p>
+              {form.musicas.map((em, i) => (
+                <div key={em.musicaId} className="flex items-center gap-3 bg-white border border-gray-100 rounded-xl px-4 py-3 shadow-sm">
+                  <span className="text-xs text-gray-400 w-4 text-right">{i + 1}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-gray-800">{em.titulo}</p>
+                    <p className="text-xs text-gray-400">{em.artista}</p>
+                  </div>
+                  <select value={em.tom ?? ""}
+                    onChange={(e) => atualizarTomNaEscala(em.musicaId, e.target.value)}
+                    className="text-xs border border-gray-200 rounded-lg px-2 py-1 outline-none bg-white w-16">
+                    <option value="">Tom</option>
+                    {TONS.map((t) => <option key={t}>{t}</option>)}
+                  </select>
+                  <button onClick={() => removeMusica(em.musicaId)}
+                    className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition">
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Roteiro ───────────────────────────────────────────────── */}
+      {subTab === "roteiro" && (
+        <div className="space-y-3">
+          {form.musicas.length === 0 && (
+            <p className="text-sm text-gray-400 text-center py-12">Adicione músicas na aba "Músicas" primeiro.</p>
+          )}
+          {form.musicas.map((em, i) => (
+            <div key={em.musicaId} className="flex items-center gap-3 bg-white border border-gray-100 rounded-xl px-4 py-3 shadow-sm">
+              <span className="text-sm font-bold text-gray-300 w-5 text-center">{i + 1}</span>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-gray-800">{em.titulo}</p>
+                <p className="text-xs text-gray-400">{em.artista} {em.tom && <span className="font-semibold text-grape-700">· {em.tom}</span>}</p>
+              </div>
+              <div className="flex flex-col gap-0.5">
+                <button onClick={() => moverMusica(i, -1)} disabled={i === 0}
+                  className="p-1 text-gray-400 hover:text-gray-700 disabled:opacity-20 hover:bg-gray-100 rounded-lg transition">
+                  <ArrowUp className="w-3.5 h-3.5" />
+                </button>
+                <button onClick={() => moverMusica(i, 1)} disabled={i === form.musicas.length - 1}
+                  className="p-1 text-gray-400 hover:text-gray-700 disabled:opacity-20 hover:bg-gray-100 rounded-lg transition">
+                  <ArrowDown className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Botão salvar fixo */}
+      <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-100">
+        <button onClick={() => setModo("lista")}
+          className="text-sm text-gray-500 px-4 py-2 rounded-xl hover:bg-gray-100 transition">Cancelar</button>
+        <button onClick={salvar}
+          disabled={!form.culto || !form.data || !form.horario}
+          className="flex items-center gap-1.5 bg-vine-700 text-white text-sm font-semibold px-5 py-2 rounded-xl hover:bg-vine-800 disabled:opacity-40 disabled:cursor-not-allowed transition">
+          <Save className="w-4 h-4" /> Salvar
+        </button>
       </div>
     </div>
   );

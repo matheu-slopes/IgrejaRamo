@@ -9,11 +9,11 @@ import {
 import {
   Shield, Users, Plus, Search, Pencil, Power, X,
   ChevronRight, Check, RotateCcw, UserPlus, AlertCircle,
-  Layers, Lock, Unlock, Trash2, Save, Link2,
+  Layers, Lock, Unlock, Trash2, Save, Link2, MapPin, Pin,
 } from "lucide-react";
 import clsx from "clsx";
-import { User, Role, Ministerio, Permissao, CanalMinisterio } from "@/types";
-import { mockCanais } from "@/lib/mockData";
+import { User, Role, Ministerio, Permissao, CanalMinisterio, Local } from "@/types";
+import { mockCanais, mockLocais } from "@/lib/mockData";
 
 const ROLES: Role[] = ["admin", "pastor", "lider", "voluntario", "membro"];
 const MINISTERIOS: Ministerio[] = ["Louvor","Mídias","Ensino","Infantil","Ação Social","Jovens","Cantina"];
@@ -32,7 +32,7 @@ const ROLE_LABEL: Record<Role, string> = {
 };
 
 type Painel = "lista" | "novo";
-type AdminTab = "usuarios" | "ministerios";
+type AdminTab = "usuarios" | "ministerios" | "locais";
 
 const CORES_CANAL = ["vine", "grape", "bark", "gold", "blue", "green", "rose"] as const;
 type CorCanal = typeof CORES_CANAL[number];
@@ -76,6 +76,7 @@ export default function AdminPage() {
         {([
           { id: "usuarios",    label: "Usuários",    icon: Users  },
           { id: "ministerios", label: "Ministérios", icon: Layers },
+          { id: "locais",      label: "Locais",      icon: MapPin },
         ] as { id: AdminTab; label: string; icon: React.ElementType }[]).map(({ id, label, icon: Icon }) => (
           <button
             key={id}
@@ -94,6 +95,10 @@ export default function AdminPage() {
 
       {adminTab === "ministerios" && (
         <MinisteriosTab usuarios={usuarios} temPermissao={temPermissao} />
+      )}
+
+      {adminTab === "locais" && (
+        <LocaisTab />
       )}
 
       {adminTab === "usuarios" && <>
@@ -800,6 +805,242 @@ function NovoUsuarioForm({
           >
             Criar usuário
           </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── LocaisTab ────────────────────────────────────────────────────────────────
+
+const AVISO_KEY = "ramo_aviso_fixado";
+
+const LOCAIS_KEY = "ramo_locais";
+
+function carregarLocais(): Local[] {
+  if (typeof window === "undefined") return mockLocais;
+  try {
+    const raw = localStorage.getItem(LOCAIS_KEY);
+    if (raw) return JSON.parse(raw) as Local[];
+  } catch {}
+  return mockLocais;
+}
+
+function LocaisTab() {
+  const [locais, setLocais] = useState<Local[]>(carregarLocais);
+  const [editandoLocal, setEditandoLocal] = useState<Local | null>(null);
+  const [novoNome, setNovoNome] = useState("");
+  const [novaDesc, setNovaDesc] = useState("");
+  const [adicionando, setAdicionando] = useState(false);
+
+  function persistirLocais(lista: Local[]) {
+    setLocais(lista);
+    localStorage.setItem(LOCAIS_KEY, JSON.stringify(lista));
+  }
+
+  // Aviso fixado — persiste em localStorage
+  const [avisoConteudo, setAvisoConteudo] = useState<string>(() => {
+    if (typeof window === "undefined") return "";
+    try { return JSON.parse(localStorage.getItem(AVISO_KEY) ?? "{}").conteudo ?? ""; }
+    catch { return ""; }
+  });
+  const [avisoAtivo, setAvisoAtivo] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    try { return JSON.parse(localStorage.getItem(AVISO_KEY) ?? "{}").ativo ?? false; }
+    catch { return false; }
+  });
+  const [avisoSalvo, setAvisoSalvo] = useState(false);
+
+  function salvarAviso() {
+    localStorage.setItem(AVISO_KEY, JSON.stringify({
+      conteudo: avisoConteudo,
+      ativo: avisoAtivo,
+      atualizadoEm: new Date().toISOString(),
+    }));
+    setAvisoSalvo(true);
+    setTimeout(() => setAvisoSalvo(false), 2000);
+  }
+
+  function toggleAvisoAtivo() {
+    const novoAtivo = !avisoAtivo;
+    setAvisoAtivo(novoAtivo);
+    localStorage.setItem(AVISO_KEY, JSON.stringify({
+      conteudo: avisoConteudo,
+      ativo: novoAtivo,
+      atualizadoEm: new Date().toISOString(),
+    }));
+  }
+
+  function adicionarLocal() {
+    if (!novoNome.trim()) return;
+    const nova = [...locais, { id: `l-${Date.now()}`, nome: novoNome.trim(), descricao: novaDesc.trim() || undefined }];
+    persistirLocais(nova);
+    setNovoNome(""); setNovaDesc(""); setAdicionando(false);
+  }
+
+  function salvarEdicao() {
+    if (!editandoLocal || !editandoLocal.nome.trim()) return;
+    persistirLocais(locais.map((l) => l.id === editandoLocal.id ? editandoLocal : l));
+    setEditandoLocal(null);
+  }
+
+  function removerLocal(id: string) {
+    persistirLocais(locais.filter((l) => l.id !== id));
+  }
+
+  return (
+    <div className="space-y-8 max-w-2xl">
+
+      {/* ── Aviso fixado ────────────────────────────────────────── */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 bg-gray-50">
+          <div className="flex items-center gap-2">
+            <Pin className="w-4 h-4 text-amber-500" />
+            <p className="font-semibold text-gray-800 text-sm">Aviso Fixado no Dashboard</p>
+          </div>
+          <button
+            onClick={toggleAvisoAtivo}
+            className={clsx(
+              "flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full border transition",
+              avisoAtivo
+                ? "bg-green-50 text-green-700 border-green-200 hover:bg-green-100"
+                : "bg-gray-100 text-gray-500 border-gray-200 hover:bg-gray-200"
+            )}
+          >
+            {avisoAtivo ? <><Check className="w-3 h-3" /> Ativo</> : <><X className="w-3 h-3" /> Inativo</>}
+          </button>
+        </div>
+        <div className="px-5 py-4 space-y-3">
+          <p className="text-xs text-gray-400 leading-relaxed">
+            Quando ativo, aparece como banner fixado no topo do dashboard para todos os usuários.
+            Deixe em branco ou inativo se não quiser exibir.
+          </p>
+          <textarea
+            value={avisoConteudo}
+            onChange={(e) => setAvisoConteudo(e.target.value)}
+            placeholder="Ex: 📌 Ensaio às 17h. Confirmar presença com Pedro."
+            rows={3}
+            className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-vine-400 resize-none placeholder:text-gray-300"
+          />
+          <div className="flex items-center justify-between">
+            {avisoSalvo && (
+              <span className="text-xs text-green-600 font-semibold flex items-center gap-1">
+                <Check className="w-3.5 h-3.5" /> Salvo com sucesso
+              </span>
+            )}
+            <button
+              onClick={salvarAviso}
+              className="ml-auto flex items-center gap-1.5 bg-vine-700 text-white text-sm font-semibold px-4 py-2 rounded-xl hover:bg-vine-800 transition"
+            >
+              <Save className="w-3.5 h-3.5" /> Salvar aviso
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Locais ──────────────────────────────────────────────── */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 bg-gray-50">
+          <div className="flex items-center gap-2">
+            <MapPin className="w-4 h-4 text-vine-600" />
+            <p className="font-semibold text-gray-800 text-sm">Locais Cadastrados</p>
+            <span className="text-xs bg-vine-100 text-vine-700 font-bold px-2 py-0.5 rounded-full">{locais.length}</span>
+          </div>
+          <button
+            onClick={() => setAdicionando(true)}
+            className="flex items-center gap-1.5 text-sm font-semibold text-vine-700 bg-vine-50 hover:bg-vine-100 px-3 py-1.5 rounded-xl border border-vine-200 transition"
+          >
+            <Plus className="w-3.5 h-3.5" /> Novo local
+          </button>
+        </div>
+
+        <div className="divide-y divide-gray-50">
+          {locais.map((local) => (
+            <div key={local.id} className="px-5 py-3.5">
+              {editandoLocal?.id === local.id ? (
+                <div className="flex items-center gap-2 flex-wrap">
+                  <input
+                    value={editandoLocal.nome}
+                    onChange={(e) => setEditandoLocal({ ...editandoLocal, nome: e.target.value })}
+                    className="flex-1 min-w-[140px] border border-gray-200 rounded-xl px-3 py-1.5 text-sm outline-none focus:border-vine-400"
+                    placeholder="Nome do local"
+                    autoFocus
+                  />
+                  <input
+                    value={editandoLocal.descricao ?? ""}
+                    onChange={(e) => setEditandoLocal({ ...editandoLocal, descricao: e.target.value })}
+                    className="flex-1 min-w-[140px] border border-gray-200 rounded-xl px-3 py-1.5 text-sm outline-none focus:border-vine-400"
+                    placeholder="Descrição (opcional)"
+                  />
+                  <button onClick={salvarEdicao} className="text-green-700 hover:text-green-900 transition">
+                    <Check className="w-4 h-4" />
+                  </button>
+                  <button onClick={() => setEditandoLocal(null)} className="text-gray-400 hover:text-gray-600 transition">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-8 h-8 rounded-xl bg-vine-50 border border-vine-100 flex items-center justify-center shrink-0">
+                      <MapPin className="w-3.5 h-3.5 text-vine-500" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-gray-800 truncate">{local.nome}</p>
+                      {local.descricao && <p className="text-xs text-gray-400 truncate">{local.descricao}</p>}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      onClick={() => setEditandoLocal(local)}
+                      className="text-gray-300 hover:text-vine-600 transition"
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => removerLocal(local.id)}
+                      className="text-gray-300 hover:text-red-500 transition"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+
+          {/* Formulário de novo local */}
+          {adicionando && (
+            <div className="px-5 py-3.5 bg-vine-50/50 flex items-center gap-2 flex-wrap border-t border-vine-100">
+              <input
+                value={novoNome}
+                onChange={(e) => setNovoNome(e.target.value)}
+                className="flex-1 min-w-[140px] border border-gray-200 rounded-xl px-3 py-1.5 text-sm outline-none focus:border-vine-400 bg-white"
+                placeholder="Nome do local *"
+                autoFocus
+                onKeyDown={(e) => e.key === "Enter" && adicionarLocal()}
+              />
+              <input
+                value={novaDesc}
+                onChange={(e) => setNovaDesc(e.target.value)}
+                className="flex-1 min-w-[140px] border border-gray-200 rounded-xl px-3 py-1.5 text-sm outline-none focus:border-vine-400 bg-white"
+                placeholder="Descrição (opcional)"
+                onKeyDown={(e) => e.key === "Enter" && adicionarLocal()}
+              />
+              <button onClick={adicionarLocal} className="text-green-700 hover:text-green-900 transition">
+                <Check className="w-4 h-4" />
+              </button>
+              <button onClick={() => { setAdicionando(false); setNovoNome(""); setNovaDesc(""); }} className="text-gray-400 hover:text-gray-600 transition">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+
+          {locais.length === 0 && !adicionando && (
+            <div className="px-5 py-8 text-center text-gray-400 text-sm">
+              Nenhum local cadastrado. Clique em &quot;Novo local&quot; para adicionar.
+            </div>
+          )}
         </div>
       </div>
     </div>
