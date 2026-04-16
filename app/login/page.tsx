@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import Link from "next/link";
 import Image from "next/image";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, ChevronDown } from "lucide-react";
 
 type Tab = "entrar" | "cadastrar";
 
@@ -60,17 +60,14 @@ export default function LoginPage() {
         {/* Logo / branding */}
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex flex-col items-center gap-2 group">
-            <div className="bg-vine-950 rounded-2xl px-6 py-4">
-              <Image
-                src="/logo.png"
-                alt="Igreja Ramo da Vida"
-                width={160}
-                height={54}
-                priority
-                className="w-[140px] h-auto"
-                style={{ filter: "invert(1)", mixBlendMode: "screen" }}
-              />
-            </div>
+            <Image
+              src="/logo.png"
+              alt="Igreja Ramo da Vida"
+              width={160}
+              height={54}
+              priority
+              className="w-[160px] h-auto"
+            />
           </Link>
         </div>
 
