@@ -62,7 +62,7 @@ export default function CanalMinisterioPage() {
         <div className="flex items-center justify-between">
           <div>
             <p className="text-xs uppercase tracking-widest opacity-60 mb-0.5">Canal</p>
-            <h1 className="text-2xl font-serif font-semibold">{slug}</h1>
+            <h1 className="text-2xl font-sans font-semibold">{slug}</h1>
             <p className="text-sm opacity-70 mt-1">{canalBase.descricao}</p>
           </div>
           <div className="flex items-center gap-2">
@@ -138,7 +138,7 @@ export default function CanalMinisterioPage() {
               {chamada === "audio" ? <Phone className="w-7 h-7" /> : <VideoIcon className="w-7 h-7" />}
             </div>
             <div className="text-center">
-              <p className="font-serif text-xl font-semibold">{slug}</p>
+              <p className="font-sans text-xl font-semibold">{slug}</p>
               <p className="text-white/70 text-sm mt-1">
                 {chamada === "audio" ? "Chamada de áudio em grupo" : "Chamada de vídeo em grupo"}
               </p>
@@ -1174,7 +1174,7 @@ function EventosTab({ ministerio, isLider, podeEditar }: { ministerio: Ministeri
                 {/* Data visual */}
                 <div className="shrink-0 w-12 text-center">
                   <p className="text-xs text-gray-400 uppercase">{diaSemana(e.data).slice(0, 3)}</p>
-                  <p className="text-2xl font-serif font-bold text-vine-800 leading-none">{e.data.split("-")[2]}</p>
+                  <p className="text-2xl font-sans font-bold text-vine-800 leading-none">{e.data.split("-")[2]}</p>
                   <p className="text-xs text-gray-400">{formatarData(e.data).split(" ").slice(1).join(" ")}</p>
                 </div>
                 <div>

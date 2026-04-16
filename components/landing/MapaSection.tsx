@@ -11,7 +11,7 @@ export default function MapaSection() {
           <p className="text-gold-600 font-semibold text-[11px] uppercase tracking-[0.3em] mb-3">
             Como chegar
           </p>
-          <h2 className="font-serif text-4xl md:text-5xl font-semibold text-vine-950">Localização</h2>
+          <h2 className="font-sans text-4xl md:text-5xl font-semibold text-vine-950">Localização</h2>
           <div className="mx-auto mt-4 w-10 h-px bg-gold-400" />
         </div>
 

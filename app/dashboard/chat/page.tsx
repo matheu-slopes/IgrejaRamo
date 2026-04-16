@@ -1278,8 +1278,10 @@ export default function ChatPage() {
       {showNewDmModal && <NewDmModal currentUserId={u.id} dms={dms} onStart={startDm} onClose={() => setShowNewDmModal(false)} />}
       {showNewGroupModal && <NewGroupModal currentUserId={u.id} onClose={() => setShowNewGroupModal(false)} onCreate={createGroup} />}
       <div className="mb-4">
-        <h1 className="text-2xl font-serif font-semibold text-vine-950">Mensagens</h1>
-        <p className="text-sm text-gray-500 mt-1">Converse diretamente ou participe dos grupos da igreja.</p>
+        <h1 className="text-2xl font-sans font-semibold text-vine-950">Mensagens</h1>
+        <p className="text-sm text-gray-500 mt-1">
+          Conversas diretas, chat do culto e canais de ministério.
+        </p>
       </div>
 
       <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden" style={{ height: "calc(100vh - 200px)", minHeight: 520 }}>

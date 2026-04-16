@@ -1,5 +1,6 @@
 import Image from "next/image";
 import { mockGaleria } from "@/lib/mockData";
+import ScrollReveal from "./ScrollReveal";
 
 // TODO (Supabase): replace mockGaleria with:
 // const { data: galeria } = await supabase.from('galeria').select().order('data', { ascending: false });
@@ -8,18 +9,21 @@ export default function GaleriaSection() {
   return (
     <section id="galeria" className="py-24 px-6 bg-vine-950">
       <div className="max-w-6xl mx-auto">
+        <ScrollReveal>
         <div className="text-center mb-12">
           <p className="text-gold-500 font-semibold text-[11px] uppercase tracking-[0.3em] mb-3">
             Momentos
           </p>
-          <h2 className="font-serif text-4xl md:text-5xl font-semibold text-white">Galeria de Fotos</h2>
+          <h2 className="font-sans text-4xl md:text-5xl font-semibold text-white">Galeria de Fotos</h2>
           <div className="mx-auto mt-4 w-10 h-px bg-gold-500/50" />
           <p className="mt-4 text-vine-400 max-w-md mx-auto text-sm leading-relaxed">
             Memórias dos nossos cultos, eventos e ações sociais.
           </p>
         </div>
+        </ScrollReveal>
 
         {/* Masonry-style grid */}
+        <ScrollReveal delay={0.15}>
         <div className="columns-1 sm:columns-2 lg:columns-3 gap-4 space-y-4">
           {mockGaleria.map((foto, i) => (
             <div
@@ -49,6 +53,7 @@ export default function GaleriaSection() {
             </div>
           ))}
         </div>
+        </ScrollReveal>
       </div>
     </section>
   );

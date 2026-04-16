@@ -11,6 +11,14 @@
   }
 }
 
+/* ─── Hide default cursor on landing (MouseFollower takes over) ──── */
+@media (hover: hover) {
+  .immersive-cursor * { cursor: none !important; }
+}
+
+/* ─── Perspective util ────────────────────────────────────────────── */
+.perspective-\[1200px\] { perspective: 1200px; }
+
 /* ─── Logo: animação de "desenhar" a cruz ─────────────────────────────── */
 .logo-draw-1 {
   stroke-dasharray: 33;
