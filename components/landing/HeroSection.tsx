@@ -15,12 +15,12 @@ export default function HeroSection() {
     offset: ["start start", "end start"],
   });
 
-  // Parallax: orbs se movem mais rápido, conteúdo mais devagar ? profundidade
+  // Parallax: orbs se movem mais rï¿½pido, conteï¿½do mais devagar ? profundidade
   const contentY = useTransform(scrollYProgress, [0, 1], [0,  -60]);
   const orb1Y    = useTransform(scrollYProgress, [0, 1], [0, -140]);
   const orb2Y    = useTransform(scrollYProgress, [0, 1], [0,  -90]);
 
-  // Posiciona o brilho do botão sob o cursor
+  // Posiciona o brilho do botï¿½o sob o cursor
   function handleMouseMove(e: React.MouseEvent<HTMLAnchorElement>) {
     if (!glowRef.current) return;
     const rect = e.currentTarget.getBoundingClientRect();
@@ -28,7 +28,7 @@ export default function HeroSection() {
     glowRef.current.style.top  = `${e.clientY - rect.top}px`;
   }
 
-  // Atalho para animação de entrada escalonada
+  // Atalho para animaï¿½ï¿½o de entrada escalonada
   const fadeUp = (delay: number) => ({
     initial:    { opacity: 0, y: 24 },
     animate:    { opacity: 1, y: 0  },
@@ -40,6 +40,18 @@ export default function HeroSection() {
       ref={sectionRef}
       className="relative min-h-screen flex flex-col items-center justify-center text-center px-6 overflow-hidden bg-vine-950"
     >
+      {/* VÃ­deo de fundo em loop */}
+      <video
+        autoPlay
+        muted
+        loop
+        playsInline
+        className="absolute inset-0 w-full h-full object-cover"
+        src="/final.mp4"
+      />
+      {/* Overlay escuro para legibilidade */}
+      <div className="absolute inset-0 bg-vine-950/55 pointer-events-none" />
+
       {/* Orbs com parallax */}
       <motion.div
         style={{ y: orb1Y }}
@@ -59,7 +71,7 @@ export default function HeroSection() {
         }}
       />
 
-      {/* Conteúdo principal com parallax suave */}
+      {/* Conteï¿½do principal com parallax suave */}
       <motion.div
         style={{ y: contentY }}
         className="relative z-10 flex flex-col items-center select-none"
@@ -84,17 +96,17 @@ export default function HeroSection() {
           <div className="w-20 h-px bg-gradient-to-l from-transparent to-gold-600/50" />
         </motion.div>
 
-        {/* Passagem bíblica */}
+        {/* Passagem bï¿½blica */}
         <motion.div {...fadeUp(0.45)} className="max-w-xs mx-auto space-y-1.5">
           <p className="font-sans italic text-[1.15rem] text-vine-200/90 leading-relaxed">
-            "Eu sou a videira; vós sois os ramos."
+            "Eu sou a videira; vï¿½s sois os ramos."
           </p>
           <span className="block text-[11px] tracking-[0.25em] text-gold-500/80 uppercase">
-            João 15:5
+            Joï¿½o 15:5
           </span>
         </motion.div>
 
-        {/* Contador regressivo para o próximo culto */}
+        {/* Contador regressivo para o prï¿½ximo culto */}
         <motion.div {...fadeUp(0.65)} className="mt-8">
           <CountdownBadge />
         </motion.div>
@@ -117,7 +129,7 @@ export default function HeroSection() {
                          bg-white/30 blur-2xl pointer-events-none
                          opacity-0 group-hover:opacity-100 transition-opacity duration-300"
             />
-            Programação
+            Programaï¿½ï¿½o
           </a>
         </motion.div>
       </motion.div>

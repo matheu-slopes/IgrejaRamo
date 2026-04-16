@@ -24,7 +24,7 @@ export default function ParticleHero() {
   });
 
   return (
-    <section ref={sectionRef} className="relative h-screen">
+    <section ref={sectionRef} className="relative h-screen overflow-hidden">
       <div className="h-screen overflow-hidden bg-black flex items-center justify-center">
 
         {/* Video background */}
@@ -34,9 +34,9 @@ export default function ParticleHero() {
           muted
           playsInline
           preload="auto"
-          className="absolute inset-0 w-full h-full object-cover"
+          className="absolute inset-0 w-full h-full object-cover scale-105 blur-sm"
         >
-          <source src="/hero-bg.mp4" type="video/mp4" />
+          <source src="/final.mp4" type="video/mp4" />
         </video>
 
         {/* Dark overlay for readability */}
