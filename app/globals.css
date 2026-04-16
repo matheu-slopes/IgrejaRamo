@@ -4,12 +4,20 @@
 
 @layer base {
   html {
-    scroll-behavior: smooth;
+    /* Smooth scroll handled by Lenis on landing page */
   }
   body {
     font-feature-settings: "kern" 1, "liga" 1, "calt" 1;
   }
 }
+
+/* ─── Hide default cursor on landing (MouseFollower takes over) ──── */
+@media (hover: hover) {
+  .immersive-cursor * { cursor: none !important; }
+}
+
+/* ─── Perspective util ────────────────────────────────────────────── */
+.perspective-\[1200px\] { perspective: 1200px; }
 
 /* ─── Logo: animação de "desenhar" a cruz ─────────────────────────────── */
 .logo-draw-1 {

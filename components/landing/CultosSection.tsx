@@ -1,4 +1,5 @@
 import { Clock } from "lucide-react";
+import ScrollReveal from "./ScrollReveal";
 
 // Programação semanal completa
 const programacao = [
@@ -56,18 +57,21 @@ export default function CultosSection() {
     <section id="cultos" className="py-24 px-6 bg-cream">
       <div className="max-w-5xl mx-auto">
         {/* Header */}
+        <ScrollReveal>
         <div className="text-center mb-14">
           <p className="text-gold-600 font-semibold text-[11px] uppercase tracking-[0.3em] mb-3">
             Venha nos visitar
           </p>
-          <h2 className="font-serif text-4xl md:text-5xl font-semibold text-vine-950">Programação Semanal</h2>
+          <h2 className="font-sans text-4xl md:text-5xl font-semibold text-vine-950">Programação Semanal</h2>
           <div className="mx-auto mt-4 w-10 h-px bg-gold-400" />
           <p className="mt-4 text-gray-500 max-w-md mx-auto text-sm leading-relaxed">
             Momentos de louvor, oração e Palavra — toda semana.
           </p>
         </div>
+        </ScrollReveal>
 
         {/* Schedule grid */}
+        <ScrollReveal delay={0.15}>
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
           {programacao.map((item) => (
             <div
@@ -100,6 +104,7 @@ export default function CultosSection() {
             </div>
           ))}
         </div>
+        </ScrollReveal>
 
         {/* Address teaser */}
         <p className="text-center text-gray-400 text-sm mt-8">

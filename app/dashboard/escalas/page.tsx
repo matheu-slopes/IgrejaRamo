@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import clsx from "clsx";
 
-// ─── helpers ──────────────────────────────────────────────────────────────────
+// --- helpers ------------------------------------------------------------------
 
 function formatDateBR(iso: string) {
   return new Date(iso + "T00:00:00").toLocaleDateString("pt-BR", {
@@ -24,32 +24,32 @@ function iniciais(nome: string) {
 
 const MIN_COR: Record<string, string> = {
   Louvor:          "bg-grape-700 text-white",
-  "Mídias":        "bg-vine-700 text-white",
+  "M�dias":        "bg-vine-700 text-white",
   Cantina:         "bg-bark-600 text-white",
   Infantil:        "bg-gold-500 text-vine-950",
-  "Ação Social":   "bg-green-600 text-white",
+  "A��o Social":   "bg-green-600 text-white",
   Jovens:          "bg-blue-600 text-white",
   Ensino:          "bg-purple-700 text-white",
 };
 
 const MIN_BADGE: Record<string, string> = {
   Louvor:          "bg-grape-100 text-grape-800",
-  "Mídias":        "bg-vine-100 text-vine-700",
+  "M�dias":        "bg-vine-100 text-vine-700",
   Cantina:         "bg-amber-100 text-amber-800",
   Infantil:        "bg-gold-100 text-gold-800",
-  "Ação Social":   "bg-green-100 text-green-800",
+  "A��o Social":   "bg-green-100 text-green-800",
   Jovens:          "bg-blue-100 text-blue-700",
   Ensino:          "bg-purple-100 text-purple-700",
 };
 
 const MIN_EMOJI: Record<string, string> = {
-  Louvor: "🎸", "Mídias": "📹", Cantina: "🧹",
-  Infantil: "🧒", "Ação Social": "🤝", Jovens: "⚡", Ensino: "📖",
+  Louvor: "??", "M�dias": "??", Cantina: "??",
+  Infantil: "??", "A��o Social": "??", Jovens: "?", Ensino: "??",
 };
 
 type View = "minhas" | "culto" | "ministerio";
 
-// ─── Page ─────────────────────────────────────────────────────────────────────
+// --- Page ---------------------------------------------------------------------
 
 export default function EscalasPage() {
   const { user } = useAuth();
@@ -80,7 +80,7 @@ export default function EscalasPage() {
         .sort((a, b) => a.data.localeCompare(b.data))
     : [];
 
-  // Conflitos (mesma data, mais de um ministério)
+  // Conflitos (mesma data, mais de um minist�rio)
   const contagemPorData: Record<string, number> = {};
   minhasEscalas.forEach((e) => {
     contagemPorData[e.data] = (contagemPorData[e.data] ?? 0) + 1;
@@ -103,9 +103,9 @@ export default function EscalasPage() {
     <div className="max-w-5xl mx-auto space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-serif font-semibold text-vine-950">Escalas de Serviço</h1>
+        <h1 className="text-2xl font-sans font-semibold text-vine-950">Escalas de Servi�o</h1>
         <p className="text-sm text-gray-500 mt-1">
-          Veja suas escalas, o culto completo e as escalas por ministério.
+          Veja suas escalas, o culto completo e as escalas por minist�rio.
         </p>
       </div>
 
@@ -113,9 +113,9 @@ export default function EscalasPage() {
       <div className="flex gap-2 flex-wrap">
         {(
           [
-            { id: "minhas" as View,     label: "Minhas Escalas",   icon: Star,        desc: "Apenas onde você está escalado" },
-            { id: "culto" as View,      label: "Escala do Culto",  icon: Layers,      desc: "Todos os ministérios em um culto" },
-            { id: "ministerio" as View, label: "Por Ministério",   icon: LayoutGrid,  desc: "Filtrar por ministério" },
+            { id: "minhas" as View,     label: "Minhas Escalas",   icon: Star,        desc: "Apenas onde voc� est� escalado" },
+            { id: "culto" as View,      label: "Escala do Culto",  icon: Layers,      desc: "Todos os minist�rios em um culto" },
+            { id: "ministerio" as View, label: "Por Minist�rio",   icon: LayoutGrid,  desc: "Filtrar por minist�rio" },
           ] as { id: View; label: string; icon: React.ElementType; desc: string }[]
         ).map(({ id, label, icon: Icon, desc }) => (
           <button
@@ -134,7 +134,7 @@ export default function EscalasPage() {
         ))}
       </div>
 
-      {/* ─── MINHAS ESCALAS ─────────────────────────────── */}
+      {/* --- MINHAS ESCALAS ------------------------------- */}
       {view === "minhas" && (
         <div className="space-y-4">
           {datasConflito.size > 0 && (
@@ -142,13 +142,13 @@ export default function EscalasPage() {
               <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
               <div>
                 <p className="text-sm font-semibold text-amber-800">
-                  Você está escalado em mais de um ministério no mesmo dia!
+                  Voc� est� escalado em mais de um minist�rio no mesmo dia!
                 </p>
                 <p className="text-xs text-amber-700 mt-0.5">
                   {Array.from(datasConflito)
                     .map((d) => formatDateBR(d))
-                    .join(" · ")}{" "}
-                  — confirme com seu líder se há necessidade de ajuste.
+                    .join(" � ")}{" "}
+                  � confirme com seu l�der se h� necessidade de ajuste.
                 </p>
               </div>
             </div>
@@ -157,7 +157,7 @@ export default function EscalasPage() {
           {minhasEscalas.length === 0 ? (
             <div className="bg-white rounded-2xl border border-dashed border-gray-200 p-16 text-center text-gray-400">
               <Star className="w-8 h-8 mx-auto mb-2 opacity-30" />
-              <p className="font-medium">Você não está escalado em nenhum culto próximo.</p>
+              <p className="font-medium">Voc� n�o est� escalado em nenhum culto pr�ximo.</p>
             </div>
           ) : (
             Object.entries(
@@ -202,7 +202,7 @@ export default function EscalasPage() {
                       </div>
                       {conflito && (
                         <span className="flex items-center gap-1 text-[10px] font-bold text-amber-700 bg-amber-100 px-2.5 py-1 rounded-full border border-amber-200">
-                          <AlertTriangle className="w-3 h-3" /> {escalas.length} ministérios — mesmo dia
+                          <AlertTriangle className="w-3 h-3" /> {escalas.length} minist�rios � mesmo dia
                         </span>
                       )}
                     </div>
@@ -223,7 +223,7 @@ export default function EscalasPage() {
                                 MIN_COR[e.ministerio] ?? "bg-vine-600 text-white"
                               )}
                             >
-                              {MIN_EMOJI[e.ministerio] ?? "📋"}
+                              {MIN_EMOJI[e.ministerio] ?? "??"}
                             </div>
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 flex-wrap mb-1">
@@ -236,7 +236,7 @@ export default function EscalasPage() {
                                   {e.ministerio}
                                 </span>
                                 <span className="text-xs text-gray-500">
-                                  {e.culto} · {e.horario}
+                                  {e.culto} � {e.horario}
                                 </span>
                               </div>
                               <div className="space-y-1">
@@ -279,7 +279,7 @@ export default function EscalasPage() {
         </div>
       )}
 
-      {/* ─── ESCALA DO CULTO ────────────────────────────── */}
+      {/* --- ESCALA DO CULTO ------------------------------ */}
       {view === "culto" && (
         <div className="space-y-4">
           {/* Seletor de data/culto */}
@@ -315,10 +315,10 @@ export default function EscalasPage() {
             </div>
           ) : (
             <>
-              {/* Sumário: todos escalados */}
+              {/* Sum�rio: todos escalados */}
               <div className="bg-vine-50 border border-vine-100 rounded-2xl px-5 py-4">
                 <p className="text-xs font-bold text-vine-600 uppercase tracking-wider mb-3">
-                  Todos escalados — {formatDateBR(dataSelecionada)}
+                  Todos escalados � {formatDateBR(dataSelecionada)}
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {Array.from(
@@ -344,7 +344,7 @@ export default function EscalasPage() {
                 </div>
               </div>
 
-              {/* Grade de ministérios */}
+              {/* Grade de minist�rios */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {escalasDoculto.map((e) => {
                   const meuItem = user
@@ -366,7 +366,7 @@ export default function EscalasPage() {
                         )}
                       >
                         <div className="flex items-center gap-2.5">
-                          <span className="text-xl">{MIN_EMOJI[e.ministerio] ?? "📋"}</span>
+                          <span className="text-xl">{MIN_EMOJI[e.ministerio] ?? "??"}</span>
                           <div>
                             <p className="font-bold text-sm leading-tight">{e.ministerio}</p>
                             <p className="text-[11px] opacity-70">{e.horario}</p>
@@ -374,7 +374,7 @@ export default function EscalasPage() {
                         </div>
                         {meuItem && (
                           <span className="text-[10px] font-bold bg-white/20 border border-white/30 px-2 py-0.5 rounded-full">
-                            Você: {meuItem.funcao}
+                            Voc�: {meuItem.funcao}
                           </span>
                         )}
                       </div>
@@ -415,7 +415,7 @@ export default function EscalasPage() {
                                   </span>
                                   {soyEu && (
                                     <span className="text-[9px] font-bold text-gold-700 bg-gold-100 px-1.5 py-0.5 rounded-full">
-                                      Você
+                                      Voc�
                                     </span>
                                   )}
                                 </div>
@@ -439,7 +439,7 @@ export default function EscalasPage() {
                       {e.musicas && e.musicas.length > 0 && (
                         <details className="border-t border-gray-100">
                           <summary className="flex items-center gap-2 px-4 py-2.5 cursor-pointer text-xs font-semibold text-gold-700 hover:bg-gold-50 transition select-none">
-                            <Music className="w-3.5 h-3.5" /> Setlist ({e.musicas.length} músicas)
+                            <Music className="w-3.5 h-3.5" /> Setlist ({e.musicas.length} m�sicas)
                           </summary>
                           <ol className="list-decimal list-inside px-6 pb-3 pt-1 space-y-1">
                             {e.musicas.map((m, i) => (
@@ -459,7 +459,7 @@ export default function EscalasPage() {
         </div>
       )}
 
-      {/* ─── POR MINISTÉRIO ─────────────────────────────── */}
+      {/* --- POR MINIST�RIO ------------------------------- */}
       {view === "ministerio" && (
         <div className="space-y-6">
           <div className="flex gap-2 flex-wrap">
@@ -474,7 +474,7 @@ export default function EscalasPage() {
                     : "bg-white text-gray-500 border-gray-200 hover:border-vine-300 hover:text-vine-700"
                 )}
               >
-                {MIN_EMOJI[m] ?? "📋"} {m}
+                {MIN_EMOJI[m] ?? "??"} {m}
               </button>
             ))}
           </div>
@@ -482,7 +482,7 @@ export default function EscalasPage() {
           {escalasDoMin.length === 0 ? (
             <div className="bg-white rounded-2xl border border-dashed border-gray-200 p-12 text-center text-gray-400">
               <AlertCircle className="w-8 h-8 mx-auto mb-2 opacity-40" />
-              <p>Nenhuma escala cadastrada para este ministério.</p>
+              <p>Nenhuma escala cadastrada para este minist�rio.</p>
             </div>
           ) : (
             <div className="space-y-6">
@@ -496,7 +496,7 @@ export default function EscalasPage() {
                       <p className="font-bold text-vine-800 text-base">{escala.culto}</p>
                       <p className="text-vine-600 text-sm flex items-center gap-1.5 mt-0.5">
                         <CalendarDays className="w-3.5 h-3.5" />
-                        {formatDateBR(escala.data)} · {escala.horario}
+                        {formatDateBR(escala.data)} � {escala.horario}
                       </p>
                     </div>
                     <div className="text-xs text-vine-400">
@@ -509,9 +509,9 @@ export default function EscalasPage() {
                     <table className="w-full text-sm">
                       <thead>
                         <tr className="border-b border-gray-100 bg-gray-50 text-gray-500 text-xs font-semibold uppercase tracking-wide">
-                          <th className="text-left px-6 py-3">Função</th>
-                          <th className="text-left px-6 py-3">Voluntário</th>
-                          <th className="text-left px-6 py-3">Observação</th>
+                          <th className="text-left px-6 py-3">Fun��o</th>
+                          <th className="text-left px-6 py-3">Volunt�rio</th>
+                          <th className="text-left px-6 py-3">Observa��o</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -548,7 +548,7 @@ export default function EscalasPage() {
                                   </span>
                                   {soyEu && (
                                     <span className="text-[9px] font-bold text-gold-700 bg-gold-100 px-1.5 py-0.5 rounded-full">
-                                      Você
+                                      Voc�
                                     </span>
                                   )}
                                 </span>
@@ -559,7 +559,7 @@ export default function EscalasPage() {
                                     <Pin className="w-3 h-3" /> {item.observacao}
                                   </span>
                                 ) : (
-                                  "—"
+                                  "�"
                                 )}
                               </td>
                             </tr>

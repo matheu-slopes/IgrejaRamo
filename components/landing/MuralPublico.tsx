@@ -1,5 +1,6 @@
 import { Bell, CalendarDays } from "lucide-react";
 import { mockAvisos } from "@/lib/mockData";
+import ScrollReveal from "./ScrollReveal";
 
 // TODO (Supabase): replace mockAvisos with:
 // const { data: avisos } = await supabase
@@ -21,17 +22,20 @@ export default function MuralPublico() {
   return (
     <section id="avisos" className="py-24 px-6 bg-stone-50">
       <div className="max-w-4xl mx-auto">
+        <ScrollReveal>
         <div className="text-center mb-12">
           <p className="text-gold-600 font-semibold text-[11px] uppercase tracking-[0.3em] mb-3">
             Fique por dentro
           </p>
-          <h2 className="font-serif text-4xl md:text-5xl font-semibold text-vine-950">Mural de Avisos</h2>
+          <h2 className="font-sans text-4xl md:text-5xl font-semibold text-vine-950">Mural de Avisos</h2>
           <div className="mx-auto mt-4 w-10 h-px bg-gold-400" />
           <p className="mt-4 text-gray-500 max-w-md mx-auto text-sm leading-relaxed">
             Comunicados e programações especiais para toda a comunidade.
           </p>
         </div>
+        </ScrollReveal>
 
+        <ScrollReveal delay={0.15}>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           {avisosPublicos.map((aviso) => (
             <div
@@ -58,6 +62,7 @@ export default function MuralPublico() {
             </div>
           ))}
         </div>
+        </ScrollReveal>
 
         {avisosPublicos.length === 0 && (
           <p className="text-center text-gray-400">Nenhum aviso no momento.</p>

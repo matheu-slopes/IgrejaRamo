@@ -19,7 +19,7 @@ export default function LandingFooter() {
               className="h-11 w-auto"
               style={{ filter: "invert(1)", mixBlendMode: "screen" }}
             />
-            <p className="font-serif italic text-vine-500 text-sm max-w-[220px] leading-relaxed">
+            <p className="font-sans italic text-vine-500 text-sm max-w-[220px] leading-relaxed">
               "Eu sou a videira; vós sois os ramos."
               <span className="block not-italic text-vine-600 text-xs mt-1">— João 15:5</span>
             </p>

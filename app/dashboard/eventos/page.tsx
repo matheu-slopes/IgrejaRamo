@@ -55,7 +55,7 @@ export default function EventosDashboardPage() {
       {/* Page header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-serif font-semibold text-vine-950">Eventos</h1>
+          <h1 className="text-2xl font-sans font-semibold text-vine-950">Eventos</h1>
           <p className="text-sm text-gray-500 mt-0.5">Agenda do ministério · integração com calendário</p>
         </div>
         {isLider && (
@@ -177,7 +177,7 @@ function EventoCard({
       <div className="flex items-start gap-4">
         <div className="shrink-0 w-12 text-center bg-vine-50 rounded-xl py-2">
           <p className="text-[10px] text-vine-400 uppercase font-semibold">{diaSemana(e.data).slice(0, 3)}</p>
-          <p className="text-xl font-serif font-bold text-vine-800 leading-tight">{e.data.split("-")[2]}</p>
+          <p className="text-xl font-sans font-bold text-vine-800 leading-tight">{e.data.split("-")[2]}</p>
           <p className="text-[10px] text-gray-400">{formatarData(e.data).split(" ").slice(1, 2).join(" ")}</p>
         </div>
         <div>

@@ -642,7 +642,7 @@ export default function ChatPage() {
   return (
     <div className="max-w-5xl mx-auto">
       <div className="mb-4">
-        <h1 className="text-2xl font-serif font-semibold text-vine-950">Mensagens</h1>
+        <h1 className="text-2xl font-sans font-semibold text-vine-950">Mensagens</h1>
         <p className="text-sm text-gray-500 mt-1">
           Conversas diretas, chat do culto e canais de ministério.
         </p>

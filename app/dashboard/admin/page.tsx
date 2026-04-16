@@ -106,7 +106,7 @@ export default function AdminPage() {
         <div>
           <div className="flex items-center gap-2 mb-0.5">
             <Shield className="w-5 h-5 text-vine-700" />
-            <h1 className="text-2xl font-serif font-semibold text-vine-950">Painel Admin</h1>
+            <h1 className="text-2xl font-sans font-semibold text-vine-950">Painel Admin</h1>
           </div>
           <p className="text-sm text-gray-500">
             Gerencie usuários, roles e permissões individuais sem editar código.
@@ -142,7 +142,7 @@ export default function AdminPage() {
               { label: "Inativos",  valor: usuarios.filter((u) => !u.ativo).length,cor: "text-red-600"   },
             ]).map((s) => (
               <div key={s.label} className="bg-white rounded-xl border border-gray-100 px-4 py-3 text-center">
-                <p className={clsx("text-2xl font-bold font-serif", s.cor)}>{s.valor}</p>
+                <p className={clsx("text-2xl font-bold font-sans", s.cor)}>{s.valor}</p>
                 <p className="text-xs text-gray-400 mt-0.5">{s.label}</p>
               </div>
             ))}
@@ -369,7 +369,7 @@ function MinisteriosTab({
               {/* Header do card */}
               <div className={clsx("px-5 py-3 flex items-center justify-between", COR_BG[canal.cor] ?? "bg-vine-600")}>
                 <div className="flex items-center gap-3">
-                  <span className="font-serif font-semibold text-white text-base">{canal.ministerio}</span>
+                  <span className="font-sans font-semibold text-white text-base">{canal.ministerio}</span>
                   <span className={clsx(
                     "text-[10px] font-semibold px-2 py-0.5 rounded-full border border-white/30 text-white/90",
                     canal.chatBloqueado ? "bg-white/20" : "bg-white/10"

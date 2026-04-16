@@ -1,4 +1,4 @@
-ï»¿"use client";
+"use client";
 
 import Link from "next/link";
 import Image from "next/image";
@@ -8,10 +8,10 @@ import clsx from "clsx";
 
 const links = [
   { href: "#cultos",      label: "Cultos"       },
-  { href: "#avisos",      label: "ProgramaÃ§Ã£o"  },
+  { href: "#avisos",      label: "Programação"  },
   { href: "#galeria",     label: "Galeria"      },
   { href: "#quem-somos",  label: "Quem Somos"   },
-  { href: "#localizacao", label: "LocalizaÃ§Ã£o"  },
+  { href: "#localizacao", label: "Localização"  },
 ];
 
 export default function PublicNavbar() {
