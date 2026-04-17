@@ -23,7 +23,7 @@ export default function ParticleHero() {
       if (window.scrollY > 80) return; // usuário já scrollou, não interfere
 
       const start = window.scrollY;
-      const distance = 160;
+      const distance = 420;
       const duration = 900;
       let startTime: number | null = null;
 
@@ -140,9 +140,17 @@ export default function ParticleHero() {
           animate={{ opacity: 1 }}
           transition={{ delay: 2 }}
           style={{ opacity: hintOpacity }}
-          className="absolute bottom-10 left-1/2 -translate-x-1/2 z-10 flex flex-col items-center gap-3"
+          className="absolute bottom-10 left-1/2 -translate-x-1/2 z-10 flex flex-col items-center gap-3 cursor-pointer group"
+          onClick={() => {
+            const next = document.getElementById("discover");
+            if (next) {
+              next.scrollIntoView({ behavior: "smooth" });
+            } else {
+              window.scrollTo({ top: window.innerHeight, behavior: "smooth" });
+            }
+          }}
         >
-          <span className="text-[10px] tracking-[0.45em] uppercase text-white/35 font-light">
+          <span className="text-[10px] tracking-[0.45em] uppercase text-white/35 font-light group-hover:text-white/70 transition-colors duration-300">
             Descubra mais
           </span>
           {/* Chevrons pulsando em cascata */}
