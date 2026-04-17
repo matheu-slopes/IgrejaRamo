@@ -13,10 +13,10 @@ import clsx from "clsx";
 
 const MINISTERIOS: { label: string; value: Ministerio; icon: React.ElementType }[] = [
   { label: "Louvor",      value: "Louvor",      icon: Music           },
-  { label: "Mídias",      value: "Mídias",      icon: Video           },
+  { label: "MÃ­dias",      value: "MÃ­dias",      icon: Video           },
   { label: "Ensino",      value: "Ensino",       icon: BookOpen        },
   { label: "Infantil",    value: "Infantil",     icon: Baby            },
-  { label: "Ação Social", value: "Ação Social",  icon: HeartHandshake  },
+  { label: "AÃ§Ã£o Social", value: "AÃ§Ã£o Social",  icon: HeartHandshake  },
 ];
 
 function formatTime(iso: string) {
@@ -86,7 +86,7 @@ export default function ConversasPage() {
       autorId: user.id,
       autorNome: user.nome,
       autorRole: user.role,
-      conteudo: tipo === "texto" ? texto.trim() : tipo === "imagem" ? "?? Imagem" : "??? Áudio",
+      conteudo: tipo === "texto" ? texto.trim() : tipo === "imagem" ? "ðŸ“· Imagem" : "ðŸŽ™ï¸ Ãudio",
       criadoEm: new Date().toISOString(),
       fixada: false,
       tipo,
@@ -133,7 +133,7 @@ export default function ConversasPage() {
       setTempoGravacao(0);
       timerRef.current = setInterval(() => setTempoGravacao((t) => t + 1), 1000);
     } catch {
-      alert("Permissão de microfone negada.");
+      alert("PermissÃ£o de microfone negada.");
     }
   }
 
@@ -163,7 +163,7 @@ export default function ConversasPage() {
       <div className="mb-4">
         <h1 className="text-2xl font-sans font-semibold text-vine-950">Conversas</h1>
         <p className="text-sm text-gray-500 mt-0.5">
-          Comunicação interna por ministério — texto, imagens e áudios.
+          ComunicaÃ§Ã£o interna por ministÃ©rio â€” texto, imagens e Ã¡udios.
         </p>
       </div>
 
@@ -215,7 +215,7 @@ export default function ConversasPage() {
               <div className={clsx("max-w-[75%]", isMe && "items-end flex flex-col")}>
                 <div className={clsx("flex items-center gap-1.5 mb-1", isMe ? "flex-row-reverse" : "flex-row")}>
                   <span className="text-xs font-semibold text-gray-700">
-                    {isMe ? "Você" : msg.autorNome.split(" ")[0]}
+                    {isMe ? "VocÃª" : msg.autorNome.split(" ")[0]}
                   </span>
                   <span className={clsx("text-[10px] font-medium px-1.5 py-0.5 rounded-full", roleBadge(msg.autorRole))}>
                     {msg.autorRole}
@@ -322,7 +322,7 @@ export default function ConversasPage() {
             value={texto}
             onChange={(e) => setTexto(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && (e.preventDefault(), enviar())}
-            placeholder={`Mensagem para ${activeMin}…`}
+            placeholder={`Mensagem para ${activeMin}â€¦`}
             className="flex-1 bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-vine-300 shadow-sm"
           />
 
@@ -336,11 +336,11 @@ export default function ConversasPage() {
             <ImageIcon className="w-5 h-5" />
           </button>
 
-          {/* Gravar áudio */}
+          {/* Gravar ï¿½udio */}
           <button
             onClick={iniciarGravacao}
             className="p-2.5 rounded-xl border border-gray-200 bg-white text-gray-500 hover:text-vine-700 hover:border-vine-300 transition"
-            title="Gravar áudio"
+            title="Gravar Ã¡udio"
           >
             <Mic className="w-5 h-5" />
           </button>
