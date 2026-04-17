@@ -3,7 +3,17 @@
 import { useRef, useEffect, useState } from "react";
 import Image from "next/image";
 import { motion, useScroll, useTransform, useMotionValue, useSpring } from "framer-motion";
-import { Play, BookOpen } from "lucide-react";
+import { Play, BookOpen, Bell, CalendarDays } from "lucide-react";
+import { mockAvisos } from "@/lib/mockData";
+
+function formatDate(iso: string) {
+  return new Date(iso + "T00:00:00").toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "long",
+  });
+}
+
+const avisosPublicos = mockAvisos.filter((a) => a.destinatarios === "todos");
 
 /* --- Tilt card component ------------------------------------------ */
 function TiltCard({
@@ -73,8 +83,7 @@ function LatestCultoCard() {
   return (
     <TiltCard
       depth={1}
-      className="rounded-3xl overflow-hidden relative group min-h-[400px]"
-      lens="Assista o culto"
+      className="rounded-[20px] overflow-hidden relative group h-full min-h-[240px] transition-shadow duration-300 hover:shadow-[0_12px_40px_rgba(0,0,0,0.08)]"
     >
       {/* Vídeo com loop nativo */}
       <video
@@ -88,7 +97,18 @@ function LatestCultoCard() {
       />
 
       {/* Dark overlay */}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-black/20" />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-black/10" />
+
+      {/* Pulsing play hint */}
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+        <motion.div
+          animate={{ scale: [1, 1.18, 1], opacity: [0.8, 0.45, 0.8] }}
+          transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
+          className="w-16 h-16 rounded-full bg-white/20 backdrop-blur-sm border border-white/30 flex items-center justify-center"
+        >
+          <Play className="w-6 h-6 fill-white text-white ml-1" />
+        </motion.div>
+      </div>
 
       {/* Content */}
       <div className="relative z-10 flex flex-col items-start justify-end h-full text-left p-8 gap-4">
@@ -121,8 +141,7 @@ function DevocionalCard() {
   return (
     <TiltCard
       depth={1}
-      className="rounded-3xl overflow-hidden relative group min-h-[400px]"
-      lens="Devocional"
+      className="rounded-[20px] overflow-hidden relative group h-full min-h-[240px] transition-shadow duration-300 hover:shadow-[0_12px_40px_rgba(0,0,0,0.08)]"
     >
       {/* Vídeo com loop nativo */}
       <video
@@ -166,179 +185,191 @@ function DevocionalCard() {
 /* --- Small info cards --------------------------------------------- */
 /* --- Main BentoGrid ----------------------------------------------- */
 export default function BentoGrid() {
-  return (
-    <section className="relative py-28 px-5 overflow-hidden">
-      {/* Background gradient orbs */}
-      <div className="absolute top-0 left-1/4 w-[600px] h-[600px] bg-gray-100/30 rounded-full blur-[130px] pointer-events-none" />
-      <div className="absolute bottom-0 right-1/4 w-[500px] h-[500px] bg-gray-100/20 rounded-full blur-[110px] pointer-events-none" />
-      <div className="absolute top-1/2 left-0 w-[300px] h-[300px] bg-gray-100/20 rounded-full blur-[90px] pointer-events-none" />
+  const sectionRef = useRef<HTMLElement>(null);
+  const { scrollYProgress } = useScroll({ target: sectionRef, offset: ["start end", "end start"] });
+  const branchParallax = useTransform(scrollYProgress, [0, 1], [40, -40]);
 
-      {/* Dot grid pattern */}
+  /* stagger container */
+  const stagger = {
+    hidden: {},
+    show: { transition: { staggerChildren: 0.15 } },
+  };
+  const fadeUp = {
+    hidden: { opacity: 0, y: 20 },
+    show: { opacity: 1, y: 0, transition: { duration: 0.6, ease: "easeOut" as const } },
+  };
+
+  return (
+    <section
+      ref={sectionRef}
+      className="relative overflow-hidden"
+      style={{
+        padding: "10vh 5vw",
+        backgroundColor: "#FDFDFB",
+        backgroundImage:
+          "url(\"data:image/svg+xml,%3Csvg width='40' height='40' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='40' height='40' filter='url(%23n)' opacity='0.025'/%3E%3C/svg%3E\")",
+      }}
+    >
+      {/* Subtle linen grain overlay */}
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-0 opacity-[0.5]"
+        className="pointer-events-none absolute inset-0"
         style={{
-          backgroundImage: "radial-gradient(circle, rgba(0,0,0,0.05) 1px, transparent 1px)",
-          backgroundSize: "32px 32px",
+          backgroundImage: "radial-gradient(circle, rgba(0,0,0,0.04) 1px, transparent 1px)",
+          backgroundSize: "28px 28px",
         }}
       />
 
-      {/* Watermark verse */}
-      <div
+      {/* ── Ramo botânico — canto inferior esquerdo ── */}
+      <motion.svg
         aria-hidden="true"
-        className="pointer-events-none absolute inset-0 flex items-center justify-center overflow-hidden select-none"
-      >
-        <p className="font-serif text-[clamp(3.5rem,10vw,8rem)] font-bold text-gray-400/[0.08] leading-tight text-center px-8 whitespace-nowrap">
-          João 15:5
-        </p>
-      </div>
-
-      {/* Diagonal accent lines */}
-      <svg
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 w-full h-full opacity-[0.1] select-none"
-        xmlns="http://www.w3.org/2000/svg"
-        preserveAspectRatio="none"
-      >
-        <line x1="0" y1="100%" x2="40%" y2="0" stroke="#d1d5db" strokeWidth="1"/>
-        <line x1="20%" y1="100%" x2="65%" y2="0" stroke="#d1d5db" strokeWidth="0.5"/>
-        <line x1="60%" y1="100%" x2="100%" y2="20%" stroke="#d1d5db" strokeWidth="1"/>
-        <line x1="80%" y1="100%" x2="100%" y2="60%" stroke="#d1d5db" strokeWidth="0.5"/>
-      </svg>
-
-      {/* Ramos �?" fundo completo */}
-      <svg
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 w-full h-full select-none opacity-[0.15]"
-        viewBox="0 0 1200 800"
-        preserveAspectRatio="xMidYMid slice"
+        style={{ y: branchParallax, filter: "blur(3px)" }}
+        className="pointer-events-none absolute -left-10 -bottom-10 w-80 h-80 opacity-[0.1] select-none"
+        viewBox="0 0 200 200"
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
       >
-        {/* canto inf esq */}
-        <g transform="translate(-20, 620) rotate(-15)">
-          <path d="M20 180 Q60 120 110 90 Q160 60 145 10" stroke="#d1d5db" strokeWidth="1.2" strokeLinecap="round"/>
-          <path d="M110 90 Q85 70 65 45" stroke="#d1d5db" strokeWidth="0.9" strokeLinecap="round"/>
-          <path d="M110 90 Q135 72 150 48" stroke="#d1d5db" strokeWidth="0.9" strokeLinecap="round"/>
-          <path d="M65 45 Q52 30 46 12" stroke="#d1d5db" strokeWidth="0.7" strokeLinecap="round"/>
-          <path d="M65 45 Q78 32 85 16" stroke="#d1d5db" strokeWidth="0.7" strokeLinecap="round"/>
-          <path d="M40 150 Q55 135 70 118" stroke="#d1d5db" strokeWidth="0.8" strokeLinecap="round"/>
-          <path d="M40 150 Q28 133 20 114" stroke="#d1d5db" strokeWidth="0.8" strokeLinecap="round"/>
-        </g>
-        {/* canto sup dir */}
-        <g transform="translate(1080, 20) rotate(160)">
-          <path d="M20 180 Q60 120 110 90 Q160 60 145 10" stroke="#d1d5db" strokeWidth="1.2" strokeLinecap="round"/>
-          <path d="M110 90 Q85 70 65 45" stroke="#d1d5db" strokeWidth="0.9" strokeLinecap="round"/>
-          <path d="M110 90 Q135 72 150 48" stroke="#d1d5db" strokeWidth="0.9" strokeLinecap="round"/>
-          <path d="M65 45 Q52 30 46 12" stroke="#d1d5db" strokeWidth="0.7" strokeLinecap="round"/>
-          <path d="M65 45 Q78 32 85 16" stroke="#d1d5db" strokeWidth="0.7" strokeLinecap="round"/>
-        </g>
-        {/* lateral esq centro */}
-        <g transform="translate(-30, 320) rotate(25)">
-          <path d="M20 180 Q60 120 110 90 Q160 60 145 10" stroke="#d1d5db" strokeWidth="1" strokeLinecap="round"/>
-          <path d="M110 90 Q85 70 65 45" stroke="#d1d5db" strokeWidth="0.8" strokeLinecap="round"/>
-          <path d="M110 90 Q135 72 150 48" stroke="#d1d5db" strokeWidth="0.8" strokeLinecap="round"/>
-          <path d="M145 10 Q162 2 175 -12" stroke="#d1d5db" strokeWidth="0.6" strokeLinecap="round"/>
-        </g>
-        {/* lateral dir centro */}
-        <g transform="translate(1100, 260) rotate(-35)">
-          <path d="M20 180 Q60 120 110 90 Q160 60 145 10" stroke="#d1d5db" strokeWidth="1" strokeLinecap="round"/>
-          <path d="M110 90 Q85 70 65 45" stroke="#d1d5db" strokeWidth="0.8" strokeLinecap="round"/>
-          <path d="M110 90 Q135 72 150 48" stroke="#d1d5db" strokeWidth="0.8" strokeLinecap="round"/>
-          <path d="M65 45 Q52 30 46 12" stroke="#d1d5db" strokeWidth="0.6" strokeLinecap="round"/>
-        </g>
-        {/* centro absoluto */}
-        <g transform="translate(540, 280) rotate(50)">
-          <path d="M20 180 Q60 120 110 90 Q160 60 145 10" stroke="#d1d5db" strokeWidth="1.1" strokeLinecap="round"/>
-          <path d="M110 90 Q85 70 65 45" stroke="#d1d5db" strokeWidth="0.9" strokeLinecap="round"/>
-          <path d="M110 90 Q135 72 150 48" stroke="#d1d5db" strokeWidth="0.9" strokeLinecap="round"/>
-          <path d="M65 45 Q52 30 46 12" stroke="#d1d5db" strokeWidth="0.7" strokeLinecap="round"/>
-          <path d="M65 45 Q78 32 85 16" stroke="#d1d5db" strokeWidth="0.7" strokeLinecap="round"/>
-          <path d="M145 10 Q162 2 175 -12" stroke="#d1d5db" strokeWidth="0.6" strokeLinecap="round"/>
-        </g>
-        {/* quarto sup esq */}
-        <g transform="translate(230, 80) rotate(-55)">
-          <path d="M20 180 Q60 120 110 90 Q160 60 145 10" stroke="#d1d5db" strokeWidth="1" strokeLinecap="round"/>
-          <path d="M110 90 Q85 70 65 45" stroke="#d1d5db" strokeWidth="0.8" strokeLinecap="round"/>
-          <path d="M110 90 Q135 72 150 48" stroke="#d1d5db" strokeWidth="0.8" strokeLinecap="round"/>
-          <path d="M145 10 Q162 2 175 -12" stroke="#d1d5db" strokeWidth="0.6" strokeLinecap="round"/>
-        </g>
-        {/* quarto inf dir */}
-        <g transform="translate(850, 580) rotate(115)">
-          <path d="M20 180 Q60 120 110 90 Q160 60 145 10" stroke="#d1d5db" strokeWidth="1" strokeLinecap="round"/>
-          <path d="M110 90 Q85 70 65 45" stroke="#d1d5db" strokeWidth="0.8" strokeLinecap="round"/>
-          <path d="M110 90 Q135 72 150 48" stroke="#d1d5db" strokeWidth="0.8" strokeLinecap="round"/>
-          <path d="M65 45 Q52 30 46 12" stroke="#d1d5db" strokeWidth="0.6" strokeLinecap="round"/>
-        </g>
-        {/* topo centro */}
-        <g transform="translate(560, -40) rotate(88)">
-          <path d="M20 180 Q60 120 110 90 Q160 60 145 10" stroke="#d1d5db" strokeWidth="1" strokeLinecap="round"/>
-          <path d="M110 90 Q85 70 65 45" stroke="#d1d5db" strokeWidth="0.8" strokeLinecap="round"/>
-          <path d="M110 90 Q135 72 150 48" stroke="#d1d5db" strokeWidth="0.8" strokeLinecap="round"/>
-          <path d="M145 10 Q162 2 175 -12" stroke="#d1d5db" strokeWidth="0.6" strokeLinecap="round"/>
-          <path d="M65 45 Q52 30 46 12" stroke="#d1d5db" strokeWidth="0.6" strokeLinecap="round"/>
-        </g>
-        {/* base centro */}
-        <g transform="translate(580, 780) rotate(-92)">
-          <path d="M20 180 Q60 120 110 90 Q160 60 145 10" stroke="#d1d5db" strokeWidth="1" strokeLinecap="round"/>
-          <path d="M110 90 Q85 70 65 45" stroke="#d1d5db" strokeWidth="0.8" strokeLinecap="round"/>
-          <path d="M110 90 Q135 72 150 48" stroke="#d1d5db" strokeWidth="0.8" strokeLinecap="round"/>
-          <path d="M145 10 Q162 2 175 -12" stroke="#d1d5db" strokeWidth="0.6" strokeLinecap="round"/>
-        </g>
-        {/* quarto sup dir */}
-        <g transform="translate(920, 100) rotate(70)">
-          <path d="M20 180 Q60 120 110 90 Q160 60 145 10" stroke="#d1d5db" strokeWidth="0.9" strokeLinecap="round"/>
-          <path d="M110 90 Q85 70 65 45" stroke="#d1d5db" strokeWidth="0.7" strokeLinecap="round"/>
-          <path d="M110 90 Q135 72 150 48" stroke="#d1d5db" strokeWidth="0.7" strokeLinecap="round"/>
-        </g>
-        {/* quarto inf esq */}
-        <g transform="translate(180, 620) rotate(-110)">
-          <path d="M20 180 Q60 120 110 90 Q160 60 145 10" stroke="#d1d5db" strokeWidth="0.9" strokeLinecap="round"/>
-          <path d="M110 90 Q85 70 65 45" stroke="#d1d5db" strokeWidth="0.7" strokeLinecap="round"/>
-          <path d="M110 90 Q135 72 150 48" stroke="#d1d5db" strokeWidth="0.7" strokeLinecap="round"/>
-          <path d="M65 45 Q52 30 46 12" stroke="#d1d5db" strokeWidth="0.6" strokeLinecap="round"/>
-        </g>
-        {/* centro esq baixo */}
-        <g transform="translate(360, 480) rotate(135)">
-          <path d="M20 180 Q60 120 110 90 Q160 60 145 10" stroke="#d1d5db" strokeWidth="0.9" strokeLinecap="round"/>
-          <path d="M110 90 Q85 70 65 45" stroke="#d1d5db" strokeWidth="0.7" strokeLinecap="round"/>
-          <path d="M110 90 Q135 72 150 48" stroke="#d1d5db" strokeWidth="0.7" strokeLinecap="round"/>
-        </g>
-        {/* centro dir cima */}
-        <g transform="translate(780, 200) rotate(-20)">
-          <path d="M20 180 Q60 120 110 90 Q160 60 145 10" stroke="#d1d5db" strokeWidth="0.9" strokeLinecap="round"/>
-          <path d="M110 90 Q85 70 65 45" stroke="#d1d5db" strokeWidth="0.7" strokeLinecap="round"/>
-          <path d="M110 90 Q135 72 150 48" stroke="#d1d5db" strokeWidth="0.7" strokeLinecap="round"/>
-          <path d="M145 10 Q162 2 175 -12" stroke="#d1d5db" strokeWidth="0.6" strokeLinecap="round"/>
-        </g>
-      </svg>
+        {/* Galhos */}
+        <path d="M20 190 Q60 140 90 100 Q120 60 100 10" stroke="#276f2a" strokeWidth="2" strokeLinecap="round"/>
+        <path d="M90 100 Q65 85 45 60" stroke="#276f2a" strokeWidth="1.5" strokeLinecap="round"/>
+        <path d="M90 100 Q115 82 130 55" stroke="#276f2a" strokeWidth="1.5" strokeLinecap="round"/>
+        <path d="M45 60 Q32 45 28 22" stroke="#276f2a" strokeWidth="1.1" strokeLinecap="round"/>
+        <path d="M45 60 Q58 46 65 28" stroke="#276f2a" strokeWidth="1.1" strokeLinecap="round"/>
+        <path d="M130 55 Q145 38 148 18" stroke="#276f2a" strokeWidth="1.1" strokeLinecap="round"/>
+        <path d="M130 55 Q118 38 120 18" stroke="#276f2a" strokeWidth="1.1" strokeLinecap="round"/>
+        <path d="M55 150 Q70 135 82 115" stroke="#276f2a" strokeWidth="1.3" strokeLinecap="round"/>
+        <path d="M55 150 Q40 132 30 112" stroke="#276f2a" strokeWidth="1.3" strokeLinecap="round"/>
+        {/* Folhas nas pontas */}
+        <ellipse cx="100" cy="10" rx="4" ry="9" transform="rotate(-15 100 10)" fill="#276f2a" opacity="0.7"/>
+        <ellipse cx="28" cy="22" rx="3.5" ry="8" transform="rotate(-30 28 22)" fill="#276f2a" opacity="0.6"/>
+        <ellipse cx="65" cy="28" rx="3.5" ry="8" transform="rotate(10 65 28)" fill="#276f2a" opacity="0.6"/>
+        <ellipse cx="148" cy="18" rx="3.5" ry="8" transform="rotate(20 148 18)" fill="#276f2a" opacity="0.6"/>
+        <ellipse cx="120" cy="18" rx="3.5" ry="8" transform="rotate(-10 120 18)" fill="#276f2a" opacity="0.6"/>
+        <ellipse cx="82" cy="115" rx="3" ry="7" transform="rotate(35 82 115)" fill="#276f2a" opacity="0.5"/>
+        <ellipse cx="30" cy="112" rx="3" ry="7" transform="rotate(-25 30 112)" fill="#276f2a" opacity="0.5"/>
+        {/* Folhas nos galhos laterais */}
+        <ellipse cx="55" cy="72" rx="3" ry="7" transform="rotate(-40 55 72)" fill="#276f2a" opacity="0.5"/>
+        <ellipse cx="118" cy="68" rx="3" ry="7" transform="rotate(30 118 68)" fill="#276f2a" opacity="0.5"/>
+        <ellipse cx="75" cy="130" rx="3" ry="7" transform="rotate(20 75 130)" fill="#276f2a" opacity="0.4"/>
+        <ellipse cx="35" cy="140" rx="3" ry="7" transform="rotate(-20 35 140)" fill="#276f2a" opacity="0.4"/>
+      </motion.svg>
 
-      <div className="max-w-6xl mx-auto">
+      {/* ── Ramo botânico — canto superior direito ── */}
+      <motion.svg
+        aria-hidden="true"
+        style={{ y: branchParallax, filter: "blur(3px)", scaleY: -1, scaleX: -1 }}
+        className="pointer-events-none absolute -right-10 -top-10 w-80 h-80 opacity-[0.1] select-none"
+        viewBox="0 0 200 200"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        {/* Galhos */}
+        <path d="M20 190 Q60 140 90 100 Q120 60 100 10" stroke="#276f2a" strokeWidth="2" strokeLinecap="round"/>
+        <path d="M90 100 Q65 85 45 60" stroke="#276f2a" strokeWidth="1.5" strokeLinecap="round"/>
+        <path d="M90 100 Q115 82 130 55" stroke="#276f2a" strokeWidth="1.5" strokeLinecap="round"/>
+        <path d="M45 60 Q32 45 28 22" stroke="#276f2a" strokeWidth="1.1" strokeLinecap="round"/>
+        <path d="M45 60 Q58 46 65 28" stroke="#276f2a" strokeWidth="1.1" strokeLinecap="round"/>
+        <path d="M130 55 Q145 38 148 18" stroke="#276f2a" strokeWidth="1.1" strokeLinecap="round"/>
+        <path d="M130 55 Q118 38 120 18" stroke="#276f2a" strokeWidth="1.1" strokeLinecap="round"/>
+        <path d="M55 150 Q70 135 82 115" stroke="#276f2a" strokeWidth="1.3" strokeLinecap="round"/>
+        <path d="M55 150 Q40 132 30 112" stroke="#276f2a" strokeWidth="1.3" strokeLinecap="round"/>
+        {/* Folhas nas pontas */}
+        <ellipse cx="100" cy="10" rx="4" ry="9" transform="rotate(-15 100 10)" fill="#276f2a" opacity="0.7"/>
+        <ellipse cx="28" cy="22" rx="3.5" ry="8" transform="rotate(-30 28 22)" fill="#276f2a" opacity="0.6"/>
+        <ellipse cx="65" cy="28" rx="3.5" ry="8" transform="rotate(10 65 28)" fill="#276f2a" opacity="0.6"/>
+        <ellipse cx="148" cy="18" rx="3.5" ry="8" transform="rotate(20 148 18)" fill="#276f2a" opacity="0.6"/>
+        <ellipse cx="120" cy="18" rx="3.5" ry="8" transform="rotate(-10 120 18)" fill="#276f2a" opacity="0.6"/>
+        <ellipse cx="82" cy="115" rx="3" ry="7" transform="rotate(35 82 115)" fill="#276f2a" opacity="0.5"/>
+        <ellipse cx="30" cy="112" rx="3" ry="7" transform="rotate(-25 30 112)" fill="#276f2a" opacity="0.5"/>
+        {/* Folhas nos galhos laterais */}
+        <ellipse cx="55" cy="72" rx="3" ry="7" transform="rotate(-40 55 72)" fill="#276f2a" opacity="0.5"/>
+        <ellipse cx="118" cy="68" rx="3" ry="7" transform="rotate(30 118 68)" fill="#276f2a" opacity="0.5"/>
+        <ellipse cx="75" cy="130" rx="3" ry="7" transform="rotate(20 75 130)" fill="#276f2a" opacity="0.4"/>
+        <ellipse cx="35" cy="140" rx="3" ry="7" transform="rotate(-20 35 140)" fill="#276f2a" opacity="0.4"/>
+      </motion.svg>
+
+      <div className="relative z-10 max-w-6xl mx-auto">
         {/* Section header */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
+          transition={{ duration: 0.6 }}
           className="text-center mb-16"
         >
-          <p className="text-vine-700 text-sm md:text-base font-semibold tracking-[0.45em] uppercase">
-            Culto & Devocional
+          <p className="text-[#1A1A1A] text-sm md:text-base font-medium tracking-[0.2em] uppercase">
+            Se liga nas últimas atualizações
           </p>
         </motion.div>
 
-        {/* Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+        {/* Grid: cards empilhados + mural ao lado */}
+        <motion.div
+          variants={stagger}
+          initial="hidden"
+          whileInView="show"
+          viewport={{ once: true }}
+          className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-stretch"
+        >
+          {/* Coluna esquerda: cards empilhados */}
+          <div className="flex flex-col gap-5 h-full">
+            <motion.div variants={fadeUp} className="flex-1 min-h-0">
+              <LatestCultoCard />
+            </motion.div>
+            <motion.div variants={fadeUp} className="flex-1 min-h-0">
+              <DevocionalCard />
+            </motion.div>
+          </div>
 
-          {/* -- Card 1: Assista nosso ultimo culto ---- */}
-          <LatestCultoCard />
+          {/* Coluna direita: Mural de Avisos */}
+          <motion.div
+            variants={fadeUp}
+            whileHover={{ scale: 1.02, boxShadow: "0 12px 40px rgba(0,0,0,0.08)" }}
+            transition={{ type: "spring", stiffness: 300, damping: 20 }}
+            className="flex flex-col rounded-[20px] border border-black/[0.05] p-[30px]"
+            style={{
+              background: "rgba(255,255,255,0.4)",
+              backdropFilter: "blur(10px)",
+              WebkitBackdropFilter: "blur(10px)",
+            }}
+          >
+            <div className="mb-6 flex items-end justify-between border-b border-black/[0.06] pb-5">
+              <div>
+                <p className="mb-1.5 text-[11px] uppercase tracking-[0.45em] text-vine-600">Fique por dentro</p>
+                <h2 className="font-sans text-2xl font-semibold leading-none text-vine-900">Mural de Avisos</h2>
+              </div>
+              <Bell className="h-5 w-5 text-vine-500" />
+            </div>
 
-          {/* -- Card 2: Devocional Diario (video loop) ---- */}
-          <DevocionalCard />
-        </div>
+            <ol className="space-y-3 flex-1 overflow-auto">
+              {avisosPublicos.map((aviso, i) => (
+                <motion.li
+                  key={aviso.id}
+                  initial={{ opacity: 0, x: 12 }}
+                  whileInView={{ opacity: 1, x: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.45, delay: i * 0.08 }}
+                  className="group flex items-start gap-4 rounded-xl border border-black/[0.05] border-l-2 border-l-vine-500 bg-transparent px-5 pl-6 py-4 transition-all duration-300 hover:bg-black/[0.03] cursor-pointer"
+                >
+                  <div className="flex flex-1 flex-col gap-1.5 min-w-0">
+                    <span className="text-sm font-semibold leading-snug text-vine-900">{aviso.titulo}</span>
+                    <span className="text-xs leading-5 text-vine-600">{aviso.conteudo}</span>
+                    <span className="mt-1 inline-flex w-fit items-center gap-1 font-serif italic text-[11px] text-gray-500">
+                      <CalendarDays className="h-2.5 w-2.5" />
+                      {formatDate(aviso.criadoEm)}
+                    </span>
+                  </div>
+                </motion.li>
+              ))}
+              {avisosPublicos.length === 0 && (
+                <li className="py-6 text-center text-[12px] text-vine-400">Nenhum aviso no momento.</li>
+              )}
+            </ol>
+          </motion.div>
+        </motion.div>
       </div>
 
-      {/* Fade de saída: funde os cards escuros com a seção seguinte */}
-      <div className="absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-b from-transparent to-[#F7F2EA]/60 pointer-events-none z-10" />
+      {/* Fade de saída */}
+      <div className="absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-b from-transparent to-[#FDFDFB]/60 pointer-events-none z-10" />
     </section>
   );
 }

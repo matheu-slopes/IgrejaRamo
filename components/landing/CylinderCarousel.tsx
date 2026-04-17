@@ -1,8 +1,8 @@
 ﻿"use client";
 
-import { motion } from "framer-motion";
-import { Clock3, MapPin, Bell, CalendarDays } from "lucide-react";
-import { mockAvisos } from "@/lib/mockData";
+import { useRef } from "react";
+import { motion, useScroll, useTransform } from "framer-motion";
+import { Clock3, MapPin } from "lucide-react";
 
 interface CultoDay {
   id: string;
@@ -64,169 +64,177 @@ const days: CultoDay[] = [
   },
 ];
 
-const avisosPublicos = mockAvisos.filter((a) => a.destinatarios === "todos");
-
-function formatDate(iso: string) {
-  return new Date(iso + "T00:00:00").toLocaleDateString("pt-BR", {
-    day: "2-digit",
-    month: "long",
-  });
-}
+/* ── Stagger variants ── */
+const stagger = {
+  hidden: {},
+  show: { transition: { staggerChildren: 0.1, delayChildren: 0.2 } },
+};
+const fadeUp = {
+  hidden: { opacity: 0, y: 24 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.55, ease: "easeOut" as const } },
+};
 
 export default function CylinderCarousel() {
+  const sectionRef = useRef<HTMLElement>(null);
+  const { scrollYProgress } = useScroll({ target: sectionRef, offset: ["start end", "end start"] });
+  const branchLeft = useTransform(scrollYProgress, [0, 1], [60, -60]);
+  const branchRight = useTransform(scrollYProgress, [0, 1], [40, -80]);
+
   return (
     <section
+      ref={sectionRef}
       id="cultos"
-      className="relative overflow-hidden px-6 py-20 sm:px-10"
+      className="relative overflow-hidden"
+      style={{ padding: "10vh 5vw", backgroundColor: "#FDFDFB" }}
     >
-      {/* Fade de entrada vindo do BentoGrid */}
-      <div className="absolute top-0 left-0 right-0 h-20 bg-gradient-to-b from-[#F7F2EA]/60 to-transparent pointer-events-none z-10" />
-      {/* glow frio à esquerda (cultos) e quente à direita (mural) */}
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_20%_0%,rgba(39,111,42,0.04),transparent_55%)]" />
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_80%_0%,rgba(39,111,42,0.06),transparent_55%)]" />
+      {/* Fade de entrada */}
+      <div className="absolute top-0 left-0 right-0 h-20 bg-gradient-to-b from-[#FDFDFB] to-transparent pointer-events-none z-10" />
 
-      <div className="relative mx-auto max-w-6xl">
-        <div className="grid grid-cols-1 gap-12 lg:grid-cols-[1fr_auto_1fr] lg:gap-0">
+      {/* Ramo botânico — lateral esquerda */}
+      <motion.svg
+        aria-hidden="true"
+        style={{ y: branchLeft, filter: "blur(3px)" }}
+        className="pointer-events-none absolute -left-16 top-1/4 w-72 h-72 opacity-[0.08] select-none"
+        viewBox="0 0 200 200"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <path d="M20 190 Q60 140 90 100 Q120 60 100 10" stroke="#276f2a" strokeWidth="2" strokeLinecap="round"/>
+        <path d="M90 100 Q65 85 45 60" stroke="#276f2a" strokeWidth="1.5" strokeLinecap="round"/>
+        <path d="M90 100 Q115 82 130 55" stroke="#276f2a" strokeWidth="1.5" strokeLinecap="round"/>
+        <path d="M45 60 Q32 45 28 22" stroke="#276f2a" strokeWidth="1.1" strokeLinecap="round"/>
+        <path d="M45 60 Q58 46 65 28" stroke="#276f2a" strokeWidth="1.1" strokeLinecap="round"/>
+        <path d="M130 55 Q145 38 148 18" stroke="#276f2a" strokeWidth="1.1" strokeLinecap="round"/>
+        <ellipse cx="100" cy="10" rx="4" ry="9" transform="rotate(-15 100 10)" fill="#276f2a" opacity="0.7"/>
+        <ellipse cx="28" cy="22" rx="3.5" ry="8" transform="rotate(-30 28 22)" fill="#276f2a" opacity="0.6"/>
+        <ellipse cx="65" cy="28" rx="3.5" ry="8" transform="rotate(10 65 28)" fill="#276f2a" opacity="0.6"/>
+        <ellipse cx="148" cy="18" rx="3.5" ry="8" transform="rotate(20 148 18)" fill="#276f2a" opacity="0.6"/>
+      </motion.svg>
 
-          {/* �.��.� COLUNA ESQUERDA �?" Programação �.��.� */}
-          <div>
-            <motion.div
-              initial={{ opacity: 0, y: 16 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.6 }}
-              className="mb-8 flex items-end justify-between border-b border-vine-300 pb-5"
+      {/* Ramo botânico — lateral direita */}
+      <motion.svg
+        aria-hidden="true"
+        style={{ y: branchRight, filter: "blur(3px)", scaleX: -1 }}
+        className="pointer-events-none absolute -right-16 bottom-1/4 w-72 h-72 opacity-[0.08] select-none"
+        viewBox="0 0 200 200"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <path d="M20 190 Q60 140 90 100 Q120 60 100 10" stroke="#276f2a" strokeWidth="2" strokeLinecap="round"/>
+        <path d="M90 100 Q65 85 45 60" stroke="#276f2a" strokeWidth="1.5" strokeLinecap="round"/>
+        <path d="M90 100 Q115 82 130 55" stroke="#276f2a" strokeWidth="1.5" strokeLinecap="round"/>
+        <path d="M130 55 Q145 38 148 18" stroke="#276f2a" strokeWidth="1.1" strokeLinecap="round"/>
+        <path d="M130 55 Q118 38 120 18" stroke="#276f2a" strokeWidth="1.1" strokeLinecap="round"/>
+        <path d="M55 150 Q70 135 82 115" stroke="#276f2a" strokeWidth="1.3" strokeLinecap="round"/>
+        <ellipse cx="100" cy="10" rx="4" ry="9" transform="rotate(-15 100 10)" fill="#276f2a" opacity="0.7"/>
+        <ellipse cx="148" cy="18" rx="3.5" ry="8" transform="rotate(20 148 18)" fill="#276f2a" opacity="0.6"/>
+        <ellipse cx="120" cy="18" rx="3.5" ry="8" transform="rotate(-10 120 18)" fill="#276f2a" opacity="0.6"/>
+        <ellipse cx="82" cy="115" rx="3" ry="7" transform="rotate(35 82 115)" fill="#276f2a" opacity="0.5"/>
+      </motion.svg>
+
+      <div className="relative z-10 mx-auto max-w-3xl">
+        {/* Section header */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.6 }}
+          className="text-center mb-14"
+        >
+          <p className="mb-3 text-[11px] uppercase tracking-[0.45em] text-vine-600">
+            Programação Semanal
+          </p>
+          <h2 className="font-sans text-3xl md:text-4xl font-semibold leading-none text-[#1A1A1A] tracking-tight">
+            Nossos Cultos
+          </h2>
+        </motion.div>
+
+        {/* Lista de cultos */}
+        <motion.ol
+          variants={stagger}
+          initial="hidden"
+          whileInView="show"
+          viewport={{ once: true }}
+          className="space-y-2 rounded-3xl border border-black/[0.05] p-4 md:p-6"
+          style={{
+            background: "rgba(255,255,255,0.4)",
+            backdropFilter: "blur(10px)",
+            WebkitBackdropFilter: "blur(10px)",
+            boxShadow: "0 8px 32px rgba(0,0,0,0.04)",
+          }}
+        >
+          {days.map((day, i) => (
+            <motion.li
+              key={day.id}
+              variants={fadeUp}
+              className="group relative rounded-2xl px-5 py-5 transition-all duration-300 cursor-pointer hover:bg-white/40 hover:backdrop-blur-md hover:shadow-[0_8px_32px_rgba(0,0,0,0.06)] hover:border-black/[0.04]"
+              style={{ border: "1px solid transparent" }}
+              whileHover={{ borderColor: "rgba(0,0,0,0.04)" }}
             >
-              <div>
-                <p className="mb-1.5 text-[11px] uppercase tracking-[0.45em] text-vine-600">
-                  Programação Semanal
-                </p>
-                <h2 className="font-sans text-2xl font-semibold leading-none text-white">
-                  Nossos Cultos
-                </h2>
-              </div>
-            </motion.div>
+              {/* Divisor gradiente inferior */}
+              <div className="absolute bottom-0 left-6 right-6 h-px bg-gradient-to-r from-transparent via-vine-300/40 to-transparent" />
 
-            <ol className="divide-y divide-vine-200">
-              {days.map((day, i) => (
-                <motion.li
-                  key={day.id}
-                  initial={{ opacity: 0, x: -12 }}
-                  whileInView={{ opacity: 1, x: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 0.45, delay: i * 0.07 }}
-                  whileHover={{ backgroundColor: "rgba(39,111,42,0.06)" }}
-                  className="group flex items-center gap-5 rounded-xl px-3 py-4 transition-colors duration-300"
+              <div className="relative z-10 flex items-center gap-5">
+                {/* Dia da semana */}
+                <span
+                  className={`w-14 shrink-0 font-sans text-lg font-bold tracking-[0.12em] transition-colors duration-300 ${
+                    day.featured
+                      ? "text-vine-800"
+                      : "text-vine-600 group-hover:text-vine-900"
+                  }`}
                 >
-                  <span className="w-5 shrink-0 text-xs tabular-nums text-vine-400 group-hover:text-vine-600 transition-colors">
-                    {String(i + 1).padStart(2, "0")}
-                  </span>
+                  {day.short}
+                </span>
 
+                {/* Separador vertical */}
+                <span className="h-10 w-px shrink-0 bg-gradient-to-b from-transparent via-vine-300/50 to-transparent" />
+
+                {/* Conteúdo */}
+                <div className="flex flex-1 flex-col gap-1 min-w-0">
                   <span
-                    className={`w-12 shrink-0 font-serif text-base font-semibold leading-none tracking-[0.1em] transition-colors duration-300 ${
-                      day.featured ? "text-vine-900" : "text-vine-700 group-hover:text-vine-950"
+                    className={`text-base font-semibold leading-tight transition-colors duration-300 ${
+                      day.featured
+                        ? "text-[#1A1A1A]"
+                        : "text-vine-900 group-hover:text-[#1A1A1A]"
                     }`}
                   >
-                    {day.short}
+                    {day.title}
                   </span>
+                  <span className="text-[13px] leading-relaxed text-vine-500/80 group-hover:text-vine-600 transition-colors duration-300">
+                    {day.description}
+                  </span>
+                </div>
 
-                  <span className="h-7 w-px shrink-0 bg-white/[0.10]" />
-
-                  <div className="flex flex-1 flex-col gap-1 min-w-0">
-                    <span
-                      className={`truncate text-sm font-semibold leading-none transition-colors duration-300 ${
-                        day.featured ? "text-vine-900" : "text-vine-800 group-hover:text-vine-950"
-                      }`}
-                    >
-                      {day.title}
-                    </span>
-                    <span className="truncate text-xs text-vine-500 group-hover:text-vine-700 transition-colors duration-300">
-                      {day.description}
-                    </span>
-                  </div>
-
-                  <div className="hidden shrink-0 flex-col items-end gap-1 sm:flex">
-                    <span className="flex items-center gap-1 text-xs text-vine-600 group-hover:text-vine-800 transition-colors">
-                      <Clock3 className="h-3 w-3 text-vine-400" />
-                      {day.time}
-                    </span>
-                    <span className="flex items-center gap-1 text-[11px] text-vine-500 group-hover:text-vine-600 transition-colors">
-                      <MapPin className="h-2.5 w-2.5" />
-                      {day.place}
-                    </span>
-                  </div>
-
-                  {day.featured && (
-                    <span className="ml-1 h-2 w-2 shrink-0 rounded-full bg-gray-400" />
-                  )}
-                </motion.li>
-              ))}
-            </ol>
-
-            <p className="mt-7 text-[10px] tracking-widest text-vine-400 uppercase">
-              R. Fernão Pompeu de Camargo, 1293 · Campinas
-            </p>
-          </div>
-
-          {/* �.��.� DIVISOR VERTICAL �.��.� */}
-          <div className="hidden lg:block w-px self-stretch bg-gray-200 mx-12" />
-
-          {/* �.��.� COLUNA DIREITA �?" Mural �.��.� */}
-          <div>
-            <motion.div
-              initial={{ opacity: 0, y: 16 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.6, delay: 0.1 }}
-              className="mb-8 flex items-end justify-between border-b border-vine-300 pb-5"
-            >
-              <div>
-                <p className="mb-1.5 text-[11px] uppercase tracking-[0.45em] text-vine-600">
-                  Fique por dentro
-                </p>
-                <h2 className="font-sans text-2xl font-semibold leading-none text-white">
-                  Mural de Avisos
-                </h2>
+                {/* Horário e local */}
+                <div className="hidden shrink-0 flex-col items-end gap-1.5 sm:flex">
+                  <span className="flex items-center gap-1.5 text-xs font-medium text-vine-700 group-hover:text-vine-900 transition-colors">
+                    <Clock3 className="h-3.5 w-3.5 text-vine-400/70" />
+                    {day.time}
+                  </span>
+                  <span className="flex items-center gap-1.5 text-[11px] text-vine-400 group-hover:text-vine-600 transition-colors">
+                    <MapPin className="h-3 w-3" />
+                    {day.place}
+                  </span>
+                </div>
               </div>
-              <Bell className="h-5 w-5 text-vine-500" />
-            </motion.div>
+            </motion.li>
+          ))}
+        </motion.ol>
 
-            <ol className="space-y-3">
-              {avisosPublicos.map((aviso, i) => (
-                <motion.li
-                  key={aviso.id}
-                  initial={{ opacity: 0, x: 12 }}
-                  whileInView={{ opacity: 1, x: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 0.45, delay: i * 0.08 }}
-                  whileHover={{ backgroundColor: "rgba(39,111,42,0.05)" }}
-                  className="group flex items-start gap-4 rounded-xl border border-vine-200 border-l-2 border-l-vine-500 bg-white/80 px-4 py-4 transition-colors duration-300 hover:border-vine-300"
-                >
-                  <div className="flex flex-1 flex-col gap-1.5 min-w-0">
-                    <span className="text-sm font-semibold leading-snug text-vine-900 transition-colors duration-300">
-                      {aviso.titulo}
-                    </span>
-                    <span className="text-xs leading-5 text-vine-600 group-hover:text-vine-950/65 transition-colors duration-300">
-                      {aviso.conteudo}
-                    </span>
-                    <span className="mt-1 inline-flex w-fit items-center gap-1 rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-vine-600 group-hover:bg-gray-200 group-hover:text-vine-700 transition-colors">
-                      <CalendarDays className="h-2.5 w-2.5" />
-                      {formatDate(aviso.criadoEm)}
-                    </span>
-                  </div>
-                </motion.li>
-              ))}
-
-              {avisosPublicos.length === 0 && (
-                <li className="py-6 text-center text-[12px] text-vine-400">
-                  Nenhum aviso no momento.
-                </li>
-              )}
-            </ol>
-          </div>
-
-        </div>
+        {/* Endereço */}
+        <motion.p
+          initial={{ opacity: 0 }}
+          whileInView={{ opacity: 1 }}
+          viewport={{ once: true }}
+          transition={{ delay: 0.8 }}
+          className="mt-10 text-center text-[10px] tracking-[0.3em] text-vine-400 uppercase"
+        >
+          R. Fernão Pompeu de Camargo, 1293 · Campinas
+        </motion.p>
       </div>
+
+      {/* Fade de saída */}
+      <div className="absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-b from-transparent to-[#FDFDFB]/60 pointer-events-none z-10" />
     </section>
   );
 }

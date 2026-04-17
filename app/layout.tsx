@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Inter, Cormorant_Garamond } from "next/font/google";
+import { Inter, Lora } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/contexts/AuthContext";
 
@@ -9,10 +9,10 @@ const inter = Inter({
   display: "swap",
 });
 
-const cormorant = Cormorant_Garamond({
+const lora = Lora({
   subsets: ["latin"],
   variable: "--font-serif",
-  weight: ["300", "400", "500", "600", "700"],
+  weight: ["400", "500", "600", "700"],
   style: ["normal", "italic"],
   display: "swap",
 });
@@ -28,7 +28,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="pt-BR" data-scroll-behavior="smooth" className={`${inter.variable} ${cormorant.variable}`}>
+    <html lang="pt-BR" data-scroll-behavior="smooth" className={`${inter.variable} ${lora.variable}`}>
         <body className="bg-cream text-gray-900 antialiased font-sans" suppressHydrationWarning>
         <AuthProvider>{children}</AuthProvider>
       </body>

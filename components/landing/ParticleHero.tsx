@@ -84,36 +84,43 @@ export default function ParticleHero() {
           {/* Layout horizontal: logo à esquerda, nome + versículo à direita */}
           <motion.div
             {...fadeUp(0.2)}
-            className="flex items-center gap-6 px-6"
+            className="flex items-center gap-8 px-6"
           >
-            {/* Logo menor */}
+            {/* Logo */}
             <Image
               src="/logo.png"
               alt="Igreja Ramo da Vida"
-              width={120}
-              height={40}
+              width={160}
+              height={60}
               priority
-              className="w-[80px] md:w-[100px] h-auto shrink-0"
+              className="w-[110px] md:w-[140px] h-auto shrink-0"
               style={{ filter: "invert(1)", mixBlendMode: "screen" }}
             />
 
             {/* Divisor */}
-            <span className="h-20 w-px bg-white/20 shrink-0" />
+            <span className="h-24 w-px bg-white/25 shrink-0" />
 
             {/* Nome + versículo */}
-            <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-4">
               <motion.h1
                 {...fadeUp(0.5)}
-                className="font-sans italic text-[clamp(1rem,2.5vw,1.6rem)] font-light text-white/90 tracking-[0.08em] leading-none"
+                className="font-sans italic text-[clamp(1.3rem,3vw,2rem)] font-light text-white tracking-[0.1em] leading-none"
+                style={{ textShadow: "0 2px 12px rgba(0,0,0,0.9)" }}
               >
                 Ramo da Vida
               </motion.h1>
 
-              <motion.div {...fadeUp(0.9)} className="flex flex-col gap-1.5 max-w-sm">
-                <p className="font-serif text-[clamp(0.9rem,2vw,1.15rem)] font-light text-white/90 leading-relaxed italic drop-shadow-[0_1px_8px_rgba(0,0,0,0.8)]">
+              <motion.div {...fadeUp(0.9)} className="flex flex-col gap-2 max-w-md">
+                <p
+                  className="font-serif text-[clamp(0.95rem,1.8vw,1.2rem)] font-normal text-white leading-[1.8] italic"
+                  style={{ textShadow: "0 1px 14px rgba(0,0,0,0.95), 0 2px 6px rgba(0,0,0,0.75)" }}
+                >
                   "Eu sou a videira; vós sois os ramos. Quem permanece em mim e eu nele, esse dá muito fruto."
                 </p>
-                <span className="text-[10px] tracking-[0.35em] uppercase text-white/55">
+                <span
+                  className="text-[11px] tracking-[0.45em] uppercase text-white/65 font-sans font-medium"
+                  style={{ textShadow: "0 1px 8px rgba(0,0,0,0.9)" }}
+                >
                   João 15:5
                 </span>
               </motion.div>
