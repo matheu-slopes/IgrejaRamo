@@ -132,7 +132,7 @@ export default function CylinderCarousel() {
         <ellipse cx="82" cy="115" rx="3" ry="7" transform="rotate(35 82 115)" fill="#276f2a" opacity="0.5"/>
       </motion.svg>
 
-      <div className="relative z-10 mx-auto max-w-3xl">
+      <div className="relative z-10 mx-auto max-w-5xl">
         {/* Section header */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
