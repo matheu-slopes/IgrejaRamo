@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useRef, useEffect, useState } from "react";
 import Image from "next/image";
@@ -156,17 +156,18 @@ function DevocionalCard() {
 /* --- Main BentoGrid ----------------------------------------------- */
 export default function BentoGrid() {
   return (
-    <section className="relative py-28 px-5 bg-[#0a140a] overflow-hidden">
+    <section className="relative py-28 px-5 bg-white overflow-hidden">
       {/* Background gradient orbs */}
-      <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-vine-800/10 rounded-full blur-[120px] pointer-events-none" />
-      <div className="absolute bottom-0 right-1/4 w-[400px] h-[400px] bg-gold-900/8 rounded-full blur-[100px] pointer-events-none" />
+      <div className="absolute top-0 left-1/4 w-[600px] h-[600px] bg-gray-100/30 rounded-full blur-[130px] pointer-events-none" />
+      <div className="absolute bottom-0 right-1/4 w-[500px] h-[500px] bg-gray-100/20 rounded-full blur-[110px] pointer-events-none" />
+      <div className="absolute top-1/2 left-0 w-[300px] h-[300px] bg-gray-100/20 rounded-full blur-[90px] pointer-events-none" />
 
       {/* Dot grid pattern */}
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-0 opacity-[0.07]"
+        className="pointer-events-none absolute inset-0 opacity-[0.5]"
         style={{
-          backgroundImage: "radial-gradient(circle, rgba(255,255,255,0.55) 1px, transparent 1px)",
+          backgroundImage: "radial-gradient(circle, rgba(0,0,0,0.05) 1px, transparent 1px)",
           backgroundSize: "32px 32px",
         }}
       />
@@ -176,7 +177,7 @@ export default function BentoGrid() {
         aria-hidden="true"
         className="pointer-events-none absolute inset-0 flex items-center justify-center overflow-hidden select-none"
       >
-        <p className="font-serif text-[clamp(3.5rem,10vw,8rem)] font-bold text-white/[0.03] leading-tight text-center px-8 whitespace-nowrap">
+        <p className="font-serif text-[clamp(3.5rem,10vw,8rem)] font-bold text-gray-400/[0.08] leading-tight text-center px-8 whitespace-nowrap">
           João 15:5
         </p>
       </div>
@@ -184,20 +185,20 @@ export default function BentoGrid() {
       {/* Diagonal accent lines */}
       <svg
         aria-hidden="true"
-        className="pointer-events-none absolute inset-0 w-full h-full opacity-[0.04] select-none"
+        className="pointer-events-none absolute inset-0 w-full h-full opacity-[0.1] select-none"
         xmlns="http://www.w3.org/2000/svg"
         preserveAspectRatio="none"
       >
-        <line x1="0" y1="100%" x2="40%" y2="0" stroke="white" strokeWidth="1"/>
-        <line x1="20%" y1="100%" x2="65%" y2="0" stroke="white" strokeWidth="0.5"/>
-        <line x1="60%" y1="100%" x2="100%" y2="20%" stroke="white" strokeWidth="1"/>
-        <line x1="80%" y1="100%" x2="100%" y2="60%" stroke="white" strokeWidth="0.5"/>
+        <line x1="0" y1="100%" x2="40%" y2="0" stroke="#d1d5db" strokeWidth="1"/>
+        <line x1="20%" y1="100%" x2="65%" y2="0" stroke="#d1d5db" strokeWidth="0.5"/>
+        <line x1="60%" y1="100%" x2="100%" y2="20%" stroke="#d1d5db" strokeWidth="1"/>
+        <line x1="80%" y1="100%" x2="100%" y2="60%" stroke="#d1d5db" strokeWidth="0.5"/>
       </svg>
 
-      {/* Ramos — fundo completo */}
+      {/* Ramos �?" fundo completo */}
       <svg
         aria-hidden="true"
-        className="pointer-events-none absolute inset-0 w-full h-full select-none opacity-[0.12]"
+        className="pointer-events-none absolute inset-0 w-full h-full select-none opacity-[0.15]"
         viewBox="0 0 1200 800"
         preserveAspectRatio="xMidYMid slice"
         fill="none"
@@ -205,99 +206,99 @@ export default function BentoGrid() {
       >
         {/* canto inf esq */}
         <g transform="translate(-20, 620) rotate(-15)">
-          <path d="M20 180 Q60 120 110 90 Q160 60 145 10" stroke="white" strokeWidth="1.2" strokeLinecap="round"/>
-          <path d="M110 90 Q85 70 65 45" stroke="white" strokeWidth="0.9" strokeLinecap="round"/>
-          <path d="M110 90 Q135 72 150 48" stroke="white" strokeWidth="0.9" strokeLinecap="round"/>
-          <path d="M65 45 Q52 30 46 12" stroke="white" strokeWidth="0.7" strokeLinecap="round"/>
-          <path d="M65 45 Q78 32 85 16" stroke="white" strokeWidth="0.7" strokeLinecap="round"/>
-          <path d="M40 150 Q55 135 70 118" stroke="white" strokeWidth="0.8" strokeLinecap="round"/>
-          <path d="M40 150 Q28 133 20 114" stroke="white" strokeWidth="0.8" strokeLinecap="round"/>
+          <path d="M20 180 Q60 120 110 90 Q160 60 145 10" stroke="#d1d5db" strokeWidth="1.2" strokeLinecap="round"/>
+          <path d="M110 90 Q85 70 65 45" stroke="#d1d5db" strokeWidth="0.9" strokeLinecap="round"/>
+          <path d="M110 90 Q135 72 150 48" stroke="#d1d5db" strokeWidth="0.9" strokeLinecap="round"/>
+          <path d="M65 45 Q52 30 46 12" stroke="#d1d5db" strokeWidth="0.7" strokeLinecap="round"/>
+          <path d="M65 45 Q78 32 85 16" stroke="#d1d5db" strokeWidth="0.7" strokeLinecap="round"/>
+          <path d="M40 150 Q55 135 70 118" stroke="#d1d5db" strokeWidth="0.8" strokeLinecap="round"/>
+          <path d="M40 150 Q28 133 20 114" stroke="#d1d5db" strokeWidth="0.8" strokeLinecap="round"/>
         </g>
         {/* canto sup dir */}
         <g transform="translate(1080, 20) rotate(160)">
-          <path d="M20 180 Q60 120 110 90 Q160 60 145 10" stroke="white" strokeWidth="1.2" strokeLinecap="round"/>
-          <path d="M110 90 Q85 70 65 45" stroke="white" strokeWidth="0.9" strokeLinecap="round"/>
-          <path d="M110 90 Q135 72 150 48" stroke="white" strokeWidth="0.9" strokeLinecap="round"/>
-          <path d="M65 45 Q52 30 46 12" stroke="white" strokeWidth="0.7" strokeLinecap="round"/>
-          <path d="M65 45 Q78 32 85 16" stroke="white" strokeWidth="0.7" strokeLinecap="round"/>
+          <path d="M20 180 Q60 120 110 90 Q160 60 145 10" stroke="#d1d5db" strokeWidth="1.2" strokeLinecap="round"/>
+          <path d="M110 90 Q85 70 65 45" stroke="#d1d5db" strokeWidth="0.9" strokeLinecap="round"/>
+          <path d="M110 90 Q135 72 150 48" stroke="#d1d5db" strokeWidth="0.9" strokeLinecap="round"/>
+          <path d="M65 45 Q52 30 46 12" stroke="#d1d5db" strokeWidth="0.7" strokeLinecap="round"/>
+          <path d="M65 45 Q78 32 85 16" stroke="#d1d5db" strokeWidth="0.7" strokeLinecap="round"/>
         </g>
         {/* lateral esq centro */}
         <g transform="translate(-30, 320) rotate(25)">
-          <path d="M20 180 Q60 120 110 90 Q160 60 145 10" stroke="white" strokeWidth="1" strokeLinecap="round"/>
-          <path d="M110 90 Q85 70 65 45" stroke="white" strokeWidth="0.8" strokeLinecap="round"/>
-          <path d="M110 90 Q135 72 150 48" stroke="white" strokeWidth="0.8" strokeLinecap="round"/>
-          <path d="M145 10 Q162 2 175 -12" stroke="white" strokeWidth="0.6" strokeLinecap="round"/>
+          <path d="M20 180 Q60 120 110 90 Q160 60 145 10" stroke="#d1d5db" strokeWidth="1" strokeLinecap="round"/>
+          <path d="M110 90 Q85 70 65 45" stroke="#d1d5db" strokeWidth="0.8" strokeLinecap="round"/>
+          <path d="M110 90 Q135 72 150 48" stroke="#d1d5db" strokeWidth="0.8" strokeLinecap="round"/>
+          <path d="M145 10 Q162 2 175 -12" stroke="#d1d5db" strokeWidth="0.6" strokeLinecap="round"/>
         </g>
         {/* lateral dir centro */}
         <g transform="translate(1100, 260) rotate(-35)">
-          <path d="M20 180 Q60 120 110 90 Q160 60 145 10" stroke="white" strokeWidth="1" strokeLinecap="round"/>
-          <path d="M110 90 Q85 70 65 45" stroke="white" strokeWidth="0.8" strokeLinecap="round"/>
-          <path d="M110 90 Q135 72 150 48" stroke="white" strokeWidth="0.8" strokeLinecap="round"/>
-          <path d="M65 45 Q52 30 46 12" stroke="white" strokeWidth="0.6" strokeLinecap="round"/>
+          <path d="M20 180 Q60 120 110 90 Q160 60 145 10" stroke="#d1d5db" strokeWidth="1" strokeLinecap="round"/>
+          <path d="M110 90 Q85 70 65 45" stroke="#d1d5db" strokeWidth="0.8" strokeLinecap="round"/>
+          <path d="M110 90 Q135 72 150 48" stroke="#d1d5db" strokeWidth="0.8" strokeLinecap="round"/>
+          <path d="M65 45 Q52 30 46 12" stroke="#d1d5db" strokeWidth="0.6" strokeLinecap="round"/>
         </g>
         {/* centro absoluto */}
         <g transform="translate(540, 280) rotate(50)">
-          <path d="M20 180 Q60 120 110 90 Q160 60 145 10" stroke="white" strokeWidth="1.1" strokeLinecap="round"/>
-          <path d="M110 90 Q85 70 65 45" stroke="white" strokeWidth="0.9" strokeLinecap="round"/>
-          <path d="M110 90 Q135 72 150 48" stroke="white" strokeWidth="0.9" strokeLinecap="round"/>
-          <path d="M65 45 Q52 30 46 12" stroke="white" strokeWidth="0.7" strokeLinecap="round"/>
-          <path d="M65 45 Q78 32 85 16" stroke="white" strokeWidth="0.7" strokeLinecap="round"/>
-          <path d="M145 10 Q162 2 175 -12" stroke="white" strokeWidth="0.6" strokeLinecap="round"/>
+          <path d="M20 180 Q60 120 110 90 Q160 60 145 10" stroke="#d1d5db" strokeWidth="1.1" strokeLinecap="round"/>
+          <path d="M110 90 Q85 70 65 45" stroke="#d1d5db" strokeWidth="0.9" strokeLinecap="round"/>
+          <path d="M110 90 Q135 72 150 48" stroke="#d1d5db" strokeWidth="0.9" strokeLinecap="round"/>
+          <path d="M65 45 Q52 30 46 12" stroke="#d1d5db" strokeWidth="0.7" strokeLinecap="round"/>
+          <path d="M65 45 Q78 32 85 16" stroke="#d1d5db" strokeWidth="0.7" strokeLinecap="round"/>
+          <path d="M145 10 Q162 2 175 -12" stroke="#d1d5db" strokeWidth="0.6" strokeLinecap="round"/>
         </g>
         {/* quarto sup esq */}
         <g transform="translate(230, 80) rotate(-55)">
-          <path d="M20 180 Q60 120 110 90 Q160 60 145 10" stroke="white" strokeWidth="1" strokeLinecap="round"/>
-          <path d="M110 90 Q85 70 65 45" stroke="white" strokeWidth="0.8" strokeLinecap="round"/>
-          <path d="M110 90 Q135 72 150 48" stroke="white" strokeWidth="0.8" strokeLinecap="round"/>
-          <path d="M145 10 Q162 2 175 -12" stroke="white" strokeWidth="0.6" strokeLinecap="round"/>
+          <path d="M20 180 Q60 120 110 90 Q160 60 145 10" stroke="#d1d5db" strokeWidth="1" strokeLinecap="round"/>
+          <path d="M110 90 Q85 70 65 45" stroke="#d1d5db" strokeWidth="0.8" strokeLinecap="round"/>
+          <path d="M110 90 Q135 72 150 48" stroke="#d1d5db" strokeWidth="0.8" strokeLinecap="round"/>
+          <path d="M145 10 Q162 2 175 -12" stroke="#d1d5db" strokeWidth="0.6" strokeLinecap="round"/>
         </g>
         {/* quarto inf dir */}
         <g transform="translate(850, 580) rotate(115)">
-          <path d="M20 180 Q60 120 110 90 Q160 60 145 10" stroke="white" strokeWidth="1" strokeLinecap="round"/>
-          <path d="M110 90 Q85 70 65 45" stroke="white" strokeWidth="0.8" strokeLinecap="round"/>
-          <path d="M110 90 Q135 72 150 48" stroke="white" strokeWidth="0.8" strokeLinecap="round"/>
-          <path d="M65 45 Q52 30 46 12" stroke="white" strokeWidth="0.6" strokeLinecap="round"/>
+          <path d="M20 180 Q60 120 110 90 Q160 60 145 10" stroke="#d1d5db" strokeWidth="1" strokeLinecap="round"/>
+          <path d="M110 90 Q85 70 65 45" stroke="#d1d5db" strokeWidth="0.8" strokeLinecap="round"/>
+          <path d="M110 90 Q135 72 150 48" stroke="#d1d5db" strokeWidth="0.8" strokeLinecap="round"/>
+          <path d="M65 45 Q52 30 46 12" stroke="#d1d5db" strokeWidth="0.6" strokeLinecap="round"/>
         </g>
         {/* topo centro */}
         <g transform="translate(560, -40) rotate(88)">
-          <path d="M20 180 Q60 120 110 90 Q160 60 145 10" stroke="white" strokeWidth="1" strokeLinecap="round"/>
-          <path d="M110 90 Q85 70 65 45" stroke="white" strokeWidth="0.8" strokeLinecap="round"/>
-          <path d="M110 90 Q135 72 150 48" stroke="white" strokeWidth="0.8" strokeLinecap="round"/>
-          <path d="M145 10 Q162 2 175 -12" stroke="white" strokeWidth="0.6" strokeLinecap="round"/>
-          <path d="M65 45 Q52 30 46 12" stroke="white" strokeWidth="0.6" strokeLinecap="round"/>
+          <path d="M20 180 Q60 120 110 90 Q160 60 145 10" stroke="#d1d5db" strokeWidth="1" strokeLinecap="round"/>
+          <path d="M110 90 Q85 70 65 45" stroke="#d1d5db" strokeWidth="0.8" strokeLinecap="round"/>
+          <path d="M110 90 Q135 72 150 48" stroke="#d1d5db" strokeWidth="0.8" strokeLinecap="round"/>
+          <path d="M145 10 Q162 2 175 -12" stroke="#d1d5db" strokeWidth="0.6" strokeLinecap="round"/>
+          <path d="M65 45 Q52 30 46 12" stroke="#d1d5db" strokeWidth="0.6" strokeLinecap="round"/>
         </g>
         {/* base centro */}
         <g transform="translate(580, 780) rotate(-92)">
-          <path d="M20 180 Q60 120 110 90 Q160 60 145 10" stroke="white" strokeWidth="1" strokeLinecap="round"/>
-          <path d="M110 90 Q85 70 65 45" stroke="white" strokeWidth="0.8" strokeLinecap="round"/>
-          <path d="M110 90 Q135 72 150 48" stroke="white" strokeWidth="0.8" strokeLinecap="round"/>
-          <path d="M145 10 Q162 2 175 -12" stroke="white" strokeWidth="0.6" strokeLinecap="round"/>
+          <path d="M20 180 Q60 120 110 90 Q160 60 145 10" stroke="#d1d5db" strokeWidth="1" strokeLinecap="round"/>
+          <path d="M110 90 Q85 70 65 45" stroke="#d1d5db" strokeWidth="0.8" strokeLinecap="round"/>
+          <path d="M110 90 Q135 72 150 48" stroke="#d1d5db" strokeWidth="0.8" strokeLinecap="round"/>
+          <path d="M145 10 Q162 2 175 -12" stroke="#d1d5db" strokeWidth="0.6" strokeLinecap="round"/>
         </g>
         {/* quarto sup dir */}
         <g transform="translate(920, 100) rotate(70)">
-          <path d="M20 180 Q60 120 110 90 Q160 60 145 10" stroke="white" strokeWidth="0.9" strokeLinecap="round"/>
-          <path d="M110 90 Q85 70 65 45" stroke="white" strokeWidth="0.7" strokeLinecap="round"/>
-          <path d="M110 90 Q135 72 150 48" stroke="white" strokeWidth="0.7" strokeLinecap="round"/>
+          <path d="M20 180 Q60 120 110 90 Q160 60 145 10" stroke="#d1d5db" strokeWidth="0.9" strokeLinecap="round"/>
+          <path d="M110 90 Q85 70 65 45" stroke="#d1d5db" strokeWidth="0.7" strokeLinecap="round"/>
+          <path d="M110 90 Q135 72 150 48" stroke="#d1d5db" strokeWidth="0.7" strokeLinecap="round"/>
         </g>
         {/* quarto inf esq */}
         <g transform="translate(180, 620) rotate(-110)">
-          <path d="M20 180 Q60 120 110 90 Q160 60 145 10" stroke="white" strokeWidth="0.9" strokeLinecap="round"/>
-          <path d="M110 90 Q85 70 65 45" stroke="white" strokeWidth="0.7" strokeLinecap="round"/>
-          <path d="M110 90 Q135 72 150 48" stroke="white" strokeWidth="0.7" strokeLinecap="round"/>
-          <path d="M65 45 Q52 30 46 12" stroke="white" strokeWidth="0.6" strokeLinecap="round"/>
+          <path d="M20 180 Q60 120 110 90 Q160 60 145 10" stroke="#d1d5db" strokeWidth="0.9" strokeLinecap="round"/>
+          <path d="M110 90 Q85 70 65 45" stroke="#d1d5db" strokeWidth="0.7" strokeLinecap="round"/>
+          <path d="M110 90 Q135 72 150 48" stroke="#d1d5db" strokeWidth="0.7" strokeLinecap="round"/>
+          <path d="M65 45 Q52 30 46 12" stroke="#d1d5db" strokeWidth="0.6" strokeLinecap="round"/>
         </g>
         {/* centro esq baixo */}
         <g transform="translate(360, 480) rotate(135)">
-          <path d="M20 180 Q60 120 110 90 Q160 60 145 10" stroke="white" strokeWidth="0.9" strokeLinecap="round"/>
-          <path d="M110 90 Q85 70 65 45" stroke="white" strokeWidth="0.7" strokeLinecap="round"/>
-          <path d="M110 90 Q135 72 150 48" stroke="white" strokeWidth="0.7" strokeLinecap="round"/>
+          <path d="M20 180 Q60 120 110 90 Q160 60 145 10" stroke="#d1d5db" strokeWidth="0.9" strokeLinecap="round"/>
+          <path d="M110 90 Q85 70 65 45" stroke="#d1d5db" strokeWidth="0.7" strokeLinecap="round"/>
+          <path d="M110 90 Q135 72 150 48" stroke="#d1d5db" strokeWidth="0.7" strokeLinecap="round"/>
         </g>
         {/* centro dir cima */}
         <g transform="translate(780, 200) rotate(-20)">
-          <path d="M20 180 Q60 120 110 90 Q160 60 145 10" stroke="white" strokeWidth="0.9" strokeLinecap="round"/>
-          <path d="M110 90 Q85 70 65 45" stroke="white" strokeWidth="0.7" strokeLinecap="round"/>
-          <path d="M110 90 Q135 72 150 48" stroke="white" strokeWidth="0.7" strokeLinecap="round"/>
-          <path d="M145 10 Q162 2 175 -12" stroke="white" strokeWidth="0.6" strokeLinecap="round"/>
+          <path d="M20 180 Q60 120 110 90 Q160 60 145 10" stroke="#d1d5db" strokeWidth="0.9" strokeLinecap="round"/>
+          <path d="M110 90 Q85 70 65 45" stroke="#d1d5db" strokeWidth="0.7" strokeLinecap="round"/>
+          <path d="M110 90 Q135 72 150 48" stroke="#d1d5db" strokeWidth="0.7" strokeLinecap="round"/>
+          <path d="M145 10 Q162 2 175 -12" stroke="#d1d5db" strokeWidth="0.6" strokeLinecap="round"/>
         </g>
       </svg>
 
@@ -309,7 +310,7 @@ export default function BentoGrid() {
           viewport={{ once: true }}
           className="text-center mb-16"
         >
-          <p className="text-white text-sm md:text-base font-semibold tracking-[0.45em] uppercase drop-shadow-[0_2px_12px_rgba(255,255,255,0.18)]">
+          <p className="text-vine-700 text-sm md:text-base font-semibold tracking-[0.45em] uppercase">
             Culto & Devocional
           </p>
         </motion.div>

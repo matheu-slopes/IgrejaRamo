@@ -6,8 +6,8 @@ import { mockGaleria } from "@/lib/mockData";
 
 export default function ImmersiveGaleria() {
   return (
-    <section id="galeria" className="relative py-28 px-5 bg-[#060d06] overflow-hidden">
-      <div className="absolute bottom-0 left-1/3 w-[500px] h-[500px] bg-vine-900/8 rounded-full blur-[140px] pointer-events-none" />
+    <section id="galeria" className="relative py-28 px-5 bg-white overflow-hidden">
+      <div className="absolute bottom-0 left-1/3 w-[500px] h-[500px] bg-gray-100/40 rounded-full blur-[140px] pointer-events-none" />
 
       <div className="max-w-6xl mx-auto relative z-10">
         <motion.div
@@ -16,13 +16,13 @@ export default function ImmersiveGaleria() {
           viewport={{ once: true }}
           className="text-center mb-16"
         >
-          <p className="text-gold-500/60 text-[11px] tracking-[0.4em] uppercase mb-3">
+          <p className="text-vine-600/70 text-[11px] tracking-[0.4em] uppercase mb-3">
             Momentos
           </p>
-          <h2 className="font-sans text-4xl md:text-5xl font-semibold text-white">
+          <h2 className="font-sans text-4xl md:text-5xl font-semibold text-vine-900">
             Galeria
           </h2>
-          <div className="mx-auto mt-4 w-12 h-px bg-gold-500/30" />
+          <div className="mx-auto mt-4 w-12 h-px bg-gray-200" />
         </motion.div>
 
         <div className="columns-1 sm:columns-2 lg:columns-3 gap-4 space-y-4">

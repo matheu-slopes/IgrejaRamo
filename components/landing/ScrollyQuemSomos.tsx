@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useRef } from "react";
 import { motion, useScroll, useTransform } from "framer-motion";
@@ -11,11 +11,11 @@ export default function ScrollyQuemSomos() {
     offset: ["start end", "end start"],
   });
 
-  // Background gradient shift — vine → deep black → grape tint
+  // Background gradient shift �?" vine-50 �?' vine-100 �?' bark-50 �?' vine-50
   const bg1 = useTransform(
     scrollYProgress,
     [0, 0.3, 0.7, 1],
-    ["#0a140a", "#080e08", "#0d080d", "#0a0a14"]
+    ["#ffffff", "#ffffff", "#ffffff", "#ffffff"]
   );
 
   return (
@@ -30,12 +30,13 @@ export default function ScrollyQuemSomos() {
             initial={{ opacity: 0 }}
             whileInView={{ opacity: 1 }}
             viewport={{ once: true }}
-            className="text-gold-500/60 text-[11px] tracking-[0.4em] uppercase mb-10"
+            className="text-vine-600 text-[11px] tracking-[0.4em] uppercase mb-10"
           >
             Nossa história
           </motion.p>
 
           <MaskRevealText
+            wordColor="text-vine-900"
             text="Nascidos do coração de Deus para manifestar o caráter de Cristo"
           />
 
@@ -44,7 +45,7 @@ export default function ScrollyQuemSomos() {
             whileInView={{ scaleX: 1 }}
             viewport={{ once: true }}
             transition={{ duration: 0.8, delay: 0.3 }}
-            className="mx-auto mt-10 w-16 h-px bg-gold-500/40 origin-center"
+            className="mx-auto mt-10 w-16 h-px bg-gray-200 origin-center"
           />
         </div>
       </div>
@@ -56,9 +57,9 @@ export default function ScrollyQuemSomos() {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: "-80px" }}
           transition={{ duration: 0.7 }}
-          className="text-vine-200/80 text-lg md:text-xl leading-relaxed"
+          className="text-vine-800 text-lg md:text-xl leading-relaxed"
         >
-          A comunidade cristã <strong className="text-white">Ramo da Vida</strong> se manifesta
+          A comunidade cristã <strong className="text-vine-950">Ramo da Vida</strong> se manifesta
           através da comunhão nos cultos, em ações sociais e no testemunho pessoal e coletivo
           de seus membros, líderes e simpatizantes do mesmo propósito.
         </motion.p>
@@ -68,11 +69,11 @@ export default function ScrollyQuemSomos() {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: "-80px" }}
           transition={{ duration: 0.7, delay: 0.15 }}
-          className="text-vine-200/80 text-lg md:text-xl leading-relaxed"
+          className="text-vine-800 text-lg md:text-xl leading-relaxed"
         >
           Nosso intuito e missão é manifestar o caráter de Cristo, seu amor, ensino e exemplo
           de maneira simples, prática e verdadeira, a fim de pregar a salvação por meio da fé
-          até que <strong className="text-white">ELE venha!</strong>
+          até que <strong className="text-vine-950">ELE venha!</strong>
         </motion.p>
 
         {/* Quote block */}
@@ -81,14 +82,14 @@ export default function ScrollyQuemSomos() {
           whileInView={{ opacity: 1, x: 0 }}
           viewport={{ once: true, margin: "-60px" }}
           transition={{ duration: 0.8 }}
-          className="border-l-2 border-gold-600/40 pl-6 py-4"
+          className="border-l-2 border-gray-300 pl-6 py-4"
         >
-          <p className="font-sans italic text-2xl md:text-3xl text-vine-200/90 leading-relaxed">
+          <p className="font-sans italic text-2xl md:text-3xl text-vine-900 leading-relaxed">
             "Eu sou a videira; vós sois os ramos. Quem permanece em mim e eu nele,
             esse dá muito fruto."
           </p>
-          <span className="block text-gold-500/60 text-[11px] tracking-[0.2em] uppercase mt-4">
-            — João 15:5
+          <span className="block text-vine-600 text-[11px] tracking-[0.2em] uppercase mt-4">
+            �?" João 15:5
           </span>
         </motion.blockquote>
 
@@ -103,16 +104,16 @@ export default function ScrollyQuemSomos() {
           {[
             { n: "2019", l: "Fundação" },
             { n: "6", l: "Ministérios" },
-            { n: "6×", l: "Cultos / semana" },
-            { n: "∞", l: "Amor" },
+            { n: "6�-", l: "Cultos / semana" },
+            { n: "�^z", l: "Amor" },
           ].map((s) => (
             <div
               key={s.l}
-              className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5 text-center
-                         hover:border-gold-600/20 transition-colors duration-500"
+              className="bg-white border border-gray-200 rounded-2xl p-5 text-center
+                         hover:border-gray-300 transition-colors duration-500"
             >
-              <p className="font-sans text-3xl font-bold text-gold-400">{s.n}</p>
-              <p className="text-vine-500 text-xs tracking-wider mt-1">{s.l}</p>
+              <p className="font-sans text-3xl font-bold text-vine-700">{s.n}</p>
+              <p className="text-vine-600 text-xs tracking-wider mt-1">{s.l}</p>
             </div>
           ))}
         </motion.div>

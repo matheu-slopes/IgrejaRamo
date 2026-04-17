@@ -5,8 +5,8 @@ import { MapPin, Clock, Phone } from "lucide-react";
 
 export default function ImmersiveMapa() {
   return (
-    <section id="localizacao" className="relative py-28 px-5 bg-[#08100a] overflow-hidden">
-      <div className="absolute top-1/2 left-0 w-[400px] h-[400px] bg-vine-900/6 rounded-full blur-[120px] pointer-events-none" />
+    <section id="localizacao" className="relative py-28 px-5 bg-white overflow-hidden">
+      <div className="absolute top-1/2 left-0 w-[400px] h-[400px] bg-gray-100/40 rounded-full blur-[120px] pointer-events-none" />
 
       <div className="max-w-5xl mx-auto relative z-10">
         <motion.div
@@ -15,13 +15,13 @@ export default function ImmersiveMapa() {
           viewport={{ once: true }}
           className="text-center mb-16"
         >
-          <p className="text-gold-500/60 text-[11px] tracking-[0.4em] uppercase mb-3">
+          <p className="text-vine-600/70 text-[11px] tracking-[0.4em] uppercase mb-3">
             Como chegar
           </p>
-          <h2 className="font-sans text-4xl md:text-5xl font-semibold text-white">
+          <h2 className="font-sans text-4xl md:text-5xl font-semibold text-vine-900">
             Localização
           </h2>
-          <div className="mx-auto mt-4 w-12 h-px bg-gold-500/30" />
+          <div className="mx-auto mt-4 w-12 h-px bg-gray-200" />
         </motion.div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-start">
@@ -55,7 +55,7 @@ export default function ImmersiveMapa() {
                     <li>2ª Terça — Ensino 19h45</li>
                     <li>Quinta — Culto 20h</li>
                     <li>Sábado — Jovens 19h30</li>
-                    <li className="text-white font-semibold">Domingo — 18h30</li>
+                    <li className="text-vine-900 font-semibold">Domingo — 18h30</li>
                   </ul>
                 ),
               },
@@ -66,12 +66,12 @@ export default function ImmersiveMapa() {
               },
             ].map((item) => (
               <div key={item.title} className="flex items-start gap-4">
-                <div className="w-10 h-10 bg-white/[0.04] border border-white/[0.08] rounded-xl flex items-center justify-center shrink-0">
-                  <item.icon className="w-5 h-5 text-gold-500/70" />
+                <div className="w-10 h-10 bg-gray-50 border border-vine-200 rounded-xl flex items-center justify-center shrink-0">
+                  <item.icon className="w-5 h-5 text-vine-600" />
                 </div>
                 <div>
-                  <p className="font-semibold text-white mb-1">{item.title}</p>
-                  <div className="text-vine-400 text-sm leading-relaxed">{item.content}</div>
+                  <p className="font-semibold text-vine-900 mb-1">{item.title}</p>
+                  <div className="text-vine-700 text-sm leading-relaxed">{item.content}</div>
                 </div>
               </div>
             ))}
@@ -83,16 +83,16 @@ export default function ImmersiveMapa() {
             whileInView={{ opacity: 1, x: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.7 }}
-            className="rounded-2xl overflow-hidden border border-white/[0.06] h-[320px] bg-vine-950/50 relative"
+            className="rounded-2xl overflow-hidden border border-vine-200 h-[320px] bg-white relative"
           >
             <iframe
               title="Localização Igreja Ramo da Vida"
               src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3675.!2d-47.0693!3d-22.8888!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2zMjLCsDUzJzE3LjgiUyA0N8KwMDQnMDkuNSJX!5e0!3m2!1spt-BR!2sbr!4v1"
-              className="w-full h-full border-0 grayscale invert opacity-60"
+              className="w-full h-full border-0 opacity-90"
               loading="lazy"
               referrerPolicy="no-referrer-when-downgrade"
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-[#08100a] via-transparent to-transparent pointer-events-none" />
+            <div className="absolute inset-0 bg-gradient-to-t from-white via-transparent to-transparent pointer-events-none" />
           </motion.div>
         </div>
       </div>
