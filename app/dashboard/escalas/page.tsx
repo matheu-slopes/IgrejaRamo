@@ -40,12 +40,7 @@ const FUNCOES_POR_MIN: Record<string, string[]> = {
 const TODOS_MINISTERIOS = Object.keys(MIN_COR) as Ministerio[];
 
 // Culto types → auto-generated ministry cards (Ação Social is handled in Eventos module)
-const TEMPLATES_CULTO = {
-  semana:  { label: "Culto de Semana (Ter/Qui)", emoji: "📅", cor: "bg-vine-50 border-vine-200",   ministerios: ["Louvor", "Mídias", "Cantina"] as Ministerio[] },
-  domingo: { label: "Culto de Domingo",           emoji: "🌟", cor: "bg-gold-50 border-gold-200",   ministerios: ["Louvor", "Mídias", "Cantina", "Infantil"] as Ministerio[] },
-  jovens:  { label: "Culto de Jovens",            emoji: "⚡", cor: "bg-blue-50 border-blue-200",   ministerios: ["Jovens"] as Ministerio[] },
-} as const;
-type TipoCulto = keyof typeof TEMPLATES_CULTO;
+const MINISTERIOS_ESCALA: Ministerio[] = ["Louvor", "Mídias", "Cantina", "Infantil", "Jovens", "Ensino"];
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -98,11 +93,11 @@ interface FormState {
   culto: string;
   horario: string;
   ministerio: Ministerio | ""; // edit mode
-  tipoCulto: TipoCulto | "";   // template mode
+  ministeriosSel: Ministerio[]; // template mode
   itens: FormItem[];
   musicas: EscalaMusica[];
 }
-const EMPTY_FORM: FormState = { data: new Date().toISOString().split("T")[0], culto: "", horario: "18:30", ministerio: "", tipoCulto: "", itens: [], musicas: [] };
+const EMPTY_FORM: FormState = { data: new Date().toISOString().split("T")[0], culto: "", horario: "18:30", ministerio: "", ministeriosSel: [], itens: [], musicas: [] };
 
 // ─── main page ───────────────────────────────────────────────────────────────
 
@@ -158,12 +153,15 @@ export default function EscalasPage() {
   }, [porData]);
 
   function openCreate(date?: string) {
-    setForm({ ...EMPTY_FORM, data: date ?? new Date().toISOString().split("T")[0] });
-    setModal({ mode: "template", date: date ?? new Date().toISOString().split("T")[0] });
+    const d = date ?? new Date().toISOString().split("T")[0];
+    // Líderes começam com seus próprios ministérios pré-selecionados
+    const presel: Ministerio[] = isAdmin ? [] : meusMinisterios;
+    setForm({ ...EMPTY_FORM, data: d, ministeriosSel: presel });
+    setModal({ mode: "template", date: d });
   }
   function openEdit(escala: Escala) {
     setForm({
-      tipoCulto: "",
+      ministeriosSel: [],
       data: escala.data, culto: escala.culto, horario: escala.horario, ministerio: escala.ministerio,
       itens: escala.itens.map((i) => ({ funcao: i.funcao, voluntarioId: i.voluntarioId, voluntarioNome: i.voluntarioNome, observacao: i.observacao ?? "" })),
       musicas: escala.musicas ?? [],
@@ -177,11 +175,11 @@ export default function EscalasPage() {
   function saveModal() {
     // ── Template creation: generate one Escala per ministry
     if (modal?.mode === "template") {
-      if (!form.tipoCulto || !form.culto.trim() || !form.horario || !form.data) return;
-      const tipo = form.tipoCulto as TipoCulto;
-      const ministerios = TEMPLATES_CULTO[tipo].ministerios;
+      if (!form.ministeriosSel.length || !form.culto.trim() || !form.horario || !form.data) return;
+      const ministerios = form.ministeriosSel;
       // duplicate guard handled in UI — skip silently if already blocked
-      if (escalas.some((e) => e.data === form.data)) return;
+      // Bloquear se algum dos ministérios selecionados já tem escala nessa data
+      if (form.ministeriosSel.some((m) => escalas.some((e) => e.data === form.data && e.ministerio === m))) return;
       const novas: Escala[] = ministerios.map((min, i) => ({
         id: `esc_${Date.now()}_${i}`,
         ministerio: min,
@@ -507,6 +505,7 @@ export default function EscalasPage() {
           meusMinisterios={meusMinisterios}
           musicas={mockMusicas}
           escalas={escalas}
+          isAdmin={isAdmin}
           onSave={saveModal}
           onClose={() => setModal(null)}
         />
@@ -872,7 +871,7 @@ function MinhaEscalaCompactCard({
 interface Musica { id: string; titulo: string; artista: string; tom?: string; }
 
 function EscalaModal({
-  mode, date, form, setForm, membros, meusMinisterios, musicas, escalas, onSave, onClose,
+  mode, date, form, setForm, membros, meusMinisterios, musicas, escalas, isAdmin, onSave, onClose,
 }: {
   mode: "template" | "edit";
   date: string;
@@ -882,6 +881,7 @@ function EscalaModal({
   meusMinisterios: Ministerio[];
   musicas: Musica[];
   escalas: Escala[];
+  isAdmin: boolean;
   onSave: () => void;
   onClose: () => void;
 }) {
@@ -889,18 +889,23 @@ function EscalaModal({
   const funcoes = FUNCOES_POR_MIN[form.ministerio] ?? ["Função"];
 
   // ── Live duplicate detection (template mode)
-  const conflito = mode === "template" && form.data
-    ? escalas.find((e) => e.data === form.data)
-    : null;
+  // Ministérios que o usuário pode criar (admin = todos, líder = só os seus)
+  const ministeriosDisponiveis: Ministerio[] = isAdmin ? MINISTERIOS_ESCALA : meusMinisterios;
+
+  // Conflito: ministérios selecionados que já têm escala na data escolhida
+  const ministeriosConflito: Ministerio[] = mode === "template" && form.data
+    ? form.ministeriosSel.filter((m) => escalas.some((e) => e.data === form.data && e.ministerio === m))
+    : [];
+  const conflito = ministeriosConflito.length > 0;
 
   // ── Template mode canSave
-  const canSaveTemplate = !!form.tipoCulto && !!form.culto.trim() && !!form.horario && !!form.data && !conflito;
+  const canSaveTemplate = form.ministeriosSel.length > 0 && !!form.culto.trim() && !!form.horario && !!form.data && !conflito;
   // ── Edit mode canSave
   const canSaveEdit = !!form.culto.trim() && !!form.horario && !!form.ministerio;
 
   const titulo = mode === "template" ? "Nova escala" : "Editar escala";
   const subtitulo = mode === "template"
-    ? "Escolha o tipo de culto e os ministérios serão criados automaticamente"
+    ? "Preencha os dados e selecione os ministérios"
     : (form.ministerio ? `${MIN_EMOJI[form.ministerio] ?? ""} ${form.ministerio}` : "Editar");
 
   return (
@@ -923,45 +928,8 @@ function EscalaModal({
           <>
             <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
 
-              {/* Step 1: choose culto type */}
-              <div>
-                <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">1. Tipo de culto</p>
-                <div className="grid grid-cols-1 gap-2">
-                  {(Object.entries(TEMPLATES_CULTO) as [TipoCulto, typeof TEMPLATES_CULTO[TipoCulto]][]).map(([key, tmpl]) => {
-                    const sel = form.tipoCulto === key;
-                    return (
-                      <button
-                        key={key}
-                        onClick={() => setForm((f) => ({ ...f, tipoCulto: key }))}
-                        className={clsx(
-                          "flex items-center gap-3 px-4 py-3 rounded-xl border-2 text-left transition",
-                          sel ? "border-vine-600 bg-vine-50" : "border-gray-200 bg-white hover:border-vine-300"
-                        )}
-                      >
-                        <span className="text-xl">{tmpl.emoji}</span>
-                        <div className="flex-1 min-w-0">
-                          <p className={clsx("text-sm font-bold", sel ? "text-vine-800" : "text-gray-700")}>{tmpl.label}</p>
-                          <div className="flex flex-wrap gap-1 mt-1">
-                            {tmpl.ministerios.map((m) => (
-                              <span key={m} className={clsx("text-[10px] font-semibold px-1.5 py-0.5 rounded-full", MIN_COR[m]?.badge ?? "bg-gray-100 text-gray-600")}>
-                                {MIN_EMOJI[m]} {m}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                        <div className={clsx("w-5 h-5 rounded-full border-2 shrink-0 flex items-center justify-center transition", sel ? "border-vine-600 bg-vine-600" : "border-gray-300")}>
-                          {sel && <Check className="w-3 h-3 text-white" />}
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Step 2: date + info */}
-              <div>
-                <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">2. Informações do culto</p>
-                <div className="space-y-3">
+              {/* Date + info */}
+              <div className="space-y-3">
                   {/* Date */}
                   <div>
                     <label className="text-xs font-semibold text-gray-500 mb-1 block">Data *</label>
@@ -986,7 +954,7 @@ function EscalaModal({
                     </div>
                     {conflito && (
                       <p className="mt-1.5 text-xs text-red-600 font-medium flex items-center gap-1">
-                        <span>⚠</span> Já existe uma escala para este dia ({conflito.culto}). Escolha outra data.
+                        <span>⚠</span> {ministeriosConflito.join(", ")} já {ministeriosConflito.length === 1 ? "tem" : "têm"} escala neste dia. Escolha outra data.
                       </p>
                     )}
                   </div>
@@ -1010,23 +978,46 @@ function EscalaModal({
                       className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-vine-400"
                     />
                   </div>
-                </div>
               </div>
 
-              {/* Preview of ministries to be created */}
-              {form.tipoCulto && (
-                <div className="bg-gray-50 rounded-xl p-3 border border-gray-200">
-                  <p className="text-xs font-bold text-gray-500 mb-2">Ministérios que serão criados:</p>
-                  <div className="flex flex-wrap gap-2">
-                    {TEMPLATES_CULTO[form.tipoCulto as TipoCulto].ministerios.map((m) => (
-                      <span key={m} className={clsx("flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded-full", MIN_COR[m]?.badge ?? "bg-gray-100 text-gray-600")}>
-                        {MIN_EMOJI[m]} {m}
-                      </span>
-                    ))}
-                  </div>
-                  <p className="text-[10px] text-gray-400 mt-2">Cada líder poderá editar sua equipe após a criação.</p>
+              {/* Ministry selection */}
+              <div>
+                <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">Ministérios *</p>
+                <div className="flex flex-wrap gap-2">
+                  {ministeriosDisponiveis.map((m) => {
+                    const sel = form.ministeriosSel.includes(m);
+                    const temConflito = ministeriosConflito.includes(m);
+                    return (
+                      <button
+                        key={m}
+                        onClick={() => setForm((f) => ({
+                          ...f,
+                          ministeriosSel: sel
+                            ? f.ministeriosSel.filter((x) => x !== m)
+                            : [...f.ministeriosSel, m],
+                        }))}
+                        className={clsx(
+                          "flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full border-2 transition",
+                          temConflito
+                            ? "border-red-400 bg-red-50 text-red-600"
+                            : sel
+                              ? clsx(MIN_COR[m]?.badge ?? "bg-vine-100 text-vine-800", "border-transparent")
+                              : "border-gray-200 text-gray-600 bg-white hover:border-vine-300"
+                        )}
+                      >
+                        <span>{temConflito ? "⚠" : MIN_EMOJI[m]}</span> {m}
+                        {sel && !temConflito && <Check className="w-3 h-3 shrink-0" />}
+                      </button>
+                    );
+                  })}
                 </div>
-              )}
+                {!isAdmin && (
+                  <p className="text-[11px] text-gray-400 mt-2">Você pode criar escalas apenas para seu(s) ministério(s).</p>
+                )}
+                {form.ministeriosSel.length === 0 && (
+                  <p className="text-[11px] text-amber-600 mt-2">Selecione ao menos um ministério.</p>
+                )}
+              </div>
             </div>
 
             <div className="flex items-center justify-between gap-3 px-5 py-4 border-t border-gray-100 bg-gray-50">
@@ -1038,7 +1029,7 @@ function EscalaModal({
                 disabled={!canSaveTemplate}
                 className="flex items-center gap-1.5 bg-vine-700 text-white text-sm font-semibold px-5 py-2 rounded-xl hover:bg-vine-600 disabled:opacity-40 disabled:cursor-not-allowed transition"
               >
-                <Plus className="w-4 h-4" /> Criar escalas
+                <Plus className="w-4 h-4" /> Criar{form.ministeriosSel.length > 0 ? ` (${form.ministeriosSel.length})` : " escalas"}
               </button>
             </div>
           </>
