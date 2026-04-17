@@ -11,7 +11,7 @@ export default function ScrollyQuemSomos() {
     offset: ["start end", "end start"],
   });
 
-  // Background gradient shift �?" vine-50 �?' vine-100 �?' bark-50 �?' vine-50
+  // Background gradient shift — vine-50 → vine-100 → bark-50 → vine-50
   const bg1 = useTransform(
     scrollYProgress,
     [0, 0.3, 0.7, 1],
@@ -89,7 +89,7 @@ export default function ScrollyQuemSomos() {
             esse dá muito fruto."
           </p>
           <span className="block text-vine-600 text-[11px] tracking-[0.2em] uppercase mt-4">
-            �?" João 15:5
+            — João 15:5
           </span>
         </motion.blockquote>
 
@@ -104,8 +104,8 @@ export default function ScrollyQuemSomos() {
           {[
             { n: "2019", l: "Fundação" },
             { n: "6", l: "Ministérios" },
-            { n: "6�-", l: "Cultos / semana" },
-            { n: "�^z", l: "Amor" },
+            { n: "6+", l: "Cultos / semana" },
+            { n: "∞", l: "Amor" },
           ].map((s) => (
             <div
               key={s.l}

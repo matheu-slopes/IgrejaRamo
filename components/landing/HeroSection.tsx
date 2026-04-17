@@ -15,12 +15,12 @@ export default function HeroSection() {
     offset: ["start start", "end start"],
   });
 
-  // Parallax: orbs se movem mais r�pido, conte�do mais devagar ? profundidade
+  // Parallax: orbs se movem mais rápido, conteúdo mais devagar → profundidade
   const contentY = useTransform(scrollYProgress, [0, 1], [0,  -60]);
   const orb1Y    = useTransform(scrollYProgress, [0, 1], [0, -140]);
   const orb2Y    = useTransform(scrollYProgress, [0, 1], [0,  -90]);
 
-  // Posiciona o brilho do bot�o sob o cursor
+  // Posiciona o brilho do botão sob o cursor
   function handleMouseMove(e: React.MouseEvent<HTMLAnchorElement>) {
     if (!glowRef.current) return;
     const rect = e.currentTarget.getBoundingClientRect();
@@ -28,7 +28,7 @@ export default function HeroSection() {
     glowRef.current.style.top  = `${e.clientY - rect.top}px`;
   }
 
-  // Atalho para anima��o de entrada escalonada
+  // Atalho para animação de entrada escalonada
   const fadeUp = (delay: number) => ({
     initial:    { opacity: 0, y: 24 },
     animate:    { opacity: 1, y: 0  },
@@ -71,7 +71,7 @@ export default function HeroSection() {
         }}
       />
 
-      {/* Conte�do principal com parallax suave */}
+      {/* Conteúdo principal com parallax suave */}
       <motion.div
         style={{ y: contentY }}
         className="relative z-10 flex flex-col items-center select-none"
@@ -96,17 +96,17 @@ export default function HeroSection() {
           <div className="w-20 h-px bg-gradient-to-l from-transparent to-gold-600/50" />
         </motion.div>
 
-        {/* Passagem b�blica */}
+        {/* Passagem bíblica */}
         <motion.div {...fadeUp(0.45)} className="max-w-xs mx-auto space-y-1.5">
           <p className="font-sans italic text-[1.15rem] text-vine-200/90 leading-relaxed">
-            "Eu sou a videira; v�s sois os ramos."
+            "Eu sou a videira; vós sois os ramos."
           </p>
           <span className="block text-[11px] tracking-[0.25em] text-gold-500/80 uppercase">
-            Jo�o 15:5
+            João 15:5
           </span>
         </motion.div>
 
-        {/* Contador regressivo para o pr�ximo culto */}
+        {/* Contador regressivo para o próximo culto */}
         <motion.div {...fadeUp(0.65)} className="mt-8">
           <CountdownBadge />
         </motion.div>
@@ -129,7 +129,7 @@ export default function HeroSection() {
                          bg-white/30 blur-2xl pointer-events-none
                          opacity-0 group-hover:opacity-100 transition-opacity duration-300"
             />
-            Programa��o
+            Programação
           </a>
         </motion.div>
       </motion.div>

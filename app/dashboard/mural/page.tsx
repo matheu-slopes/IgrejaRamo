@@ -336,7 +336,7 @@ export default function ConversasPage() {
             <ImageIcon className="w-5 h-5" />
           </button>
 
-          {/* Gravar �udio */}
+          {/* Gravar áudio */}
           <button
             onClick={iniciarGravacao}
             className="p-2.5 rounded-xl border border-gray-200 bg-white text-gray-500 hover:text-vine-700 hover:border-vine-300 transition"
