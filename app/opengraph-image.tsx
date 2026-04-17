@@ -1,11 +1,15 @@
 import { ImageResponse } from "next/og";
+import { readFileSync } from "fs";
+import { join } from "path";
 
-export const runtime = "edge";
 export const alt = "Igreja Ramo da Vida";
 export const size = { width: 600, height: 600 };
 export const contentType = "image/png";
 
 export default function Image() {
+  const logoData = readFileSync(join(process.cwd(), "public", "logo.png"));
+  const logoBase64 = `data:image/png;base64,${logoData.toString("base64")}`;
+
   return new ImageResponse(
     (
       <div
@@ -18,22 +22,14 @@ export default function Image() {
           justifyContent: "center",
         }}
       >
-        {/* Logo SVG preta no centro */}
-        <svg
-          viewBox="0 0 72 100"
-          width="260"
-          height="360"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <line x1="36" y1="5" x2="36" y2="38" stroke="#111" strokeWidth="4" strokeLinecap="round" />
-          <line x1="12" y1="38" x2="60" y2="38" stroke="#111" strokeWidth="4" strokeLinecap="round" />
-          <line x1="36" y1="38" x2="36" y2="94" stroke="#111" strokeWidth="4" strokeLinecap="round" />
-          <path d="M36 53 C40 47 56 46 56 54 C56 61 43 60 36 53 Z" fill="#111" />
-          <path d="M36 65 C32 59 16 58 16 66 C16 73 29 72 36 65 Z" fill="#111" />
-          <path d="M36 78 C40 72 58 71 58 79 C58 86 43 85 36 78 Z" fill="#111" />
-          <path d="M36 90 C32 84 14 83 14 91 C14 98 31 97 36 90 Z" fill="#111" />
-        </svg>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={logoBase64}
+          width={420}
+          height={420}
+          alt="logo"
+          style={{ objectFit: "contain" }}
+        />
       </div>
     ),
     { ...size }
