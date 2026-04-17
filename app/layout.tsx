@@ -28,9 +28,9 @@ export const metadata: Metadata = {
     siteName: "Igreja Ramo da Vida",
     images: [
       {
-        url: "/logo.png",
-        width: 800,
-        height: 800,
+        url: "/opengraph-image",
+        width: 1200,
+        height: 630,
         alt: "Logo Igreja Ramo da Vida",
       },
     ],
@@ -41,7 +41,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Igreja Ramo da Vida",
     description: "Comunidade Igreja Ramo da Vida — Campinas, SP",
-    images: ["/logo.png"],
+    images: ["/opengraph-image"],
   },
 };
 
