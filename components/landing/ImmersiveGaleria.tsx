@@ -6,7 +6,7 @@ import { mockGaleria } from "@/lib/mockData";
 
 export default function ImmersiveGaleria() {
   return (
-    <section id="galeria" className="relative py-28 px-5 bg-white overflow-hidden">
+    <section id="galeria" className="relative py-28 px-5 overflow-hidden">
       <div className="absolute bottom-0 left-1/3 w-[500px] h-[500px] bg-gray-100/40 rounded-full blur-[140px] pointer-events-none" />
 
       <div className="max-w-6xl mx-auto relative z-10">

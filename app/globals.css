@@ -8,10 +8,38 @@
   }
   body {
     font-feature-settings: "kern" 1, "liga" 1, "calt" 1;
+    background-color: #F7F2EA;
+  }
+
+  /* Granulado sutil para dar profundidade ao fundo cream */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    opacity: 0.045;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23noise)' opacity='1'/%3E%3C/svg%3E");
+    background-repeat: repeat;
+    background-size: 200px 200px;
+  }
+
+  /* Escurecimento leve sobre o fundo */
+  body::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background-color: rgba(0, 0, 0, 0.08);
   }
 }
 
-/* ─── Hide default cursor on landing (MouseFollower takes over) ──── */
+/* ─── Marquee de versículos — loop infinito real ─────────────────── */
+@keyframes marquee-scroll {
+  from { transform: translate3d(0, 0, 0); }
+  to   { transform: translate3d(-50%, 0, 0); }
+}
 @media (hover: hover) {
   .immersive-cursor * { cursor: none !important; }
 }

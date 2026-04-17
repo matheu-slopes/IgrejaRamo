@@ -3,7 +3,7 @@ import Image from "next/image";
 
 export default function ImmersiveFooter() {
   return (
-    <footer className="bg-white text-vine-600 pt-16 pb-8 px-6 border-t border-vine-200">
+    <footer className="text-vine-600 pt-16 pb-8 px-6 border-t border-vine-200">
       <div className="max-w-5xl mx-auto">
         <div className="flex flex-col md:flex-row items-center justify-between gap-8 pb-10 border-b border-vine-200">
           <div className="flex flex-col items-center md:items-start gap-4">

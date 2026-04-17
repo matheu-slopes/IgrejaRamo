@@ -5,7 +5,7 @@ import { MapPin, Clock, Phone } from "lucide-react";
 
 export default function ImmersiveMapa() {
   return (
-    <section id="localizacao" className="relative py-28 px-5 bg-white overflow-hidden">
+    <section id="localizacao" className="relative py-28 px-5 overflow-hidden">
       <div className="absolute top-1/2 left-0 w-[400px] h-[400px] bg-gray-100/40 rounded-full blur-[120px] pointer-events-none" />
 
       <div className="max-w-5xl mx-auto relative z-10">

@@ -80,6 +80,7 @@ module.exports = {
         "fade-in":    "fadeIn 0.6s ease forwards",
         "fade-in-up": "fadeInUp 0.6s ease forwards",
         "float":      "float 4s ease-in-out infinite",
+        "marquee":    "marquee 30s linear infinite",
       },
       keyframes: {
         fadeIn: {
@@ -93,6 +94,10 @@ module.exports = {
         float: {
           "0%, 100%": { transform: "translateY(0)" },
           "50%":      { transform: "translateY(-8px)" },
+        },
+        marquee: {
+          from: { transform: "translateX(0)" },
+          to:   { transform: "translateX(-50%)" },
         },
       },
     },

@@ -2,6 +2,7 @@ import dynamic from "next/dynamic";
 import ImmersiveNav from "@/components/landing/ImmersiveNav";
 import FloatingCTA from "@/components/FloatingCTA";
 import ParticleHero from "@/components/landing/ParticleHero";
+import VerseMarquee from "@/components/landing/VerseMarquee";
 
 // Lazy load seções abaixo do fold
 const BentoGrid = dynamic(() => import("@/components/landing/BentoGrid"));
@@ -23,6 +24,9 @@ export default function HomePage() {
         <div id="discover">
           <BentoGrid />
         </div>
+
+        {/* Carrossel de versículos */}
+        <VerseMarquee />
 
         {/* 3. Programação semanal + Mural lado a lado */}
         <div id="cultos">

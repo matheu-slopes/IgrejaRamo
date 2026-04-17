@@ -15,7 +15,7 @@ function formatDate(iso: string) {
 
 export default function ImmersiveMural() {
   return (
-    <section id="avisos" className="relative py-28 px-5 bg-white overflow-hidden">
+    <section id="avisos" className="relative py-28 px-5 overflow-hidden">
       <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-gray-100/40 rounded-full blur-[120px] pointer-events-none" />
 
       <div className="max-w-4xl mx-auto relative z-10">

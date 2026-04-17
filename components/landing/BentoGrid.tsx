@@ -59,6 +59,17 @@ function TiltCard({
 
 /* --- Latest Culto Card -------------------------------------------- */
 function LatestCultoCard() {
+  const [videoUrl, setVideoUrl] = useState<string>("https://www.youtube.com/@ramodavida");
+
+  useEffect(() => {
+    fetch("/api/youtube-latest")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data?.video?.url) setVideoUrl(data.video.url);
+      })
+      .catch(() => {});
+  }, []);
+
   return (
     <TiltCard
       depth={1}
@@ -88,7 +99,7 @@ function LatestCultoCard() {
           </h3>
         </div>
         <a
-          href="https://www.youtube.com/@ramodavida"
+          href={videoUrl}
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex items-center gap-2.5 px-6 py-3 rounded-full
@@ -156,7 +167,7 @@ function DevocionalCard() {
 /* --- Main BentoGrid ----------------------------------------------- */
 export default function BentoGrid() {
   return (
-    <section className="relative py-28 px-5 bg-white overflow-hidden">
+    <section className="relative py-28 px-5 overflow-hidden">
       {/* Background gradient orbs */}
       <div className="absolute top-0 left-1/4 w-[600px] h-[600px] bg-gray-100/30 rounded-full blur-[130px] pointer-events-none" />
       <div className="absolute bottom-0 right-1/4 w-[500px] h-[500px] bg-gray-100/20 rounded-full blur-[110px] pointer-events-none" />
@@ -325,6 +336,9 @@ export default function BentoGrid() {
           <DevocionalCard />
         </div>
       </div>
+
+      {/* Fade de saída: funde os cards escuros com a seção seguinte */}
+      <div className="absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-b from-transparent to-[#F7F2EA]/60 pointer-events-none z-10" />
     </section>
   );
 }

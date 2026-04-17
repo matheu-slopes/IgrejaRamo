@@ -29,7 +29,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="pt-BR" data-scroll-behavior="smooth" className={`${inter.variable} ${cormorant.variable}`}>
-      <body className="bg-white text-gray-900 antialiased font-sans" suppressHydrationWarning>
+        <body className="bg-cream text-gray-900 antialiased font-sans" suppressHydrationWarning>
         <AuthProvider>{children}</AuthProvider>
       </body>
     </html>

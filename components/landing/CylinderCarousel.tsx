@@ -77,8 +77,10 @@ export default function CylinderCarousel() {
   return (
     <section
       id="cultos"
-      className="relative overflow-hidden bg-white px-6 py-20 sm:px-10"
+      className="relative overflow-hidden px-6 py-20 sm:px-10"
     >
+      {/* Fade de entrada vindo do BentoGrid */}
+      <div className="absolute top-0 left-0 right-0 h-20 bg-gradient-to-b from-[#F7F2EA]/60 to-transparent pointer-events-none z-10" />
       {/* glow frio à esquerda (cultos) e quente à direita (mural) */}
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_20%_0%,rgba(39,111,42,0.04),transparent_55%)]" />
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_80%_0%,rgba(39,111,42,0.06),transparent_55%)]" />
