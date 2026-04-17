@@ -29,8 +29,8 @@ export const metadata: Metadata = {
     images: [
       {
         url: "/opengraph-image",
-        width: 600,
-        height: 600,
+        width: 1200,
+        height: 630,
         alt: "Logo Igreja Ramo da Vida",
       },
     ],
