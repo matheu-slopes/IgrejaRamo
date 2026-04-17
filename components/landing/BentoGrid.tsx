@@ -59,35 +59,22 @@ function TiltCard({
 
 /* --- Latest Culto Card -------------------------------------------- */
 function LatestCultoCard() {
-  const [video, setVideo] = useState<{ title: string; url: string; thumbnail: string } | null>(null);
-
-  useEffect(() => {
-    fetch("/api/youtube-latest")
-      .then((r) => r.json())
-      .then((d) => d.video && setVideo(d.video))
-      .catch(() => {});
-  }, []);
-
-  const href = video?.url ?? "https://www.youtube.com/@ramodavida";
-  const bgImage = video?.thumbnail;
-
   return (
     <TiltCard
       depth={1}
       className="rounded-3xl overflow-hidden relative group min-h-[400px]"
       lens="Assista o culto"
     >
-      {/* Background: thumbnail do vídeo ou fallback */}
-      {bgImage ? (
-        <Image
-          src={bgImage}
-          alt="Último culto"
-          fill
-          className="object-cover transition-transform duration-700 group-hover:scale-105"
-        />
-      ) : (
-        <div className="absolute inset-0 bg-vine-950" />
-      )}
+      {/* Vídeo com loop nativo */}
+      <video
+        src="/final.mp4"
+        autoPlay
+        muted
+        loop
+        playsInline
+        preload="metadata"
+        className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+      />
 
       {/* Dark overlay */}
       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-black/20" />
@@ -101,7 +88,7 @@ function LatestCultoCard() {
           </h3>
         </div>
         <a
-          href={href}
+          href="https://www.youtube.com/@ramodavida"
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex items-center gap-2.5 px-6 py-3 rounded-full

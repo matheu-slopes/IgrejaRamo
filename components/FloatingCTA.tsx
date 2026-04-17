@@ -1,5 +1,5 @@
 // TODO: substitua pelo número real da igreja (somente dígitos, com DDI+DDD)
-const WHATSAPP_NUMBER = "5519000000000";
+const WHATSAPP_NUMBER = "5519995953536";
 
 function WhatsAppIcon({ className }: { className?: string }) {
   return (

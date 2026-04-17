@@ -47,7 +47,7 @@ export default function HeroSection() {
         loop
         playsInline
         className="absolute inset-0 w-full h-full object-cover"
-        src="/final.mp4"
+        src="/0416.mp4"
       />
       {/* Overlay escuro para legibilidade */}
       <div className="absolute inset-0 bg-vine-950/55 pointer-events-none" />
