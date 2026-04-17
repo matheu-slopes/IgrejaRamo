@@ -2,6 +2,7 @@ import { ImageResponse } from "next/og";
 import { readFileSync } from "fs";
 import { join } from "path";
 
+export const runtime = "nodejs";
 export const alt = "Igreja Ramo da Vida";
 export const size = { width: 600, height: 600 };
 export const contentType = "image/png";
