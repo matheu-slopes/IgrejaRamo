@@ -17,9 +17,11 @@ export default function ParticleHero() {
   const contentScale   = useTransform(scrollYProgress, [0, 0.5], [1, 0.92]);
   const hintOpacity    = useTransform(scrollYProgress, [0, 0.1], [1, 0]);
 
-  // Auto-scroll nudge after 3 seconds
+  // Auto-scroll nudge: após 10s e a cada 10s, só se estiver no topo
   useEffect(() => {
-    const timer = setTimeout(() => {
+    function nudge() {
+      if (window.scrollY > 80) return; // usuário já scrollou, não interfere
+
       const start = window.scrollY;
       const distance = 160;
       const duration = 900;
@@ -35,10 +37,8 @@ export default function ParticleHero() {
         const progress = Math.min(elapsed / duration, 1);
 
         if (progress < 0.5) {
-          // scroll down
           window.scrollTo(0, start + distance * easeInOutQuad(progress * 2));
         } else {
-          // scroll back up
           window.scrollTo(0, start + distance * (1 - easeInOutQuad((progress - 0.5) * 2)));
         }
 
@@ -46,9 +46,15 @@ export default function ParticleHero() {
       }
 
       requestAnimationFrame(step);
-    }, 3000);
+    }
 
-    return () => clearTimeout(timer);
+    const first = setTimeout(nudge, 10000);
+    const interval = setInterval(nudge, 10000);
+
+    return () => {
+      clearTimeout(first);
+      clearInterval(interval);
+    };
   }, []);
 
   const fadeUp = (delay: number) => ({
