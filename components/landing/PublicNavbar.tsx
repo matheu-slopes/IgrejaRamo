@@ -8,10 +8,10 @@ import clsx from "clsx";
 
 const links = [
   { href: "#cultos",      label: "Cultos"       },
-  { href: "#avisos",      label: "Programação"  },
+  { href: "#avisos",      label: "Programaï¿½ï¿½o"  },
   { href: "#galeria",     label: "Galeria"      },
   { href: "#quem-somos",  label: "Quem Somos"   },
-  { href: "#localizacao", label: "Localização"  },
+  { href: "#localizacao", label: "Localizaï¿½ï¿½o"  },
 ];
 
 export default function PublicNavbar() {

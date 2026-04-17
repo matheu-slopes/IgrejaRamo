@@ -1,261 +1,230 @@
 "use client";
 
-import { useState, useRef } from "react";
-import { motion, AnimatePresence, useMotionValue, useSpring, useTransform } from "framer-motion";
-import { Clock, MapPin, X, ChevronLeft, ChevronRight } from "lucide-react";
+import { motion } from "framer-motion";
+import { Clock3, MapPin, Bell, CalendarDays } from "lucide-react";
+import { mockAvisos } from "@/lib/mockData";
 
-interface EventCard {
+interface CultoDay {
   id: string;
-  titulo: string;
-  descricao: string;
-  data: string;
-  horario: string;
-  local: string;
-  cor: string;
+  short: string;
+  full: string;
+  title: string;
+  description: string;
+  time: string;
+  place: string;
+  featured?: boolean;
 }
 
-const programacao: EventCard[] = [
+const days: CultoDay[] = [
   {
-    id: "p1",
-    titulo: "Oração",
-    descricao: "Momento de busca e intercessão coletiva.",
-    data: "Segunda-feira",
-    horario: "20h00",
-    local: "Templo Principal",
-    cor: "from-vine-800 to-vine-900",
+    id: "seg",
+    short: "SEG",
+    full: "Segunda-feira",
+    title: "Oração",
+    description: "Busca, intercessão coletiva e fortalecimento espiritual.",
+    time: "20h00",
+    place: "Templo Principal",
   },
   {
-    id: "p2",
-    titulo: "Culto de Mulheres",
-    descricao: "Comunhão e palavra direcionada — 1ª terça do mês.",
-    data: "Terça-feira",
-    horario: "19h30",
-    local: "Templo Principal",
-    cor: "from-grape-800 to-grape-900",
+    id: "ter",
+    short: "TER",
+    full: "Terça-feira",
+    title: "Mulheres & Ensino",
+    description: "1ª terça: culto de mulheres. 2ª terça: ensino bíblico.",
+    time: "19h30 / 19h45",
+    place: "Templo Principal",
   },
   {
-    id: "p3",
-    titulo: "Culto de Ensino",
-    descricao: "Aprofundamento bíblico e capacitação — 2ª terça do mês.",
-    data: "Terça-feira",
-    horario: "19h45",
-    local: "Templo Principal",
-    cor: "from-bark-700 to-bark-800",
+    id: "qui",
+    short: "QUI",
+    full: "Quinta-feira",
+    title: "Culto de Quinta",
+    description: "Louvor, oração e Palavra para renovar a fé no meio da semana.",
+    time: "20h00",
+    place: "Templo Principal",
   },
   {
-    id: "p4",
-    titulo: "Culto de Quinta",
-    descricao: "Louvor, oração e Palavra para fortalecer a semana.",
-    data: "Quinta-feira",
-    horario: "20h00",
-    local: "Templo Principal",
-    cor: "from-vine-700 to-vine-900",
+    id: "sab",
+    short: "SÁB",
+    full: "Sábado",
+    title: "Jovens",
+    description: "Encontro quinzenal com adoração, comunhão e palavra para a juventude.",
+    time: "19h30",
+    place: "Sala 3",
   },
   {
-    id: "p5",
-    titulo: "Jovens",
-    descricao: "Encontro quinzenal da juventude com adoração e comunhão.",
-    data: "Sábado",
-    horario: "19h30",
-    local: "Sala 3",
-    cor: "from-vine-600 to-vine-800",
-  },
-  {
-    id: "p6",
-    titulo: "Culto Dominical",
-    descricao: "Celebração semanal com toda a família. 1º dom: 10h.",
-    data: "Domingo",
-    horario: "18h30",
-    local: "Templo Principal",
-    cor: "from-gold-600 to-gold-800",
+    id: "dom",
+    short: "DOM",
+    full: "Domingo",
+    title: "Culto Dominical",
+    description: "Celebração com louvor, mensagem e comunhão para toda a família.",
+    time: "18h30",
+    place: "Templo Principal",
+    featured: true,
   },
 ];
 
+const avisosPublicos = mockAvisos.filter((a) => a.destinatarios === "todos");
+
+function formatDate(iso: string) {
+  return new Date(iso + "T00:00:00").toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "long",
+  });
+}
+
 export default function CylinderCarousel() {
-  const [activeIndex, setActiveIndex] = useState(0);
-  const [expandedCard, setExpandedCard] = useState<EventCard | null>(null);
-  const dragX = useMotionValue(0);
-  const springX = useSpring(dragX, { stiffness: 300, damping: 30 });
-
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  const total = programacao.length;
-  const angleStep = 360 / total;
-
-  function next() {
-    setActiveIndex((i) => (i + 1) % total);
-  }
-  function prev() {
-    setActiveIndex((i) => (i - 1 + total) % total);
-  }
-
   return (
-    <section className="relative py-28 px-5 bg-[#060d06] overflow-hidden">
-      {/* Background glow */}
-      <div className="absolute inset-0 pointer-events-none"
-        style={{ background: "radial-gradient(ellipse at 50% 60%, rgba(212,154,18,0.04) 0%, transparent 60%)" }}
-      />
+    <section
+      id="cultos"
+      className="relative overflow-hidden bg-[#050805] px-6 py-20 sm:px-10"
+    >
+      {/* glow frio à esquerda (cultos) e quente à direita (mural) */}
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_20%_0%,rgba(180,220,255,0.04),transparent_55%)]" />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_80%_0%,rgba(100,220,140,0.05),transparent_55%)]" />
 
-      <div className="max-w-5xl mx-auto">
-        {/* Label */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          className="text-center mb-20"
-        >
-          <p className="text-gold-500/70 text-[11px] tracking-[0.4em] uppercase mb-3">
-            Programação
-          </p>
-          <h2 className="font-sans text-4xl md:text-6xl font-semibold text-white">
-            Nossos Cultos
-          </h2>
-        </motion.div>
+      <div className="relative mx-auto max-w-6xl">
+        <div className="grid grid-cols-1 gap-12 lg:grid-cols-[1fr_auto_1fr] lg:gap-0">
 
-        {/* 3D Carousel */}
-        <div ref={containerRef} className="relative w-full h-[340px] perspective-[1200px] flex items-center justify-center">
-          <div
-            className="relative w-[280px] h-[300px] transform-gpu"
-            style={{
-              transformStyle: "preserve-3d",
-              transform: `rotateY(${-activeIndex * angleStep}deg)`,
-              transition: "transform 0.7s cubic-bezier(0.23, 1, 0.32, 1)",
-            }}
-          >
-            {programacao.map((evento, i) => {
-              const angle = i * angleStep;
-              const radius = 320;
-              return (
-                <div
-                  key={evento.id}
-                  className="absolute inset-0"
-                  style={{
-                    transformStyle: "preserve-3d",
-                    transform: `rotateY(${angle}deg) translateZ(${radius}px)`,
-                  }}
-                >
-                  <motion.div
-                    whileHover={{ scale: 1.05 }}
-                    onClick={() => setExpandedCard(evento)}
-                    className={`w-[280px] h-[300px] rounded-3xl bg-gradient-to-b ${evento.cor}
-                               border border-white/10 backdrop-blur-md p-6
-                               flex flex-col justify-between cursor-pointer
-                               shadow-2xl shadow-black/40`}
-                  >
-                    <div>
-                      <p className="text-white/50 text-[10px] tracking-[0.3em] uppercase mb-1">
-                        {evento.data}
-                      </p>
-                      <h3 className="text-white text-xl font-bold mb-2">{evento.titulo}</h3>
-                      <p className="text-white/60 text-sm leading-relaxed">{evento.descricao}</p>
-                    </div>
-                    <div className="flex items-center gap-4 text-white/50 text-xs">
-                      <span className="flex items-center gap-1">
-                        <Clock className="w-3.5 h-3.5" /> {evento.horario}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <MapPin className="w-3.5 h-3.5" /> {evento.local}
-                      </span>
-                    </div>
-                  </motion.div>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Navigation arrows */}
-          <button
-            onClick={prev}
-            className="absolute left-4 md:left-8 z-20 w-11 h-11 rounded-full bg-white/5 border border-white/10
-                       flex items-center justify-center text-white/60 hover:text-white hover:bg-white/10 transition"
-            aria-label="Anterior"
-          >
-            <ChevronLeft className="w-5 h-5" />
-          </button>
-          <button
-            onClick={next}
-            className="absolute right-4 md:right-8 z-20 w-11 h-11 rounded-full bg-white/5 border border-white/10
-                       flex items-center justify-center text-white/60 hover:text-white hover:bg-white/10 transition"
-            aria-label="Próximo"
-          >
-            <ChevronRight className="w-5 h-5" />
-          </button>
-
-          {/* Dots */}
-          <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 flex gap-2">
-            {programacao.map((_, i) => (
-              <button
-                key={i}
-                onClick={() => setActiveIndex(i)}
-                className={`w-2 h-2 rounded-full transition-all duration-300 ${
-                  i === activeIndex ? "bg-gold-400 w-6" : "bg-white/20 hover:bg-white/40"
-                }`}
-                aria-label={`Ir para ${programacao[i].titulo}`}
-              />
-            ))}
-          </div>
-        </div>
-
-        {/* Address */}
-        <motion.p
-          initial={{ opacity: 0 }}
-          whileInView={{ opacity: 1 }}
-          viewport={{ once: true }}
-          className="text-center text-vine-600 text-sm mt-16"
-        >
-          📍 R. Fernão Pompeu de Camargo, 1293 — Jardim do Trevo, Campinas – SP
-        </motion.p>
-      </div>
-
-      {/* -- Expanded card overlay ----------------------------------------- */}
-      <AnimatePresence>
-        {expandedCard && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] flex items-center justify-center"
-            onClick={() => setExpandedCard(null)}
-          >
-            {/* Backdrop */}
-            <div className="absolute inset-0 bg-black/60 backdrop-blur-md" />
-
-            {/* Card */}
+          {/* ══ COLUNA ESQUERDA — Programação ══ */}
+          <div>
             <motion.div
-              initial={{ scale: 0.8, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.8, opacity: 0 }}
-              transition={{ type: "spring", stiffness: 300, damping: 25 }}
-              onClick={(e) => e.stopPropagation()}
-              className={`relative z-10 w-full max-w-md mx-4 rounded-3xl bg-gradient-to-b ${expandedCard.cor}
-                         border border-white/10 p-8 shadow-2xl`}
+              initial={{ opacity: 0, y: 16 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6 }}
+              className="mb-8 flex items-end justify-between border-b border-white/[0.10] pb-5"
             >
-              <button
-                onClick={() => setExpandedCard(null)}
-                className="absolute top-4 right-4 w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white/60 hover:text-white transition"
-                aria-label="Fechar"
-              >
-                <X className="w-4 h-4" />
-              </button>
-
-              <p className="text-white/50 text-[10px] tracking-[0.3em] uppercase mb-2">
-                {expandedCard.data}
-              </p>
-              <h3 className="text-white text-3xl font-bold font-sans mb-4">{expandedCard.titulo}</h3>
-              <p className="text-white/70 text-base leading-relaxed mb-8">{expandedCard.descricao}</p>
-
-              <div className="flex items-center gap-6 text-white/60 text-sm">
-                <span className="flex items-center gap-2">
-                  <Clock className="w-4 h-4" /> {expandedCard.horario}
-                </span>
-                <span className="flex items-center gap-2">
-                  <MapPin className="w-4 h-4" /> {expandedCard.local}
-                </span>
+              <div>
+                <p className="mb-1.5 text-[11px] uppercase tracking-[0.45em] text-white/45">
+                  Programação Semanal
+                </p>
+                <h2 className="font-sans text-2xl font-semibold leading-none text-white">
+                  Nossos Cultos
+                </h2>
               </div>
             </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+
+            <ol className="divide-y divide-white/[0.07]">
+              {days.map((day, i) => (
+                <motion.li
+                  key={day.id}
+                  initial={{ opacity: 0, x: -12 }}
+                  whileInView={{ opacity: 1, x: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.45, delay: i * 0.07 }}
+                  whileHover={{ backgroundColor: "rgba(255,255,255,0.04)" }}
+                  className="group flex items-center gap-5 rounded-xl px-3 py-4 transition-colors duration-300"
+                >
+                  <span className="w-5 shrink-0 text-xs tabular-nums text-white/20 group-hover:text-white/40 transition-colors">
+                    {String(i + 1).padStart(2, "0")}
+                  </span>
+
+                  <span
+                    className={`w-12 shrink-0 font-serif text-base font-semibold leading-none tracking-[0.1em] transition-colors duration-300 ${
+                      day.featured ? "text-white" : "text-white/60 group-hover:text-white/90"
+                    }`}
+                  >
+                    {day.short}
+                  </span>
+
+                  <span className="h-7 w-px shrink-0 bg-white/[0.10]" />
+
+                  <div className="flex flex-1 flex-col gap-1 min-w-0">
+                    <span
+                      className={`truncate text-sm font-semibold leading-none transition-colors duration-300 ${
+                        day.featured ? "text-white" : "text-white/75 group-hover:text-white"
+                      }`}
+                    >
+                      {day.title}
+                    </span>
+                    <span className="truncate text-xs text-white/40 group-hover:text-white/60 transition-colors duration-300">
+                      {day.description}
+                    </span>
+                  </div>
+
+                  <div className="hidden shrink-0 flex-col items-end gap-1 sm:flex">
+                    <span className="flex items-center gap-1 text-xs text-white/60 group-hover:text-white/85 transition-colors">
+                      <Clock3 className="h-3 w-3 text-white/30" />
+                      {day.time}
+                    </span>
+                    <span className="flex items-center gap-1 text-[11px] text-white/30 group-hover:text-white/50 transition-colors">
+                      <MapPin className="h-2.5 w-2.5" />
+                      {day.place}
+                    </span>
+                  </div>
+
+                  {day.featured && (
+                    <span className="ml-1 h-2 w-2 shrink-0 rounded-full bg-emerald-400/80" />
+                  )}
+                </motion.li>
+              ))}
+            </ol>
+
+            <p className="mt-7 text-[10px] tracking-widest text-white/25 uppercase">
+              R. Fernão Pompeu de Camargo, 1293 · Campinas
+            </p>
+          </div>
+
+          {/* ══ DIVISOR VERTICAL ══ */}
+          <div className="hidden lg:block w-px self-stretch bg-white/[0.10] mx-12" />
+
+          {/* ══ COLUNA DIREITA — Mural ══ */}
+          <div>
+            <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6, delay: 0.1 }}
+              className="mb-8 flex items-end justify-between border-b border-emerald-400/20 pb-5"
+            >
+              <div>
+                <p className="mb-1.5 text-[11px] uppercase tracking-[0.45em] text-emerald-400/60">
+                  Fique por dentro
+                </p>
+                <h2 className="font-sans text-2xl font-semibold leading-none text-white">
+                  Mural de Avisos
+                </h2>
+              </div>
+              <Bell className="h-5 w-5 text-emerald-400/40" />
+            </motion.div>
+
+            <ol className="space-y-3">
+              {avisosPublicos.map((aviso, i) => (
+                <motion.li
+                  key={aviso.id}
+                  initial={{ opacity: 0, x: 12 }}
+                  whileInView={{ opacity: 1, x: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.45, delay: i * 0.08 }}
+                  whileHover={{ backgroundColor: "rgba(52,211,153,0.05)" }}
+                  className="group flex items-start gap-4 rounded-xl border border-white/[0.06] border-l-2 border-l-emerald-400/40 bg-white/[0.025] px-4 py-4 transition-colors duration-300 hover:border-emerald-400/30"
+                >
+                  <div className="flex flex-1 flex-col gap-1.5 min-w-0">
+                    <span className="text-sm font-semibold leading-snug text-white/85 group-hover:text-white transition-colors duration-300">
+                      {aviso.titulo}
+                    </span>
+                    <span className="text-xs leading-5 text-white/45 group-hover:text-white/65 transition-colors duration-300">
+                      {aviso.conteudo}
+                    </span>
+                    <span className="mt-1 inline-flex w-fit items-center gap-1 rounded-full bg-emerald-400/10 px-2 py-0.5 text-[10px] font-medium text-emerald-400/70 group-hover:bg-emerald-400/15 group-hover:text-emerald-300 transition-colors">
+                      <CalendarDays className="h-2.5 w-2.5" />
+                      {formatDate(aviso.criadoEm)}
+                    </span>
+                  </div>
+                </motion.li>
+              ))}
+
+              {avisosPublicos.length === 0 && (
+                <li className="py-6 text-center text-[12px] text-white/25">
+                  Nenhum aviso no momento.
+                </li>
+              )}
+            </ol>
+          </div>
+
+        </div>
+      </div>
     </section>
   );
 }
