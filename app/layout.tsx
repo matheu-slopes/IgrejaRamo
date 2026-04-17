@@ -20,6 +20,29 @@ const lora = Lora({
 export const metadata: Metadata = {
   title: "Igreja Ramo da Vida",
   description: "Comunidade Igreja Ramo da Vida — Campinas, SP",
+  metadataBase: new URL("https://ramodavida.vercel.app"),
+  openGraph: {
+    title: "Igreja Ramo da Vida",
+    description: "Comunidade Igreja Ramo da Vida — Campinas, SP",
+    url: "https://ramodavida.vercel.app",
+    siteName: "Igreja Ramo da Vida",
+    images: [
+      {
+        url: "/logo.png",
+        width: 800,
+        height: 800,
+        alt: "Logo Igreja Ramo da Vida",
+      },
+    ],
+    locale: "pt_BR",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Igreja Ramo da Vida",
+    description: "Comunidade Igreja Ramo da Vida — Campinas, SP",
+    images: ["/logo.png"],
+  },
 };
 
 export default function RootLayout({
