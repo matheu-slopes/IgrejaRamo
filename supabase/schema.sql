@@ -1,0 +1,337 @@
+-- ================================================================
+-- RAMO CHURCH — Schema completo do Supabase
+-- Execute este arquivo no Supabase Dashboard → SQL Editor
+-- ================================================================
+
+-- ──────────────────────────────────────────────────────────────
+-- ENUMS
+-- ──────────────────────────────────────────────────────────────
+CREATE TYPE role_tipo AS ENUM ('admin', 'pastor', 'lider', 'voluntario', 'membro');
+
+CREATE TYPE ministerio_tipo AS ENUM (
+  'Ensino', 'Louvor', 'Ação Social', 'Infantil', 'Mídias', 'Cantina', 'Jovens'
+);
+
+CREATE TYPE tipo_mensagem AS ENUM ('texto', 'imagem', 'audio');
+
+CREATE TYPE tipo_notificacao AS ENUM ('aviso', 'escala', 'evento', 'ministerio', 'sistema');
+
+CREATE TYPE tipo_grupo AS ENUM ('geral', 'lideranca', 'ministerio', 'culto', 'evento');
+
+CREATE TYPE funcao_ministerio AS ENUM ('Líder', 'Sub-líder', 'Membro', 'Visitante');
+
+CREATE TYPE funcao_escala AS ENUM (
+  'Ministro', 'Guitarra', 'Baixo', 'Bateria', 'Teclado', 'Backing Vocal',
+  'Transmissão', 'Projeção/Letras', 'Fotografia',
+  'Abertura/Oferta', 'Escala de Limpeza',
+  'Professora', 'Monitor'
+);
+
+-- ──────────────────────────────────────────────────────────────
+-- PERFIS (ligado ao auth.users do Supabase)
+-- ──────────────────────────────────────────────────────────────
+CREATE TABLE perfis (
+  id            UUID        PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  nome          TEXT        NOT NULL,
+  email         TEXT        NOT NULL,
+  telefone      TEXT,
+  foto          TEXT,
+  role          role_tipo   NOT NULL DEFAULT 'membro',
+  ministerios   ministerio_tipo[] DEFAULT '{}',
+  data_ingresso DATE        NOT NULL DEFAULT CURRENT_DATE,
+  ativo         BOOLEAN     NOT NULL DEFAULT TRUE,
+  permissoes    TEXT[]      DEFAULT '{}',
+  created_at    TIMESTAMPTZ DEFAULT NOW(),
+  updated_at    TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Trigger: cria perfil automaticamente ao criar usuário no auth
+CREATE OR REPLACE FUNCTION handle_new_user()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO perfis (id, nome, email)
+  VALUES (
+    NEW.id,
+    COALESCE(NEW.raw_user_meta_data->>'nome', NEW.email),
+    NEW.email
+  );
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION handle_new_user();
+
+-- ──────────────────────────────────────────────────────────────
+-- EVENTOS
+-- ──────────────────────────────────────────────────────────────
+CREATE TABLE eventos (
+  id          UUID             PRIMARY KEY DEFAULT gen_random_uuid(),
+  titulo      TEXT             NOT NULL,
+  descricao   TEXT,
+  data        DATE             NOT NULL,
+  horario     TIME             NOT NULL,
+  local       TEXT             NOT NULL,
+  publico     BOOLEAN          NOT NULL DEFAULT FALSE,
+  ministerio  ministerio_tipo,
+  imagem_url  TEXT,
+  criado_por  UUID             REFERENCES perfis(id),
+  recorrente  BOOLEAN          DEFAULT FALSE,
+  created_at  TIMESTAMPTZ      DEFAULT NOW()
+);
+
+-- ──────────────────────────────────────────────────────────────
+-- AVISOS
+-- ──────────────────────────────────────────────────────────────
+CREATE TABLE avisos (
+  id            UUID             PRIMARY KEY DEFAULT gen_random_uuid(),
+  titulo        TEXT             NOT NULL,
+  conteudo      TEXT             NOT NULL,
+  criado_em     TIMESTAMPTZ      DEFAULT NOW(),
+  destinatarios JSONB            NOT NULL DEFAULT '"todos"',
+  ministerio    ministerio_tipo
+);
+
+-- Aviso fixado no topo do dashboard (apenas 1 registro)
+CREATE TABLE aviso_fixado (
+  id           INT   PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+  conteudo     TEXT  NOT NULL,
+  ativo        BOOLEAN NOT NULL DEFAULT TRUE,
+  atualizado_em TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ──────────────────────────────────────────────────────────────
+-- LOCAIS
+-- ──────────────────────────────────────────────────────────────
+CREATE TABLE locais (
+  id        UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  nome      TEXT NOT NULL,
+  descricao TEXT
+);
+
+-- ──────────────────────────────────────────────────────────────
+-- MÚSICAS (repertório)
+-- ──────────────────────────────────────────────────────────────
+CREATE TABLE musicas (
+  id           UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  titulo       TEXT        NOT NULL,
+  artista      TEXT        NOT NULL,
+  tom          TEXT,
+  estilo       TEXT,
+  link_youtube TEXT,
+  created_at   TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ──────────────────────────────────────────────────────────────
+-- ESCALAS
+-- ──────────────────────────────────────────────────────────────
+CREATE TABLE escalas (
+  id                       UUID             PRIMARY KEY DEFAULT gen_random_uuid(),
+  ministerio               ministerio_tipo  NOT NULL,
+  data                     DATE             NOT NULL,
+  horario                  TIME             NOT NULL,
+  culto                    TEXT             NOT NULL,
+  observacoes              TEXT,
+  visivel                  BOOLEAN          DEFAULT FALSE,
+  confirmacao_participantes BOOLEAN         DEFAULT FALSE,
+  criado_por               UUID             REFERENCES perfis(id),
+  created_at               TIMESTAMPTZ      DEFAULT NOW()
+);
+
+-- Itens da escala (funções + voluntários)
+CREATE TABLE escala_itens (
+  id              UUID          PRIMARY KEY DEFAULT gen_random_uuid(),
+  escala_id       UUID          NOT NULL REFERENCES escalas(id) ON DELETE CASCADE,
+  funcao          funcao_escala NOT NULL,
+  voluntario_id   UUID          REFERENCES perfis(id),
+  voluntario_nome TEXT          NOT NULL,
+  observacao      TEXT
+);
+
+-- Músicas de uma escala (com tom específico para aquele culto)
+CREATE TABLE escala_musicas (
+  id        UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  escala_id UUID NOT NULL REFERENCES escalas(id) ON DELETE CASCADE,
+  musica_id UUID REFERENCES musicas(id),
+  titulo    TEXT NOT NULL,
+  artista   TEXT NOT NULL,
+  tom       TEXT,
+  ordem     INT  DEFAULT 0
+);
+
+-- ──────────────────────────────────────────────────────────────
+-- MURAL DE MENSAGENS (por ministério)
+-- ──────────────────────────────────────────────────────────────
+CREATE TABLE mural_mensagens (
+  id          UUID             PRIMARY KEY DEFAULT gen_random_uuid(),
+  ministerio  ministerio_tipo  NOT NULL,
+  autor_id    UUID             REFERENCES perfis(id),
+  autor_nome  TEXT             NOT NULL,
+  autor_role  role_tipo        NOT NULL,
+  conteudo    TEXT             NOT NULL,
+  criado_em   TIMESTAMPTZ      DEFAULT NOW(),
+  fixada      BOOLEAN          DEFAULT FALSE,
+  tipo        tipo_mensagem    DEFAULT 'texto',
+  media_url   TEXT,
+  reacoes     JSONB            DEFAULT '[]',
+  editado_em  TIMESTAMPTZ,
+  resposta_a  JSONB            -- { id, autorNome, conteudo }
+);
+
+-- ──────────────────────────────────────────────────────────────
+-- GALERIA PÚBLICA
+-- ──────────────────────────────────────────────────────────────
+CREATE TABLE fotos_galeria (
+  id      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  titulo  TEXT NOT NULL,
+  url     TEXT NOT NULL,
+  data    DATE NOT NULL DEFAULT CURRENT_DATE
+);
+
+-- ──────────────────────────────────────────────────────────────
+-- NOTIFICAÇÕES
+-- ──────────────────────────────────────────────────────────────
+CREATE TABLE notificacoes (
+  id          UUID                PRIMARY KEY DEFAULT gen_random_uuid(),
+  usuario_id  UUID                REFERENCES perfis(id) ON DELETE CASCADE,
+  titulo      TEXT                NOT NULL,
+  corpo       TEXT                NOT NULL,
+  tipo        tipo_notificacao    NOT NULL,
+  lida        BOOLEAN             DEFAULT FALSE,
+  criada_em   TIMESTAMPTZ         DEFAULT NOW(),
+  link        TEXT,
+  ministerio  ministerio_tipo
+);
+
+-- ──────────────────────────────────────────────────────────────
+-- CANAIS DE MINISTÉRIO
+-- ──────────────────────────────────────────────────────────────
+CREATE TABLE canais_ministerio (
+  ministerio     ministerio_tipo PRIMARY KEY,
+  descricao      TEXT,
+  chat_bloqueado BOOLEAN DEFAULT FALSE,
+  cor            TEXT    NOT NULL DEFAULT 'vine'
+);
+
+-- Popula os canais padrão
+INSERT INTO canais_ministerio (ministerio, descricao, cor) VALUES
+  ('Ensino',      'Canal do ministério de ensino e doutrina',    'sky'),
+  ('Louvor',      'Canal do ministério de louvor e adoração',    'grape'),
+  ('Ação Social', 'Canal de ação social e evangelismo',          'olive'),
+  ('Infantil',    'Canal do ministério infantil',                'amber'),
+  ('Mídias',      'Canal do ministério de mídias e transmissão', 'cyan'),
+  ('Cantina',     'Canal da cantina e hospitalidade',            'orange'),
+  ('Jovens',      'Canal do ministério de jovens',               'vine');
+
+-- ──────────────────────────────────────────────────────────────
+-- MEMBROS DE MINISTÉRIO
+-- ──────────────────────────────────────────────────────────────
+CREATE TABLE membros_ministerio (
+  id               UUID               PRIMARY KEY DEFAULT gen_random_uuid(),
+  usuario_id       UUID               NOT NULL REFERENCES perfis(id) ON DELETE CASCADE,
+  ministerio       ministerio_tipo    NOT NULL,
+  funcao           funcao_ministerio  NOT NULL DEFAULT 'Membro',
+  ativo            BOOLEAN            DEFAULT TRUE,
+  data_entrada     DATE               DEFAULT CURRENT_DATE,
+  permissoes_canal TEXT[]             DEFAULT '{}',
+  UNIQUE(usuario_id, ministerio)
+);
+
+-- ──────────────────────────────────────────────────────────────
+-- GRUPOS DE CHAT
+-- ──────────────────────────────────────────────────────────────
+CREATE TABLE grupos (
+  id           UUID            PRIMARY KEY DEFAULT gen_random_uuid(),
+  nome         TEXT            NOT NULL,
+  tipo         tipo_grupo      NOT NULL,
+  emoji        TEXT            NOT NULL DEFAULT '💬',
+  cor          TEXT            NOT NULL DEFAULT 'bg-gray-700',
+  descricao    TEXT,
+  ministerio   ministerio_tipo,
+  evento_id    UUID            REFERENCES eventos(id),
+  data         DATE,
+  horario      TIME,
+  somente_admin BOOLEAN        DEFAULT FALSE,
+  admin_id     UUID            REFERENCES perfis(id),
+  institucional BOOLEAN        DEFAULT FALSE,
+  membros      UUID[]          DEFAULT '{}',
+  created_at   TIMESTAMPTZ     DEFAULT NOW()
+);
+
+-- ──────────────────────────────────────────────────────────────
+-- CONVERSAS DIRETAS (1:1)
+-- ──────────────────────────────────────────────────────────────
+CREATE TABLE conversas_diretas (
+  id             UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  participante_a UUID        NOT NULL REFERENCES perfis(id),
+  participante_b UUID        NOT NULL REFERENCES perfis(id),
+  created_at     TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(participante_a, participante_b)
+);
+
+-- ──────────────────────────────────────────────────────────────
+-- MENSAGENS (grupos e conversas diretas)
+-- ──────────────────────────────────────────────────────────────
+CREATE TABLE mensagens (
+  id          UUID          PRIMARY KEY DEFAULT gen_random_uuid(),
+  grupo_id    UUID          REFERENCES grupos(id) ON DELETE CASCADE,
+  conversa_id UUID          REFERENCES conversas_diretas(id) ON DELETE CASCADE,
+  autor_id    UUID          REFERENCES perfis(id),
+  autor_nome  TEXT          NOT NULL,
+  conteudo    TEXT          NOT NULL,
+  tipo        tipo_mensagem DEFAULT 'texto',
+  media_url   TEXT,
+  criado_em   TIMESTAMPTZ   DEFAULT NOW(),
+  editado_em  TIMESTAMPTZ,
+  lida        BOOLEAN       DEFAULT FALSE,
+  reacoes     JSONB         DEFAULT '[]',
+  resposta_a  JSONB,        -- { id, autorNome, conteudo }
+  CONSTRAINT chk_destino CHECK (
+    (grupo_id IS NOT NULL AND conversa_id IS NULL) OR
+    (grupo_id IS NULL AND conversa_id IS NOT NULL)
+  )
+);
+
+-- ──────────────────────────────────────────────────────────────
+-- ROW LEVEL SECURITY (RLS) — proteção básica
+-- ──────────────────────────────────────────────────────────────
+ALTER TABLE perfis             ENABLE ROW LEVEL SECURITY;
+ALTER TABLE eventos            ENABLE ROW LEVEL SECURITY;
+ALTER TABLE avisos             ENABLE ROW LEVEL SECURITY;
+ALTER TABLE escalas            ENABLE ROW LEVEL SECURITY;
+ALTER TABLE escala_itens       ENABLE ROW LEVEL SECURITY;
+ALTER TABLE escala_musicas     ENABLE ROW LEVEL SECURITY;
+ALTER TABLE musicas            ENABLE ROW LEVEL SECURITY;
+ALTER TABLE mural_mensagens    ENABLE ROW LEVEL SECURITY;
+ALTER TABLE fotos_galeria      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE notificacoes       ENABLE ROW LEVEL SECURITY;
+ALTER TABLE canais_ministerio  ENABLE ROW LEVEL SECURITY;
+ALTER TABLE membros_ministerio ENABLE ROW LEVEL SECURITY;
+ALTER TABLE grupos             ENABLE ROW LEVEL SECURITY;
+ALTER TABLE conversas_diretas  ENABLE ROW LEVEL SECURITY;
+ALTER TABLE mensagens          ENABLE ROW LEVEL SECURITY;
+ALTER TABLE locais             ENABLE ROW LEVEL SECURITY;
+ALTER TABLE aviso_fixado       ENABLE ROW LEVEL SECURITY;
+ALTER TABLE fotos_galeria      ENABLE ROW LEVEL SECURITY;
+
+-- Perfil: usuário vê/edita apenas o próprio perfil (admins veem todos via service role)
+CREATE POLICY "perfil_select" ON perfis FOR SELECT USING (auth.uid() = id);
+CREATE POLICY "perfil_update" ON perfis FOR UPDATE USING (auth.uid() = id);
+
+-- Eventos públicos visíveis para todos sem login
+CREATE POLICY "eventos_publicos" ON eventos FOR SELECT USING (publico = TRUE OR auth.uid() IS NOT NULL);
+
+-- Notificações: cada usuário vê apenas as suas
+CREATE POLICY "notificacoes_own" ON notificacoes FOR SELECT USING (usuario_id = auth.uid());
+CREATE POLICY "notificacoes_update" ON notificacoes FOR UPDATE USING (usuario_id = auth.uid());
+
+-- Mensagens: apenas membros autenticados
+CREATE POLICY "mensagens_select" ON mensagens FOR SELECT USING (auth.uid() IS NOT NULL);
+CREATE POLICY "mensagens_insert" ON mensagens FOR INSERT WITH CHECK (autor_id = auth.uid());
+
+-- Fotos galeria: leitura pública
+CREATE POLICY "galeria_select" ON fotos_galeria FOR SELECT USING (TRUE);
+
+-- Canais: leitura pública para membros autenticados
+CREATE POLICY "canais_select" ON canais_ministerio FOR SELECT USING (auth.uid() IS NOT NULL);
