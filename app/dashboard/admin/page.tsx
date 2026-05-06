@@ -10,6 +10,7 @@ import {
   Shield, Users, Plus, Search, Pencil, Power, X,
   ChevronRight, Check, RotateCcw, UserPlus, AlertCircle,
   Layers, Lock, Unlock, Trash2, Save, Link2, MapPin, Pin,
+  Eye, EyeOff,
 } from "lucide-react";
 import clsx from "clsx";
 import { User, Role, Ministerio, Permissao, CanalMinisterio, Local } from "@/types";
@@ -221,7 +222,10 @@ export default function AdminPage() {
           <div className="w-96 shrink-0">
             {painel === "novo" && !editando ? (
               <NovoUsuarioForm
-                onCriar={(dados) => { criarUsuario(dados); setPainel("lista"); }}
+                onCriar={async (dados, senha) => {
+                  const result = await criarUsuario(dados, senha);
+                  return result !== null;
+                }}
                 onCancelar={() => setPainel("lista")}
               />
             ) : editando ? (
@@ -684,20 +688,32 @@ function EditarUsuarioPanel({
 
 // ─── Formulário de novo usuário ───────────────────────────────────
 
+function gerarSenha() {
+  const chars = "abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  return "Ramo@" + Array.from({ length: 8 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
+}
+
 function NovoUsuarioForm({
   onCriar, onCancelar,
 }: {
-  onCriar: (dados: Omit<User, "id">) => void;
+  onCriar: (dados: Omit<User, "id">, senha: string) => Promise<boolean>;
   onCancelar: () => void;
 }) {
   const [form, setForm] = useState({
     nome: "", email: "", telefone: "", role: "membro" as Role,
     ministerios: [] as Ministerio[], ativo: true,
   });
+  const [senha, setSenha]           = useState(gerarSenha);
+  const [showSenha, setShowSenha]   = useState(false);
+  const [loading, setLoading]       = useState(false);
+  const [erro, setErro]             = useState("");
+  const [criado, setCriado]         = useState<{ email: string; senha: string } | null>(null);
+  const [copiado, setCopiado]       = useState(false);
 
-  function submeter() {
-    if (!form.nome.trim() || !form.email.trim()) return;
-    onCriar({
+  async function submeter() {
+    if (!form.nome.trim() || !form.email.trim() || !senha) return;
+    setErro(""); setLoading(true);
+    const ok = await onCriar({
       nome:        form.nome.trim(),
       email:       form.email.trim(),
       telefone:    form.telefone.trim() || undefined,
@@ -705,7 +721,65 @@ function NovoUsuarioForm({
       ministerios: form.ministerios,
       ativo:       true,
       dataIngresso: new Date().toISOString().split("T")[0],
-    });
+    }, senha);
+    setLoading(false);
+    if (ok) {
+      setCriado({ email: form.email.trim(), senha });
+    } else {
+      setErro("Erro ao criar usuário. Verifique se o e-mail já está em uso.");
+    }
+  }
+
+  function copiar() {
+    navigator.clipboard.writeText(`E-mail: ${criado!.email}\nSenha: ${criado!.senha}`);
+    setCopiado(true);
+    setTimeout(() => setCopiado(false), 2000);
+  }
+
+  const inputCls = "w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-vine-400 focus:ring-1 focus:ring-vine-100";
+
+  // ── Tela de sucesso: exibe credenciais ──
+  if (criado) {
+    return (
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden sticky top-4">
+        <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-2">
+          <Check className="w-4 h-4 text-green-600" />
+          <p className="font-semibold text-gray-800 text-sm">Usuário criado!</p>
+        </div>
+        <div className="p-5 space-y-4">
+          <p className="text-xs text-gray-500">
+            Compartilhe as credenciais abaixo com o membro para que ele possa fazer login.
+          </p>
+          <div className="bg-gray-50 rounded-xl border border-gray-200 p-4 space-y-2 font-mono text-sm">
+            <div className="flex justify-between gap-2">
+              <span className="text-gray-400 text-xs">E-mail</span>
+              <span className="text-gray-800 text-xs font-semibold break-all text-right">{criado.email}</span>
+            </div>
+            <div className="flex justify-between gap-2">
+              <span className="text-gray-400 text-xs">Senha</span>
+              <span className="text-gray-800 text-xs font-semibold">{criado.senha}</span>
+            </div>
+          </div>
+          <button
+            onClick={copiar}
+            className={clsx(
+              "w-full py-2.5 rounded-xl text-sm font-semibold transition border",
+              copiado
+                ? "bg-green-50 text-green-700 border-green-200"
+                : "bg-vine-50 text-vine-800 border-vine-200 hover:bg-vine-100"
+            )}
+          >
+            {copiado ? "Copiado!" : "Copiar credenciais"}
+          </button>
+          <button
+            onClick={onCancelar}
+            className="w-full py-2 text-sm text-gray-400 hover:text-gray-600 transition"
+          >
+            Fechar
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -726,21 +800,53 @@ function NovoUsuarioForm({
             value={form.nome}
             onChange={(e) => setForm({ ...form, nome: e.target.value })}
             placeholder="Nome completo *"
-            className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-vine-400 focus:ring-1 focus:ring-vine-100"
+            className={inputCls}
           />
           <input
             value={form.email}
             onChange={(e) => setForm({ ...form, email: e.target.value })}
             placeholder="E-mail *"
             type="email"
-            className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-vine-400 focus:ring-1 focus:ring-vine-100"
+            className={inputCls}
           />
           <input
             value={form.telefone}
             onChange={(e) => setForm({ ...form, telefone: e.target.value })}
             placeholder="Telefone"
-            className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-vine-400 focus:ring-1 focus:ring-vine-100"
+            className={inputCls}
           />
+          {/* Campo de senha com geração automática */}
+          <div>
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Senha inicial</p>
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <input
+                  value={senha}
+                  onChange={(e) => setSenha(e.target.value)}
+                  type={showSenha ? "text" : "password"}
+                  placeholder="Senha *"
+                  minLength={6}
+                  className={inputCls + " pr-9"}
+                />
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  onClick={() => setShowSenha((v) => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  {showSenha ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                </button>
+              </div>
+              <button
+                type="button"
+                onClick={() => { setSenha(gerarSenha()); setShowSenha(true); }}
+                className="text-xs px-3 py-2 rounded-xl border border-gray-200 text-gray-500 hover:bg-gray-50 transition shrink-0"
+                title="Gerar senha aleatória"
+              >
+                Gerar
+              </button>
+            </div>
+          </div>
         </div>
 
         <div>
@@ -791,6 +897,10 @@ function NovoUsuarioForm({
           As permissões serão automaticamente definidas pelo role escolhido. Você pode customizá-las depois.
         </p>
 
+        {erro && (
+          <p className="text-xs text-red-500 bg-red-50 rounded-lg px-3 py-2">{erro}</p>
+        )}
+
         <div className="flex gap-2 pt-1">
           <button
             onClick={onCancelar}
@@ -800,16 +910,17 @@ function NovoUsuarioForm({
           </button>
           <button
             onClick={submeter}
-            disabled={!form.nome || !form.email}
+            disabled={!form.nome || !form.email || !senha || loading}
             className="flex-1 text-sm bg-vine-800 text-white font-semibold py-2.5 rounded-xl hover:bg-vine-700 transition disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            Criar usuário
+            {loading ? "Criando..." : "Criar usuário"}
           </button>
         </div>
       </div>
     </div>
   );
 }
+
 
 // ─── LocaisTab ────────────────────────────────────────────────────────────────
 
