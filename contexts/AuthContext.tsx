@@ -166,27 +166,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function criarUsuario(dados: Omit<User, "id">, senha: string): Promise<User | null> {
-    const { data, error } = await supabase.auth.signUp({
-      email: dados.email,
-      password: senha,
-      options: { data: { nome: dados.nome } },
+    const res = await fetch("/api/criar-usuario", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email:         dados.email,
+        senha,
+        nome:          dados.nome,
+        telefone:      dados.telefone,
+        role:          dados.role,
+        ministerios:   dados.ministerios,
+        dataIngresso:  dados.dataIngresso,
+        ativo:         dados.ativo,
+        permissoes:    dados.permissoes ?? [],
+      }),
     });
-    if (error || !data.user) return null;
-
-    // Upsert no perfil com todos os dados (sobrescreve o criado pelo trigger)
-    await supabase.from("perfis").upsert({
-      id:            data.user.id,
-      nome:          dados.nome,
-      email:         dados.email,
-      telefone:      dados.telefone ?? null,
-      role:          dados.role,
-      ministerios:   dados.ministerios,
-      data_ingresso: dados.dataIngresso,
-      ativo:         dados.ativo,
-      permissoes:    dados.permissoes ?? [],
-    });
-
-    const novo: User = { ...dados, id: data.user.id };
+    if (!res.ok) return null;
+    const { id } = await res.json();
+    const novo: User = { ...dados, id };
     setUsuarios((prev) => [...prev, novo]);
     return novo;
   }
