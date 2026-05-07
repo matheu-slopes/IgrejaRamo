@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import clsx from "clsx";
 import {
@@ -34,8 +34,11 @@ const navMain = [
 ];
 
 const navAdmin = [
-  { href: "/dashboard/admin/avisos",      label: "Avisos",     icon: Bell     },
-  { href: "/dashboard/admin/devocional",  label: "Devocional", icon: BookOpen },
+  { href: "/dashboard/admin?tab=usuarios",             label: "Usuários",    icon: Users    },
+  { href: "/dashboard/admin?tab=ministerios",          label: "Ministérios", icon: Shield   },
+  { href: "/dashboard/admin?tab=locais",               label: "Locais",      icon: CalendarDays },
+  { href: "/dashboard/admin?tab=conteudo&secao=avisos",     label: "Avisos",      icon: Bell     },
+  { href: "/dashboard/admin?tab=conteudo&secao=devocional", label: "Devocional",  icon: BookOpen },
 ];
 
 const ministerios = [
@@ -49,9 +52,20 @@ const ministerios = [
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { user, logout, temPermissao } = useAuth();
   const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
+
+  function isActive(href: string) {
+    const [hPath, hQuery] = href.split("?");
+    if (pathname !== hPath) return false;
+    if (!hQuery) return true;
+    return hQuery.split("&").every((pair) => {
+      const [key, val] = pair.split("=");
+      return searchParams.get(key) === val;
+    });
+  }
 
   function handleLogout() {
     logout();
@@ -89,7 +103,7 @@ export default function Sidebar() {
       </div>
 
       {/* Main nav */}
-      <nav className="flex-1 overflow-y-auto py-4 space-y-1 px-2">
+      <nav className="flex-1 overflow-y-auto py-4 space-y-1 px-2 scrollbar-thin scrollbar-thumb-vine-800 scrollbar-track-transparent" style={{ scrollbarWidth: "thin", scrollbarColor: "#2d4a2d transparent" }}>
         {navMain.map(({ href, label, icon: Icon }) => (
           <Link
             key={href}
@@ -141,28 +155,13 @@ export default function Sidebar() {
               </p>
             )}
             {collapsed && <div className="border-t border-vine-800 my-3 mx-1" />}
-            <Link
-              href="/dashboard/admin"
-              className={clsx(
-                "flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition",
-                pathname === "/dashboard/admin"
-                  ? "bg-vine-700 text-white"
-                  : "text-vine-400 hover:bg-vine-800 hover:text-white"
-              )}
-              title={collapsed ? "Painel Admin" : undefined}
-            >
-              <Shield className="w-4 h-4 shrink-0" />
-              {!collapsed && <span>Painel Admin</span>}
-            </Link>
             {navAdmin.map(({ href, label, icon: Icon }) => (
               <Link
                 key={href}
                 href={href}
                 className={clsx(
                   "flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition",
-                  pathname === href
-                    ? "bg-vine-700 text-white"
-                    : "text-vine-400 hover:bg-vine-800 hover:text-white"
+                  isActive(href) ? "bg-vine-700 text-white" : "text-vine-400 hover:bg-vine-800 hover:text-white"
                 )}
                 title={collapsed ? label : undefined}
               >

@@ -42,6 +42,9 @@ export default function CanalMinisterioPage() {
       if (data && data.length > 0) {
         setCanalBase({ ministerio: data[0].ministerio, descricao: data[0].descricao ?? "", chatBloqueado: data[0].chat_bloqueado, cor: data[0].cor });
         setChatBloqueado(data[0].chat_bloqueado);
+      } else {
+        // Fallback: canal existe no enum mas não na tabela ainda
+        setCanalBase({ ministerio: slug, descricao: "", chatBloqueado: false, cor: "vine" });
       }
     });
   }, [slug]);

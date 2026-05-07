@@ -55,7 +55,16 @@ export default function AdminPage() {
     const t = searchParams.get("tab") as AdminTab | null;
     return t && ["usuarios", "ministerios", "locais", "conteudo"].includes(t) ? t : "usuarios";
   });
-  const [initSecao] = useState(() => searchParams.get("secao") ?? undefined);
+  const [initSecao, setInitSecao] = useState(() => searchParams.get("secao") ?? undefined);
+
+  // Sincroniza com mudanças de URL (navegação pela sidebar)
+  useEffect(() => {
+    const t = searchParams.get("tab") as AdminTab | null;
+    if (t && ["usuarios", "ministerios", "locais", "conteudo"].includes(t)) {
+      setAdminTab(t);
+    }
+    setInitSecao(searchParams.get("secao") ?? undefined);
+  }, [searchParams]);
   const [busca, setBusca] = useState("");
   const [painel, setPainel] = useState<Painel>("lista");
   const [editando, setEditando] = useState<User | null>(null);
@@ -77,29 +86,6 @@ export default function AdminPage() {
 
   return (
     <div className="max-w-5xl space-y-6">
-      {/* Header */}
-      {/* Tab switcher */}
-      <div className="flex gap-2 border-b border-gray-100 pb-1 mb-2">
-        {([
-          { id: "usuarios",    label: "Usuários",    icon: Users    },
-          { id: "ministerios", label: "Ministérios", icon: Layers   },
-          { id: "locais",      label: "Locais",      icon: MapPin   },
-          { id: "conteudo",    label: "Conteúdo",    icon: BookOpen },
-        ] as { id: AdminTab; label: string; icon: React.ElementType }[]).map(({ id, label, icon: Icon }) => (
-          <button
-            key={id}
-            onClick={() => setAdminTab(id)}
-            className={clsx(
-              "flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold transition",
-              adminTab === id
-                ? "bg-vine-700 text-white"
-                : "text-gray-500 hover:text-vine-700 hover:bg-vine-50"
-            )}
-          >
-            <Icon className="w-4 h-4" /> {label}
-          </button>
-        ))}
-      </div>
 
       {adminTab === "ministerios" && (
         <MinisteriosTab usuarios={usuarios} temPermissao={temPermissao} />
@@ -263,251 +249,91 @@ export default function AdminPage() {
 // ─── Aba de Ministérios ───────────────────────────────────────────
 
 function MinisteriosTab({
-  usuarios, temPermissao,
+  usuarios,
 }: {
   usuarios: User[];
   temPermissao: (p: Permissao) => boolean;
 }) {
-  const podeEditar = temPermissao("atribuir_permissoes");
-  const [canais, setCanais] = useState<CanalMinisterio[]>([]);
+  const MINISTERIOS_LISTA: Ministerio[] = ["Louvor","Mídias","Ensino","Infantil","Ação Social","Jovens","Cantina"];
+  const [editandoMin, setEditandoMin] = useState<Ministerio | null>(null);
+  const [salvando, setSalvando] = useState(false);
 
-  useEffect(() => {
-    supabase
-      .from("canais_ministerio")
-      .select()
-      .then(({ data }) => {
-        if (data) {
-          setCanais(
-            data.map((c) => ({
-              ministerio: c.ministerio, descricao: c.descricao ?? "",
-              chatBloqueado: c.chat_bloqueado, cor: c.cor,
-            }))
-          );
-        }
-      });
-  }, []);
-  const [editandoCanal, setEditandoCanal] = useState<CanalMinisterio | null>(null);
-  const [showNovoForm, setShowNovoForm] = useState(false);
-  const [novoForm, setNovoForm] = useState({ ministerio: "" as Ministerio | string, descricao: "", cor: "vine", chatBloqueado: false });
-
-  function salvarEdicao() {
-    if (!editandoCanal) return;
-    supabase
-      .from("canais_ministerio")
-      .update({ descricao: editandoCanal.descricao, chat_bloqueado: editandoCanal.chatBloqueado, cor: editandoCanal.cor })
-      .eq("ministerio", editandoCanal.ministerio)
-      .then(() => {});
-    setCanais((prev) => prev.map((c) => c.ministerio === editandoCanal.ministerio ? editandoCanal : c));
-    setEditandoCanal(null);
-  }
-
-  function removerCanal(m: string) {
-    if (!confirm(`Remover o canal "${m}"?`)) return;
-    supabase.from("canais_ministerio").delete().eq("ministerio", m).then(() => {});
-    setCanais((prev) => prev.filter((c) => c.ministerio !== m));
-  }
-
-  function criarCanal() {
-    if (!novoForm.ministerio.trim() || !novoForm.descricao.trim()) return;
-    const novo: CanalMinisterio = {
-      ministerio: novoForm.ministerio.trim() as Ministerio,
-      descricao: novoForm.descricao.trim(),
-      chatBloqueado: novoForm.chatBloqueado,
-      cor: novoForm.cor,
-    };
-    supabase
-      .from("canais_ministerio")
-      .insert({ ministerio: novo.ministerio, descricao: novo.descricao, chat_bloqueado: novo.chatBloqueado, cor: novo.cor })
-      .then(() => {});
-    setCanais((prev) => [...prev, novo]);
-    setNovoForm({ ministerio: "", descricao: "", cor: "vine", chatBloqueado: false });
-    setShowNovoForm(false);
+  async function toggleMembro(usuario: User, ministerio: Ministerio) {
+    const jaEsta = usuario.ministerios?.includes(ministerio);
+    const novos = jaEsta
+      ? (usuario.ministerios ?? []).filter((m) => m !== ministerio)
+      : [...(usuario.ministerios ?? []), ministerio];
+    setSalvando(true);
+    await supabase.from("perfis").update({ ministerios: novos }).eq("id", usuario.id);
+    setSalvando(false);
+    // Atualiza localmente sem recarregar a lista inteira
+    usuario.ministerios = novos;
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <p className="text-sm text-gray-500">{canais.length} canal{canais.length !== 1 ? "is" : ""} de ministério</p>
-        {podeEditar && (
-          <button
-            onClick={() => setShowNovoForm(true)}
-            className="flex items-center gap-1.5 bg-vine-700 text-white text-sm font-semibold px-4 py-2 rounded-xl hover:bg-vine-600 transition"
-          >
-            <Plus className="w-4 h-4" /> Novo canal
-          </button>
-        )}
+        <p className="text-sm text-gray-500">{MINISTERIOS_LISTA.length} ministérios</p>
+        <p className="text-xs text-gray-400 bg-gray-100 px-3 py-1.5 rounded-lg">Os ministérios são definidos no sistema</p>
       </div>
-
-      {/* Formulário novo canal */}
-      {showNovoForm && (
-        <div className="bg-vine-50 border border-vine-200 rounded-2xl p-5 space-y-4">
-          <p className="text-sm font-semibold text-vine-800">Novo canal de ministério</p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <input
-              value={novoForm.ministerio as string}
-              onChange={(e) => setNovoForm({ ...novoForm, ministerio: e.target.value })}
-              placeholder="Nome do ministério *"
-              className="border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-vine-400"
-            />
-            <input
-              value={novoForm.descricao}
-              onChange={(e) => setNovoForm({ ...novoForm, descricao: e.target.value })}
-              placeholder="Descrição *"
-              className="border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-vine-400"
-            />
-          </div>
-          <div className="flex items-center gap-4">
-            <div className="flex-1">
-              <p className="text-xs text-gray-500 mb-1.5">Cor do canal</p>
-              <div className="flex gap-2 flex-wrap">
-                {CORES_CANAL.map((cor) => (
-                  <button
-                    key={cor}
-                    onClick={() => setNovoForm({ ...novoForm, cor })}
-                    className={clsx(
-                      "w-7 h-7 rounded-full border-2 transition",
-                      COR_BG[cor],
-                      novoForm.cor === cor ? "border-vine-900 scale-110" : "border-transparent"
-                    )}
-                    title={COR_LABEL[cor]}
-                  />
-                ))}
-              </div>
-            </div>
-            <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={novoForm.chatBloqueado}
-                onChange={(e) => setNovoForm({ ...novoForm, chatBloqueado: e.target.checked })}
-                className="accent-vine-700 w-4 h-4"
-              />
-              Chat bloqueado por padrão
-            </label>
-          </div>
-          <div className="flex gap-2 justify-end">
-            <button onClick={() => setShowNovoForm(false)} className="text-sm text-gray-500 px-4 py-1.5 rounded-xl hover:bg-gray-100">Cancelar</button>
-            <button
-              onClick={criarCanal}
-              disabled={!novoForm.ministerio || !novoForm.descricao}
-              className="text-sm bg-vine-700 text-white font-semibold px-4 py-1.5 rounded-xl hover:bg-vine-600 disabled:opacity-40"
-            >
-              Criar canal
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Lista de canais */}
-      <div className="grid grid-cols-1 gap-3">
-        {canais.map((canal) => {
-          const isEditing = editandoCanal?.ministerio === canal.ministerio;
-          const membrosDoCanal = usuarios.filter((u) => u.ministerios.includes(canal.ministerio as Ministerio));
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {MINISTERIOS_LISTA.map((min) => {
+          const membros = usuarios.filter((u) => u.ministerios?.includes(min));
+          const isEditing = editandoMin === min;
           return (
-            <div
-              key={canal.ministerio}
-              className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden"
-            >
-              {/* Header do card */}
-              <div className={clsx("px-5 py-3 flex items-center justify-between", COR_BG[canal.cor] ?? "bg-vine-600")}>
-                <div className="flex items-center gap-3">
-                  <span className="font-sans font-semibold text-white text-base">{canal.ministerio}</span>
-                  <span className={clsx(
-                    "text-[10px] font-semibold px-2 py-0.5 rounded-full border border-white/30 text-white/90",
-                    canal.chatBloqueado ? "bg-white/20" : "bg-white/10"
-                  )}>
-                    {canal.chatBloqueado ? "🔒 Chat bloqueado" : "💬 Chat livre"}
-                  </span>
+            <div key={min} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+              <div className="flex items-center justify-between px-5 py-3 bg-vine-700">
+                <span className="font-semibold text-white">{min}</span>
+                <div className="flex items-center gap-2">
+                  <a
+                    href={`/dashboard/ministerio/${encodeURIComponent(min)}`}
+                    className="text-white/80 hover:text-white text-xs bg-white/10 hover:bg-white/20 px-2.5 py-1 rounded-lg transition flex items-center gap-1"
+                  >
+                    <Link2 className="w-3 h-3" /> Canal
+                  </a>
+                  <button
+                    onClick={() => setEditandoMin(isEditing ? null : min)}
+                    className="text-white/80 hover:text-white text-xs bg-white/10 hover:bg-white/20 px-2.5 py-1 rounded-lg transition flex items-center gap-1"
+                  >
+                    <Users className="w-3 h-3" /> {isEditing ? "Fechar" : "Membros"}
+                  </button>
                 </div>
-                {podeEditar && (
-                  <div className="flex gap-2">
-                    <a
-                      href={`/dashboard/ministerio/${encodeURIComponent(canal.ministerio)}`}
-                      className="flex items-center gap-1 text-white/80 hover:text-white text-xs bg-white/10 hover:bg-white/20 px-2.5 py-1 rounded-lg transition"
-                    >
-                      <Link2 className="w-3 h-3" /> Abrir
-                    </a>
-                    <button
-                      onClick={() => isEditing ? setEditandoCanal(null) : setEditandoCanal({ ...canal })}
-                      className="flex items-center gap-1 text-white/80 hover:text-white text-xs bg-white/10 hover:bg-white/20 px-2.5 py-1 rounded-lg transition"
-                    >
-                      <Pencil className="w-3 h-3" /> {isEditing ? "Cancelar" : "Editar"}
-                    </button>
-                    <button
-                      onClick={() => removerCanal(canal.ministerio)}
-                      className="text-white/70 hover:text-red-200 hover:bg-white/10 p-1 rounded-lg transition"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                )}
               </div>
-
-              {/* Body */}
               <div className="px-5 py-4">
-                {isEditing && editandoCanal ? (
-                  <div className="space-y-4">
-                    <div className="space-y-3">
-                      <div>
-                        <label className="text-xs text-gray-500 mb-1 block">Descrição</label>
-                        <input
-                          value={editandoCanal.descricao}
-                          onChange={(e) => setEditandoCanal({ ...editandoCanal, descricao: e.target.value })}
-                          className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-vine-400"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-xs text-gray-500 mb-1.5 block">Cor do canal</label>
-                        <div className="flex gap-2 flex-wrap">
-                          {CORES_CANAL.map((cor) => (
-                            <button
-                              key={cor}
-                              onClick={() => setEditandoCanal({ ...editandoCanal, cor })}
-                              className={clsx(
-                                "w-7 h-7 rounded-full border-2 transition",
-                                COR_BG[cor],
-                                editandoCanal.cor === cor ? "border-gray-800 scale-110" : "border-transparent"
-                              )}
-                              title={COR_LABEL[cor]}
-                            />
-                          ))}
-                        </div>
-                      </div>
-                      <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={editandoCanal.chatBloqueado}
-                          onChange={(e) => setEditandoCanal({ ...editandoCanal, chatBloqueado: e.target.checked })}
-                          className="accent-vine-700 w-4 h-4"
-                        />
-                        Chat bloqueado por padrão
-                      </label>
-                    </div>
-                    <button
-                      onClick={salvarEdicao}
-                      className="flex items-center gap-1.5 bg-vine-700 text-white text-sm font-semibold px-4 py-2 rounded-xl hover:bg-vine-600 transition"
-                    >
-                      <Save className="w-3.5 h-3.5" /> Salvar alterações
-                    </button>
-                  </div>
-                ) : (
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <p className="text-sm text-gray-600">{canal.descricao}</p>
-                      <p className="text-xs text-gray-400 mt-1">
-                        {membrosDoCanal.length} membro{membrosDoCanal.length !== 1 ? "s" : ""}
-                        {membrosDoCanal.length > 0 && (
-                          <span className="ml-1 text-gray-500">
-                            • {membrosDoCanal.slice(0, 3).map((u) => u.nome.split(" ")[0]).join(", ")}
-                            {membrosDoCanal.length > 3 && ` +${membrosDoCanal.length - 3}`}
+                {!isEditing ? (
+                  <>
+                    <p className="text-xs text-gray-400 mb-2">{membros.length} membro{membros.length !== 1 ? "s" : ""}</p>
+                    {membros.length > 0 ? (
+                      <div className="flex flex-wrap gap-1.5">
+                        {membros.map((u) => (
+                          <span key={u.id} className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
+                            {u.nome.split(" ")[0]}
                           </span>
-                        )}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      {canal.chatBloqueado
-                        ? <Lock className="w-4 h-4 text-amber-400" />
-                        : <Unlock className="w-4 h-4 text-green-400" />}
-                    </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-gray-300 italic">Nenhum membro atribuído</p>
+                    )}
+                  </>
+                ) : (
+                  <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                    <p className="text-xs text-gray-500 mb-2">Selecione os membros deste ministério:</p>
+                    {usuarios.map((u) => {
+                      const jaEsta = u.ministerios?.includes(min);
+                      return (
+                        <label key={u.id} className="flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-gray-50 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={!!jaEsta}
+                            disabled={salvando}
+                            onChange={() => toggleMembro(u, min)}
+                            className="accent-vine-700 w-4 h-4"
+                          />
+                          <span className="text-sm text-gray-700">{u.nome}</span>
+                          <span className="text-xs text-gray-400 capitalize ml-auto">{u.role}</span>
+                        </label>
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -1338,15 +1164,6 @@ function ConteudoTab({ initSecao }: { initSecao?: string }) {
 
   return (
     <div className="space-y-4">
-      {/* Sub-navegação */}
-      <div className="flex gap-2">
-        <button onClick={() => setSecao("avisos")} className={clsx("flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold transition", secao === "avisos" ? "bg-vine-700 text-white" : "text-gray-500 hover:bg-vine-50 hover:text-vine-700")}>
-          <Bell className="w-4 h-4" /> Avisos
-        </button>
-        <button onClick={() => setSecao("devocional")} className={clsx("flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold transition", secao === "devocional" ? "bg-vine-700 text-white" : "text-gray-500 hover:bg-vine-50 hover:text-vine-700")}>
-          <BookOpen className="w-4 h-4" /> Devocional
-        </button>
-      </div>
 
       {/* ── AVISOS ── */}
       {secao === "avisos" && (
