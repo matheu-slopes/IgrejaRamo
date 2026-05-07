@@ -4,8 +4,8 @@ import { useState, useEffect } from "react";
 import { CalendarDays, Calendar, ExternalLink, ChevronDown, Filter, Plus } from "lucide-react";
 import clsx from "clsx";
 import { Evento, Ministerio } from "@/types";
-import { mockEventos, mockLocais } from "@/lib/mockData";
 import type { Local } from "@/types";
+import { supabase } from "@/lib/supabase";
 import { downloadICS, linkGoogleCalendar, formatarData, diaSemana } from "@/lib/calendarUtils";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -16,16 +16,29 @@ export default function EventosDashboardPage() {
   const { user, temPermissao } = useAuth();
   const isLider = temPermissao("criar_evento");
 
-  const [locais, setLocais] = useState<Local[]>(mockLocais);
+  const [locais, setLocais] = useState<Local[]>([]);
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem("ramo_locais");
-      if (raw) setLocais(JSON.parse(raw));
-    } catch {}
+    supabase.from("locais").select().then(({ data }) => { if (data) setLocais(data); });
   }, []);
 
-  const [eventos, setEventos] = useState<Evento[]>(mockEventos);
+  const [eventos, setEventos] = useState<Evento[]>([]);
+
+  useEffect(() => {
+    supabase.from("eventos").select().order("data", { ascending: true }).then(({ data }) => {
+      if (data) {
+        setEventos(
+          data.map((e) => ({
+            id: e.id, titulo: e.titulo, descricao: e.descricao ?? "",
+            data: e.data, horario: e.horario, local: e.local,
+            publico: e.publico, ministerio: e.ministerio,
+            imagemUrl: e.imagem_url, criadoPor: e.criado_por,
+            recorrente: e.recorrente,
+          }))
+        );
+      }
+    });
+  }, []);
   const [filtro, setFiltro] = useState<Filtro>(TODOS);
   const [calMenu, setCalMenu] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
@@ -45,7 +58,26 @@ export default function EventosDashboardPage() {
 
   function criar() {
     if (!form.titulo || !form.data || !form.horario || !form.local) return;
-    setEventos((prev) => [{ ...form, id: `ev-${Date.now()}`, criadoPor: user?.id }, ...prev]);
+    supabase
+      .from("eventos")
+      .insert({
+        titulo: form.titulo, descricao: form.descricao || null,
+        data: form.data, horario: form.horario, local: form.local,
+        publico: form.publico, ministerio: form.ministerio,
+        criado_por: user?.id,
+      })
+      .select()
+      .single()
+      .then(({ data }) => {
+        if (data) {
+          setEventos((prev) => [{
+            id: data.id, titulo: data.titulo, descricao: data.descricao ?? "",
+            data: data.data, horario: data.horario, local: data.local,
+            publico: data.publico, ministerio: data.ministerio,
+            criadoPor: data.criado_por,
+          }, ...prev]);
+        }
+      });
     setForm({ titulo: "", descricao: "", data: "", horario: "", local: "", publico: false, ministerio: user?.ministerios[0] });
     setShowForm(false);
   }

@@ -14,9 +14,7 @@ import {
 } from "lucide-react";
 import clsx from "clsx";
 import { Local, Ministerio, MuralMensagem, MembroMinisterio, Evento, FuncaoMinisterio, Escala, EscalaMusica, Musica, FuncaoEscala, ItemEscala } from "@/types";
-import {
-  mockMuralMensagens, mockMembrosMinisterio, mockEventos, mockCanais, mockLocais, mockMusicas, mockEscalas,
-} from "@/lib/mockData";
+import { supabase } from "@/lib/supabase";
 import { downloadICS, linkGoogleCalendar, formatarData, diaSemana } from "@/lib/calendarUtils";
 
 type Tab = "chat" | "membros" | "eventos" | "escalas";
@@ -35,8 +33,18 @@ export default function CanalMinisterioPage() {
 
   // ── estado global ─────────────────────────────────────────────────────
   const [tab, setTab] = useState<Tab>("chat");
-  const canalBase = mockCanais.find((c) => c.ministerio === slug);
-  const [chatBloqueado, setChatBloqueado] = useState(canalBase?.chatBloqueado ?? false);
+  const [canalBase, setCanalBase] = useState<{ ministerio: string; descricao: string; chatBloqueado: boolean; cor: string } | null>(null);
+  const [chatBloqueado, setChatBloqueado] = useState(false);
+  const [chamada, setChamada] = useState<"audio" | "video" | null>(null);
+
+  useEffect(() => {
+    supabase.from("canais_ministerio").select().eq("ministerio", slug).limit(1).then(({ data }) => {
+      if (data && data.length > 0) {
+        setCanalBase({ ministerio: data[0].ministerio, descricao: data[0].descricao ?? "", chatBloqueado: data[0].chat_bloqueado, cor: data[0].cor });
+        setChatBloqueado(data[0].chat_bloqueado);
+      }
+    });
+  }, [slug]);
 
   // ── permissão ─────────────────────────────────────────────────────
   const podeBloquearChat    = temPermissao("bloquear_chat");
@@ -47,13 +55,12 @@ export default function CanalMinisterioPage() {
   if (!canalBase) {
     return (
       <div className="flex items-center justify-center h-60 text-gray-400">
-        Canal não encontrado.
+        Carregando canal...
       </div>
     );
   }
 
   const corBg = corMap[canalBase.cor] ?? "bg-vine-800";
-  const [chamada, setChamada] = useState<"audio" | "video" | null>(null);
 
   return (
     <div className="space-y-0">
@@ -202,9 +209,30 @@ function ChatTab({
   podeFixar: boolean;
   user: { id?: string; nome: string; role: string } | null;
 }) {
-  const [msgs, setMsgs] = useState<MuralMensagem[]>(
-    mockMuralMensagens.filter((m) => m.ministerio === ministerio)
-  );
+  const [msgs, setMsgs] = useState<MuralMensagem[]>([]);
+
+  useEffect(() => {
+    supabase
+      .from("mural_mensagens")
+      .select()
+      .eq("ministerio", ministerio)
+      .order("criado_em", { ascending: true })
+      .limit(100)
+      .then(({ data }) => {
+        if (data) {
+          setMsgs(
+            data.map((m) => ({
+              id: m.id, ministerio: m.ministerio, autorId: m.autor_id,
+              autorNome: m.autor_nome, autorRole: m.autor_role,
+              conteudo: m.conteudo, criadoEm: m.criado_em,
+              fixada: m.fixada, tipo: m.tipo, mediaUrl: m.media_url,
+              reacoes: m.reacoes ?? [], editadoEm: m.editado_em,
+              respostaA: m.resposta_a,
+            }))
+          );
+        }
+      });
+  }, [ministerio]);
   const [texto, setTexto] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -252,20 +280,26 @@ function ChatTab({
   function enviar(tipo: MuralMensagem["tipo"] = "texto", mediaUrl?: string) {
     if (!user) return;
     if (tipo === "texto" && !texto.trim()) return;
-    const nova: MuralMensagem = {
-      id: `m${Date.now()}`,
-      ministerio,
-      autorId: "me",
-      autorNome: user.nome,
-      autorRole: user.role as MuralMensagem["autorRole"],
-      conteudo: tipo === "texto" ? texto.trim() : tipo === "imagem" ? "📷 Imagem" : "🎙️ Áudio",
-      criadoEm: new Date().toISOString(),
-      fixada: false,
-      tipo,
-      mediaUrl,
-      respostaA: respostaA ?? undefined,
-    };
-    setMsgs((prev) => [...prev, nova]);
+    const conteudo = tipo === "texto" ? texto.trim() : tipo === "imagem" ? "📷 Imagem" : "🎙️ Áudio";
+    supabase
+      .from("mural_mensagens")
+      .insert({
+        ministerio, autor_id: user.id, autor_nome: user.nome,
+        autor_role: user.role, conteudo, tipo, media_url: mediaUrl ?? null,
+        fixada: false, resposta_a: respostaA ?? null,
+      })
+      .select().single()
+      .then(({ data }) => {
+        if (data) {
+          setMsgs((prev) => [...prev, {
+            id: data.id, ministerio: data.ministerio, autorId: data.autor_id,
+            autorNome: data.autor_nome, autorRole: data.autor_role,
+            conteudo: data.conteudo, criadoEm: data.criado_em,
+            fixada: data.fixada, tipo: data.tipo, mediaUrl: data.media_url,
+            reacoes: [], respostaA: data.resposta_a,
+          }]);
+        }
+      });
     setTexto("");
     setImagemPreview(null);
     setAudioUrl(null);

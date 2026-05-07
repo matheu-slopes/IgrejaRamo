@@ -2,7 +2,6 @@
 
 import { useState, useRef, useEffect, ReactNode } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { mockConversasDiretas, mockGrupos, mockUsers } from "@/lib/mockData";
 import { ConversaDireta, Grupo, MensagemConversa } from "@/types";
 import {
   MessageSquare, Users, Send, ArrowLeft, Search, Lock, Plus,
@@ -583,15 +582,16 @@ function InfoPanel({
 // ─── NewDmModal ──────────────────────────────────────────────────
 
 function NewDmModal({
-  currentUserId, dms, onStart, onClose,
+  currentUserId, dms, usuarios, onStart, onClose,
 }: {
   currentUserId: string;
   dms: ConversaDireta[];
+  usuarios: import("@/types").User[];
   onStart: (userId: string, nome: string) => void;
   onClose: () => void;
 }) {
   const [search, setSearch] = useState("");
-  const others = mockUsers.filter((mu) => mu.id !== currentUserId);
+  const others = usuarios.filter((mu) => mu.id !== currentUserId);
   const filtered = others.filter((mu) => !search || mu.nome.toLowerCase().includes(search.toLowerCase()));
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={onClose}>
@@ -628,9 +628,10 @@ function NewDmModal({
 const GROUP_EMOJIS = ["💬","⛪","🎸","📖","✝️","🌿","🤝","📋","🎉","🙏","👑","⚡","🕊️","🎵"];
 
 function NewGroupModal({
-  currentUserId, onClose, onCreate,
+  currentUserId, usuarios, onClose, onCreate,
 }: {
   currentUserId: string;
+  usuarios: import("@/types").User[];
   onClose: () => void;
   onCreate: (nome: string, emoji: string, membros: string[]) => void;
 }) {
@@ -638,7 +639,7 @@ function NewGroupModal({
   const [emoji, setEmoji] = useState("💬");
   const [membros, setMembros] = useState<string[]>([]);
   const [search, setSearch] = useState("");
-  const others = mockUsers.filter((mu) => mu.id !== currentUserId);
+  const others = usuarios.filter((mu) => mu.id !== currentUserId);
   const filtered = others.filter((mu) => !search || mu.nome.toLowerCase().includes(search.toLowerCase()));
   function toggle(id: string) {
     setMembros((prev) => prev.includes(id) ? prev.filter((m) => m !== id) : [...prev, id]);
@@ -701,7 +702,7 @@ function GrupoAvatar({ grupo, size = "md" }: { grupo: Grupo; size?: "sm" | "md" 
 // ─── Page ─────────────────────────────────────────────────────────
 
 export default function ChatPage() {
-  const { user } = useAuth();
+  const { user, usuarios } = useAuth();
   const [tab, setTab] = useState<ChatTab>("direto");
   const [activeChat, setActiveChat] = useState<ActiveChat>(null);
   const [search, setSearch] = useState("");
@@ -711,8 +712,8 @@ export default function ChatPage() {
   const [starredIds, setStarredIds] = useState<Set<string>>(new Set());
   const [toast, setToast] = useState<string | null>(null);
 
-  const [dms, setDms] = useState<ConversaDireta[]>(mockConversasDiretas);
-  const [grupos, setGrupos] = useState<Grupo[]>(mockGrupos);
+  const [dms, setDms] = useState<ConversaDireta[]>([]);
+  const [grupos, setGrupos] = useState<Grupo[]>([]);
   const [archivedDms, setArchivedDms] = useState<Set<string>>(new Set());
   const [replyTo, setReplyTo] = useState<MensagemConversa | null>(null);
   const [myReacoes, setMyReacoes] = useState<Set<string>>(new Set());
@@ -971,7 +972,7 @@ export default function ChatPage() {
 
     if (activeChat.tipo === "direto" && activeDm) {
       const other = otherParticipant(activeDm);
-      const otherUser = mockUsers.find((mu) => mu.id === other.id);
+      const otherUser = usuarios.find((mu) => mu.id === other.id);
       const avatarEl = (
         <div className="w-9 h-9 rounded-full bg-vine-700 text-white flex items-center justify-center text-sm font-bold shrink-0">
           {iniciais(other.nome)}
@@ -1275,8 +1276,8 @@ export default function ChatPage() {
   return (
     <div className="max-w-5xl mx-auto">
       {toast && <Toast msg={toast} />}
-      {showNewDmModal && <NewDmModal currentUserId={u.id} dms={dms} onStart={startDm} onClose={() => setShowNewDmModal(false)} />}
-      {showNewGroupModal && <NewGroupModal currentUserId={u.id} onClose={() => setShowNewGroupModal(false)} onCreate={createGroup} />}
+      {showNewDmModal && <NewDmModal currentUserId={u.id} dms={dms} usuarios={usuarios} onStart={startDm} onClose={() => setShowNewDmModal(false)} />}
+      {showNewGroupModal && <NewGroupModal currentUserId={u.id} usuarios={usuarios} onClose={() => setShowNewGroupModal(false)} onCreate={createGroup} />}
       <div className="mb-4">
         <h1 className="text-2xl font-sans font-semibold text-vine-950">Mensagens</h1>
         <p className="text-sm text-gray-500 mt-1">

@@ -2,17 +2,16 @@
 
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { mockUsers } from "@/lib/mockData";
 import { User } from "@/types";
 import { Search, CheckCircle, XCircle } from "lucide-react";
 
 export default function MembrosPage() {
-  const { user } = useAuth();
+  const { user, usuarios } = useAuth();
   const [busca, setBusca] = useState("");
 
   if (!user) return null;
 
-  const membros = mockUsers.filter(
+  const membros = usuarios.filter(
     (u) =>
       u.nome.toLowerCase().includes(busca.toLowerCase()) ||
       u.email.toLowerCase().includes(busca.toLowerCase())

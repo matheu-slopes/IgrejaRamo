@@ -21,6 +21,7 @@ import {
   Shield,
   ChevronLeft,
   ChevronRight,
+  Bell,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -30,6 +31,11 @@ const navMain = [
   { href: "/dashboard/chat",     label: "Conversas",  icon: MessageSquare   },
   { href: "/dashboard/eventos",  label: "Eventos",    icon: CalendarDays    },
   { href: "/dashboard/membros",  label: "Membros",    icon: UserPlus        },
+];
+
+const navAdmin = [
+  { href: "/dashboard/admin/avisos",      label: "Avisos",     icon: Bell     },
+  { href: "/dashboard/admin/devocional",  label: "Devocional", icon: BookOpen },
 ];
 
 const ministerios = [
@@ -126,12 +132,12 @@ export default function Sidebar() {
           </Link>
         ))}
 
-        {/* Admin */}
-        {temPermissao("gerenciar_usuarios") && (
+        {/* Admin quick links — apenas admin */}
+        {user?.role === "admin" && (
           <>
             {!collapsed && (
               <p className="px-3 pt-5 pb-1 text-xs font-bold uppercase tracking-widest text-vine-500">
-                Sistema
+                Painel Admin
               </p>
             )}
             {collapsed && <div className="border-t border-vine-800 my-3 mx-1" />}
@@ -145,9 +151,25 @@ export default function Sidebar() {
               )}
               title={collapsed ? "Painel Admin" : undefined}
             >
-              <Shield className="w-5 h-5 shrink-0" />
+              <Shield className="w-4 h-4 shrink-0" />
               {!collapsed && <span>Painel Admin</span>}
             </Link>
+            {navAdmin.map(({ href, label, icon: Icon }) => (
+              <Link
+                key={href}
+                href={href}
+                className={clsx(
+                  "flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition",
+                  pathname === href
+                    ? "bg-vine-700 text-white"
+                    : "text-vine-400 hover:bg-vine-800 hover:text-white"
+                )}
+                title={collapsed ? label : undefined}
+              >
+                <Icon className="w-4 h-4 shrink-0" />
+                {!collapsed && <span>{label}</span>}
+              </Link>
+            ))}
           </>
         )}
       </nav>

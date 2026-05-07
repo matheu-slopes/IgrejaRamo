@@ -1,10 +1,10 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Bell, CalendarDays } from "lucide-react";
-import { mockAvisos } from "@/lib/mockData";
-
-const avisosPublicos = mockAvisos.filter((a) => a.destinatarios === "todos");
+import { supabase } from "@/lib/supabase";
+import { Aviso } from "@/types";
 
 function formatDate(iso: string) {
   return new Date(iso + "T00:00:00").toLocaleDateString("pt-BR", {
@@ -14,6 +14,28 @@ function formatDate(iso: string) {
 }
 
 export default function ImmersiveMural() {
+  const [avisos, setAvisos] = useState<Aviso[]>([]);
+
+  useEffect(() => {
+    supabase
+      .from("avisos")
+      .select()
+      .order("criado_em", { ascending: false })
+      .limit(6)
+      .then(({ data }) => {
+        if (data) {
+          setAvisos(
+            data
+              .filter((a) => a.destinatarios === "todos")
+              .map((a) => ({
+                id: a.id, titulo: a.titulo, conteudo: a.conteudo,
+                criadoEm: a.criado_em, destinatarios: a.destinatarios,
+                ministerio: a.ministerio,
+              }))
+          );
+        }
+      });
+  }, []);
   return (
     <section id="avisos" className="relative py-28 px-5 overflow-hidden">
       <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-gray-100/40 rounded-full blur-[120px] pointer-events-none" />
@@ -35,7 +57,7 @@ export default function ImmersiveMural() {
         </motion.div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {avisosPublicos.map((aviso, i) => (
+          {avisos.map((aviso, i) => (
             <motion.div
               key={aviso.id}
               initial={{ opacity: 0, y: 24 }}
@@ -68,7 +90,7 @@ export default function ImmersiveMural() {
           ))}
         </div>
 
-        {avisosPublicos.length === 0 && (
+        {avisos.length === 0 && (
           <p className="text-center text-vine-600">Nenhum aviso no momento.</p>
         )}
       </div>

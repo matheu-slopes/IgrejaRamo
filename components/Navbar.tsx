@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
-import { mockConversasDiretas, mockChatsCulto } from "@/lib/mockData";
+
 import {
   Church,
   LayoutDashboard,
@@ -25,17 +25,8 @@ export default function Navbar() {
     router.push("/login");
   }
 
-  // Unread message count for the badge
-  const unreadCount = user
-    ? [
-        ...mockConversasDiretas
-          .filter((dm) => dm.participantes.includes(user.id))
-          .flatMap((dm) => dm.mensagens.filter((m) => m.autorId !== user.id && !m.lida)),
-        ...mockChatsCulto.flatMap((c) =>
-          c.mensagens.filter((m) => m.autorId !== user.id && !m.lida)
-        ),
-      ].length
-    : 0;
+  // TODO: conectar ao chat real quando implementado
+  const unreadCount = 0;
 
   const navItems = [
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },

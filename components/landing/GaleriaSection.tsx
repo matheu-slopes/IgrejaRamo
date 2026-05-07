@@ -1,11 +1,30 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import Image from "next/image";
-import { mockGaleria } from "@/lib/mockData";
 import ScrollReveal from "./ScrollReveal";
+import { supabase } from "@/lib/supabase";
+import { FotoGaleria } from "@/types";
 
 // TODO (Supabase): replace mockGaleria with:
 // const { data: galeria } = await supabase.from('galeria').select().order('data', { ascending: false });
 
 export default function GaleriaSection() {
+  const [fotos, setFotos] = useState<FotoGaleria[]>([]);
+
+  useEffect(() => {
+    supabase
+      .from("fotos_galeria")
+      .select()
+      .order("data", { ascending: false })
+      .limit(9)
+      .then(({ data }) => {
+        if (data) setFotos(data);
+      });
+  }, []);
+
+  if (fotos.length === 0) return null;
+
   return (
     <section id="galeria" className="py-24 px-6 bg-vine-950">
       <div className="max-w-6xl mx-auto">
@@ -25,7 +44,7 @@ export default function GaleriaSection() {
         {/* Masonry-style grid */}
         <ScrollReveal delay={0.15}>
         <div className="columns-1 sm:columns-2 lg:columns-3 gap-4 space-y-4">
-          {mockGaleria.map((foto, i) => (
+          {fotos.map((foto, i) => (
             <div
               key={foto.id}
               className="break-inside-avoid rounded-2xl overflow-hidden relative group shadow hover:shadow-xl transition"

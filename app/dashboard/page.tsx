@@ -2,11 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import {
-  mockEventos,
-  mockAvisos,
-  mockMinhaProximaEscala,
-} from "@/lib/mockData";
+import { supabase } from "@/lib/supabase";
+import { Evento, Aviso } from "@/types";
 import {
   CalendarCheck,
   Bell,
@@ -20,10 +17,6 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 
-// TODO (Supabase): Replace mock imports with server fetches:
-// const escalas = await supabase.from('escalas').select().eq('voluntarioId', user.id).gte('data', today);
-// const avisos = await supabase.from('avisos').select().order('criadoEm', { ascending: false });
-
 function formatDate(iso: string) {
   return new Date(iso + "T00:00:00").toLocaleDateString("pt-BR", {
     weekday: "short",
@@ -32,34 +25,118 @@ function formatDate(iso: string) {
   });
 }
 
+type MinhaEscala = {
+  data: string;
+  horario: string;
+  culto: string;
+  ministerio: string;
+  funcao: string;
+  local: string;
+  observacao: string;
+};
+
 export default function DashboardPage() {
   const { user } = useAuth();
   const [avisoFixado, setAvisoFixado] = useState<{ conteudo: string; ativo: boolean } | null>(null);
+  const [proximosEventos, setProximosEventos] = useState<Evento[]>([]);
+  const [avisosFiltrados, setAvisosFiltrados] = useState<Aviso[]>([]);
+  const [escala, setEscala] = useState<MinhaEscala | null>(null);
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem("ramo_aviso_fixado");
-      if (raw) setAvisoFixado(JSON.parse(raw));
-    } catch {}
+    supabase
+      .from("aviso_fixado")
+      .select()
+      .eq("ativo", true)
+      .limit(1)
+      .then(({ data }) => {
+        if (data && data.length > 0) {
+          setAvisoFixado({ conteudo: data[0].conteudo, ativo: data[0].ativo });
+        }
+      });
   }, []);
 
+  useEffect(() => {
+    const today = new Date().toISOString().split("T")[0];
+    supabase
+      .from("eventos")
+      .select()
+      .gte("data", today)
+      .order("data", { ascending: true })
+      .limit(4)
+      .then(({ data }) => {
+        if (data) {
+          setProximosEventos(
+            data.map((e) => ({
+              id: e.id, titulo: e.titulo, descricao: e.descricao ?? "",
+              data: e.data, horario: e.horario, local: e.local,
+              publico: e.publico, ministerio: e.ministerio,
+              imagemUrl: e.imagem_url, criadoPor: e.criado_por,
+              recorrente: e.recorrente,
+            }))
+          );
+        }
+      });
+  }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    supabase
+      .from("avisos")
+      .select()
+      .order("criado_em", { ascending: false })
+      .limit(5)
+      .then(({ data }) => {
+        if (data) {
+          setAvisosFiltrados(
+            data
+              .filter(
+                (a) =>
+                  a.destinatarios === "todos" ||
+                  (Array.isArray(a.destinatarios) && a.destinatarios.includes(user.role))
+              )
+              .slice(0, 3)
+              .map((a) => ({
+                id: a.id, titulo: a.titulo, conteudo: a.conteudo,
+                criadoEm: a.criado_em, destinatarios: a.destinatarios,
+                ministerio: a.ministerio,
+              }))
+          );
+        }
+      });
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+    const today = new Date().toISOString().split("T")[0];
+    supabase
+      .from("escala_itens")
+      .select("funcao, observacao, escalas(data, horario, culto, ministerio, locais(nome))")
+      .eq("voluntario_id", user.id)
+      .gte("escalas.data", today)
+      .order("escalas.data", { ascending: true })
+      .limit(1)
+      .then(({ data }) => {
+        if (data && data.length > 0) {
+          const item = data[0] as any;
+          const esc = item.escalas;
+          if (esc) {
+            setEscala({
+              data: new Date(esc.data + "T00:00:00").toLocaleDateString("pt-BR", {
+                weekday: "long", day: "2-digit", month: "long",
+              }),
+              horario: esc.horario,
+              culto: esc.culto,
+              ministerio: esc.ministerio,
+              funcao: item.funcao,
+              local: esc.locais?.nome ?? "",
+              observacao: item.observacao ?? "",
+            });
+          }
+        }
+      });
+  }, [user]);
+
   if (!user) return null;
-
-  const today = new Date().toISOString().split("T")[0];
-  const proximosEventos = mockEventos
-    .filter((e) => e.data >= today)
-    .sort((a, b) => a.data.localeCompare(b.data))
-    .slice(0, 4);
-
-  const avisosFiltrados = mockAvisos
-    .filter(
-      (a) =>
-        a.destinatarios === "todos" ||
-        (Array.isArray(a.destinatarios) && a.destinatarios.includes(user.role))
-    )
-    .slice(0, 3);
-
-  const escala = mockMinhaProximaEscala;
 
   return (
     <div className="max-w-5xl mx-auto space-y-8">
@@ -82,6 +159,7 @@ export default function DashboardPage() {
       )}
 
       {/* ── Minha Próxima Escala ─────────────────────────────── */}
+      {escala && (
       <section>
         <h2 className="text-sm font-bold uppercase tracking-widest text-gray-400 mb-3">
           Minha Próxima Escala
@@ -121,6 +199,7 @@ export default function DashboardPage() {
           </div>
         </div>
       </section>
+      )}
 
       {/* ── Two-column grid ──────────────────────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

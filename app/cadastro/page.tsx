@@ -4,12 +4,11 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import Navbar from "@/components/Navbar";
-import { mockUsers } from "@/lib/mockData";
 import { User } from "@/types";
 import { Search, CheckCircle, XCircle } from "lucide-react";
 
 export default function CadastroPage() {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, usuarios } = useAuth();
   const router = useRouter();
   const [busca, setBusca] = useState("");
 
@@ -19,7 +18,7 @@ export default function CadastroPage() {
 
   if (isLoading || !user) return null;
 
-  const membros = mockUsers.filter(
+  const membros = usuarios.filter(
     (u) =>
       u.nome.toLowerCase().includes(busca.toLowerCase()) ||
       u.email.toLowerCase().includes(busca.toLowerCase())

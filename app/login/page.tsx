@@ -21,12 +21,17 @@ export default function LoginPage() {
     e.preventDefault();
     setError("");
     setLoading(true);
-    const ok = await login(email, password);
-    setLoading(false);
-    if (ok) {
-      router.push("/dashboard");
-    } else {
-      setError("E-mail ou senha incorretos. Verifique e tente novamente.");
+    try {
+      const ok = await login(email, password);
+      if (ok) {
+        router.push("/dashboard");
+      } else {
+        setError("E-mail ou senha incorretos. Verifique e tente novamente.");
+      }
+    } catch {
+      setError("Erro de conexão. Tente novamente.");
+    } finally {
+      setLoading(false);
     }
   }
 

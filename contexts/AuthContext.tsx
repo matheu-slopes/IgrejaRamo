@@ -54,8 +54,46 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   async function carregarPerfil(uid: string) {
-    const { data } = await supabase.from("perfis").select("*").eq("id", uid).single();
-    if (data) setUser(rowToUser(data));
+    const { data, error } = await supabase.from("perfis").select("*").eq("id", uid).single();
+    if (data) {
+      setUser(rowToUser(data));
+      return;
+    }
+    // Se a tabela não existir ainda (schema não rodou), não quebra
+    if (error?.code === "42P01") return;
+    // Se o perfil não existe, cria com dados mínimos do auth
+    if (error?.code === "PGRST116") {
+      const { data: authUser } = await supabase.auth.getUser();
+      if (authUser?.user) {
+        const { data: novo } = await supabase.from("perfis").upsert({
+          id:    authUser.user.id,
+          nome:  authUser.user.user_metadata?.nome ?? authUser.user.email,
+          email: authUser.user.email,
+          role:  "membro",
+        }).select().single();
+        if (novo) setUser(rowToUser(novo));
+      }
+      return;
+    }
+    // RLS bloqueou ou outro erro — tenta buscar via getUser como fallback
+    if (error) {
+      try {
+        const { data: authUser } = await supabase.auth.getUser();
+        if (authUser?.user) {
+          setUser({
+            id: authUser.user.id,
+            nome: authUser.user.user_metadata?.nome ?? authUser.user.email ?? "Usuário",
+            email: authUser.user.email ?? "",
+            role: "membro",
+            ministerios: [],
+            dataIngresso: new Date().toISOString().slice(0, 10),
+            ativo: true,
+          });
+        }
+      } catch {
+        // não foi possível carregar perfil, usuário permanece null
+      }
+    }
   }
 
   async function carregarTodosUsuarios() {
@@ -64,9 +102,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session?.user) {
-        carregarPerfil(session.user.id);
+        await carregarPerfil(session.user.id);
         carregarTodosUsuarios();
       }
       setIsLoading(false);
@@ -87,8 +125,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   async function login(email: string, password: string): Promise<boolean> {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    return !error;
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error || !data.user) return false;
+      try {
+        await carregarPerfil(data.user.id);
+        carregarTodosUsuarios();
+      } catch {
+        // login ok, mas perfil não carregou — onAuthStateChange vai tentar de novo
+      }
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   function logout() {

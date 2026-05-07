@@ -4,7 +4,8 @@ import { useRef, useEffect, useState } from "react";
 import Image from "next/image";
 import { motion, useScroll, useTransform, useMotionValue, useSpring } from "framer-motion";
 import { Play, BookOpen, Bell, CalendarDays } from "lucide-react";
-import { mockAvisos } from "@/lib/mockData";
+import { supabase } from "@/lib/supabase";
+import { Aviso } from "@/types";
 
 function formatDate(iso: string) {
   return new Date(iso + "T00:00:00").toLocaleDateString("pt-BR", {
@@ -12,8 +13,6 @@ function formatDate(iso: string) {
     month: "long",
   });
 }
-
-const avisosPublicos = mockAvisos.filter((a) => a.destinatarios === "todos");
 
 /* --- Tilt card component ------------------------------------------ */
 function TiltCard({
@@ -188,6 +187,28 @@ export default function BentoGrid() {
   const sectionRef = useRef<HTMLElement>(null);
   const { scrollYProgress } = useScroll({ target: sectionRef, offset: ["start end", "end start"] });
   const branchParallax = useTransform(scrollYProgress, [0, 1], [40, -40]);
+  const [avisos, setAvisos] = useState<Aviso[]>([]);
+
+  useEffect(() => {
+    supabase
+      .from("avisos")
+      .select()
+      .order("criado_em", { ascending: false })
+      .limit(5)
+      .then(({ data }) => {
+        if (data) {
+          setAvisos(
+            data
+              .filter((a) => a.destinatarios === "todos")
+              .map((a) => ({
+                id: a.id, titulo: a.titulo, conteudo: a.conteudo,
+                criadoEm: a.criado_em, destinatarios: a.destinatarios,
+                ministerio: a.ministerio,
+              }))
+          );
+        }
+      });
+  }, []);
 
   /* stagger container */
   const stagger = {
@@ -341,7 +362,7 @@ export default function BentoGrid() {
             </div>
 
             <ol className="space-y-3 flex-1 overflow-auto">
-              {avisosPublicos.map((aviso, i) => (
+              {avisos.map((aviso, i) => (
                 <motion.li
                   key={aviso.id}
                   initial={{ opacity: 0, x: 12 }}
@@ -360,7 +381,7 @@ export default function BentoGrid() {
                   </div>
                 </motion.li>
               ))}
-              {avisosPublicos.length === 0 && (
+              {avisos.length === 0 && (
                 <li className="py-6 text-center text-[12px] text-vine-400">Nenhum aviso no momento.</li>
               )}
             </ol>

@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { mockEscalas, mockMusicas } from "@/lib/mockData";
-import { Escala, EscalaMusica, FuncaoEscala, ItemEscala, Ministerio, User } from "@/types";
+import { supabase } from "@/lib/supabase";
+import { Escala, EscalaMusica, FuncaoEscala, ItemEscala, Ministerio, User, Musica } from "@/types";
 import {
   Star, MessageCircle, Pencil, Trash2, Plus, X, Check,
   Save, Music, ChevronDown, ChevronUp, Filter, AlertTriangle, Calendar, Search,
@@ -107,13 +107,51 @@ export default function EscalasPage() {
   const isAdmin = user?.role === "admin" || user?.role === "pastor";
   const meusMinisterios = (user?.ministerios ?? []) as Ministerio[];
 
-  const [escalas, setEscalas] = useState<Escala[]>([...mockEscalas]);
+  const [escalas, setEscalas] = useState<Escala[]>([]);
+  const [musicas, setMusicas] = useState<Musica[]>([]);
   const [tab, setTab] = useState<"minhas" | "geral">("minhas");
   const [filterMin, setFilterMin] = useState<"todos" | "meus" | Ministerio>("todos");
   const [searchGeral, setSearchGeral] = useState("");
   const [modal, setModal] = useState<{ mode: "template" | "edit"; date: string; escalaId?: string } | null>(null);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [copied, setCopied] = useState<string | null>(null);
+
+  useEffect(() => {
+    supabase
+      .from("escalas")
+      .select("*, escala_itens(*), escala_musicas(*)")
+      .order("data", { ascending: true })
+      .then(({ data }) => {
+        if (data) {
+          setEscalas(
+            data.map((e) => ({
+              id: e.id, ministerio: e.ministerio, data: e.data,
+              horario: e.horario, culto: e.culto,
+              observacoes: e.observacoes, visivel: e.visivel,
+              confirmacaoParticipantes: e.confirmacao_participantes,
+              criadoPor: e.criado_por ?? "",
+              itens: (e.escala_itens ?? []).map((i: any) => ({
+                funcao: i.funcao, voluntarioId: i.voluntario_id ?? "",
+                voluntarioNome: i.voluntario_nome, observacao: i.observacao,
+              })),
+              musicas: (e.escala_musicas ?? []).map((m: any) => ({
+                musicaId: m.musica_id ?? "", titulo: m.titulo,
+                artista: m.artista, tom: m.tom,
+              })),
+            }))
+          );
+        }
+      });
+  }, []);
+
+  useEffect(() => {
+    supabase
+      .from("musicas")
+      .select()
+      .then(({ data }) => {
+        if (data) setMusicas(data);
+      });
+  }, []);
 
   // group escalas by date, filtered by ministry + search
   const escalasVisiveis = useMemo(() => {
@@ -170,32 +208,47 @@ export default function EscalasPage() {
   }
   function deleteEscala(id: string) {
     if (!confirm("Remover esta escala?")) return;
+    supabase.from("escalas").delete().eq("id", id).then(() => {});
     setEscalas((prev) => prev.filter((e) => e.id !== id));
   }
-  function saveModal() {
+  async function saveModal() {
     // ── Template creation: generate one Escala per ministry
     if (modal?.mode === "template") {
       if (!form.ministeriosSel.length || !form.culto.trim() || !form.horario || !form.data) return;
-      const ministerios = form.ministeriosSel;
-      // duplicate guard handled in UI — skip silently if already blocked
-      // Bloquear se algum dos ministérios selecionados já tem escala nessa data
       if (form.ministeriosSel.some((m) => escalas.some((e) => e.data === form.data && e.ministerio === m))) return;
-      const novas: Escala[] = ministerios.map((min, i) => ({
-        id: `esc_${Date.now()}_${i}`,
-        ministerio: min,
-        data: form.data,
-        horario: form.horario,
-        culto: form.culto.trim(),
-        itens: [],
-        criadoPor: user?.nome ?? "",
-      }));
-      setEscalas((prev) => [...prev, ...novas]);
+      for (const min of form.ministeriosSel) {
+        const { data: inserted } = await supabase
+          .from("escalas")
+          .insert({ ministerio: min, data: form.data, horario: form.horario, culto: form.culto.trim(), criado_por: user?.nome ?? "" })
+          .select()
+          .single();
+        if (inserted) {
+          setEscalas((prev) => [...prev, {
+            id: inserted.id, ministerio: inserted.ministerio, data: inserted.data,
+            horario: inserted.horario, culto: inserted.culto,
+            criadoPor: inserted.criado_por ?? "", itens: [], musicas: [],
+          }]);
+        }
+      }
       setModal(null);
       return;
     }
     // ── Edit: update existing ministry escala
     if (!form.culto.trim() || !form.horario || !form.ministerio) return;
     if (modal?.mode === "edit" && modal.escalaId) {
+      await supabase.from("escalas").update({ culto: form.culto.trim(), horario: form.horario }).eq("id", modal.escalaId);
+      await supabase.from("escala_itens").delete().eq("escala_id", modal.escalaId);
+      if (form.itens.length > 0) {
+        await supabase.from("escala_itens").insert(
+          form.itens.map((i) => ({ escala_id: modal.escalaId, funcao: i.funcao, voluntario_id: i.voluntarioId || null, voluntario_nome: i.voluntarioNome, observacao: i.observacao || null }))
+        );
+      }
+      await supabase.from("escala_musicas").delete().eq("escala_id", modal.escalaId);
+      if (form.musicas.length > 0) {
+        await supabase.from("escala_musicas").insert(
+          form.musicas.map((m) => ({ escala_id: modal.escalaId, musica_id: m.musicaId || null, titulo: m.titulo, artista: m.artista, tom: m.tom }))
+        );
+      }
       setEscalas((prev) => prev.map((e) => e.id !== modal.escalaId ? e : {
         ...e, culto: form.culto.trim(), horario: form.horario,
         itens: form.itens.map((i) => ({ funcao: i.funcao as FuncaoEscala, voluntarioId: i.voluntarioId, voluntarioNome: i.voluntarioNome, observacao: i.observacao || undefined })),
@@ -503,7 +556,7 @@ export default function EscalasPage() {
           setForm={setForm}
           membros={membrosDoForm}
           meusMinisterios={meusMinisterios}
-          musicas={mockMusicas}
+          musicas={musicas}
           escalas={escalas}
           isAdmin={isAdmin}
           onSave={saveModal}

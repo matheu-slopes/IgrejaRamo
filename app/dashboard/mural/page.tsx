@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
-import { mockMuralMensagens } from "@/lib/mockData";
+import { supabase } from "@/lib/supabase";
 import { Ministerio, MuralMensagem, TipoMensagem } from "@/types";
 import {
   Pin, Send, Music, Video, BookOpen, Baby, HeartHandshake,
@@ -40,7 +40,7 @@ export default function ConversasPage() {
   const paramMin = searchParams.get("min") as Ministerio | null;
 
   const [activeMin, setActiveMin] = useState<Ministerio>(paramMin ?? "Louvor");
-  const [mensagens, setMensagens] = useState<MuralMensagem[]>(mockMuralMensagens);
+  const [mensagens, setMensagens] = useState<MuralMensagem[]>([]);
   const [texto, setTexto] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -62,15 +62,36 @@ export default function ConversasPage() {
   }, [paramMin]);
 
   useEffect(() => {
+    supabase
+      .from("mural_mensagens")
+      .select()
+      .eq("ministerio", activeMin)
+      .order("criado_em", { ascending: true })
+      .limit(50)
+      .then(({ data }) => {
+        if (data) {
+          setMensagens(
+            data.map((m) => ({
+              id: m.id, ministerio: m.ministerio, autorId: m.autor_id,
+              autorNome: m.autor_nome, autorRole: m.autor_role,
+              conteudo: m.conteudo, criadoEm: m.criado_em,
+              fixada: m.fixada, tipo: m.tipo, mediaUrl: m.media_url,
+              reacoes: m.reacoes ?? [], editadoEm: m.editado_em,
+              respostaA: m.resposta_a,
+            }))
+          );
+        }
+      });
+  }, [activeMin]);
+
+  useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [mensagens, activeMin]);
 
   // Cleanup timer on unmount
   useEffect(() => () => { if (timerRef.current) clearInterval(timerRef.current); }, []);
 
-  const filtradas = mensagens
-    .filter((m) => m.ministerio === activeMin)
-    .sort((a, b) => {
+  const filtradas = [...mensagens].sort((a, b) => {
       if (a.fixada && !b.fixada) return -1;
       if (!a.fixada && b.fixada) return 1;
       return a.criadoEm.localeCompare(b.criadoEm);
@@ -80,19 +101,33 @@ export default function ConversasPage() {
     if (!user) return;
     if (tipo === "texto" && !texto.trim() && !mediaUrl) return;
 
-    const nova: MuralMensagem = {
-      id: `m_${Date.now()}`,
-      ministerio: activeMin,
-      autorId: user.id,
-      autorNome: user.nome,
-      autorRole: user.role,
-      conteudo: tipo === "texto" ? texto.trim() : tipo === "imagem" ? "📷 Imagem" : "🎙️ Áudio",
-      criadoEm: new Date().toISOString(),
-      fixada: false,
-      tipo,
-      mediaUrl,
-    };
-    setMensagens((prev) => [...prev, nova]);
+    const conteudo = tipo === "texto" ? texto.trim() : tipo === "imagem" ? "📷 Imagem" : "🎙️ Áudio";
+
+    supabase
+      .from("mural_mensagens")
+      .insert({
+        ministerio: activeMin,
+        autor_id: user.id,
+        autor_nome: user.nome,
+        autor_role: user.role,
+        conteudo,
+        tipo,
+        media_url: mediaUrl ?? null,
+        fixada: false,
+      })
+      .select()
+      .single()
+      .then(({ data }) => {
+        if (data) {
+          setMensagens((prev) => [...prev, {
+            id: data.id, ministerio: data.ministerio, autorId: data.autor_id,
+            autorNome: data.autor_nome, autorRole: data.autor_role,
+            conteudo: data.conteudo, criadoEm: data.criado_em,
+            fixada: data.fixada, tipo: data.tipo, mediaUrl: data.media_url,
+            reacoes: data.reacoes ?? [],
+          }]);
+        }
+      });
     setTexto("");
     setImagemPreview(null);
     setAudioUrl(null);

@@ -1,10 +1,27 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import { motion } from "framer-motion";
-import { mockGaleria } from "@/lib/mockData";
+import { supabase } from "@/lib/supabase";
+import { FotoGaleria } from "@/types";
 
 export default function ImmersiveGaleria() {
+  const [fotos, setFotos] = useState<FotoGaleria[]>([]);
+
+  useEffect(() => {
+    supabase
+      .from("fotos_galeria")
+      .select()
+      .order("data", { ascending: false })
+      .limit(9)
+      .then(({ data }) => {
+        if (data) setFotos(data);
+      });
+  }, []);
+
+  if (fotos.length === 0) return null;
+
   return (
     <section id="galeria" className="relative py-28 px-5 overflow-hidden">
       <div className="absolute bottom-0 left-1/3 w-[500px] h-[500px] bg-gray-100/40 rounded-full blur-[140px] pointer-events-none" />
@@ -26,7 +43,7 @@ export default function ImmersiveGaleria() {
         </motion.div>
 
         <div className="columns-1 sm:columns-2 lg:columns-3 gap-4 space-y-4">
-          {mockGaleria.map((foto, i) => (
+          {fotos.map((foto, i) => (
             <motion.div
               key={foto.id}
               initial={{ opacity: 0, y: 20 }}

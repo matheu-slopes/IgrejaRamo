@@ -214,6 +214,29 @@ CREATE TABLE mural_mensagens (
 );
 
 -- ──────────────────────────────────────────────────────────────
+-- DEVOCIONAIS
+-- ──────────────────────────────────────────────────────────────
+CREATE TABLE devocionais (
+  id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  titulo      TEXT        NOT NULL,
+  subtitulo   TEXT,
+  conteudo    TEXT        NOT NULL,
+  versículo   TEXT,
+  referencia  TEXT,
+  imagem_url  TEXT,
+  data        DATE        NOT NULL DEFAULT CURRENT_DATE,
+  ativo       BOOLEAN     NOT NULL DEFAULT TRUE,
+  criado_por  UUID        REFERENCES perfis(id),
+  created_at  TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE devocionais ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "devocionais_select" ON devocionais FOR SELECT USING (TRUE);
+CREATE POLICY "devocionais_insert" ON devocionais FOR INSERT WITH CHECK (auth.uid() IS NOT NULL);
+CREATE POLICY "devocionais_update" ON devocionais FOR UPDATE USING (auth.uid() IS NOT NULL);
+CREATE POLICY "devocionais_delete" ON devocionais FOR DELETE USING (auth.uid() IS NOT NULL);
+
+-- ──────────────────────────────────────────────────────────────
 -- GALERIA PÚBLICA
 -- ──────────────────────────────────────────────────────────────
 CREATE TABLE fotos_galeria (
@@ -369,3 +392,67 @@ CREATE POLICY "galeria_select" ON fotos_galeria FOR SELECT USING (TRUE);
 
 -- Canais: leitura pública para membros autenticados
 CREATE POLICY "canais_select" ON canais_ministerio FOR SELECT USING (auth.uid() IS NOT NULL);
+
+-- ──────────────────────────────────────────────────────────────
+-- POLÍTICAS ADICIONAIS (necessárias para o app funcionar)
+-- ──────────────────────────────────────────────────────────────
+
+-- Perfis: todos os membros autenticados veem todos os perfis (app interno)
+DROP POLICY IF EXISTS "perfil_select" ON perfis;
+CREATE POLICY "perfil_select" ON perfis FOR SELECT USING (auth.uid() IS NOT NULL);
+CREATE POLICY "perfil_insert" ON perfis FOR INSERT WITH CHECK (auth.uid() = id);
+
+-- Avisos: leitura para membros autenticados
+CREATE POLICY "avisos_select" ON avisos FOR SELECT USING (auth.uid() IS NOT NULL);
+CREATE POLICY "avisos_insert" ON avisos FOR INSERT WITH CHECK (auth.uid() IS NOT NULL);
+CREATE POLICY "avisos_update" ON avisos FOR UPDATE USING (auth.uid() IS NOT NULL);
+CREATE POLICY "avisos_delete" ON avisos FOR DELETE USING (auth.uid() IS NOT NULL);
+
+-- Mural mensagens: leitura + envio para autenticados
+CREATE POLICY "mural_select" ON mural_mensagens FOR SELECT USING (auth.uid() IS NOT NULL);
+CREATE POLICY "mural_insert" ON mural_mensagens FOR INSERT WITH CHECK (autor_id = auth.uid());
+CREATE POLICY "mural_update" ON mural_mensagens FOR UPDATE USING (autor_id = auth.uid());
+CREATE POLICY "mural_delete" ON mural_mensagens FOR DELETE USING (autor_id = auth.uid());
+
+-- Escalas: leitura + CRUD para autenticados (permissão de criar_escala é checada no app)
+CREATE POLICY "escalas_select"        ON escalas       FOR SELECT USING (auth.uid() IS NOT NULL);
+CREATE POLICY "escalas_insert"        ON escalas       FOR INSERT WITH CHECK (auth.uid() IS NOT NULL);
+CREATE POLICY "escalas_update"        ON escalas       FOR UPDATE USING (auth.uid() IS NOT NULL);
+CREATE POLICY "escalas_delete"        ON escalas       FOR DELETE USING (auth.uid() IS NOT NULL);
+CREATE POLICY "escala_itens_select"   ON escala_itens  FOR SELECT USING (auth.uid() IS NOT NULL);
+CREATE POLICY "escala_itens_insert"   ON escala_itens  FOR INSERT WITH CHECK (auth.uid() IS NOT NULL);
+CREATE POLICY "escala_itens_delete"   ON escala_itens  FOR DELETE USING (auth.uid() IS NOT NULL);
+CREATE POLICY "escala_musicas_select" ON escala_musicas FOR SELECT USING (auth.uid() IS NOT NULL);
+CREATE POLICY "escala_musicas_insert" ON escala_musicas FOR INSERT WITH CHECK (auth.uid() IS NOT NULL);
+CREATE POLICY "escala_musicas_delete" ON escala_musicas FOR DELETE USING (auth.uid() IS NOT NULL);
+
+-- Músicas: leitura + CRUD para autenticados
+CREATE POLICY "musicas_select" ON musicas FOR SELECT USING (auth.uid() IS NOT NULL);
+CREATE POLICY "musicas_insert" ON musicas FOR INSERT WITH CHECK (auth.uid() IS NOT NULL);
+CREATE POLICY "musicas_update" ON musicas FOR UPDATE USING (auth.uid() IS NOT NULL);
+CREATE POLICY "musicas_delete" ON musicas FOR DELETE USING (auth.uid() IS NOT NULL);
+
+-- Locais: leitura + CRUD para autenticados
+CREATE POLICY "locais_select" ON locais FOR SELECT USING (auth.uid() IS NOT NULL);
+CREATE POLICY "locais_insert" ON locais FOR INSERT WITH CHECK (auth.uid() IS NOT NULL);
+CREATE POLICY "locais_update" ON locais FOR UPDATE USING (auth.uid() IS NOT NULL);
+CREATE POLICY "locais_delete" ON locais FOR DELETE USING (auth.uid() IS NOT NULL);
+
+-- Aviso fixado: leitura pública, escrita para autenticados
+CREATE POLICY "aviso_fixado_select" ON aviso_fixado FOR SELECT USING (TRUE);
+CREATE POLICY "aviso_fixado_upsert" ON aviso_fixado FOR INSERT WITH CHECK (auth.uid() IS NOT NULL);
+CREATE POLICY "aviso_fixado_update" ON aviso_fixado FOR UPDATE USING (auth.uid() IS NOT NULL);
+
+-- Canais ministerio: escrita para autenticados (admin check no app)
+CREATE POLICY "canais_insert" ON canais_ministerio FOR INSERT WITH CHECK (auth.uid() IS NOT NULL);
+CREATE POLICY "canais_update" ON canais_ministerio FOR UPDATE USING (auth.uid() IS NOT NULL);
+CREATE POLICY "canais_delete" ON canais_ministerio FOR DELETE USING (auth.uid() IS NOT NULL);
+
+-- Notificações: inserir para autenticados
+CREATE POLICY "notificacoes_insert" ON notificacoes FOR INSERT WITH CHECK (auth.uid() IS NOT NULL);
+
+-- Membros ministerio: CRUD para autenticados
+CREATE POLICY "membros_min_select" ON membros_ministerio FOR SELECT USING (auth.uid() IS NOT NULL);
+CREATE POLICY "membros_min_insert" ON membros_ministerio FOR INSERT WITH CHECK (auth.uid() IS NOT NULL);
+CREATE POLICY "membros_min_update" ON membros_ministerio FOR UPDATE USING (auth.uid() IS NOT NULL);
+CREATE POLICY "membros_min_delete" ON membros_ministerio FOR DELETE USING (auth.uid() IS NOT NULL);

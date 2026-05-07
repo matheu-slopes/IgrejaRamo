@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Bell, X, CheckCheck, CalendarDays, MessageSquare, AlertCircle, Users } from "lucide-react";
 import Link from "next/link";
 import clsx from "clsx";
 import { Notificacao, TipoNotificacao } from "@/types";
-import { mockNotificacoes } from "@/lib/mockData";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/contexts/AuthContext";
 
 const tipoIcon: Record<TipoNotificacao, React.ReactNode> = {
   escala:     <CalendarDays className="w-4 h-4 text-vine-400"  />,
@@ -25,20 +26,46 @@ function formatarTempo(iso: string) {
 }
 
 export default function NotificationBell() {
-  const [notifs, setNotifs] = useState<Notificacao[]>(mockNotificacoes);
+  const { user } = useAuth();
+  const [notifs, setNotifs] = useState<Notificacao[]>([]);
   const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (!user) return;
+    supabase
+      .from("notificacoes")
+      .select()
+      .eq("usuario_id", user.id)
+      .order("criada_em", { ascending: false })
+      .limit(20)
+      .then(({ data }) => {
+        if (data) {
+          setNotifs(
+            data.map((n) => ({
+              id: n.id, titulo: n.titulo, corpo: n.corpo,
+              tipo: n.tipo, lida: n.lida, criadaEm: n.criada_em,
+              link: n.link, ministerio: n.ministerio,
+            }))
+          );
+        }
+      });
+  }, [user]);
 
   const naoLidas = notifs.filter((n) => !n.lida).length;
 
   function marcarTodas() {
+    const ids = notifs.filter((n) => !n.lida).map((n) => n.id);
+    if (ids.length > 0) supabase.from("notificacoes").update({ lida: true }).in("id", ids).then(() => {});
     setNotifs((prev) => prev.map((n) => ({ ...n, lida: true })));
   }
 
   function marcarUma(id: string) {
+    supabase.from("notificacoes").update({ lida: true }).eq("id", id).then(() => {});
     setNotifs((prev) => prev.map((n) => n.id === id ? { ...n, lida: true } : n));
   }
 
   function remover(id: string) {
+    supabase.from("notificacoes").delete().eq("id", id).then(() => {});
     setNotifs((prev) => prev.filter((n) => n.id !== id));
   }
 
@@ -160,7 +187,11 @@ export default function NotificationBell() {
             {notifs.length > 0 && (
               <div className="border-t border-gray-100 px-4 py-2.5 text-center">
                 <button
-                  onClick={() => setNotifs([])}
+                  onClick={() => {
+                    const ids = notifs.map((n) => n.id);
+                    if (ids.length > 0) supabase.from("notificacoes").delete().in("id", ids).then(() => {});
+                    setNotifs([]);
+                  }}
                   className="text-[11px] text-gray-400 hover:text-red-400 transition"
                 >
                   Limpar todas

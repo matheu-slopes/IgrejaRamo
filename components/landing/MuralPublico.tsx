@@ -1,15 +1,10 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import { Bell, CalendarDays } from "lucide-react";
-import { mockAvisos } from "@/lib/mockData";
 import ScrollReveal from "./ScrollReveal";
-
-// TODO (Supabase): replace mockAvisos with:
-// const { data: avisos } = await supabase
-//   .from('avisos')
-//   .select()
-//   .eq('destinatarios', 'todos')
-//   .order('criadoEm', { ascending: false });
-
-const avisosPublicos = mockAvisos.filter((a) => a.destinatarios === "todos");
+import { supabase } from "@/lib/supabase";
+import { Aviso } from "@/types";
 
 function formatDate(iso: string) {
   return new Date(iso + "T00:00:00").toLocaleDateString("pt-BR", {
@@ -19,6 +14,29 @@ function formatDate(iso: string) {
 }
 
 export default function MuralPublico() {
+  const [avisos, setAvisos] = useState<Aviso[]>([]);
+
+  useEffect(() => {
+    supabase
+      .from("avisos")
+      .select()
+      .order("criado_em", { ascending: false })
+      .limit(6)
+      .then(({ data }) => {
+        if (data) {
+          setAvisos(
+            data
+              .filter((a) => a.destinatarios === "todos")
+              .map((a) => ({
+                id: a.id, titulo: a.titulo, conteudo: a.conteudo,
+                criadoEm: a.criado_em, destinatarios: a.destinatarios,
+                ministerio: a.ministerio,
+              }))
+          );
+        }
+      });
+  }, []);
+
   return (
     <section id="avisos" className="py-24 px-6 bg-stone-50">
       <div className="max-w-4xl mx-auto">
@@ -37,7 +55,7 @@ export default function MuralPublico() {
 
         <ScrollReveal delay={0.15}>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-          {avisosPublicos.map((aviso) => (
+          {avisos.map((aviso) => (
             <div
               key={aviso.id}
               className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm hover:shadow-md hover:border-vine-200 transition-all"
@@ -64,7 +82,7 @@ export default function MuralPublico() {
         </div>
         </ScrollReveal>
 
-        {avisosPublicos.length === 0 && (
+        {avisos.length === 0 && (
           <p className="text-center text-gray-400">Nenhum aviso no momento.</p>
         )}
       </div>

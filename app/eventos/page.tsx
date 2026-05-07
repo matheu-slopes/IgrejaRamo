@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import Navbar from "@/components/Navbar";
-import { mockEventos } from "@/lib/mockData";
+import { supabase } from "@/lib/supabase";
 import { Evento } from "@/types";
 import { CalendarDays, MapPin, Clock, Globe, Lock } from "lucide-react";
 
@@ -12,14 +12,35 @@ export default function EventosPage() {
   const { user, isLoading } = useAuth();
   const router = useRouter();
   const [filtro, setFiltro] = useState<"todos" | "publico" | "interno">("todos");
+  const [todosEventos, setTodosEventos] = useState<Evento[]>([]);
 
   useEffect(() => {
     if (!isLoading && !user) router.push("/login");
   }, [user, isLoading, router]);
 
+  useEffect(() => {
+    supabase
+      .from("eventos")
+      .select()
+      .order("data", { ascending: true })
+      .then(({ data }) => {
+        if (data) {
+          setTodosEventos(
+            data.map((e) => ({
+              id: e.id, titulo: e.titulo, descricao: e.descricao ?? "",
+              data: e.data, horario: e.horario, local: e.local,
+              publico: e.publico, ministerio: e.ministerio,
+              imagemUrl: e.imagem_url, criadoPor: e.criado_por,
+              recorrente: e.recorrente,
+            }))
+          );
+        }
+      });
+  }, []);
+
   if (isLoading || !user) return null;
 
-  const eventos = mockEventos.filter((e) => {
+  const eventos = todosEventos.filter((e) => {
     if (filtro === "publico") return e.publico;
     if (filtro === "interno") return !e.publico;
     return true;

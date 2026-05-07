@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useSearchParams } from "next/navigation";
 import {
   TODAS_PERMISSOES, PERMISSAO_LABEL, GRUPOS_PERMISSAO,
   DEFAULTS_POR_ROLE, permissoesEfetivas,
@@ -10,11 +11,11 @@ import {
   Shield, Users, Plus, Search, Pencil, Power, X,
   ChevronRight, Check, RotateCcw, UserPlus, AlertCircle,
   Layers, Lock, Unlock, Trash2, Save, Link2, MapPin, Pin,
-  Eye, EyeOff,
+  Eye, EyeOff, Bell, BookOpen,
 } from "lucide-react";
 import clsx from "clsx";
 import { User, Role, Ministerio, Permissao, CanalMinisterio, Local } from "@/types";
-import { mockCanais, mockLocais } from "@/lib/mockData";
+import { supabase } from "@/lib/supabase";
 
 const ROLES: Role[] = ["admin", "pastor", "lider", "voluntario", "membro"];
 const MINISTERIOS: Ministerio[] = ["Louvor","Mídias","Ensino","Infantil","Ação Social","Jovens","Cantina"];
@@ -33,7 +34,7 @@ const ROLE_LABEL: Record<Role, string> = {
 };
 
 type Painel = "lista" | "novo";
-type AdminTab = "usuarios" | "ministerios" | "locais";
+type AdminTab = "usuarios" | "ministerios" | "locais" | "conteudo";
 
 const CORES_CANAL = ["vine", "grape", "bark", "gold", "blue", "green", "rose"] as const;
 type CorCanal = typeof CORES_CANAL[number];
@@ -48,8 +49,13 @@ const COR_BG: Record<string, string> = {
 
 export default function AdminPage() {
   const { user: eu, usuarios, atualizarUsuario, criarUsuario, removerUsuario, temPermissao } = useAuth();
+  const searchParams = useSearchParams();
 
-  const [adminTab, setAdminTab] = useState<AdminTab>("usuarios");
+  const [adminTab, setAdminTab] = useState<AdminTab>(() => {
+    const t = searchParams.get("tab") as AdminTab | null;
+    return t && ["usuarios", "ministerios", "locais", "conteudo"].includes(t) ? t : "usuarios";
+  });
+  const [initSecao] = useState(() => searchParams.get("secao") ?? undefined);
   const [busca, setBusca] = useState("");
   const [painel, setPainel] = useState<Painel>("lista");
   const [editando, setEditando] = useState<User | null>(null);
@@ -75,9 +81,10 @@ export default function AdminPage() {
       {/* Tab switcher */}
       <div className="flex gap-2 border-b border-gray-100 pb-1 mb-2">
         {([
-          { id: "usuarios",    label: "Usuários",    icon: Users  },
-          { id: "ministerios", label: "Ministérios", icon: Layers },
-          { id: "locais",      label: "Locais",      icon: MapPin },
+          { id: "usuarios",    label: "Usuários",    icon: Users    },
+          { id: "ministerios", label: "Ministérios", icon: Layers   },
+          { id: "locais",      label: "Locais",      icon: MapPin   },
+          { id: "conteudo",    label: "Conteúdo",    icon: BookOpen },
         ] as { id: AdminTab; label: string; icon: React.ElementType }[]).map(({ id, label, icon: Icon }) => (
           <button
             key={id}
@@ -100,6 +107,10 @@ export default function AdminPage() {
 
       {adminTab === "locais" && (
         <LocaisTab />
+      )}
+
+      {adminTab === "conteudo" && (
+        <ConteudoTab initSecao={initSecao} />
       )}
 
       {adminTab === "usuarios" && <>
@@ -258,19 +269,41 @@ function MinisteriosTab({
   temPermissao: (p: Permissao) => boolean;
 }) {
   const podeEditar = temPermissao("atribuir_permissoes");
-  const [canais, setCanais] = useState<CanalMinisterio[]>([...mockCanais]);
+  const [canais, setCanais] = useState<CanalMinisterio[]>([]);
+
+  useEffect(() => {
+    supabase
+      .from("canais_ministerio")
+      .select()
+      .then(({ data }) => {
+        if (data) {
+          setCanais(
+            data.map((c) => ({
+              ministerio: c.ministerio, descricao: c.descricao ?? "",
+              chatBloqueado: c.chat_bloqueado, cor: c.cor,
+            }))
+          );
+        }
+      });
+  }, []);
   const [editandoCanal, setEditandoCanal] = useState<CanalMinisterio | null>(null);
   const [showNovoForm, setShowNovoForm] = useState(false);
   const [novoForm, setNovoForm] = useState({ ministerio: "" as Ministerio | string, descricao: "", cor: "vine", chatBloqueado: false });
 
   function salvarEdicao() {
     if (!editandoCanal) return;
+    supabase
+      .from("canais_ministerio")
+      .update({ descricao: editandoCanal.descricao, chat_bloqueado: editandoCanal.chatBloqueado, cor: editandoCanal.cor })
+      .eq("ministerio", editandoCanal.ministerio)
+      .then(() => {});
     setCanais((prev) => prev.map((c) => c.ministerio === editandoCanal.ministerio ? editandoCanal : c));
     setEditandoCanal(null);
   }
 
   function removerCanal(m: string) {
     if (!confirm(`Remover o canal "${m}"?`)) return;
+    supabase.from("canais_ministerio").delete().eq("ministerio", m).then(() => {});
     setCanais((prev) => prev.filter((c) => c.ministerio !== m));
   }
 
@@ -282,6 +315,10 @@ function MinisteriosTab({
       chatBloqueado: novoForm.chatBloqueado,
       cor: novoForm.cor,
     };
+    supabase
+      .from("canais_ministerio")
+      .insert({ ministerio: novo.ministerio, descricao: novo.descricao, chat_bloqueado: novo.chatBloqueado, cor: novo.cor })
+      .then(() => {});
     setCanais((prev) => [...prev, novo]);
     setNovoForm({ ministerio: "", descricao: "", cor: "vine", chatBloqueado: false });
     setShowNovoForm(false);
@@ -924,50 +961,50 @@ function NovoUsuarioForm({
 
 // ─── LocaisTab ────────────────────────────────────────────────────────────────
 
-const AVISO_KEY = "ramo_aviso_fixado";
-
-const LOCAIS_KEY = "ramo_locais";
-
-function carregarLocais(): Local[] {
-  if (typeof window === "undefined") return mockLocais;
-  try {
-    const raw = localStorage.getItem(LOCAIS_KEY);
-    if (raw) return JSON.parse(raw) as Local[];
-  } catch {}
-  return mockLocais;
-}
-
 function LocaisTab() {
-  const [locais, setLocais] = useState<Local[]>(carregarLocais);
+  const [locais, setLocais] = useState<Local[]>([]);
   const [editandoLocal, setEditandoLocal] = useState<Local | null>(null);
   const [novoNome, setNovoNome] = useState("");
   const [novaDesc, setNovaDesc] = useState("");
   const [adicionando, setAdicionando] = useState(false);
 
-  function persistirLocais(lista: Local[]) {
-    setLocais(lista);
-    localStorage.setItem(LOCAIS_KEY, JSON.stringify(lista));
-  }
+  useEffect(() => {
+    supabase
+      .from("locais")
+      .select()
+      .then(({ data }) => {
+        if (data) setLocais(data);
+      });
+  }, []);
 
-  // Aviso fixado — persiste em localStorage
-  const [avisoConteudo, setAvisoConteudo] = useState<string>(() => {
-    if (typeof window === "undefined") return "";
-    try { return JSON.parse(localStorage.getItem(AVISO_KEY) ?? "{}").conteudo ?? ""; }
-    catch { return ""; }
-  });
-  const [avisoAtivo, setAvisoAtivo] = useState<boolean>(() => {
-    if (typeof window === "undefined") return false;
-    try { return JSON.parse(localStorage.getItem(AVISO_KEY) ?? "{}").ativo ?? false; }
-    catch { return false; }
-  });
+  // Aviso fixado — persiste em Supabase
+  const [avisoConteudo, setAvisoConteudo] = useState<string>("");
+  const [avisoAtivo, setAvisoAtivo] = useState<boolean>(false);
   const [avisoSalvo, setAvisoSalvo] = useState(false);
+  const [avisoId, setAvisoId] = useState<string | null>(null);
+
+  useEffect(() => {
+    supabase
+      .from("aviso_fixado")
+      .select()
+      .limit(1)
+      .then(({ data }) => {
+        if (data && data.length > 0) {
+          setAvisoConteudo(data[0].conteudo ?? "");
+          setAvisoAtivo(data[0].ativo ?? false);
+          setAvisoId(data[0].id);
+        }
+      });
+  }, []);
 
   function salvarAviso() {
-    localStorage.setItem(AVISO_KEY, JSON.stringify({
-      conteudo: avisoConteudo,
-      ativo: avisoAtivo,
-      atualizadoEm: new Date().toISOString(),
-    }));
+    if (avisoId) {
+      supabase.from("aviso_fixado").update({ conteudo: avisoConteudo, ativo: avisoAtivo, atualizado_em: new Date().toISOString() }).eq("id", avisoId).then(() => {});
+    } else {
+      supabase.from("aviso_fixado").insert({ conteudo: avisoConteudo, ativo: avisoAtivo }).select().single().then(({ data }) => {
+        if (data) setAvisoId(data.id);
+      });
+    }
     setAvisoSalvo(true);
     setTimeout(() => setAvisoSalvo(false), 2000);
   }
@@ -975,28 +1012,34 @@ function LocaisTab() {
   function toggleAvisoAtivo() {
     const novoAtivo = !avisoAtivo;
     setAvisoAtivo(novoAtivo);
-    localStorage.setItem(AVISO_KEY, JSON.stringify({
-      conteudo: avisoConteudo,
-      ativo: novoAtivo,
-      atualizadoEm: new Date().toISOString(),
-    }));
+    if (avisoId) {
+      supabase.from("aviso_fixado").update({ ativo: novoAtivo }).eq("id", avisoId).then(() => {});
+    }
   }
 
   function adicionarLocal() {
     if (!novoNome.trim()) return;
-    const nova = [...locais, { id: `l-${Date.now()}`, nome: novoNome.trim(), descricao: novaDesc.trim() || undefined }];
-    persistirLocais(nova);
+    supabase
+      .from("locais")
+      .insert({ nome: novoNome.trim(), descricao: novaDesc.trim() || null })
+      .select()
+      .single()
+      .then(({ data }) => {
+        if (data) setLocais((prev) => [...prev, data]);
+      });
     setNovoNome(""); setNovaDesc(""); setAdicionando(false);
   }
 
   function salvarEdicao() {
     if (!editandoLocal || !editandoLocal.nome.trim()) return;
-    persistirLocais(locais.map((l) => l.id === editandoLocal.id ? editandoLocal : l));
+    supabase.from("locais").update({ nome: editandoLocal.nome, descricao: editandoLocal.descricao }).eq("id", editandoLocal.id).then(() => {});
+    setLocais((prev) => prev.map((l) => l.id === editandoLocal.id ? editandoLocal : l));
     setEditandoLocal(null);
   }
 
   function removerLocal(id: string) {
-    persistirLocais(locais.filter((l) => l.id !== id));
+    supabase.from("locais").delete().eq("id", id).then(() => {});
+    setLocais((prev) => prev.filter((l) => l.id !== id));
   }
 
   return (
@@ -1154,6 +1197,283 @@ function LocaisTab() {
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+// ─── ConteudoTab ──────────────────────────────────────────────────────────────
+
+interface Aviso { id: string; titulo: string; conteudo: string; criado_em: string; destinatarios: string; }
+interface Devocional { id: string; titulo: string; subtitulo: string | null; conteudo: string; versiculo: string | null; referencia: string | null; imagem_url: string | null; data: string; ativo: boolean; }
+
+function ConteudoTab({ initSecao }: { initSecao?: string }) {
+  const [secao, setSecao] = useState<"avisos" | "devocional">(
+    initSecao === "devocional" ? "devocional" : "avisos"
+  );
+
+  // ── Avisos ──
+  const [avisos, setAvisos] = useState<Aviso[]>([]);
+  const [novoAviso, setNovoAviso] = useState({ titulo: "", conteudo: "", destinatarios: "todos" });
+  const [adicionandoAviso, setAdicionandoAviso] = useState(false);
+  const [salvandoAviso, setSalvandoAviso] = useState(false);
+  const [erroAviso, setErroAviso] = useState<string | null>(null);
+
+  useEffect(() => {
+    supabase.from("avisos").select("id,titulo,conteudo,criado_em,destinatarios").order("criado_em", { ascending: false }).limit(30).then(({ data, error }) => {
+      if (error) console.error("avisos fetch:", error);
+      if (data) setAvisos(data as Aviso[]);
+    });
+  }, []);
+
+  async function criarAviso() {
+    if (!novoAviso.titulo.trim() || !novoAviso.conteudo.trim()) return;
+    setErroAviso(null);
+    setSalvandoAviso(true);
+
+    const timeout = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error("Tempo esgotado — verifique a conexão ou as políticas RLS no Supabase")), 8000)
+    );
+
+    try {
+      // Garante sessão ativa antes de tentar o insert
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData.session) {
+        setErroAviso("Sessão expirada — faça login novamente");
+        return;
+      }
+
+      const query = supabase.from("avisos").insert({
+        titulo: novoAviso.titulo.trim(),
+        conteudo: novoAviso.conteudo.trim(),
+        destinatarios: novoAviso.destinatarios,
+      });
+
+      const { error } = await Promise.race([query, timeout]) as Awaited<typeof query>;
+
+      if (error) {
+        console.error("Erro ao criar aviso:", error);
+        setErroAviso(`${error.message} (code: ${error.code})`);
+      } else {
+        // Recarrega a lista do banco após inserir
+        const { data: lista } = await supabase
+          .from("avisos")
+          .select("id,titulo,conteudo,criado_em,destinatarios")
+          .order("criado_em", { ascending: false })
+          .limit(30);
+        if (lista) setAvisos(lista as Aviso[]);
+        setNovoAviso({ titulo: "", conteudo: "", destinatarios: "todos" });
+        setAdicionandoAviso(false);
+      }
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error("Exceção ao criar aviso:", e);
+      setErroAviso(msg);
+    } finally {
+      setSalvandoAviso(false);
+    }
+  }
+
+  function removerAviso(id: string) {
+    supabase.from("avisos").delete().eq("id", id).then(() => {});
+    setAvisos((prev) => prev.filter((a) => a.id !== id));
+  }
+
+  // ── Devocional ──
+  const [devs, setDevs] = useState<Devocional[]>([]);
+  const [novoDev, setNovoDev] = useState({ titulo: "", subtitulo: "", conteudo: "", versiculo: "", referencia: "", imagem_url: "", data: new Date().toISOString().slice(0, 10), ativo: true });
+  const [adicionandoDev, setAdicionandoDev] = useState(false);
+  const [salvandoDev, setSalvandoDev] = useState(false);
+  const [editandoDev, setEditandoDev] = useState<Devocional | null>(null);
+
+  useEffect(() => {
+    supabase.from("devocionais").select().order("data", { ascending: false }).limit(20).then(({ data }) => {
+      if (data) setDevs(data as Devocional[]);
+    });
+  }, []);
+
+  async function criarDevocional() {
+    if (!novoDev.titulo.trim() || !novoDev.conteudo.trim()) return;
+    setSalvandoDev(true);
+    const { data } = await supabase.from("devocionais").insert({
+      titulo: novoDev.titulo.trim(),
+      subtitulo: novoDev.subtitulo.trim() || null,
+      conteudo: novoDev.conteudo.trim(),
+      "versículo": novoDev.versiculo.trim() || null,
+      referencia: novoDev.referencia.trim() || null,
+      imagem_url: novoDev.imagem_url.trim() || null,
+      data: novoDev.data,
+      ativo: novoDev.ativo,
+    }).select().single();
+    if (data) setDevs((prev) => [data as Devocional, ...prev]);
+    setNovoDev({ titulo: "", subtitulo: "", conteudo: "", versiculo: "", referencia: "", imagem_url: "", data: new Date().toISOString().slice(0, 10), ativo: true });
+    setAdicionandoDev(false);
+    setSalvandoDev(false);
+  }
+
+  async function salvarEdicaoDev() {
+    if (!editandoDev) return;
+    setSalvandoDev(true);
+    await supabase.from("devocionais").update({
+      titulo: editandoDev.titulo,
+      subtitulo: editandoDev.subtitulo || null,
+      conteudo: editandoDev.conteudo,
+      "versículo": editandoDev.versiculo || null,
+      referencia: editandoDev.referencia || null,
+      imagem_url: editandoDev.imagem_url || null,
+      data: editandoDev.data,
+      ativo: editandoDev.ativo,
+    }).eq("id", editandoDev.id);
+    setDevs((prev) => prev.map((d) => d.id === editandoDev.id ? editandoDev : d));
+    setEditandoDev(null);
+    setSalvandoDev(false);
+  }
+
+  function removerDev(id: string) {
+    supabase.from("devocionais").delete().eq("id", id).then(() => {});
+    setDevs((prev) => prev.filter((d) => d.id !== id));
+  }
+
+  const inputCls = "w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-vine-400 bg-gray-50";
+  const textareaCls = "w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-vine-400 bg-gray-50 resize-none";
+
+  return (
+    <div className="space-y-4">
+      {/* Sub-navegação */}
+      <div className="flex gap-2">
+        <button onClick={() => setSecao("avisos")} className={clsx("flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold transition", secao === "avisos" ? "bg-vine-700 text-white" : "text-gray-500 hover:bg-vine-50 hover:text-vine-700")}>
+          <Bell className="w-4 h-4" /> Avisos
+        </button>
+        <button onClick={() => setSecao("devocional")} className={clsx("flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold transition", secao === "devocional" ? "bg-vine-700 text-white" : "text-gray-500 hover:bg-vine-50 hover:text-vine-700")}>
+          <BookOpen className="w-4 h-4" /> Devocional
+        </button>
+      </div>
+
+      {/* ── AVISOS ── */}
+      {secao === "avisos" && (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+            <div>
+              <p className="font-semibold text-gray-800 text-sm">Avisos públicos</p>
+              <p className="text-xs text-gray-400 mt-0.5">Aparecem no mural da página inicial</p>
+            </div>
+            <button onClick={() => setAdicionandoAviso(true)} className="flex items-center gap-1.5 bg-vine-700 hover:bg-vine-800 text-white text-xs font-semibold px-3 py-2 rounded-xl transition">
+              <Plus className="w-3.5 h-3.5" /> Novo aviso
+            </button>
+          </div>
+
+          {adicionandoAviso && (
+            <div className="px-5 py-4 border-b border-vine-50 bg-vine-50/30 space-y-3">
+              <input className={inputCls} placeholder="Título do aviso" value={novoAviso.titulo} onChange={(e) => setNovoAviso((p) => ({ ...p, titulo: e.target.value }))} />
+              <textarea className={textareaCls} rows={3} placeholder="Conteúdo do aviso..." value={novoAviso.conteudo} onChange={(e) => setNovoAviso((p) => ({ ...p, conteudo: e.target.value }))} />
+              <select className={inputCls} value={novoAviso.destinatarios} onChange={(e) => setNovoAviso((p) => ({ ...p, destinatarios: e.target.value }))}>
+                <option value="todos">Todos (público)</option>
+                <option value="membros">Apenas membros</option>
+                <option value="lideranca">Apenas liderança</option>
+              </select>
+              {erroAviso && (
+                <p className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">{erroAviso}</p>
+              )}
+              <div className="flex gap-2 justify-end">
+                <button onClick={() => { setAdicionandoAviso(false); setErroAviso(null); }} className="px-4 py-2 rounded-xl text-sm text-gray-500 hover:bg-gray-100 transition">Cancelar</button>
+                <button onClick={criarAviso} disabled={salvandoAviso} className="flex items-center gap-1.5 bg-vine-700 hover:bg-vine-800 text-white text-sm font-semibold px-4 py-2 rounded-xl transition disabled:opacity-60">
+                  <Save className="w-3.5 h-3.5" /> {salvandoAviso ? "Publicando..." : "Publicar"}
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div className="divide-y divide-gray-50">
+            {avisos.map((a) => (
+              <div key={a.id} className="flex items-start gap-3 px-5 py-4 hover:bg-gray-50/50">
+                <Bell className="w-4 h-4 text-vine-400 mt-0.5 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-sm text-gray-800">{a.titulo}</p>
+                  <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{a.conteudo}</p>
+                  <p className="text-xs text-gray-400 mt-1">{new Date(a.criado_em).toLocaleDateString("pt-BR")} · {typeof a.destinatarios === "string" ? a.destinatarios : "todos"}</p>
+                </div>
+                <button onClick={() => removerAviso(a.id)} className="p-1.5 hover:bg-red-50 rounded-lg text-gray-300 hover:text-red-400 transition shrink-0">
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            ))}
+            {avisos.length === 0 && (
+              <div className="px-5 py-10 text-center text-gray-400 text-sm">Nenhum aviso publicado ainda.</div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── DEVOCIONAL ── */}
+      {secao === "devocional" && (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+            <div>
+              <p className="font-semibold text-gray-800 text-sm">Devocional diário</p>
+              <p className="text-xs text-gray-400 mt-0.5">O mais recente ativo aparece na página inicial</p>
+            </div>
+            <button onClick={() => setAdicionandoDev(true)} className="flex items-center gap-1.5 bg-vine-700 hover:bg-vine-800 text-white text-xs font-semibold px-3 py-2 rounded-xl transition">
+              <Plus className="w-3.5 h-3.5" /> Novo devocional
+            </button>
+          </div>
+
+          {(adicionandoDev || editandoDev) && (
+            <div className="px-5 py-4 border-b border-vine-50 bg-vine-50/30 space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <input className={inputCls} placeholder="Título*" value={editandoDev ? editandoDev.titulo : novoDev.titulo} onChange={(e) => editandoDev ? setEditandoDev({ ...editandoDev, titulo: e.target.value }) : setNovoDev((p) => ({ ...p, titulo: e.target.value }))} />
+                <input className={inputCls} placeholder="Subtítulo" value={editandoDev ? (editandoDev.subtitulo ?? "") : novoDev.subtitulo} onChange={(e) => editandoDev ? setEditandoDev({ ...editandoDev, subtitulo: e.target.value }) : setNovoDev((p) => ({ ...p, subtitulo: e.target.value }))} />
+              </div>
+              <textarea className={textareaCls} rows={6} placeholder="Conteúdo do devocional*" value={editandoDev ? editandoDev.conteudo : novoDev.conteudo} onChange={(e) => editandoDev ? setEditandoDev({ ...editandoDev, conteudo: e.target.value }) : setNovoDev((p) => ({ ...p, conteudo: e.target.value }))} />
+              <div className="grid grid-cols-2 gap-3">
+                <input className={inputCls} placeholder="Versículo (ex: João 3:16)" value={editandoDev ? (editandoDev.versiculo ?? "") : novoDev.versiculo} onChange={(e) => editandoDev ? setEditandoDev({ ...editandoDev, versiculo: e.target.value }) : setNovoDev((p) => ({ ...p, versiculo: e.target.value }))} />
+                <input className={inputCls} placeholder="Referência bíblica" value={editandoDev ? (editandoDev.referencia ?? "") : novoDev.referencia} onChange={(e) => editandoDev ? setEditandoDev({ ...editandoDev, referencia: e.target.value }) : setNovoDev((p) => ({ ...p, referencia: e.target.value }))} />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <input className={inputCls} placeholder="URL de imagem (opcional)" value={editandoDev ? (editandoDev.imagem_url ?? "") : novoDev.imagem_url} onChange={(e) => editandoDev ? setEditandoDev({ ...editandoDev, imagem_url: e.target.value }) : setNovoDev((p) => ({ ...p, imagem_url: e.target.value }))} />
+                <input type="date" className={inputCls} value={editandoDev ? editandoDev.data : novoDev.data} onChange={(e) => editandoDev ? setEditandoDev({ ...editandoDev, data: e.target.value }) : setNovoDev((p) => ({ ...p, data: e.target.value }))} />
+              </div>
+              <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none">
+                <input type="checkbox" checked={editandoDev ? editandoDev.ativo : novoDev.ativo} onChange={(e) => editandoDev ? setEditandoDev({ ...editandoDev, ativo: e.target.checked }) : setNovoDev((p) => ({ ...p, ativo: e.target.checked }))} className="rounded" />
+                Ativo (visível na home)
+              </label>
+              <div className="flex gap-2 justify-end">
+                <button onClick={() => { setAdicionandoDev(false); setEditandoDev(null); }} className="px-4 py-2 rounded-xl text-sm text-gray-500 hover:bg-gray-100 transition">Cancelar</button>
+                <button onClick={editandoDev ? salvarEdicaoDev : criarDevocional} disabled={salvandoDev} className="flex items-center gap-1.5 bg-vine-700 hover:bg-vine-800 text-white text-sm font-semibold px-4 py-2 rounded-xl transition disabled:opacity-60">
+                  <Save className="w-3.5 h-3.5" /> {editandoDev ? "Salvar" : "Publicar"}
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div className="divide-y divide-gray-50">
+            {devs.map((d) => (
+              <div key={d.id} className="flex items-start gap-3 px-5 py-4 hover:bg-gray-50/50">
+                <BookOpen className="w-4 h-4 text-vine-400 mt-0.5 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <p className="font-semibold text-sm text-gray-800">{d.titulo}</p>
+                    {d.ativo ? <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">Ativo</span> : <span className="text-xs bg-gray-100 text-gray-400 px-2 py-0.5 rounded-full font-medium">Inativo</span>}
+                  </div>
+                  {d.subtitulo && <p className="text-xs text-gray-500 mt-0.5">{d.subtitulo}</p>}
+                  <p className="text-xs text-gray-400 mt-0.5 line-clamp-2">{d.conteudo}</p>
+                  {d.versiculo && <p className="text-xs text-vine-600 mt-1 italic">&ldquo;{d.versiculo}&rdquo; {d.referencia && `— ${d.referencia}`}</p>}
+                  <p className="text-xs text-gray-400 mt-1">{new Date(d.data + "T00:00:00").toLocaleDateString("pt-BR")}</p>
+                </div>
+                <div className="flex gap-1 shrink-0">
+                  <button onClick={() => setEditandoDev(d)} className="p-1.5 hover:bg-vine-50 rounded-lg text-gray-300 hover:text-vine-600 transition">
+                    <Pencil className="w-4 h-4" />
+                  </button>
+                  <button onClick={() => removerDev(d.id)} className="p-1.5 hover:bg-red-50 rounded-lg text-gray-300 hover:text-red-400 transition">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            ))}
+            {devs.length === 0 && (
+              <div className="px-5 py-10 text-center text-gray-400 text-sm">Nenhum devocional criado ainda.</div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
