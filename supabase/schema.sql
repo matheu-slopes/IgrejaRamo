@@ -4,6 +4,37 @@
 -- ================================================================
 
 -- ──────────────────────────────────────────────────────────────
+-- RESET (seguro para re-executar)
+-- ──────────────────────────────────────────────────────────────
+DROP TABLE IF EXISTS mensagens            CASCADE;
+DROP TABLE IF EXISTS conversas_diretas    CASCADE;
+DROP TABLE IF EXISTS grupos               CASCADE;
+DROP TABLE IF EXISTS membros_ministerio   CASCADE;
+DROP TABLE IF EXISTS canais_ministerio    CASCADE;
+DROP TABLE IF EXISTS notificacoes         CASCADE;
+DROP TABLE IF EXISTS fotos_galeria        CASCADE;
+DROP TABLE IF EXISTS mural_mensagens      CASCADE;
+DROP TABLE IF EXISTS escala_musicas       CASCADE;
+DROP TABLE IF EXISTS escala_itens         CASCADE;
+DROP TABLE IF EXISTS escalas              CASCADE;
+DROP TABLE IF EXISTS musicas              CASCADE;
+DROP TABLE IF EXISTS locais               CASCADE;
+DROP TABLE IF EXISTS aviso_fixado         CASCADE;
+DROP TABLE IF EXISTS avisos               CASCADE;
+DROP TABLE IF EXISTS eventos              CASCADE;
+DROP TABLE IF EXISTS perfis               CASCADE;
+
+DROP TYPE IF EXISTS funcao_escala         CASCADE;
+DROP TYPE IF EXISTS funcao_ministerio     CASCADE;
+DROP TYPE IF EXISTS tipo_grupo            CASCADE;
+DROP TYPE IF EXISTS tipo_notificacao      CASCADE;
+DROP TYPE IF EXISTS tipo_mensagem         CASCADE;
+DROP TYPE IF EXISTS ministerio_tipo       CASCADE;
+DROP TYPE IF EXISTS role_tipo             CASCADE;
+
+DROP FUNCTION IF EXISTS handle_new_user() CASCADE;
+
+-- ──────────────────────────────────────────────────────────────
 -- ENUMS
 -- ──────────────────────────────────────────────────────────────
 CREATE TYPE role_tipo AS ENUM ('admin', 'pastor', 'lider', 'voluntario', 'membro');
@@ -54,7 +85,10 @@ BEGIN
     NEW.id,
     COALESCE(NEW.raw_user_meta_data->>'nome', NEW.email),
     NEW.email
-  );
+  )
+  ON CONFLICT (id) DO NOTHING;
+  RETURN NEW;
+EXCEPTION WHEN OTHERS THEN
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
