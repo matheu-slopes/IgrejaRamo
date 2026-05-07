@@ -87,7 +87,7 @@ export default function ImmersiveMapa() {
           >
             <iframe
               title="Localização Igreja Ramo da Vida"
-              src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3675.!2d-47.0693!3d-22.8888!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2zMjLCsDUzJzE3LjgiUyA0N8KwMDQnMDkuNSJX!5e0!3m2!1spt-BR!2sbr!4v1"
+              src="https://maps.google.com/maps?q=R.+Fern%C3%A3o+Pompeu+de+Camargo%2C+1293%2C+Jardim+do+Trevo%2C+Campinas%2C+SP%2C+13040-010&output=embed"
               className="w-full h-full border-0 opacity-90"
               loading="lazy"
               referrerPolicy="no-referrer-when-downgrade"
