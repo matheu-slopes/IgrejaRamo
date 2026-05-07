@@ -819,9 +819,20 @@ function MembrosTab({
   isLider: boolean;
   podeAtribuirPermissoes: boolean;
 }) {
-  const [membros, setMembros] = useState<MembroMinisterio[]>(
-    mockMembrosMinisterio.filter((m) => m.ministerio === ministerio)
-  );
+  const [membros, setMembros] = useState<MembroMinisterio[]>([]);
+
+  useEffect(() => {
+    supabase.from("membros_ministerio").select(`
+      id, funcao, ativo, data_entrada,
+      perfis ( id, nome, email, telefone )
+    `).eq("ministerio", ministerio).eq("ativo", true).then(({ data }) => {
+      if (data) setMembros(data.map((r: Record<string, unknown>) => {
+        const p = r.perfis as Record<string, unknown>;
+        return { id: r.id as string, nome: p?.nome as string, email: p?.email as string, telefone: p?.telefone as string | undefined, funcao: r.funcao as FuncaoMinisterio, ministerio, ativo: r.ativo as boolean, dataEntrada: r.data_entrada as string };
+      }));
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ministerio]);
   const [editandoId, setEditandoId] = useState<string | null>(null);
   const [novaFuncao, setNovaFuncao] = useState<FuncaoMinisterio>("Membro");
   const [showForm, setShowForm] = useState(false);
@@ -1085,23 +1096,32 @@ function MembrosTab({
 // ─── TAB: EVENTOS ─────────────────────────────────────────────────────────────
 
 function EventosTab({ ministerio, isLider, podeEditar }: { ministerio: Ministerio; isLider: boolean; podeEditar: boolean }) {
-  const [eventos, setEventos] = useState<Evento[]>(
-    mockEventos.filter((e) => e.ministerio === ministerio || !e.ministerio)
-      .filter((e) => e.ministerio === ministerio)
-  );
+  const [eventos, setEventos] = useState<Evento[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState<Omit<Evento, "id" | "criadoPor">>({
     titulo: "", descricao: "", data: "", horario: "", local: "", publico: false, ministerio,
   });
   const [calendarMenu, setCalendarMenu] = useState<string | null>(null);
-  const [locais, setLocais] = useState<Local[]>(mockLocais);
+  const [locais, setLocais] = useState<Local[]>([]);
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem("ramo_locais");
-      if (raw) setLocais(JSON.parse(raw));
-    } catch {}
-  }, []);
+    supabase.from("eventos").select().eq("ministerio", ministerio).order("data").then(({ data }) => {
+      if (data) setEventos(data.map((e: Record<string, unknown>) => ({
+        id: e.id as string, titulo: e.titulo as string,
+        descricao: (e.descricao as string) ?? undefined,
+        data: e.data as string, horario: e.horario as string,
+        local: e.local as string, publico: e.publico as boolean,
+        ministerio: e.ministerio as Ministerio, criadoPor: (e.criado_por as string) ?? "",
+      })));
+    });
+    supabase.from("locais").select().then(({ data }) => {
+      if (data) setLocais(data.map((l: Record<string, unknown>) => ({
+        id: l.id as string, nome: l.nome as string,
+        descricao: (l.descricao as string) ?? undefined,
+      })));
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ministerio]);
 
   function criarEvento() {
     if (!form.titulo || !form.data || !form.horario || !form.local) return;
@@ -1341,10 +1361,34 @@ function formatDateSimples(iso: string) {
 }
 
 function EscalasLouvorTab({ ministerio, isLider }: { ministerio: Ministerio; isLider: boolean }) {
-  const membros = mockMembrosMinisterio.filter((m) => m.ministerio === ministerio);
-  const [escalas, setEscalas] = useState<Escala[]>(
-    () => mockEscalas.filter((e) => e.ministerio === ministerio)
-  );
+  const [membros, setMembros] = useState<MembroMinisterio[]>([]);
+  const [escalas, setEscalas] = useState<Escala[]>([]);
+  const [musicas, setMusicas] = useState<Musica[]>([]);
+
+  useEffect(() => {
+    supabase.from("membros_ministerio").select(`id, funcao, ativo, data_entrada, perfis ( id, nome, email, telefone )`)
+      .eq("ministerio", ministerio).eq("ativo", true).then(({ data }) => {
+        if (data) setMembros(data.map((r: Record<string, unknown>) => {
+          const p = r.perfis as Record<string, unknown>;
+          return { id: r.id as string, nome: (p?.nome ?? "") as string, email: (p?.email ?? "") as string, telefone: p?.telefone as string | undefined, funcao: r.funcao as FuncaoMinisterio, ministerio, ativo: r.ativo as boolean, dataEntrada: r.data_entrada as string };
+        }));
+      });
+    supabase.from("escalas").select(`*, escala_itens(*), escala_musicas(*)`).eq("ministerio", ministerio).order("data", { ascending: false }).then(({ data }) => {
+      if (data) setEscalas(data.map((e: Record<string, unknown>) => ({
+        id: e.id as string, ministerio: e.ministerio as Ministerio,
+        data: e.data as string, horario: e.horario as string, culto: e.culto as string,
+        observacoes: (e.observacoes as string) ?? undefined, visivel: e.visivel as boolean,
+        confirmacaoParticipantes: e.confirmacao_participantes as boolean,
+        criadoPor: (e.criado_por as string) ?? "",
+        itens: ((e.escala_itens as Record<string, unknown>[]) ?? []).map((i) => ({ funcao: i.funcao as FuncaoEscala, voluntarioId: (i.voluntario_id as string) ?? undefined, voluntarioNome: i.voluntario_nome as string, observacao: (i.observacao as string) ?? undefined })),
+        musicas: ((e.escala_musicas as Record<string, unknown>[]) ?? []).sort((a, b) => (a.ordem as number) - (b.ordem as number)).map((m) => ({ musicaId: (m.musica_id as string) ?? "", titulo: m.titulo as string, artista: m.artista as string, tom: (m.tom as string) ?? "" })),
+      })));
+    });
+    supabase.from("musicas").select().order("titulo").then(({ data }) => {
+      if (data) setMusicas(data as Musica[]);
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ministerio]);
   const [modo, setModo] = useState<"lista" | "form">("lista");
   const [editId, setEditId] = useState<string | null>(null);
   const [subTab, setSubTab] = useState<EscalaSubTab>("detalhes");
@@ -1425,7 +1469,7 @@ function EscalasLouvorTab({ ministerio, isLider }: { ministerio: Ministerio; isL
     setForm((f) => ({ ...f, itens: f.itens.filter((_, i) => i !== idx) }));
   }
 
-  const musicasFiltradas = mockMusicas.filter((m) =>
+  const musicasFiltradas = musicas.filter((m) =>
     m.titulo.toLowerCase().includes(buscaMusica.toLowerCase()) ||
     m.artista.toLowerCase().includes(buscaMusica.toLowerCase())
   );

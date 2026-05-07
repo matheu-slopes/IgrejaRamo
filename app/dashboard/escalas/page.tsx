@@ -921,8 +921,6 @@ function MinhaEscalaCompactCard({
 
 // ─── EscalaModal ─────────────────────────────────────────────────────────────
 
-interface Musica { id: string; titulo: string; artista: string; tom?: string; }
-
 function EscalaModal({
   mode, date, form, setForm, membros, meusMinisterios, musicas, escalas, isAdmin, onSave, onClose,
 }: {
