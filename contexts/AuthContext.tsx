@@ -41,7 +41,7 @@ interface AuthContextType {
   /** Atualiza um usuário (role, permissoes, ativo, etc.) no Supabase */
   atualizarUsuario: (id: string, dados: Partial<User>) => Promise<void>;
   /** Cria um novo usuário no Supabase Auth + perfis. A senha é definida pelo admin. */
-  criarUsuario: (dados: Omit<User, "id">, senha: string) => Promise<User | null>;
+  criarUsuario: (dados: Omit<User, "id">, senha: string) => Promise<{ user: User } | { error: string }>;
   /** Remove um usuário */
   removerUsuario: (id: string) => Promise<void>;
 }
@@ -165,7 +165,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (user?.id === id) setUser((prev) => prev ? { ...prev, ...dados } : prev);
   }
 
-  async function criarUsuario(dados: Omit<User, "id">, senha: string): Promise<User | null> {
+  async function criarUsuario(dados: Omit<User, "id">, senha: string): Promise<{ user: User } | { error: string }> {
     const res = await fetch("/api/criar-usuario", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -181,11 +181,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         permissoes:    dados.permissoes ?? [],
       }),
     });
-    if (!res.ok) return null;
-    const { id } = await res.json();
-    const novo: User = { ...dados, id };
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) return { error: json.error ?? "Erro desconhecido ao criar usuário." };
+    const novo: User = { ...dados, id: json.id };
     setUsuarios((prev) => [...prev, novo]);
-    return novo;
+    return { user: novo };
   }
 
   async function removerUsuario(id: string) {

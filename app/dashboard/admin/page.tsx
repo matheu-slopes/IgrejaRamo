@@ -221,7 +221,8 @@ export default function AdminPage() {
               <NovoUsuarioForm
                 onCriar={async (dados, senha) => {
                   const result = await criarUsuario(dados, senha);
-                  return result !== null;
+                  if ("error" in result) return { error: result.error };
+                  return { ok: true };
                 }}
                 onCancelar={() => setPainel("lista")}
               />
@@ -559,7 +560,7 @@ function gerarSenha() {
 function NovoUsuarioForm({
   onCriar, onCancelar,
 }: {
-  onCriar: (dados: Omit<User, "id">, senha: string) => Promise<boolean>;
+  onCriar: (dados: Omit<User, "id">, senha: string) => Promise<{ ok: true } | { error: string }>;
   onCancelar: () => void;
 }) {
   const [form, setForm] = useState({
@@ -576,7 +577,7 @@ function NovoUsuarioForm({
   async function submeter() {
     if (!form.nome.trim() || !form.email.trim() || !senha) return;
     setErro(""); setLoading(true);
-    const ok = await onCriar({
+    const result = await onCriar({
       nome:        form.nome.trim(),
       email:       form.email.trim(),
       telefone:    form.telefone.trim() || undefined,
@@ -586,10 +587,10 @@ function NovoUsuarioForm({
       dataIngresso: new Date().toISOString().split("T")[0],
     }, senha);
     setLoading(false);
-    if (ok) {
+    if ("ok" in result) {
       setCriado({ email: form.email.trim(), senha });
     } else {
-      setErro("Erro ao criar usuário. Verifique se o e-mail já está em uso.");
+      setErro(result.error);
     }
   }
 
