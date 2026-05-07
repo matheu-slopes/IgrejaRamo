@@ -102,18 +102,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   useEffect(() => {
+    let initialLoadDone = false;
+
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session?.user) {
-        await carregarPerfil(session.user.id);
-        carregarTodosUsuarios();
+        try {
+          await Promise.race([
+            carregarPerfil(session.user.id),
+            new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 6000)),
+          ]);
+          carregarTodosUsuarios();
+        } catch {
+          // timeout ou erro — libera o loading mesmo assim
+        }
       }
+      initialLoadDone = true;
       setIsLoading(false);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      // Ignora o disparo inicial que ocorre junto com getSession
+      if (!initialLoadDone) return;
       if (session?.user) {
-        await carregarPerfil(session.user.id);
-        await carregarTodosUsuarios();
+        await carregarPerfil(session.user.id).catch(() => {});
+        carregarTodosUsuarios();
       } else {
         setUser(null);
         setUsuarios([]);

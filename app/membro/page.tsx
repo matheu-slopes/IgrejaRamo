@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -12,11 +12,21 @@ import {
   LogOut,
   MapPin,
   Info,
+  KeyRound,
+  Eye,
+  EyeOff,
 } from "lucide-react";
+import clsx from "clsx";
 
 export default function MembroPortalPage() {
   const { user, logout, isLoading } = useAuth();
   const router = useRouter();
+
+  const [novaSenha, setNovaSenha]         = useState("");
+  const [showSenha, setShowSenha]         = useState(false);
+  const [salvandoSenha, setSalvandoSenha] = useState(false);
+  const [erroSenha, setErroSenha]         = useState("");
+  const [okSenha, setOkSenha]             = useState(false);
 
   useEffect(() => {
     if (!isLoading && !user) router.push("/login");
@@ -29,6 +39,21 @@ export default function MembroPortalPage() {
         <div className="w-8 h-8 border-4 border-vine-400 border-t-transparent rounded-full animate-spin" />
       </div>
     );
+  }
+
+  async function trocarSenha() {
+    if (!user) return;
+    if (novaSenha.length < 6) { setErroSenha("Mínimo 6 caracteres."); return; }
+    setErroSenha(""); setSalvandoSenha(true); setOkSenha(false);
+    const res = await fetch("/api/alterar-senha", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: user.id, novaSenha }),
+    });
+    const json = await res.json().catch(() => ({}));
+    setSalvandoSenha(false);
+    if (res.ok) { setOkSenha(true); setNovaSenha(""); setTimeout(() => setOkSenha(false), 3000); }
+    else setErroSenha(json.error ?? "Erro ao alterar senha.");
   }
 
   function handleLogout() {
@@ -99,6 +124,45 @@ export default function MembroPortalPage() {
               canais de ministério e outras funções internas, entre em contato com a liderança
               para ser vinculado a um ministério.
             </p>
+          </div>
+        </div>
+
+        {/* Trocar senha */}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+          <div className="px-5 py-3 border-b border-gray-100 bg-gray-50 flex items-center gap-2">
+            <KeyRound className="w-4 h-4 text-gray-400" />
+            <p className="text-xs font-bold uppercase tracking-widest text-gray-400">Trocar senha</p>
+          </div>
+          <div className="px-5 py-4 space-y-3">
+            <div className="relative">
+              <input
+                type={showSenha ? "text" : "password"}
+                value={novaSenha}
+                onChange={(e) => { setNovaSenha(e.target.value); setErroSenha(""); setOkSenha(false); }}
+                placeholder="Nova senha (mín. 6 caracteres)"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-vine-400 focus:ring-1 focus:ring-vine-100 pr-10"
+              />
+              <button
+                type="button"
+                onClick={() => setShowSenha((v) => !v)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              >
+                {showSenha ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+            {erroSenha && <p className="text-xs text-red-500">{erroSenha}</p>}
+            <button
+              onClick={trocarSenha}
+              disabled={salvandoSenha || !novaSenha}
+              className={clsx(
+                "w-full py-2.5 rounded-xl text-sm font-semibold border transition",
+                okSenha
+                  ? "bg-green-50 text-green-700 border-green-200"
+                  : "bg-vine-700 text-white border-vine-700 hover:bg-vine-800 disabled:opacity-50"
+              )}
+            >
+              {salvandoSenha ? "Salvando..." : okSenha ? "Senha alterada!" : "Salvar nova senha"}
+            </button>
           </div>
         </div>
 

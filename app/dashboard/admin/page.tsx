@@ -361,6 +361,26 @@ function EditarUsuarioPanel({
   const permAtivas = permissoesEfetivas(usuario);
   const temCustom  = !!usuario.permissoes;
 
+  const [novaSenha, setNovaSenha]           = useState("");
+  const [showNovaSenha, setShowNovaSenha]   = useState(false);
+  const [salvandoSenha, setSalvandoSenha]   = useState(false);
+  const [erroSenha, setErroSenha]           = useState("");
+  const [okSenha, setOkSenha]               = useState(false);
+
+  async function trocarSenha() {
+    if (novaSenha.length < 6) { setErroSenha("Mínimo 6 caracteres."); return; }
+    setErroSenha(""); setSalvandoSenha(true); setOkSenha(false);
+    const res = await fetch("/api/alterar-senha", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: usuario.id, novaSenha }),
+    });
+    const json = await res.json().catch(() => ({}));
+    setSalvandoSenha(false);
+    if (res.ok) { setOkSenha(true); setNovaSenha(""); setTimeout(() => setOkSenha(false), 3000); }
+    else setErroSenha(json.error ?? "Erro ao alterar senha.");
+  }
+
   function togglePermissao(p: Permissao) {
     const base = permissoesEfetivas(usuario);
     const nova  = base.includes(p) ? base.filter((x) => x !== p) : [...base, p];
@@ -528,6 +548,42 @@ function EditarUsuarioPanel({
               </div>
             );
           })}
+        </div>
+
+        {/* Trocar senha */}
+        <div>
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Trocar senha</p>
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <input
+                type={showNovaSenha ? "text" : "password"}
+                value={novaSenha}
+                onChange={(e) => { setNovaSenha(e.target.value); setErroSenha(""); setOkSenha(false); }}
+                placeholder="Nova senha (mín. 6 caracteres)"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-vine-400 focus:ring-1 focus:ring-vine-100 pr-9"
+              />
+              <button
+                type="button"
+                onClick={() => setShowNovaSenha((v) => !v)}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              >
+                {showNovaSenha ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+            <button
+              onClick={trocarSenha}
+              disabled={salvandoSenha || !novaSenha}
+              className={clsx(
+                "px-3 py-2 rounded-xl text-sm font-semibold border transition whitespace-nowrap",
+                okSenha
+                  ? "bg-green-50 text-green-700 border-green-200"
+                  : "bg-vine-50 text-vine-800 border-vine-200 hover:bg-vine-100 disabled:opacity-50"
+              )}
+            >
+              {salvandoSenha ? "..." : okSenha ? "Salvo!" : "Salvar"}
+            </button>
+          </div>
+          {erroSenha && <p className="text-xs text-red-500 mt-1">{erroSenha}</p>}
         </div>
 
         {/* Ações */}
