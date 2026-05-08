@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, ReactNode } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/lib/supabase";
 import { ConversaDireta, Grupo, MensagemConversa } from "@/types";
 import {
   MessageSquare, Users, Send, ArrowLeft, Search, Lock, Plus,
@@ -720,6 +721,8 @@ export default function ChatPage() {
   const [ctxMenu, setCtxMenu] = useState<{ id: string; type: "dm" | "grupo" } | null>(null);
   const [showNewDmModal, setShowNewDmModal] = useState(false);
   const [showNewGroupModal, setShowNewGroupModal] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const realtimeCanalRef = useRef<any>(null);
 
   useEffect(() => {
     if (!ctxMenu) return;
@@ -727,6 +730,130 @@ export default function ChatPage() {
     document.addEventListener("click", handleClick);
     return () => document.removeEventListener("click", handleClick);
   }, [ctxMenu]);
+
+  // ── helpers Supabase ─────────────────────────────────────────────
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  function rowToMensagem(row: any): MensagemConversa {
+    return {
+      id: row.id,
+      autorId: row.autor_id,
+      autorNome: row.autor_nome ?? "?",
+      conteudo: row.conteudo,
+      criadoEm: row.criado_em,
+      editadoEm: row.editado_em ?? undefined,
+      respostaA: row.resposta_a_id ? {
+        id: row.resposta_a_id,
+        autorNome: row.resposta_a_autor_nome ?? "",
+        conteudo: row.resposta_a_conteudo ?? "",
+      } : undefined,
+    };
+  }
+
+  // ── carregar conversas ────────────────────────────────────────────
+  useEffect(() => {
+    if (!user?.id) return;
+    carregarConversas();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, usuarios]);
+
+  async function carregarConversas() {
+    if (!user) return;
+    const { data: participacoes } = await supabase
+      .from("chat_participantes").select("conversa_id").eq("user_id", user.id);
+    if (!participacoes?.length) return;
+
+    const ids = (participacoes as { conversa_id: string }[]).map(p => p.conversa_id);
+
+    const [{ data: conversas }, { data: todosParticipantes }, { data: ultimasMsgs }] = await Promise.all([
+      supabase.from("chat_conversas").select("*").in("id", ids),
+      supabase.from("chat_participantes").select("conversa_id, user_id").in("conversa_id", ids),
+      supabase.from("chat_mensagens").select("*").in("conversa_id", ids).order("criado_em", { ascending: false }),
+    ]);
+
+    const participantesPorConversa: Record<string, string[]> = {};
+    for (const p of (todosParticipantes ?? []) as { conversa_id: string; user_id: string }[]) {
+      if (!participantesPorConversa[p.conversa_id]) participantesPorConversa[p.conversa_id] = [];
+      participantesPorConversa[p.conversa_id].push(p.user_id);
+    }
+
+    const lastMsgPorConversa: Record<string, MensagemConversa> = {};
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    for (const row of (ultimasMsgs ?? []) as any[]) {
+      if (!lastMsgPorConversa[row.conversa_id]) lastMsgPorConversa[row.conversa_id] = rowToMensagem(row);
+    }
+
+    const newDms: ConversaDireta[] = [];
+    const newGrupos: Grupo[] = [];
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    for (const c of (conversas ?? []) as any[]) {
+      const membrosIds = participantesPorConversa[c.id] ?? [];
+      const lastMsg = lastMsgPorConversa[c.id];
+      const mensagens = lastMsg ? [lastMsg] : [];
+
+      if (c.tipo === "direto") {
+        const otherId = membrosIds.find((id: string) => id !== user.id) ?? "";
+        const otherNome = usuarios.find(mu => mu.id === otherId)?.nome ?? "Usuário";
+        newDms.push({
+          id: c.id,
+          participantes: [user.id, otherId] as [string, string],
+          participantesNomes: [user.nome, otherNome] as [string, string],
+          mensagens,
+        });
+      } else {
+        newGrupos.push({
+          id: c.id, nome: c.nome ?? "Grupo", tipo: "geral",
+          emoji: c.emoji ?? "💬", cor: c.cor ?? "bg-vine-700",
+          descricao: c.descricao ?? undefined, adminId: c.admin_id ?? undefined,
+          somenteAdmin: c.somente_admin ?? false, institucional: c.institucional ?? false,
+          membros: membrosIds, mensagens,
+        });
+      }
+    }
+
+    setDms(newDms);
+    setGrupos(newGrupos);
+  }
+
+  async function carregarMensagens(conversaId: string) {
+    const { data } = await supabase
+      .from("chat_mensagens").select("*")
+      .eq("conversa_id", conversaId).order("criado_em", { ascending: true });
+    if (!data) return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const msgs = (data as any[]).map(rowToMensagem);
+    setDms(prev => prev.map(dm => dm.id === conversaId ? { ...dm, mensagens: msgs } : dm));
+    setGrupos(prev => prev.map(g => g.id === conversaId ? { ...g, mensagens: msgs } : g));
+  }
+
+  // ── realtime subscription ao abrir conversa ───────────────────────
+  useEffect(() => {
+    if (!activeChat) {
+      if (realtimeCanalRef.current) { supabase.removeChannel(realtimeCanalRef.current); realtimeCanalRef.current = null; }
+      return;
+    }
+    carregarMensagens(activeChat.id);
+    if (realtimeCanalRef.current) supabase.removeChannel(realtimeCanalRef.current);
+
+    const cid = activeChat.id;
+    const channel = supabase.channel(`chat_msgs_${cid}`)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .on("postgres_changes" as any, {
+        event: "INSERT", schema: "public", table: "chat_mensagens",
+        filter: `conversa_id=eq.${cid}`,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      }, (payload: any) => {
+        if (payload.new?.autor_id === user?.id) return; // otimista já adicionado
+        const msg = rowToMensagem(payload.new);
+        setDms(prev => prev.map(dm => dm.id === cid ? { ...dm, mensagens: [...dm.mensagens, msg] } : dm));
+        setGrupos(prev => prev.map(g => g.id === cid ? { ...g, mensagens: [...g.mensagens, msg] } : g));
+      })
+      .subscribe();
+
+    realtimeCanalRef.current = channel;
+    return () => { supabase.removeChannel(channel); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeChat?.id]);
 
   function showToast(msg: string) {
     setToast(msg);
@@ -751,50 +878,62 @@ export default function ChatPage() {
     setCtxMenu(null);
   }
 
-  function leaveGrupo(id: string) {
-    setGrupos((prev) => prev.map((g) => g.id === id ? { ...g, membros: g.membros.filter((m) => m !== u.id) } : g));
-    if (activeChat?.tipo === "grupo" && activeChat.id === id) openChat(null);
-    setCtxMenu(null);
-  }
-
-  function deleteGrupo(id: string) {
+  async function leaveGrupo(id: string) {
+    await supabase.from("chat_participantes").delete().eq("conversa_id", id).eq("user_id", u.id);
     setGrupos((prev) => prev.filter((g) => g.id !== id));
     if (activeChat?.tipo === "grupo" && activeChat.id === id) openChat(null);
     setCtxMenu(null);
   }
 
-  function startDm(userId: string, userNome: string) {
+  async function deleteGrupo(id: string) {
+    await supabase.from("chat_conversas").delete().eq("id", id);
+    setGrupos((prev) => prev.filter((g) => g.id !== id));
+    if (activeChat?.tipo === "grupo" && activeChat.id === id) openChat(null);
+    setCtxMenu(null);
+  }
+
+  async function startDm(userId: string, userNome: string) {
     const existing = dms.find((dm) => dm.participantes.includes(u.id) && dm.participantes.includes(userId));
     if (existing) {
       openChat({ tipo: "direto", id: existing.id });
-    } else {
-      const newDm: ConversaDireta = {
-        id: `dm_${Date.now()}`,
-        participantes: [u.id, userId] as [string, string],
-        participantesNomes: [u.nome, userNome] as [string, string],
-        mensagens: [],
-      };
-      setDms((prev) => [...prev, newDm]);
-      openChat({ tipo: "direto", id: newDm.id });
+      setShowNewDmModal(false);
+      return;
     }
+    const { data: novaConversa } = await supabase
+      .from("chat_conversas").insert({ tipo: "direto" }).select().single();
+    if (!novaConversa) return;
+    await supabase.from("chat_participantes").insert([
+      { conversa_id: (novaConversa as { id: string }).id, user_id: u.id },
+      { conversa_id: (novaConversa as { id: string }).id, user_id: userId },
+    ]);
+    const cid = (novaConversa as { id: string }).id;
+    setDms((prev) => [...prev, {
+      id: cid,
+      participantes: [u.id, userId] as [string, string],
+      participantesNomes: [u.nome, userNome] as [string, string],
+      mensagens: [],
+    }]);
+    openChat({ tipo: "direto", id: cid });
     setShowNewDmModal(false);
   }
 
-  function createGroup(nome: string, emoji: string, membros: string[]) {
+  async function createGroup(nome: string, emoji: string, membros: string[]) {
     const allMembros = membros.includes(u.id) ? membros : [...membros, u.id];
-    const newGrupo: Grupo = {
-      id: `g_${Date.now()}`,
-      nome,
-      tipo: "ministerio",
-      emoji,
-      cor: "bg-vine-700",
-      descricao: `Grupo criado por ${u.nome}`,
-      adminId: u.id,
-      membros: allMembros,
-      mensagens: [],
-    };
-    setGrupos((prev) => [...prev, newGrupo]);
-    openChat({ tipo: "grupo", id: newGrupo.id });
+    const { data: novoGrupo } = await supabase.from("chat_conversas").insert({
+      tipo: "grupo", nome, emoji, cor: "bg-vine-700",
+      descricao: `Grupo criado por ${u.nome}`, admin_id: u.id, somente_admin: false,
+    }).select().single();
+    if (!novoGrupo) return;
+    const cid = (novoGrupo as { id: string }).id;
+    await supabase.from("chat_participantes").insert(
+      allMembros.map(uid => ({ conversa_id: cid, user_id: uid }))
+    );
+    setGrupos((prev) => [...prev, {
+      id: cid, nome, tipo: "geral", emoji, cor: "bg-vine-700",
+      descricao: `Grupo criado por ${u.nome}`, adminId: u.id,
+      somenteAdmin: false, institucional: false, membros: allMembros, mensagens: [],
+    }]);
+    openChat({ tipo: "grupo", id: cid });
     setShowNewGroupModal(false);
   }
 
@@ -809,30 +948,49 @@ export default function ChatPage() {
     return u.role === "admin" || u.role === "pastor" || u.role === "lider";
   }
 
-  function sendDm(dmId: string, text: string) {
+  async function sendDm(dmId: string, text: string) {
+    const replyData = replyTo ? {
+      resposta_a_id: replyTo.id,
+      resposta_a_autor_nome: replyTo.autorNome,
+      resposta_a_conteudo: replyTo.conteudo,
+    } : {};
+    // Optimistic
+    const tempId = `tmp_${Date.now()}`;
     const msg: MensagemConversa = {
-      id: `dm_${Date.now()}`,
-      autorId: u.id, autorNome: u.nome,
+      id: tempId, autorId: u.id, autorNome: u.nome,
       conteudo: text, criadoEm: new Date().toISOString(), lida: true,
       respostaA: replyTo ? { id: replyTo.id, autorNome: replyTo.autorNome, conteudo: replyTo.conteudo } : undefined,
     };
     setDms((prev) => prev.map((dm) => dm.id === dmId ? { ...dm, mensagens: [...dm.mensagens, msg] } : dm));
     setReplyTo(null);
+    await supabase.from("chat_mensagens").insert({
+      conversa_id: dmId, autor_id: u.id, autor_nome: u.nome, conteudo: text, ...replyData,
+    });
   }
 
-  function sendGrupo(grupoId: string, text: string) {
+  async function sendGrupo(grupoId: string, text: string) {
+    const replyData = replyTo ? {
+      resposta_a_id: replyTo.id,
+      resposta_a_autor_nome: replyTo.autorNome,
+      resposta_a_conteudo: replyTo.conteudo,
+    } : {};
+    const tempId = `tmp_${Date.now()}`;
     const msg: MensagemConversa = {
-      id: `g_${Date.now()}`,
-      autorId: u.id, autorNome: u.nome,
+      id: tempId, autorId: u.id, autorNome: u.nome,
       conteudo: text, criadoEm: new Date().toISOString(), lida: true,
       respostaA: replyTo ? { id: replyTo.id, autorNome: replyTo.autorNome, conteudo: replyTo.conteudo } : undefined,
     };
     setGrupos((prev) => prev.map((g) => g.id === grupoId ? { ...g, mensagens: [...g.mensagens, msg] } : g));
     setReplyTo(null);
+    await supabase.from("chat_mensagens").insert({
+      conversa_id: grupoId, autor_id: u.id, autor_nome: u.nome, conteudo: text, ...replyData,
+    });
   }
 
-  function editMsg(msgId: string, newText: string) {
+  async function editMsg(msgId: string, newText: string) {
     if (!activeChat) return;
+    await supabase.from("chat_mensagens")
+      .update({ conteudo: newText, editado_em: new Date().toISOString() }).eq("id", msgId);
     const updater = (msgs: MensagemConversa[]) =>
       msgs.map((m) => m.id === msgId ? { ...m, conteudo: newText, editadoEm: new Date().toISOString() } : m);
     if (activeChat.tipo === "direto") {
