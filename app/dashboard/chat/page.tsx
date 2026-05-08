@@ -726,6 +726,7 @@ export default function ChatPage() {
 
   const [dms, setDms] = useState<ConversaDireta[]>([]);
   const [grupos, setGrupos] = useState<Grupo[]>([]);
+  const cacheLoadedRef = useRef(false);
   const [archivedDms, setArchivedDms] = useState<Set<string>>(new Set());
   const [replyTo, setReplyTo] = useState<MensagemConversa | null>(null);
   const [myReacoes, setMyReacoes] = useState<Set<string>>(new Set());
@@ -745,6 +746,26 @@ export default function ChatPage() {
     document.addEventListener("click", handleClick);
     return () => document.removeEventListener("click", handleClick);
   }, [ctxMenu]);
+
+  // ── cache localStorage ────────────────────────────────────────────
+  function cacheKey(uid: string) { return `chat_v1_${uid}`; }
+
+  function salvarCache(uid: string, newDms: ConversaDireta[], newGrupos: Grupo[]) {
+    try {
+      // Limita a 50 mensagens por conversa para não explodir o localStorage
+      const dmsSave = newDms.map(d => ({ ...d, mensagens: d.mensagens.slice(-50) }));
+      const gruposSave = newGrupos.map(g => ({ ...g, mensagens: g.mensagens.slice(-50) }));
+      localStorage.setItem(cacheKey(uid), JSON.stringify({ dms: dmsSave, grupos: gruposSave }));
+    } catch { /* private mode ou storage cheio */ }
+  }
+
+  function lerCache(uid: string): { dms: ConversaDireta[]; grupos: Grupo[] } | null {
+    try {
+      const raw = localStorage.getItem(cacheKey(uid));
+      if (!raw) return null;
+      return JSON.parse(raw);
+    } catch { return null; }
+  }
 
   // ── helpers Supabase ─────────────────────────────────────────────
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -767,6 +788,20 @@ export default function ChatPage() {
   // ── carregar conversas ────────────────────────────────────────────
   useEffect(() => {
     if (!user?.id) return;
+    // 1) Carrega cache imediatamente (zero latência)
+    if (!cacheLoadedRef.current) {
+      cacheLoadedRef.current = true;
+      const cached = lerCache(user.id);
+      if (cached) {
+        setDms(cached.dms);
+        setGrupos(cached.grupos);
+        setConversaIds([
+          ...cached.dms.map((d: ConversaDireta) => d.id),
+          ...cached.grupos.map((g: Grupo) => g.id),
+        ]);
+      }
+    }
+    // 2) Busca do servidor em background
     carregarConversas();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
@@ -842,6 +877,8 @@ export default function ChatPage() {
     setDms(newDms);
     setGrupos(newGrupos);
     setConversaIds([...newDms.map(d => d.id), ...newGrupos.map(g => g.id)]);
+    // Persiste no cache para a próxima vez
+    salvarCache(user.id, newDms, newGrupos);
   }
 
   async function carregarMensagens(conversaId: string) {
@@ -865,6 +902,10 @@ export default function ChatPage() {
       const pending = g.mensagens.filter(m => !dbIds.has(m.id));
       return { ...g, mensagens: [...dbMsgs, ...pending] };
     }));
+    // Atualiza cache com o histórico completo da conversa
+    if (user?.id) {
+      setDms(prev => { salvarCache(user.id, prev, grupos); return prev; });
+    }
   }
 
   // ── broadcast: subscribe a cada conversa (WebSocket puro, sem banco) ──
