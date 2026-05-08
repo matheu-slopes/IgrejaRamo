@@ -21,13 +21,14 @@ function AudioPlayer({ src, isMe }: { src: string; isMe: boolean }) {
   const [playing, setPlaying]   = useState(false);
   const [current, setCurrent]   = useState(0);
   const [duration, setDuration] = useState(0);
+  const [loadError, setLoadError] = useState(false);
   const seekingDuration = useRef(false);
 
   useEffect(() => {
     const el = audioRef.current;
     if (!el) return;
     seekingDuration.current = false;
-    setPlaying(false); setCurrent(0); setDuration(0);
+    setPlaying(false); setCurrent(0); setDuration(0); setLoadError(false);
 
     function tryFix() {
       if (!el) return;
@@ -57,10 +58,12 @@ function AudioPlayer({ src, isMe }: { src: string; isMe: boolean }) {
       setPlaying(false);
       if (el) { el.currentTime = 0; setCurrent(0); }
     }
+    function onError() { setLoadError(true); setPlaying(false); }
     el.addEventListener("loadedmetadata", tryFix);
     el.addEventListener("durationchange", onDurationChange);
     el.addEventListener("timeupdate", onTimeUpdate);
     el.addEventListener("ended", onEnded);
+    el.addEventListener("error", onError);
     el.addEventListener("play",  () => setPlaying(true));
     el.addEventListener("pause", () => setPlaying(false));
     if (el.readyState >= 1) tryFix();
@@ -69,6 +72,7 @@ function AudioPlayer({ src, isMe }: { src: string; isMe: boolean }) {
       el.removeEventListener("durationchange", onDurationChange);
       el.removeEventListener("timeupdate", onTimeUpdate);
       el.removeEventListener("ended", onEnded);
+      el.removeEventListener("error", onError);
       el.removeEventListener("play",  () => setPlaying(true));
       el.removeEventListener("pause", () => setPlaying(false));
     };
@@ -101,26 +105,42 @@ function AudioPlayer({ src, isMe }: { src: string; isMe: boolean }) {
     )}>
       {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
       <audio ref={audioRef} src={src} preload="metadata" className="hidden" />
-      <button
-        onClick={toggle}
-        className={clsx(
-          "w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition-colors",
-          isMe ? "bg-white/20 hover:bg-white/30 text-white" : "bg-vine-700 hover:bg-vine-800 text-white"
-        )}
-      >
-        {playing
-          ? <Square className="w-3 h-3 fill-current" />
-          : <Play   className="w-3.5 h-3.5 fill-current ml-0.5" />}
-      </button>
-      <input
-        type="range" min={0} max={duration || 100} step={0.1} value={current}
-        onChange={seek}
-        className="flex-1 h-1 rounded-full cursor-pointer min-w-0"
-        style={{ accentColor: isMe ? "white" : "#4a6741" }}
-      />
-      <span className={clsx("text-[10px] font-medium shrink-0 tabular-nums", isMe ? "text-vine-200" : "text-gray-400")}>
-        {fmt(current)}&nbsp;/&nbsp;{fmt(duration)}
-      </span>
+      {loadError ? (
+        <>
+          <div className={clsx(
+            "w-8 h-8 rounded-full flex items-center justify-center shrink-0",
+            isMe ? "bg-white/20 text-white/60" : "bg-gray-100 text-gray-400"
+          )}>
+            <MicOff className="w-3.5 h-3.5" />
+          </div>
+          <span className={clsx("text-xs flex-1", isMe ? "text-white/60" : "text-gray-400")}>
+            Áudio indisponível
+          </span>
+        </>
+      ) : (
+        <>
+          <button
+            onClick={toggle}
+            className={clsx(
+              "w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition-colors",
+              isMe ? "bg-white/20 hover:bg-white/30 text-white" : "bg-vine-700 hover:bg-vine-800 text-white"
+            )}
+          >
+            {playing
+              ? <Square className="w-3 h-3 fill-current" />
+              : <Play   className="w-3.5 h-3.5 fill-current ml-0.5" />}
+          </button>
+          <input
+            type="range" min={0} max={duration || 100} step={0.1} value={current}
+            onChange={seek}
+            className="flex-1 h-1 rounded-full cursor-pointer min-w-0"
+            style={{ accentColor: isMe ? "white" : "#4a6741" }}
+          />
+          <span className={clsx("text-[10px] font-medium shrink-0 tabular-nums", isMe ? "text-vine-200" : "text-gray-400")}>
+            {fmt(current)}&nbsp;/&nbsp;{fmt(duration)}
+          </span>
+        </>
+      )}
     </div>
   );
 }
@@ -1216,9 +1236,11 @@ export default function ChatPage() {
           if (!arr?.length) return conv;
           const existIds = new Set(conv.mensagens.map(m => m.id));
           const novas = arr.filter(im => !existIds.has(im.id)).map(buildInboxMsg);
-          return novas.length > 0
-            ? { ...conv, mensagens: [...conv.mensagens, ...novas] }
-            : conv;
+          if (!novas.length) return conv;
+          const merged = [...conv.mensagens, ...novas].sort(
+            (a, b) => new Date(a.criadoEm).getTime() - new Date(b.criadoEm).getTime()
+          );
+          return { ...conv, mensagens: merged };
         });
 
       const mergedDms    = mergeInboxInto(baseDms);
@@ -1363,21 +1385,36 @@ export default function ChatPage() {
         mediaUrl: im.mediaUrl, criadoEm: im.criadoEm, lida: false,
       }));
 
+    // Ordena por criadoEm para garantir sequência correta independente da origem
+    const sortByTime = (arr: MensagemConversa[]) =>
+      arr.slice().sort((a, b) => new Date(a.criadoEm).getTime() - new Date(b.criadoEm).getTime());
+
     setDms(prev => prev.map(dm => {
       if (dm.id !== conversaId) return dm;
       // Mantém mensagens otimistas (enviadas mas insert ainda em voo)
       const pending = dm.mensagens.filter(m => !dbIds.has(m.id));
-      // Dedup: pending pode sobrepor inboxExtra
+      // Preserva mediaUrl do cache caso a coluna não exista no banco
+      // (ex: banco retorna media_url=null mas cache tem a URL correta)
+      const cacheById = new Map(dm.mensagens.map(m => [m.id, m]));
+      const mergedDb = dbMsgs.map(dbMsg => {
+        const cached = cacheById.get(dbMsg.id);
+        return (!dbMsg.mediaUrl && cached?.mediaUrl) ? { ...dbMsg, mediaUrl: cached.mediaUrl } : dbMsg;
+      });
       const pendingIds = new Set(pending.map(m => m.id));
       const uniqueInbox = inboxExtra.filter(m => !pendingIds.has(m.id));
-      return { ...dm, mensagens: [...dbMsgs, ...pending, ...uniqueInbox] };
+      return { ...dm, mensagens: sortByTime([...mergedDb, ...pending, ...uniqueInbox]) };
     }));
     setGrupos(prev => prev.map(g => {
       if (g.id !== conversaId) return g;
       const pending = g.mensagens.filter(m => !dbIds.has(m.id));
+      const cacheById = new Map(g.mensagens.map(m => [m.id, m]));
+      const mergedDb = dbMsgs.map(dbMsg => {
+        const cached = cacheById.get(dbMsg.id);
+        return (!dbMsg.mediaUrl && cached?.mediaUrl) ? { ...dbMsg, mediaUrl: cached.mediaUrl } : dbMsg;
+      });
       const pendingIds = new Set(pending.map(m => m.id));
       const uniqueInbox = inboxExtra.filter(m => !pendingIds.has(m.id));
-      return { ...g, mensagens: [...dbMsgs, ...pending, ...uniqueInbox] };
+      return { ...g, mensagens: sortByTime([...mergedDb, ...pending, ...uniqueInbox]) };
     }));
     // cache salvo automaticamente pelo useEffect [dms, grupos]
   }
@@ -1783,10 +1820,19 @@ export default function ChatPage() {
       const finalMsg = { ...msg, mediaUrl: finalUrl };
       broadcastChannelsRef.current.get(conversaId)?.send({ type: "broadcast", event: "msg", payload: finalMsg });
 
+      // Persiste no banco — tratamento de erro igual ao sendDm
       fetch("/api/chat/mensagem", {
         method: "POST", keepalive: true,
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token ?? ""}` },
         body: JSON.stringify({ id: msgId, conversa_id: conversaId, autor_id: u.id, autor_nome: u.nome, conteudo: tipoMsg === "documento" ? nomeArquivo : "", tipo: tipoMsg, media_url: finalUrl }),
+      }).then(async (r) => {
+        if (!r.ok) {
+          const j = await r.json().catch(() => ({}));
+          console.error("sendArquivo DB error:", j.error ?? r.status);
+          showToast("Arquivo enviado, mas erro ao salvar: " + (j.error ?? r.statusText));
+        }
+      }).catch((e) => {
+        console.error("sendArquivo DB fetch error:", e);
       });
     } catch (err: unknown) {
       const errMsg = err instanceof Error ? err.message : "Erro ao enviar arquivo";
