@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -38,15 +38,23 @@ export default function CanalMinisterioPage() {
   const [chamada, setChamada] = useState<"audio" | "video" | null>(null);
 
   useEffect(() => {
-    supabase.from("canais_ministerio").select().eq("ministerio", slug).limit(1).then(({ data }) => {
-      if (data && data.length > 0) {
+    // Timeout de segurança: se demorar mais de 3s, usa fallback e não trava
+    const fallbackTimer = setTimeout(() => {
+      setCanalBase((prev) => prev ?? { ministerio: slug, descricao: "", chatBloqueado: false, cor: "vine" });
+    }, 3000);
+
+    supabase.from("canais_ministerio").select().eq("ministerio", slug).limit(1).then(({ data, error }) => {
+      clearTimeout(fallbackTimer);
+      if (!error && data && data.length > 0) {
         setCanalBase({ ministerio: data[0].ministerio, descricao: data[0].descricao ?? "", chatBloqueado: data[0].chat_bloqueado, cor: data[0].cor });
         setChatBloqueado(data[0].chat_bloqueado);
       } else {
-        // Fallback: canal existe no enum mas não na tabela ainda
+        if (error) console.error("canais_ministerio error:", error.message);
         setCanalBase({ ministerio: slug, descricao: "", chatBloqueado: false, cor: "vine" });
       }
     });
+
+    return () => clearTimeout(fallbackTimer);
   }, [slug]);
 
   // ── permissão ─────────────────────────────────────────────────────
@@ -214,27 +222,85 @@ function ChatTab({
 }) {
   const [msgs, setMsgs] = useState<MuralMensagem[]>([]);
 
+  function rowToMsg(m: Record<string, unknown>): MuralMensagem {
+    return {
+      id: m.id as string, ministerio: m.ministerio as Ministerio,
+      autorId: (m.autor_id as string) ?? "",
+      autorNome: (m.autor_nome as string) ?? "",
+      autorRole: (m.autor_role as MuralMensagem["autorRole"]) ?? "membro",
+      conteudo: (m.conteudo as string) ?? "",
+      criadoEm: (m.criado_em as string) ?? new Date().toISOString(),
+      fixada: !!(m.fixada),
+      tipo: (m.tipo as MuralMensagem["tipo"]) ?? "texto",
+      mediaUrl: (m.media_url as string) ?? undefined,
+      reacoes: Array.isArray(m.reacoes) ? m.reacoes : [],
+      editadoEm: (m.editado_em as string) ?? undefined,
+      respostaA: (m.resposta_a as MuralMensagem["respostaA"]) ?? undefined,
+    };
+  }
+
   useEffect(() => {
     supabase
       .from("mural_mensagens")
       .select()
       .eq("ministerio", ministerio)
       .order("criado_em", { ascending: true })
-      .limit(100)
+      .limit(200)
       .then(({ data }) => {
-        if (data) {
-          setMsgs(
-            data.map((m) => ({
-              id: m.id, ministerio: m.ministerio, autorId: m.autor_id,
-              autorNome: m.autor_nome, autorRole: m.autor_role,
-              conteudo: m.conteudo, criadoEm: m.criado_em,
-              fixada: m.fixada, tipo: m.tipo, mediaUrl: m.media_url,
-              reacoes: m.reacoes ?? [], editadoEm: m.editado_em,
-              respostaA: m.resposta_a,
-            }))
-          );
-        }
+        if (data) setMsgs(data.map(rowToMsg));
       });
+  }, [ministerio]);
+
+  // Realtime: mensagens em tempo real para todos os membros do ministério
+  useEffect(() => {
+    const ch = supabase
+      .channel(`mural_${ministerio}`)
+      .on("postgres_changes", {
+        event: "INSERT", schema: "public",
+        table: "mural_mensagens",
+        filter: `ministerio=eq.${ministerio}`,
+      }, ({ new: raw }) => {
+        const nova = rowToMsg(raw as Record<string, unknown>);
+        setMsgs((prev) => {
+          // substitui mensagem temporária (otimista) pela confirmada do banco
+          const tempIdx = prev.findIndex(
+            (m) => m.id.startsWith("temp-") &&
+              m.autorId === nova.autorId &&
+              m.conteudo === nova.conteudo &&
+              Math.abs(new Date(m.criadoEm).getTime() - new Date(nova.criadoEm).getTime()) < 15000
+          );
+          if (tempIdx >= 0) {
+            const next = [...prev];
+            next[tempIdx] = { ...next[tempIdx], id: nova.id, criadoEm: nova.criadoEm, mediaUrl: nova.mediaUrl ?? next[tempIdx].mediaUrl };
+            return next;
+          }
+          return prev.some((x) => x.id === nova.id) ? prev : [...prev, nova];
+        });
+      })
+      .on("postgres_changes", {
+        event: "UPDATE", schema: "public",
+        table: "mural_mensagens",
+        filter: `ministerio=eq.${ministerio}`,
+      }, ({ new: raw }) => {
+        const row = raw as Record<string, unknown>;
+        setMsgs((prev) => prev.map((msg) => msg.id !== row.id ? msg : {
+          ...msg,
+          conteudo: (row.conteudo as string) ?? msg.conteudo,
+          fixada: !!(row.fixada),
+          editadoEm: (row.editado_em as string) ?? undefined,
+          reacoes: Array.isArray(row.reacoes) ? row.reacoes : [],
+        }));
+      })
+      .on("postgres_changes", {
+        event: "DELETE", schema: "public",
+        table: "mural_mensagens",
+      }, ({ old: raw }) => {
+        const row = raw as Record<string, unknown>;
+        if (row.id) setMsgs((prev) => prev.filter((m) => m.id !== row.id));
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ministerio]);
   const [texto, setTexto] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -246,9 +312,11 @@ function ChatTab({
   const [tempoGravacao, setTempoGravacao] = useState(0);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<BlobPart[]>([]);
+  const audioBlobRef = useRef<Blob | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Image
+  const [imagemFile, setImagemFile] = useState<File | null>(null);
   const [imagemPreview, setImagemPreview] = useState<string | null>(null);
 
   // Favorites & menu
@@ -280,41 +348,65 @@ function ChatTab({
   );
   const favoritosMsgs = msgs.filter((m) => favoritos.includes(m.id));
 
-  function enviar(tipo: MuralMensagem["tipo"] = "texto", mediaUrl?: string) {
+  async function enviar(tipo: MuralMensagem["tipo"] = "texto") {
     if (!user) return;
     if (tipo === "texto" && !texto.trim()) return;
+
+    const tempId = `temp-${Date.now()}`;
+    const agora = new Date().toISOString();
     const conteudo = tipo === "texto" ? texto.trim() : tipo === "imagem" ? "📷 Imagem" : "🎙️ Áudio";
-    supabase
-      .from("mural_mensagens")
-      .insert({
-        ministerio, autor_id: user.id, autor_nome: user.nome,
-        autor_role: user.role, conteudo, tipo, media_url: mediaUrl ?? null,
-        fixada: false, resposta_a: respostaA ?? null,
-      })
-      .select().single()
-      .then(({ data }) => {
-        if (data) {
-          setMsgs((prev) => [...prev, {
-            id: data.id, ministerio: data.ministerio, autorId: data.autor_id,
-            autorNome: data.autor_nome, autorRole: data.autor_role,
-            conteudo: data.conteudo, criadoEm: data.criado_em,
-            fixada: data.fixada, tipo: data.tipo, mediaUrl: data.media_url,
-            reacoes: [], respostaA: data.resposta_a,
-          }]);
-        }
-      });
-    setTexto("");
-    setImagemPreview(null);
-    setAudioUrl(null);
-    setRespostaA(null);
+    const respostaCapturada = respostaA;
+
+    // 1. Feedback imediato (otimista)
+    const localUrl = tipo === "imagem" ? imagemPreview : tipo === "audio" ? audioUrl : undefined;
+    setMsgs((prev) => [...prev, {
+      id: tempId, ministerio, autorId: user.id ?? "", autorNome: user.nome,
+      autorRole: user.role as MuralMensagem["autorRole"],
+      conteudo, criadoEm: agora, fixada: false, tipo,
+      mediaUrl: localUrl ?? undefined, reacoes: [],
+      respostaA: respostaCapturada ?? undefined,
+    }]);
+    setTexto(""); setImagemPreview(null); setAudioUrl(null); setRespostaA(null); setImagemFile(null);
+
+    // 2. Upload de mídia para Storage (se houver)
+    let uploadedUrl: string | null = null;
+    try {
+      if (tipo === "imagem" && imagemFile) {
+        const ext = imagemFile.name.split(".").pop() ?? "jpg";
+        const path = `ministerio/${ministerio}/${tempId}.${ext}`;
+        const { error: upErr } = await supabase.storage.from("chat-imagens").upload(path, imagemFile, { upsert: false });
+        if (upErr) throw upErr;
+        uploadedUrl = supabase.storage.from("chat-imagens").getPublicUrl(path).data.publicUrl;
+        setMsgs((prev) => prev.map((m) => m.id === tempId ? { ...m, mediaUrl: uploadedUrl ?? undefined } : m));
+      } else if (tipo === "audio" && audioBlobRef.current) {
+        const path = `ministerio/${ministerio}/${tempId}.webm`;
+        const { error: upErr } = await supabase.storage.from("chat-midias").upload(path, audioBlobRef.current, { upsert: false, contentType: "audio/webm" });
+        if (upErr) throw upErr;
+        uploadedUrl = supabase.storage.from("chat-midias").getPublicUrl(path).data.publicUrl;
+        setMsgs((prev) => prev.map((m) => m.id === tempId ? { ...m, mediaUrl: uploadedUrl ?? undefined } : m));
+      }
+    } catch {
+      setMsgs((prev) => prev.filter((m) => m.id !== tempId));
+      alert("Erro ao enviar mídia. Tente novamente.");
+      return;
+    }
+
+    // 3. Persiste no banco (Realtime trará o ID real e substituirá o temp)
+    supabase.from("mural_mensagens").insert({
+      ministerio, autor_id: user.id, autor_nome: user.nome,
+      autor_role: user.role, conteudo, tipo,
+      media_url: uploadedUrl ?? null,
+      fixada: false, resposta_a: respostaCapturada ?? null,
+    }).then(({ error }) => {
+      if (error) setMsgs((prev) => prev.filter((m) => m.id !== tempId));
+    });
   }
 
   function handleImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => setImagemPreview(ev.target?.result as string);
-    reader.readAsDataURL(file);
+    setImagemFile(file);
+    setImagemPreview(URL.createObjectURL(file)); // preview local imediato
     e.target.value = "";
   }
 
@@ -326,7 +418,8 @@ function ChatTab({
       mr.ondataavailable = (e) => chunksRef.current.push(e.data);
       mr.onstop = () => {
         const blob = new Blob(chunksRef.current, { type: "audio/webm" });
-        setAudioUrl(URL.createObjectURL(blob));
+        audioBlobRef.current = blob;
+        setAudioUrl(URL.createObjectURL(blob)); // preview local
         stream.getTracks().forEach((t) => t.stop());
       };
       mr.start();
@@ -349,7 +442,11 @@ function ChatTab({
   }
 
   function toggleFixar(id: string) {
-    setMsgs((prev) => prev.map((m) => m.id === id ? { ...m, fixada: !m.fixada } : m));
+    const msg = msgs.find((m) => m.id === id);
+    if (!msg) return;
+    const novaFixada = !msg.fixada;
+    setMsgs((prev) => prev.map((m) => m.id === id ? { ...m, fixada: novaFixada } : m));
+    supabase.from("mural_mensagens").update({ fixada: novaFixada }).eq("id", id);
     setMenuId(null);
   }
 
@@ -357,21 +454,39 @@ function ChatTab({
     const key = `${msgId}_${emoji}`;
     const already = myReacoes.has(key);
     setMyReacoes((prev) => { const next = new Set(prev); already ? next.delete(key) : next.add(key); return next; });
-    setMsgs((prev) => prev.map((m) => {
-      if (m.id !== msgId) return m;
-      const reacoes = m.reacoes ?? [];
-      if (already) return { ...m, reacoes: reacoes.map((r) => r.emoji === emoji ? { ...r, count: r.count - 1 } : r).filter((r) => r.count > 0) };
-      const ex = reacoes.find((r) => r.emoji === emoji);
-      return { ...m, reacoes: ex ? reacoes.map((r) => r.emoji === emoji ? { ...r, count: r.count + 1 } : r) : [...reacoes, { emoji, count: 1 }] };
-    }));
+    const msg = msgs.find((m) => m.id === msgId);
+    if (!msg) return;
+    const reacoes = msg.reacoes ?? [];
+    const newReacoes = already
+      ? reacoes.map((r) => r.emoji === emoji ? { ...r, count: r.count - 1 } : r).filter((r) => r.count > 0)
+      : (() => { const ex = reacoes.find((r) => r.emoji === emoji); return ex ? reacoes.map((r) => r.emoji === emoji ? { ...r, count: r.count + 1 } : r) : [...reacoes, { emoji, count: 1 }]; })();
+    setMsgs((prev) => prev.map((m) => m.id === msgId ? { ...m, reacoes: newReacoes } : m));
+    supabase.from("mural_mensagens").update({ reacoes: newReacoes }).eq("id", msgId);
     setMenuId(null);
   }
 
   function salvarEdicao(msgId: string) {
     if (!editTexto.trim()) return;
-    setMsgs((prev) => prev.map((m) => m.id === msgId ? { ...m, conteudo: editTexto.trim(), editadoEm: new Date().toISOString() } : m));
+    const novoConteudo = editTexto.trim();
+    const agora = new Date().toISOString();
+    setMsgs((prev) => prev.map((m) => m.id === msgId ? { ...m, conteudo: novoConteudo, editadoEm: agora } : m));
+    supabase.from("mural_mensagens").update({ conteudo: novoConteudo, editado_em: agora }).eq("id", msgId);
     setEditandoId(null);
     setEditTexto("");
+  }
+
+  function excluirMensagem(msgId: string) {
+    setMsgs((prev) => prev.filter((m) => m.id !== msgId));
+    setMenuId(null);
+    supabase.from("mural_mensagens").delete().eq("id", msgId).then(({ error }) => {
+      if (error) {
+        // Reverte o otimismo se o banco rejeitar
+        console.error("Erro ao excluir mensagem:", error.message);
+        supabase.from("mural_mensagens").select().eq("id", msgId).single().then(({ data }) => {
+          if (data) setMsgs((prev) => [...prev, rowToMsg(data as Record<string, unknown>)]);
+        });
+      }
+    });
   }
 
   const temMidia = !!imagemPreview || !!audioUrl;
@@ -515,6 +630,14 @@ function ChatTab({
                             {m.fixada ? "Desafixar" : "Fixar mensagem"}
                           </button>
                         )}
+                        {isMe && (
+                          <button
+                            onClick={() => excluirMensagem(m.id)}
+                            className="w-full flex items-center gap-2 px-3 py-2.5 text-xs text-red-500 hover:bg-red-50 transition text-left border-t border-gray-50"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" /> Excluir mensagem
+                          </button>
+                        )}
                       </div>
                     </>
                   )}
@@ -612,7 +735,7 @@ function ChatTab({
             <div className="flex-1 text-sm text-gray-600">Imagem pronta para enviar</div>
             <button onClick={() => setImagemPreview(null)} className="text-gray-400 hover:text-red-400"><X className="w-4 h-4" /></button>
             <button
-              onClick={() => enviar("imagem", imagemPreview!)}
+              onClick={() => enviar("imagem")}
               className="bg-vine-700 text-white text-sm font-semibold px-4 py-2 rounded-xl hover:bg-vine-600 flex items-center gap-1.5"
             >
               <Send className="w-3.5 h-3.5" /> Enviar
@@ -626,7 +749,7 @@ function ChatTab({
             <audio controls preload="metadata" src={audioUrl} className="h-9 flex-1" />
             <button onClick={() => { URL.revokeObjectURL(audioUrl); setAudioUrl(null); }} className="text-gray-400 hover:text-red-400"><X className="w-4 h-4" /></button>
             <button
-              onClick={() => enviar("audio", audioUrl!)}
+              onClick={() => enviar("audio")}
               className="bg-vine-700 text-white text-sm font-semibold px-4 py-2 rounded-xl hover:bg-vine-600 flex items-center gap-1.5"
             >
               <Send className="w-3.5 h-3.5" /> Enviar
@@ -822,15 +945,23 @@ function MembrosTab({
   const [membros, setMembros] = useState<MembroMinisterio[]>([]);
 
   useEffect(() => {
-    supabase.from("membros_ministerio").select(`
-      id, funcao, ativo, data_entrada,
-      perfis ( id, nome, email, telefone )
-    `).eq("ministerio", ministerio).eq("ativo", true).then(({ data }) => {
-      if (data) setMembros(data.map((r: Record<string, unknown>) => {
-        const p = r.perfis as Record<string, unknown>;
-        return { id: r.id as string, nome: p?.nome as string, email: p?.email as string, telefone: p?.telefone as string | undefined, funcao: r.funcao as FuncaoMinisterio, ministerio, ativo: r.ativo as boolean, dataEntrada: r.data_entrada as string };
-      }));
-    });
+    // Os membros ficam em `perfis` com o array `ministerios`
+    supabase.from("perfis")
+      .select("id, nome, email, telefone, role, data_ingresso")
+      .contains("ministerios", [ministerio])
+      .eq("ativo", true)
+      .then(({ data }) => {
+        if (data) setMembros(data.map((p: Record<string, unknown>) => ({
+          id: p.id as string,
+          nome: p.nome as string,
+          email: p.email as string,
+          telefone: (p.telefone as string) ?? undefined,
+          funcao: (p.role === "pastor" || p.role === "lider" ? "Líder" : "Membro") as FuncaoMinisterio,
+          ministerio,
+          ativo: true,
+          dataEntrada: (p.data_ingresso as string) ?? "",
+        })));
+      });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ministerio]);
   const [editandoId, setEditandoId] = useState<string | null>(null);
@@ -955,8 +1086,8 @@ function MembrosTab({
           </thead>
           <tbody>
             {membros.map((m) => (
-              <>
-                <tr key={m.id} className="border-b border-gray-50 hover:bg-gray-50 transition">
+              <React.Fragment key={m.id}>
+                <tr className="border-b border-gray-50 hover:bg-gray-50 transition">
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2.5">
                       <div className="w-7 h-7 bg-vine-100 text-vine-800 rounded-full flex items-center justify-center font-bold text-xs">
@@ -1035,7 +1166,7 @@ function MembrosTab({
                 </tr>
                 {/* Painel de permissões do canal para este membro */}
                 {permExpandido === m.id && (
-                  <tr key={`${m.id}-perms`} className="bg-vine-50 border-b border-vine-100">
+                  <tr className="bg-vine-50 border-b border-vine-100">
                     <td colSpan={isLider || podeAtribuirPermissoes ? 4 : 3} className="px-6 py-4">
                       <div>
                         <p className="text-xs font-semibold text-vine-800 uppercase tracking-wider mb-3 flex items-center gap-1.5">
@@ -1077,7 +1208,7 @@ function MembrosTab({
                     </td>
                   </tr>
                 )}
-              </>
+              </React.Fragment>
             ))}
             {membros.length === 0 && (
               <tr>
@@ -1366,12 +1497,21 @@ function EscalasLouvorTab({ ministerio, isLider }: { ministerio: Ministerio; isL
   const [musicas, setMusicas] = useState<Musica[]>([]);
 
   useEffect(() => {
-    supabase.from("membros_ministerio").select(`id, funcao, ativo, data_entrada, perfis ( id, nome, email, telefone )`)
-      .eq("ministerio", ministerio).eq("ativo", true).then(({ data }) => {
-        if (data) setMembros(data.map((r: Record<string, unknown>) => {
-          const p = r.perfis as Record<string, unknown>;
-          return { id: r.id as string, nome: (p?.nome ?? "") as string, email: (p?.email ?? "") as string, telefone: p?.telefone as string | undefined, funcao: r.funcao as FuncaoMinisterio, ministerio, ativo: r.ativo as boolean, dataEntrada: r.data_entrada as string };
-        }));
+    supabase.from("perfis")
+      .select("id, nome, email, telefone, role, data_ingresso")
+      .contains("ministerios", [ministerio])
+      .eq("ativo", true)
+      .then(({ data }) => {
+        if (data) setMembros(data.map((p: Record<string, unknown>) => ({
+          id: p.id as string,
+          nome: p.nome as string,
+          email: (p.email ?? "") as string,
+          telefone: (p.telefone as string) ?? undefined,
+          funcao: (p.role === "pastor" || p.role === "lider" ? "Líder" : "Membro") as FuncaoMinisterio,
+          ministerio,
+          ativo: true,
+          dataEntrada: (p.data_ingresso as string) ?? "",
+        })));
       });
     supabase.from("escalas").select(`*, escala_itens(*), escala_musicas(*)`).eq("ministerio", ministerio).order("data", { ascending: false }).then(({ data }) => {
       if (data) setEscalas(data.map((e: Record<string, unknown>) => ({
