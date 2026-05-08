@@ -594,6 +594,9 @@ function NewDmModal({
   const [search, setSearch] = useState("");
   const others = usuarios.filter((mu) => mu.id !== currentUserId);
   const filtered = others.filter((mu) => !search || mu.nome.toLowerCase().includes(search.toLowerCase()));
+  const existingIds = new Set(
+    dms.flatMap((dm) => dm.participantes).filter((id) => id !== currentUserId)
+  );
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden" onClick={(e) => e.stopPropagation()}>
@@ -608,15 +611,21 @@ function NewDmModal({
           </div>
         </div>
         <div className="max-h-72 overflow-y-auto">
-          {filtered.map((mu) => (
-            <button key={mu.id} onClick={() => onStart(mu.id, mu.nome)} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition text-left border-b border-gray-50 last:border-0">
-              <div className="w-9 h-9 rounded-full bg-vine-700 text-white flex items-center justify-center text-sm font-bold shrink-0">{iniciais(mu.nome)}</div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-gray-800 truncate">{mu.nome}</p>
-                <p className="text-xs text-gray-400 capitalize truncate">{mu.role}</p>
-              </div>
-            </button>
-          ))}
+          {filtered.map((mu) => {
+            const hasChat = existingIds.has(mu.id);
+            return (
+              <button key={mu.id} onClick={() => onStart(mu.id, mu.nome)} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition text-left border-b border-gray-50 last:border-0">
+                <div className="w-9 h-9 rounded-full bg-vine-700 text-white flex items-center justify-center text-sm font-bold shrink-0">{iniciais(mu.nome)}</div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-gray-800 truncate">{mu.nome}</p>
+                  <p className="text-xs text-gray-400 capitalize truncate">{mu.role}</p>
+                </div>
+                {hasChat && (
+                  <span className="text-[10px] text-vine-600 font-semibold bg-vine-50 px-2 py-0.5 rounded-full shrink-0">Abrir</span>
+                )}
+              </button>
+            );
+          })}
           {filtered.length === 0 && <p className="text-center text-gray-400 text-sm py-8">Nenhum membro encontrado.</p>}
         </div>
       </div>
@@ -722,7 +731,7 @@ export default function ChatPage() {
   const [showNewDmModal, setShowNewDmModal] = useState(false);
   const [showNewGroupModal, setShowNewGroupModal] = useState(false);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const realtimeCanalRef = useRef<any>(null);
+  const realtimeGlobalRef = useRef<any>(null);
 
   useEffect(() => {
     if (!ctxMenu) return;
@@ -828,25 +837,20 @@ export default function ChatPage() {
     setGrupos(prev => prev.map(g => g.id === conversaId ? { ...g, mensagens: msgs } : g));
   }
 
-  // ── realtime subscription ao abrir conversa ───────────────────────
+  // ── realtime global — escuta TODAS as conversas do usuário ─────────
   useEffect(() => {
-    if (!activeChat) {
-      if (realtimeCanalRef.current) { supabase.removeChannel(realtimeCanalRef.current); realtimeCanalRef.current = null; }
-      return;
-    }
-    carregarMensagens(activeChat.id);
-    if (realtimeCanalRef.current) supabase.removeChannel(realtimeCanalRef.current);
+    if (!user?.id) return;
 
-    const cid = activeChat.id;
-    const channel = supabase.channel(`chat_msgs_${cid}`)
+    if (realtimeGlobalRef.current) supabase.removeChannel(realtimeGlobalRef.current);
+
+    const channel = supabase.channel(`chat_global_${user.id}`)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .on("postgres_changes" as any, {
         event: "INSERT", schema: "public", table: "chat_mensagens",
-        filter: `conversa_id=eq.${cid}`,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       }, (payload: any) => {
         const msg = rowToMensagem(payload.new);
-        // dedup por ID — evita duplicar mensagem já adicionada otimisticamente
+        const cid = payload.new.conversa_id as string;
         setDms(prev => prev.map(dm => dm.id === cid ? {
           ...dm,
           mensagens: dm.mensagens.some(m => m.id === msg.id) ? dm.mensagens : [...dm.mensagens, msg],
@@ -856,10 +860,33 @@ export default function ChatPage() {
           mensagens: g.mensagens.some(m => m.id === msg.id) ? g.mensagens : [...g.mensagens, msg],
         } : g));
       })
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .on("postgres_changes" as any, {
+        event: "UPDATE", schema: "public", table: "chat_mensagens",
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      }, (payload: any) => {
+        const msg = rowToMensagem(payload.new);
+        const cid = payload.new.conversa_id as string;
+        setDms(prev => prev.map(dm => dm.id === cid ? {
+          ...dm,
+          mensagens: dm.mensagens.map(m => m.id === msg.id ? msg : m),
+        } : dm));
+        setGrupos(prev => prev.map(g => g.id === cid ? {
+          ...g,
+          mensagens: g.mensagens.map(m => m.id === msg.id ? msg : m),
+        } : g));
+      })
       .subscribe();
 
-    realtimeCanalRef.current = channel;
+    realtimeGlobalRef.current = channel;
     return () => { supabase.removeChannel(channel); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
+
+  // ── carrega histórico ao abrir conversa ────────────────────────────
+  useEffect(() => {
+    if (!activeChat) return;
+    carregarMensagens(activeChat.id);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeChat?.id]);
 
@@ -880,8 +907,10 @@ export default function ChatPage() {
     });
   }
 
-  function archiveDm(id: string) {
-    setArchivedDms((prev) => new Set([...prev, id]));
+  async function deleteDm(id: string) {
+    // deleta conversa — ON DELETE CASCADE remove participantes e mensagens
+    await supabase.from("chat_conversas").delete().eq("id", id);
+    setDms((prev) => prev.filter((dm) => dm.id !== id));
     if (activeChat?.tipo === "direto" && activeChat.id === id) openChat(null);
     setCtxMenu(null);
   }
@@ -1353,11 +1382,11 @@ export default function ChatPage() {
                       {ctxOpen && (
                         <div className="absolute right-0 top-8 z-30 bg-white border border-gray-200 rounded-xl shadow-lg py-1 min-w-[170px]">
                           <button
-                            onClick={() => archiveDm(dm.id)}
-                            className="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm text-gray-600 hover:bg-gray-50 transition"
+                            onClick={() => deleteDm(dm.id)}
+                            className="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition"
                           >
-                            <Archive className="w-3.5 h-3.5" />
-                            Arquivar conversa
+                            <Trash2 className="w-3.5 h-3.5" />
+                            Apagar conversa
                           </button>
                         </div>
                       )}
