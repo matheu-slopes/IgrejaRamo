@@ -13,6 +13,20 @@ import {
 } from "lucide-react";
 import clsx from "clsx";
 
+// ─── Helper: retorna sempre um access_token fresco ────────────────
+// getSession() usa cache local sem validar expiração. Se o token
+// estiver a menos de 60 s do vencimento (ou já vencido), força refresh.
+async function getFreshToken(): Promise<string> {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) return "";
+  const expiresAt = session.expires_at ?? 0; // segundos desde epoch
+  if (Date.now() / 1000 > expiresAt - 60) {
+    const { data } = await supabase.auth.refreshSession();
+    return data.session?.access_token ?? "";
+  }
+  return session.access_token;
+}
+
 // ─── AudioPlayer ─────────────────────────────────────────────────
 // O MediaRecorder não escreve duração nos metadados do WebM.
 // O hack: seek para 1e101 força o browser a varrer o arquivo e calcular a duração real.
@@ -1718,10 +1732,10 @@ export default function ChatPage() {
     // O broadcast SÓ acontece depois, carregando o timestamp do servidor.
     // Isso garante que todos os clientes ordenam mensagens pelo relógio do servidor.
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const token = await getFreshToken();
       const r = await fetch("/api/chat/mensagem", {
         method: "POST", keepalive: true,
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${session?.access_token ?? ""}` },
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
         body: JSON.stringify({
           id: msgId, conversa_id: dmId, autor_id: u.id, autor_nome: u.nome, conteudo: text,
           resposta_a_id: replySnapshot?.id ?? null,
@@ -1773,10 +1787,10 @@ export default function ChatPage() {
 
     // 2) DB primeiro → timestamp do servidor
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const token = await getFreshToken();
       const r = await fetch("/api/chat/mensagem", {
         method: "POST", keepalive: true,
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${session?.access_token ?? ""}` },
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
         body: JSON.stringify({
           id: msgId, conversa_id: grupoId, autor_id: u.id, autor_nome: u.nome, conteudo: text,
           resposta_a_id: replySnapshot?.id ?? null,
@@ -1824,13 +1838,13 @@ export default function ChatPage() {
     // Não faz broadcast ainda — blob: URL só funciona localmente
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const token = await getFreshToken();
       const fd = new FormData();
       fd.append("file", file);
       fd.append("conversa_id", conversaId);
       const upRes = await fetch("/api/chat/upload-imagem", {
         method: "POST",
-        headers: { Authorization: `Bearer ${session?.access_token ?? ""}` },
+        headers: { Authorization: `Bearer ${token}` },
         body: fd,
       });
       if (!upRes.ok) { const j = await upRes.json().catch(() => ({})); throw new Error(j.error ?? "Upload falhou"); }
@@ -1849,7 +1863,7 @@ export default function ChatPage() {
       // Persiste no banco
       fetch("/api/chat/mensagem", {
         method: "POST", keepalive: true,
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token ?? ""}` },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ id: msgId, conversa_id: conversaId, autor_id: u.id, autor_nome: u.nome, conteudo: "", tipo: "imagem", media_url: finalUrl }),
       });
     } catch (err: unknown) {
@@ -1875,7 +1889,7 @@ export default function ChatPage() {
     // Não faz broadcast ainda — blob: URL só funciona localmente
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const token = await getFreshToken();
       const file = fileOrBlob instanceof File ? fileOrBlob : new File([fileOrBlob], nomeArquivo, { type: fileOrBlob.type });
       const fd = new FormData();
       fd.append("file", file);
@@ -1883,7 +1897,7 @@ export default function ChatPage() {
       fd.append("file_type", tipoMsg);
       const upRes = await fetch("/api/chat/upload-arquivo", {
         method: "POST",
-        headers: { Authorization: `Bearer ${session?.access_token ?? ""}` },
+        headers: { Authorization: `Bearer ${token}` },
         body: fd,
       });
       if (!upRes.ok) { const j = await upRes.json().catch(() => ({})); throw new Error(j.error ?? "Upload falhou"); }
@@ -1901,7 +1915,7 @@ export default function ChatPage() {
       // Persiste no banco — tratamento de erro igual ao sendDm
       fetch("/api/chat/mensagem", {
         method: "POST", keepalive: true,
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token ?? ""}` },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ id: msgId, conversa_id: conversaId, autor_id: u.id, autor_nome: u.nome, conteudo: tipoMsg === "documento" ? nomeArquivo : "", tipo: tipoMsg, media_url: finalUrl }),
       }).then(async (r) => {
         if (!r.ok) {
