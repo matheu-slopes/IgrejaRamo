@@ -980,7 +980,7 @@ function GrupoAvatar({ grupo, size = "md" }: { grupo: Grupo; size?: "sm" | "md" 
 
 export default function ChatPage() {
   const { user, usuarios } = useAuth();
-  const { setTotalUnread, setActiveChatId, consumeInbox } = useChatUnread();
+  const { setTotalUnread, setActiveChatId } = useChatUnread();
   const [tab, setTab] = useState<ChatTab>("direto");
   const [activeChat, setActiveChat] = useState<ActiveChat>(null);
   const [search, setSearch] = useState("");
@@ -1150,22 +1150,39 @@ export default function ChatPage() {
     // Persiste no cache para a próxima vez
     salvarCache(user.id, newDms, newGrupos);
 
-    // Injeta mensagens que chegaram via broadcast enquanto o chat estava desmontado.
-    // Resolve a race condition: broadcast chega antes do keepalive salvar no banco,
-    // e também garante mensagens perdidas quando o usuário estava em outra página.
-    const inbox = consumeInbox();
-    if (inbox.size > 0) {
-      setDms(prev => prev.map(dm => {
-        const inboxMsg = inbox.get(dm.id);
-        if (!inboxMsg || dm.mensagens.some(m => m.id === inboxMsg.id)) return dm;
-        return { ...dm, mensagens: [...dm.mensagens, { ...inboxMsg, tipo: (inboxMsg.tipo as MensagemConversa["tipo"]) }] };
-      }));
-      setGrupos(prev => prev.map(g => {
-        const inboxMsg = inbox.get(g.id);
-        if (!inboxMsg || g.mensagens.some(m => m.id === inboxMsg.id)) return g;
-        return { ...g, mensagens: [...g.mensagens, { ...inboxMsg, tipo: (inboxMsg.tipo as MensagemConversa["tipo"]) }] };
-      }));
-    }
+    // ── Injeta mensagens do inbox (localStorage) ─────────────────
+    // Mensagens que chegaram via broadcast enquanto o usuário estava em outra página.
+    // São mescladas APÓS setDms para aparecerem como última mensagem na lista.
+    try {
+      const inboxKey = `chat_inbox_${user.id}`;
+      const inboxRaw = localStorage.getItem(inboxKey);
+      if (inboxRaw) {
+        localStorage.removeItem(inboxKey);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const inbox = JSON.parse(inboxRaw) as Record<string, any>;
+        const hasMsgs = Object.keys(inbox).length > 0;
+        if (hasMsgs) {
+          setDms(prev => prev.map(dm => {
+            const im = inbox[dm.id];
+            if (!im || dm.mensagens.some(m => m.id === im.id)) return dm;
+            return { ...dm, mensagens: [...dm.mensagens, {
+              id: im.id, autorId: im.autorId, autorNome: im.autorNome,
+              conteudo: im.conteudo ?? "", tipo: im.tipo ?? "texto",
+              mediaUrl: im.mediaUrl, criadoEm: im.criadoEm, lida: false,
+            }] };
+          }));
+          setGrupos(prev => prev.map(g => {
+            const im = inbox[g.id];
+            if (!im || g.mensagens.some(m => m.id === im.id)) return g;
+            return { ...g, mensagens: [...g.mensagens, {
+              id: im.id, autorId: im.autorId, autorNome: im.autorNome,
+              conteudo: im.conteudo ?? "", tipo: im.tipo ?? "texto",
+              mediaUrl: im.mediaUrl, criadoEm: im.criadoEm, lida: false,
+            }] };
+          }));
+        }
+      }
+    } catch { /* localStorage indisponível */ }
   }
 
   async function carregarMensagens(conversaId: string) {

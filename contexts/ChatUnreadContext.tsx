@@ -5,25 +5,16 @@ import { usePathname } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
 
-// Mensagem mínima guardada no inbox (não importa o type completo para evitar dep circular)
-type InboxMsg = {
-  id: string; autorId: string; autorNome: string; conteudo: string;
-  tipo: string; mediaUrl?: string; criadoEm: string; lida: boolean;
-};
-
 type ChatUnreadCtx = {
   totalUnread: number;
   setTotalUnread: (n: number) => void;
   setActiveChatId: (id: string | null) => void;
-  /** Drena e retorna todas as mensagens recebidas enquanto o chat estava desmontado */
-  consumeInbox: () => Map<string, InboxMsg>;
 };
 
 const ChatUnreadContext = createContext<ChatUnreadCtx>({
   totalUnread: 0,
   setTotalUnread: () => {},
   setActiveChatId: () => {},
-  consumeInbox: () => new Map(),
 });
 
 // ── helpers localStorage ────────────────────────────────────────────
@@ -44,6 +35,16 @@ function conversaIdsFromCache(uid: string): string[] {
     ];
   } catch { return []; }
 }
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function saveToLocalInbox(uid: string, cid: string, msg: any) {
+  try {
+    const key = `chat_inbox_${uid}`;
+    const raw = localStorage.getItem(key);
+    const inbox: Record<string, unknown> = raw ? JSON.parse(raw) : {};
+    inbox[cid] = msg;
+    localStorage.setItem(key, JSON.stringify(inbox));
+  } catch {}
+}
 
 export function ChatUnreadProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
@@ -53,19 +54,10 @@ export function ChatUnreadProvider({ children }: { children: ReactNode }) {
   const channelsRef = useRef<Map<string, any>>(new Map());
   const pathnameRef = useRef(pathname);
   const userIdRef = useRef<string | undefined>(undefined);
-  // ID da conversa aberta no chat page (null quando fora do chat)
   const activeChatIdRef = useRef<string | null>(null);
-  // Inbox: mensagens recebidas via broadcast enquanto o chat page estava desmontado
-  const inboxRef = useRef<Map<string, InboxMsg>>(new Map());
 
   function setActiveChatId(id: string | null) {
     activeChatIdRef.current = id;
-  }
-
-  function consumeInbox(): Map<string, InboxMsg> {
-    const snapshot = new Map(inboxRef.current);
-    inboxRef.current.clear();
-    return snapshot;
   }
 
   // Mantém pathnameRef sempre atualizado dentro dos closures
@@ -84,36 +76,35 @@ export function ChatUnreadProvider({ children }: { children: ReactNode }) {
     setTotalUnreadState(persistedCount(user.id));
   }, [user?.id]);
 
-  // Zera ao entrar na página de chat (o chat page cuida dos counts internos)
-  useEffect(() => {
-    if (pathname === "/dashboard/chat" && user?.id) {
-      setTotalUnreadState(0);
-      saveCount(user.id, 0);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathname]);
-
-  // Inscreve nos canais Broadcast de todas as conversas conhecidas.
-  // Roda em cada navegação para pegar novas conversas adicionadas ao cache.
+  // ── Gerencia canais de broadcast ─────────────────────────────────
+  // ESTRATÉGIA:
+  // - Quando no chat page → remove todos os canais do contexto.
+  //   O chat page cuida dos próprios canais e chama setTotalUnread diretamente.
+  // - Quando fora do chat page → recria canais frescos.
+  //   Isso garante que um LEAVE enviado pelo chat page ao desmontar não
+  //   deixe os canais do contexto "mortos" no servidor.
   useEffect(() => {
     if (!user?.id) return;
     const uid = user.id;
     const map = channelsRef.current;
-    const ids = conversaIdsFromCache(uid);
 
+    // Sempre limpa antes (garante canais frescos, evita canais zumbis)
+    map.forEach(ch => supabase.removeChannel(ch));
+    map.clear();
+
+    // No chat page: sem canais no contexto (chat page gerencia tudo)
+    if (pathname === "/dashboard/chat") return;
+
+    const ids = conversaIdsFromCache(uid);
     for (const cid of ids) {
-      if (map.has(cid)) continue; // já inscrito, não duplicar
       const ch = supabase
-        .channel(`room:${cid}`) // mesmo nome usado pelo chat page
+        .channel(`room:${cid}`)
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .on("broadcast", { event: "msg" }, ({ payload }: { payload: any }) => {
-          // Ignora mensagens próprias
-          if (payload?.autorId === uid) return;
-          // Ignora apenas se: está na página de chat E esta conversa específica está ativa
-          if (pathnameRef.current === "/dashboard/chat" && activeChatIdRef.current === cid) return;
+          if (payload?.autorId === uid) return; // mensagem própria
 
-          // Guarda no inbox para o chat page recuperar quando montar
-          inboxRef.current.set(cid, {
+          // Salva no inbox do localStorage (persiste mesmo com gaps de reconexão)
+          saveToLocalInbox(uid, cid, {
             id:        payload.id,
             autorId:   payload.autorId,
             autorNome: payload.autorNome,
@@ -124,31 +115,26 @@ export function ChatUnreadProvider({ children }: { children: ReactNode }) {
             lida:      false,
           });
 
-          // Incrementa badge apenas quando fora do chat (ou em conversa diferente)
-          if (pathnameRef.current !== "/dashboard/chat") {
-            setTotalUnreadState(prev => {
-              const next = prev + 1;
-              saveCount(uid, next);
-              return next;
-            });
-          }
+          // Incrementa badge
+          setTotalUnreadState(prev => {
+            const next = prev + 1;
+            saveCount(uid, next);
+            return next;
+          });
         })
         .subscribe();
       map.set(cid, ch);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathname, user?.id]); // re-roda a cada navegação para capturar novas conversas
 
-  // Limpeza só no unmount
-  useEffect(() => {
     return () => {
-      channelsRef.current.forEach(ch => supabase.removeChannel(ch));
-      channelsRef.current.clear();
+      map.forEach(ch => supabase.removeChannel(ch));
+      map.clear();
     };
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname, user?.id]);
 
   return (
-    <ChatUnreadContext.Provider value={{ totalUnread, setTotalUnread, setActiveChatId, consumeInbox }}>
+    <ChatUnreadContext.Provider value={{ totalUnread, setTotalUnread, setActiveChatId }}>
       {children}
     </ChatUnreadContext.Provider>
   );
