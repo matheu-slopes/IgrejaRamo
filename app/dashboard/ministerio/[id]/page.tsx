@@ -312,7 +312,7 @@ function ChatTab({
   const [tempoGravacao, setTempoGravacao] = useState(0);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<BlobPart[]>([]);
-  const audioBlobRef = useRef<Blob | null>(null);
+  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Image
@@ -366,7 +366,10 @@ function ChatTab({
       mediaUrl: localUrl ?? undefined, reacoes: [],
       respostaA: respostaCapturada ?? undefined,
     }]);
-    setTexto(""); setImagemPreview(null); setAudioUrl(null); setRespostaA(null); setImagemFile(null);
+    setTexto(""); setImagemPreview(null); setAudioUrl(null); setRespostaA(null); setImagemFile(null); setAudioBlob(null);
+
+    // Captura o blob antes do estado ser limpo
+    const blobParaUpload = audioBlob;
 
     // 2. Upload de mídia via API (service role — evita problema de permissão do bucket)
     let uploadedUrl: string | null = null;
@@ -388,8 +391,8 @@ function ChatTab({
         if (!res.ok) throw new Error(json.error ?? "Upload falhou");
         uploadedUrl = json.url;
         setMsgs((prev) => prev.map((m) => m.id === tempId ? { ...m, mediaUrl: uploadedUrl ?? undefined } : m));
-      } else if (tipo === "audio" && audioBlobRef.current) {
-        const audioFile = new File([audioBlobRef.current], "audio.webm", { type: "audio/webm" });
+      } else if (tipo === "audio" && blobParaUpload) {
+        const audioFile = new File([blobParaUpload], "audio.webm", { type: "audio/webm" });
         const fd = new FormData();
         fd.append("file", audioFile);
         fd.append("conversa_id", `ministerio_${ministerio}`);
@@ -456,7 +459,7 @@ function ChatTab({
       mr.ondataavailable = (e) => chunksRef.current.push(e.data);
       mr.onstop = () => {
         const blob = new Blob(chunksRef.current, { type: "audio/webm" });
-        audioBlobRef.current = blob;
+        setAudioBlob(blob);
         setAudioUrl(URL.createObjectURL(blob)); // preview local
         stream.getTracks().forEach((t) => t.stop());
       };
