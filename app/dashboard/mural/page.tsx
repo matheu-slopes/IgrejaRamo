@@ -279,7 +279,7 @@ export default function ConversasPage() {
                   )}
                   {msg.tipo === "audio" && msg.mediaUrl && (
                     <div className="px-3 py-2">
-                      <audio controls src={msg.mediaUrl} className="h-9 w-56" />
+                      <audio controls preload="metadata" src={msg.mediaUrl} className="h-9 w-56" />
                     </div>
                   )}
                 </div>
@@ -323,7 +323,7 @@ export default function ConversasPage() {
 
       {audioUrl && (
         <div className="mt-2 bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 flex items-center gap-3">
-          <audio controls src={audioUrl} className="h-9 flex-1" />
+          <audio controls preload="metadata" src={audioUrl} className="h-9 flex-1" />
           <button onClick={cancelarAudio} className="text-gray-400 hover:text-red-400 transition"><X className="w-4 h-4" /></button>
           <button
             onClick={enviarAudio}

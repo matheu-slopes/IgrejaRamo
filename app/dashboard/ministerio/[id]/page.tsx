@@ -573,7 +573,7 @@ function ChatTab({
                     )}
                     {m.tipo === "audio" && m.mediaUrl && (
                       <div className="px-3 py-2">
-                        <audio controls src={m.mediaUrl} className="h-9 w-52" />
+                        <audio controls preload="metadata" src={m.mediaUrl} className="h-9 w-52" />
                       </div>
                     )}
 
@@ -623,7 +623,7 @@ function ChatTab({
         {/* Preview de áudio */}
         {audioUrl && (
           <div className="mt-2 bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 flex items-center gap-3">
-            <audio controls src={audioUrl} className="h-9 flex-1" />
+            <audio controls preload="metadata" src={audioUrl} className="h-9 flex-1" />
             <button onClick={() => { URL.revokeObjectURL(audioUrl); setAudioUrl(null); }} className="text-gray-400 hover:text-red-400"><X className="w-4 h-4" /></button>
             <button
               onClick={() => enviar("audio", audioUrl!)}
@@ -776,7 +776,7 @@ function ChatTab({
                           <img src={m.mediaUrl} alt="" className="w-full rounded-lg object-cover max-h-32" />
                         )}
                         {m.tipo === "audio" && m.mediaUrl && (
-                          <audio controls src={m.mediaUrl} className="w-full h-8" />
+                          <audio controls preload="metadata" src={m.mediaUrl} className="w-full h-8" />
                         )}
                         <p className="text-[10px] text-amber-400 mt-1.5">
                           {new Date(m.criadoEm).toLocaleString("pt-BR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}

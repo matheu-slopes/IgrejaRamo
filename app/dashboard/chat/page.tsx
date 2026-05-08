@@ -335,7 +335,7 @@ function ComposeBar({
         <div className="flex items-center gap-2 mb-2 bg-vine-50 border border-vine-200 rounded-xl px-3 py-2">
           <Mic className="w-4 h-4 text-vine-600 shrink-0" />
           {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-          <audio src={audioPreview.url} controls className="h-8 flex-1 min-w-0" />
+          <audio src={audioPreview.url} controls preload="metadata" className="h-8 flex-1 min-w-0" />
           <button
             onClick={() => { URL.revokeObjectURL(audioPreview.url); setAudioPreview(null); }}
             className="text-gray-400 hover:text-red-500 transition shrink-0"
@@ -547,6 +547,7 @@ function MessageBubble({
                 <audio
                   src={msg.mediaUrl}
                   controls
+                  preload="metadata"
                   className="h-9 max-w-[240px]"
                   style={{ colorScheme: isMe ? "dark" : "light" }}
                 />
