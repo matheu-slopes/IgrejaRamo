@@ -10,11 +10,12 @@ import {
   Phone,
   Calendar,
   LogOut,
-  MapPin,
-  Info,
   KeyRound,
   Eye,
   EyeOff,
+  Pencil,
+  Check,
+  X,
 } from "lucide-react";
 import clsx from "clsx";
 
@@ -22,11 +23,17 @@ export default function MembroPortalPage() {
   const { user, logout, isLoading } = useAuth();
   const router = useRouter();
 
+  const { atualizarUsuario } = useAuth();
+
   const [novaSenha, setNovaSenha]         = useState("");
   const [showSenha, setShowSenha]         = useState(false);
   const [salvandoSenha, setSalvandoSenha] = useState(false);
   const [erroSenha, setErroSenha]         = useState("");
   const [okSenha, setOkSenha]             = useState(false);
+
+  const [editandoNome, setEditandoNome]   = useState(false);
+  const [novoNome, setNovoNome]           = useState("");
+  const [salvandoNome, setSalvandoNome]   = useState(false);
 
   useEffect(() => {
     if (!isLoading && !user) router.push("/login");
@@ -54,6 +61,14 @@ export default function MembroPortalPage() {
     setSalvandoSenha(false);
     if (res.ok) { setOkSenha(true); setNovaSenha(""); setTimeout(() => setOkSenha(false), 3000); }
     else setErroSenha(json.error ?? "Erro ao alterar senha.");
+  }
+
+  async function salvarNome() {
+    if (!user || !novoNome.trim()) return;
+    setSalvandoNome(true);
+    await atualizarUsuario(user.id, { nome: novoNome.trim() });
+    setSalvandoNome(false);
+    setEditandoNome(false);
   }
 
   function handleLogout() {
@@ -87,9 +102,28 @@ export default function MembroPortalPage() {
           <div className="w-20 h-20 bg-vine-700 rounded-full flex items-center justify-center text-white text-3xl font-bold shadow-lg">
             {iniciais}
           </div>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">{user.nome}</h1>
-            <p className="text-sm text-gray-400 mt-0.5">Bem-vindo(a) ao portal de membros</p>
+          <div className="flex flex-col items-center gap-1">
+            {editandoNome ? (
+              <div className="flex items-center gap-2">
+                <input
+                  autoFocus
+                  value={novoNome}
+                  onChange={(e) => setNovoNome(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") salvarNome(); if (e.key === "Escape") setEditandoNome(false); }}
+                  className="border border-vine-400 rounded-xl px-3 py-1.5 text-base font-bold text-gray-900 outline-none focus:ring-1 focus:ring-vine-300"
+                />
+                <button onClick={salvarNome} disabled={salvandoNome} className="w-7 h-7 bg-vine-700 rounded-full flex items-center justify-center text-white hover:bg-vine-800 transition"><Check className="w-3.5 h-3.5" /></button>
+                <button onClick={() => setEditandoNome(false)} className="w-7 h-7 bg-gray-100 rounded-full flex items-center justify-center text-gray-500 hover:bg-gray-200 transition"><X className="w-3.5 h-3.5" /></button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <h1 className="text-2xl font-bold text-gray-900">{user.nome}</h1>
+                <button onClick={() => { setNovoNome(user.nome); setEditandoNome(true); }} className="text-gray-400 hover:text-vine-600 transition" title="Editar nome">
+                  <Pencil className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+            <p className="text-sm text-gray-400">Bem-vindo(a) ao portal de membros</p>
           </div>
         </div>
 
@@ -99,7 +133,6 @@ export default function MembroPortalPage() {
             <p className="text-xs font-bold uppercase tracking-widest text-gray-400">Seus dados</p>
           </div>
           <div className="divide-y divide-gray-50">
-            <InfoRow icon={<User className="w-4 h-4 text-vine-600" />} label="Nome" value={user.nome} />
             <InfoRow icon={<Mail className="w-4 h-4 text-vine-600" />} label="E-mail" value={user.email} />
             {user.telefone && (
               <InfoRow icon={<Phone className="w-4 h-4 text-vine-600" />} label="Telefone" value={user.telefone} />
@@ -111,19 +144,6 @@ export default function MembroPortalPage() {
                 day: "2-digit", month: "long", year: "numeric",
               })}
             />
-          </div>
-        </div>
-
-        {/* Info sobre a situação */}
-        <div className="bg-amber-50 border border-amber-100 rounded-2xl px-5 py-4 flex items-start gap-3">
-          <Info className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
-          <div className="text-sm text-amber-800 space-y-1">
-            <p className="font-semibold">Acesso limitado</p>
-            <p className="text-xs leading-relaxed">
-              Seu cadastro está registrado como <strong>membro</strong>. Para acessar escalas,
-              canais de ministério e outras funções internas, entre em contato com a liderança
-              para ser vinculado a um ministério.
-            </p>
           </div>
         </div>
 
@@ -163,19 +183,6 @@ export default function MembroPortalPage() {
             >
               {salvandoSenha ? "Salvando..." : okSenha ? "Senha alterada!" : "Salvar nova senha"}
             </button>
-          </div>
-        </div>
-
-        {/* Informações da Igreja */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-          <div className="px-5 py-3 border-b border-gray-100 bg-gray-50">
-            <p className="text-xs font-bold uppercase tracking-widest text-gray-400">Igreja Ramo da Vida</p>
-          </div>
-          <div className="divide-y divide-gray-50">
-            <InfoRow icon={<MapPin className="w-4 h-4 text-vine-600" />} label="Endereço" value="Rua das Palmeiras, 123 — Centro" />
-            <InfoRow icon={<Calendar className="w-4 h-4 text-vine-600" />} label="Culto de Quinta" value="Quintas-feiras às 20h" />
-            <InfoRow icon={<Calendar className="w-4 h-4 text-vine-600" />} label="Culto de Domingo" value="Domingos às 18h30" />
-            <InfoRow icon={<Church className="w-4 h-4 text-vine-600" />} label="Pastor" value="Pastor João Silva" />
           </div>
         </div>
 
