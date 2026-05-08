@@ -139,12 +139,15 @@ export default function Sidebar() {
           );
         })}
 
-        {/* Meus Ministérios section — filtrado pelo perfil do usuário */}
+        {/* Meus Ministérios — filtrado pelo perfil do usuário */}
         {(() => {
-          const isAdminOrPastor = user?.role === "admin" || user?.role === "pastor";
-          const meusItens = isAdminOrPastor
-            ? ministerios
-            : ministerios.filter((m) => user?.ministerios?.includes(m.label));
+          const meusItens = ministerios.filter((m) =>
+            user?.role === "admin" || user?.role === "pastor"
+              ? true
+              : user?.ministerios?.some(
+                  (um) => um.toLowerCase() === m.label.toLowerCase()
+                )
+          );
           if (meusItens.length === 0) return null;
           return (
             <>

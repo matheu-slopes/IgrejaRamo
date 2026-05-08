@@ -41,6 +41,7 @@ export interface User {
   ministerios: Ministerio[];
   dataIngresso: string; // ISO date
   ativo: boolean;
+  primeiroAcesso?: boolean;
   /**
    * Permissões individuais. Se preenchido, SUBSTITUI os defaults do role.
    * Se undefined, herda os defaults definidos em lib/permissions.ts.

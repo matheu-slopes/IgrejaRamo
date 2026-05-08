@@ -24,7 +24,7 @@ export default function LoginPage() {
     try {
       const result = await login(email, password);
       if (result) {
-        router.push(result.role === "membro" ? "/membro" : "/dashboard");
+        router.push("/dashboard");
       } else {
         setError("E-mail ou senha incorretos. Verifique e tente novamente.");
       }

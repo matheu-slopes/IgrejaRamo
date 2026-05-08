@@ -14,18 +14,19 @@ import { temPermissao as checkPermissao } from "@/lib/permissions";
 // Converte linha da tabela `perfis` para o tipo User do app
 function rowToUser(row: Record<string, unknown>): User {
   return {
-    id:           row.id as string,
-    nome:         row.nome as string,
-    email:        row.email as string,
-    telefone:     (row.telefone as string) ?? undefined,
-    foto:         (row.foto as string) ?? undefined,
-    role:         row.role as User["role"],
-    ministerios:  (row.ministerios as User["ministerios"]) ?? [],
-    dataIngresso: row.data_ingresso as string,
-    ativo:        row.ativo as boolean,
-    permissoes:   (row.permissoes as Permissao[])?.length
-                    ? (row.permissoes as Permissao[])
-                    : undefined,
+    id:             row.id as string,
+    nome:           row.nome as string,
+    email:          row.email as string,
+    telefone:       (row.telefone as string) ?? undefined,
+    foto:           (row.foto as string) ?? undefined,
+    role:           row.role as User["role"],
+    ministerios:    (row.ministerios as User["ministerios"]) ?? [],
+    dataIngresso:   row.data_ingresso as string,
+    ativo:          row.ativo as boolean,
+    primeiroAcesso: (row.primeiro_acesso as boolean) ?? false,
+    permissoes:     (row.permissoes as Permissao[])?.length
+                      ? (row.permissoes as Permissao[])
+                      : undefined,
   };
 }
 
@@ -53,14 +54,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [usuarios, setUsuarios] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  async function carregarPerfil(uid: string) {
+  async function carregarPerfil(uid: string): Promise<User | null> {
     const { data, error } = await supabase.from("perfis").select("*").eq("id", uid).single();
     if (data) {
-      setUser(rowToUser(data));
-      return;
+      const u = rowToUser(data);
+      setUser(u);
+      return u;
     }
     // Se a tabela não existir ainda (schema não rodou), não quebra
-    if (error?.code === "42P01") return;
+    if (error?.code === "42P01") return null;
     // Se o perfil não existe, cria com dados mínimos do auth
     if (error?.code === "PGRST116") {
       const { data: authUser } = await supabase.auth.getUser();
@@ -71,16 +73,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           email: authUser.user.email,
           role:  "membro",
         }).select().single();
-        if (novo) setUser(rowToUser(novo));
+        if (novo) {
+          const u = rowToUser(novo);
+          setUser(u);
+          return u;
+        }
       }
-      return;
+      return null;
     }
     // RLS bloqueou ou outro erro — tenta buscar via getUser como fallback
     if (error) {
       try {
         const { data: authUser } = await supabase.auth.getUser();
         if (authUser?.user) {
-          setUser({
+          const u: User = {
             id: authUser.user.id,
             nome: authUser.user.user_metadata?.nome ?? authUser.user.email ?? "Usuário",
             email: authUser.user.email ?? "",
@@ -88,12 +94,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             ministerios: [],
             dataIngresso: new Date().toISOString().slice(0, 10),
             ativo: true,
-          });
+          };
+          setUser(u);
+          return u;
         }
       } catch {
         // não foi possível carregar perfil, usuário permanece null
       }
     }
+    return null;
   }
 
   async function carregarTodosUsuarios() {
@@ -140,14 +149,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error || !data.user) return false;
+      let role = "membro";
       try {
-        await carregarPerfil(data.user.id);
+        const u = await Promise.race([
+          carregarPerfil(data.user.id),
+          new Promise<null>((resolve) => setTimeout(() => resolve(null), 6000)),
+        ]);
+        if (u) role = u.role;
         carregarTodosUsuarios();
       } catch {
         // login ok, mas perfil não carregou — onAuthStateChange vai tentar de novo
       }
-      const { data: perfil } = await supabase.from("perfis").select("role").eq("id", data.user.id).single();
-      return { role: perfil?.role ?? "membro" };
+      return { role };
     } catch {
       return false;
     }
@@ -171,6 +184,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (dados.ministerios !== undefined) payload.ministerios   = dados.ministerios;
     if (dados.dataIngresso !== undefined) payload.data_ingresso = dados.dataIngresso;
     if (dados.ativo       !== undefined) payload.ativo         = dados.ativo;
+    if (dados.primeiroAcesso !== undefined) payload.primeiro_acesso = dados.primeiroAcesso;
     if (dados.permissoes  !== undefined) payload.permissoes    = dados.permissoes ?? [];
 
     await supabase.from("perfis").update(payload).eq("id", id);
