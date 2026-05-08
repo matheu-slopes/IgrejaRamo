@@ -1384,16 +1384,16 @@ function EventosTab({ ministerio, isLider, podeEditar }: { ministerio: Ministeri
               onChange={(e) => setForm({ ...form, horario: e.target.value })}
               className="border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-gold-400 bg-white"
             />
-            <select
-              value={form.local}
-              onChange={(e) => setForm({ ...form, local: e.target.value })}
-              className="border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-gold-400 bg-white"
-            >
-              <option value="">Local *</option>
-              {locais.map((l) => (
-                <option key={l.id} value={l.nome}>{l.nome}</option>
-              ))}
-            </select>
+            <div className="flex items-center gap-2 border border-gray-200 rounded-xl px-3 py-2 bg-white focus-within:border-gold-400">
+              <span className="text-sm text-gray-400 shrink-0">Local:</span>
+              <input
+                type="text"
+                value={form.local}
+                onChange={(e) => setForm({ ...form, local: e.target.value })}
+                placeholder="Onde será o evento?"
+                className="flex-1 text-sm outline-none bg-transparent"
+              />
+            </div>
             <textarea
               value={form.descricao}
               onChange={(e) => setForm({ ...form, descricao: e.target.value })}
