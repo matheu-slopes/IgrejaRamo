@@ -1125,6 +1125,15 @@ export default function ChatPage() {
   const [archivedDms, setArchivedDms] = useState<Set<string>>(new Set());
   const [replyTo, setReplyTo] = useState<MensagemConversa | null>(null);
   const [myReacoes, setMyReacoes] = useState<Set<string>>(new Set());
+
+  // Carrega reações persistidas do localStorage ao montar
+  useEffect(() => {
+    if (!user?.id) return;
+    try {
+      const raw = localStorage.getItem(`chat_reacoes_${user.id}`);
+      if (raw) setMyReacoes(new Set(JSON.parse(raw)));
+    } catch { /* ignore */ }
+  }, [user?.id]);
   const [ctxMenu, setCtxMenu] = useState<{ id: string; type: "dm" | "grupo" } | null>(null);
   const [showNewDmModal, setShowNewDmModal] = useState(false);
   const [showNewGroupModal, setShowNewGroupModal] = useState(false);
@@ -1190,6 +1199,7 @@ export default function ChatPage() {
       mediaUrl: row.media_url ?? undefined,
       criadoEm: row.criado_em,
       editadoEm: row.editado_em ?? undefined,
+      reacoes: Array.isArray(row.reacoes) ? row.reacoes : (row.reacoes ? JSON.parse(row.reacoes) : undefined),
       respostaA: row.resposta_a_id ? {
         id: row.resposta_a_id,
         autorNome: row.resposta_a_autor_nome ?? "",
@@ -1861,29 +1871,48 @@ export default function ChatPage() {
   }
 
   function toggleReaction(msgId: string, emoji: string) {
+    if (!activeChat || !user?.id) return;
     const key = `${msgId}_${emoji}`;
     const already = myReacoes.has(key);
+
+    // 1) Atualiza estado local e persiste no localStorage
     setMyReacoes((prev) => {
       const next = new Set(prev);
       already ? next.delete(key) : next.add(key);
+      try { localStorage.setItem(`chat_reacoes_${user.id}`, JSON.stringify([...next])); } catch { /* ignore */ }
       return next;
     });
+
+    // 2) Calcula novo array de reações para o banco e para outros usuários
+    const getMsg = () => {
+      const msgs = activeChat.tipo === "direto"
+        ? dms.find(d => d.id === activeChat.id)?.mensagens
+        : grupos.find(g => g.id === activeChat.id)?.mensagens;
+      return msgs?.find(m => m.id === msgId);
+    };
+    const current = getMsg();
+    const reacoes = current?.reacoes ?? [];
+    const newReacoes = already
+      ? reacoes.map(r => r.emoji === emoji ? { ...r, count: r.count - 1 } : r).filter(r => r.count > 0)
+      : (() => { const ex = reacoes.find(r => r.emoji === emoji); return ex ? reacoes.map(r => r.emoji === emoji ? { ...r, count: r.count + 1 } : r) : [...reacoes, { emoji, count: 1 }]; })();
+
+    // 3) Atualiza estado local imediatamente (optimistic)
     const updater = (msgs: MensagemConversa[]): MensagemConversa[] =>
-      msgs.map((m) => {
-        if (m.id !== msgId) return m;
-        const reacoes = m.reacoes ?? [];
-        if (already) {
-          return { ...m, reacoes: reacoes.map((r) => r.emoji === emoji ? { ...r, count: r.count - 1 } : r).filter((r) => r.count > 0) };
-        } else {
-          const ex = reacoes.find((r) => r.emoji === emoji);
-          return { ...m, reacoes: ex ? reacoes.map((r) => r.emoji === emoji ? { ...r, count: r.count + 1 } : r) : [...reacoes, { emoji, count: 1 }] };
-        }
-      });
-    if (activeChat?.tipo === "direto") {
-      setDms((prev) => prev.map((dm) => dm.id === activeChat!.id ? { ...dm, mensagens: updater(dm.mensagens) } : dm));
-    } else if (activeChat?.tipo === "grupo") {
-      setGrupos((prev) => prev.map((g) => g.id === activeChat!.id ? { ...g, mensagens: updater(g.mensagens) } : g));
+      msgs.map(m => m.id === msgId ? { ...m, reacoes: newReacoes } : m);
+    if (activeChat.tipo === "direto") {
+      setDms(prev => prev.map(dm => dm.id === activeChat.id ? { ...dm, mensagens: updater(dm.mensagens) } : dm));
+    } else {
+      setGrupos(prev => prev.map(g => g.id === activeChat.id ? { ...g, mensagens: updater(g.mensagens) } : g));
     }
+
+    // 4) Persiste no banco — dispara UPDATE que o postgres_changes já escuta
+    // O outro usuário receberá a atualização automaticamente via postgres_changes UPDATE
+    supabase.from("chat_mensagens")
+      .update({ reacoes: newReacoes })
+      .eq("id", msgId)
+      .then(({ error }) => {
+        if (error) console.error("toggleReaction DB error:", error.message);
+      });
   }
 
   const myDms = dms.filter((dm) => dm.participantes.includes(u.id) && !archivedDms.has(dm.id));
