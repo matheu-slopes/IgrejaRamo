@@ -9,9 +9,121 @@ import {
   MessageSquare, Users, Send, ArrowLeft, Search, Lock, Plus,
   Info, Smile, Paperclip, Mic, Star, X, FileText, Square, MicOff,
   Image as ImageIcon, MoreVertical, Trash2, LogOut, Check, Archive, Pencil, Reply,
-  Download,
+  Download, Play,
 } from "lucide-react";
 import clsx from "clsx";
+
+// ─── AudioPlayer ─────────────────────────────────────────────────
+// O MediaRecorder não escreve duração nos metadados do WebM.
+// O hack: seek para 1e101 força o browser a varrer o arquivo e calcular a duração real.
+function AudioPlayer({ src, isMe }: { src: string; isMe: boolean }) {
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const [playing, setPlaying]   = useState(false);
+  const [current, setCurrent]   = useState(0);
+  const [duration, setDuration] = useState(0);
+  const seekingDuration = useRef(false);
+
+  useEffect(() => {
+    const el = audioRef.current;
+    if (!el) return;
+    seekingDuration.current = false;
+    setPlaying(false); setCurrent(0); setDuration(0);
+
+    function tryFix() {
+      if (!el) return;
+      if (!isFinite(el.duration) || el.duration === 0) {
+        seekingDuration.current = true;
+        el.currentTime = 1e101; // força o browser a determinar o final do arquivo
+      } else {
+        setDuration(el.duration);
+      }
+    }
+    function onDurationChange() {
+      if (!el) return;
+      if (isFinite(el.duration) && el.duration > 0) {
+        setDuration(el.duration);
+        if (seekingDuration.current) {
+          seekingDuration.current = false;
+          el.currentTime = 0;
+          setCurrent(0);
+        }
+      }
+    }
+    function onTimeUpdate() {
+      if (!el || seekingDuration.current) return;
+      setCurrent(el.currentTime);
+    }
+    function onEnded() {
+      setPlaying(false);
+      if (el) { el.currentTime = 0; setCurrent(0); }
+    }
+    el.addEventListener("loadedmetadata", tryFix);
+    el.addEventListener("durationchange", onDurationChange);
+    el.addEventListener("timeupdate", onTimeUpdate);
+    el.addEventListener("ended", onEnded);
+    el.addEventListener("play",  () => setPlaying(true));
+    el.addEventListener("pause", () => setPlaying(false));
+    if (el.readyState >= 1) tryFix();
+    return () => {
+      el.removeEventListener("loadedmetadata", tryFix);
+      el.removeEventListener("durationchange", onDurationChange);
+      el.removeEventListener("timeupdate", onTimeUpdate);
+      el.removeEventListener("ended", onEnded);
+      el.removeEventListener("play",  () => setPlaying(true));
+      el.removeEventListener("pause", () => setPlaying(false));
+    };
+  }, [src]);
+
+  function toggle() {
+    const el = audioRef.current;
+    if (!el) return;
+    playing ? el.pause() : el.play();
+  }
+  function seek(e: React.ChangeEvent<HTMLInputElement>) {
+    const el = audioRef.current;
+    if (!el) return;
+    const t = parseFloat(e.target.value);
+    el.currentTime = t;
+    setCurrent(t);
+  }
+  function fmt(s: number) {
+    if (!isFinite(s) || isNaN(s) || s < 0) return "0:00";
+    const m = Math.floor(s / 60);
+    return `${m}:${Math.floor(s % 60).toString().padStart(2, "0")}`;
+  }
+
+  return (
+    <div className={clsx(
+      "flex items-center gap-2 px-3 py-2.5 rounded-2xl w-[240px]",
+      isMe
+        ? "bg-vine-700 text-white rounded-br-sm"
+        : "bg-white border border-gray-100 text-gray-800 shadow-sm rounded-bl-sm"
+    )}>
+      {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+      <audio ref={audioRef} src={src} preload="metadata" className="hidden" />
+      <button
+        onClick={toggle}
+        className={clsx(
+          "w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition-colors",
+          isMe ? "bg-white/20 hover:bg-white/30 text-white" : "bg-vine-700 hover:bg-vine-800 text-white"
+        )}
+      >
+        {playing
+          ? <Square className="w-3 h-3 fill-current" />
+          : <Play   className="w-3.5 h-3.5 fill-current ml-0.5" />}
+      </button>
+      <input
+        type="range" min={0} max={duration || 100} step={0.1} value={current}
+        onChange={seek}
+        className="flex-1 h-1 rounded-full cursor-pointer min-w-0"
+        style={{ accentColor: isMe ? "white" : "#4a6741" }}
+      />
+      <span className={clsx("text-[10px] font-medium shrink-0 tabular-nums", isMe ? "text-vine-200" : "text-gray-400")}>
+        {fmt(current)}&nbsp;/&nbsp;{fmt(duration)}
+      </span>
+    </div>
+  );
+}
 
 // ─── Constants ────────────────────────────────────────────────────
 
@@ -467,7 +579,7 @@ function MessageBubble({
 
   return (
     <div
-      className={clsx("flex gap-2 max-w-[80%] relative", isMe ? "ml-auto flex-row-reverse" : "")}
+      className={clsx("flex gap-2 max-w-[80%]", isMe ? "ml-auto flex-row-reverse" : "")}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
     >
@@ -476,7 +588,8 @@ function MessageBubble({
           {iniciais(msg.autorNome)}
         </div>
       )}
-      <div className={clsx("flex flex-col", isMe ? "items-end" : "items-start")}>
+      {/* Coluna de conteúdo — relative para posicionar botões de ação sem afetar o layout */}
+      <div className={clsx("relative flex flex-col", isMe ? "items-end" : "items-start")}>
         {showAuthor && !isMe && (
           <span className="text-[10px] font-semibold text-vine-600 mb-0.5 px-1">
             {msg.autorNome.split(" ")[0]}
@@ -498,7 +611,7 @@ function MessageBubble({
           </div>
         )}
 
-        {/* Bubble or edit mode */}
+        {/* Bubble / audio / edit mode */}
         {editing ? (
           <div className="w-64">
             <textarea
@@ -521,11 +634,14 @@ function MessageBubble({
               </button>
             </div>
           </div>
+        ) : msg.tipo === "audio" && msg.mediaUrl ? (
+          /* Áudio fica fora da bolha para evitar duplo fundo */
+          <AudioPlayer src={msg.mediaUrl} isMe={isMe} />
         ) : (
           <div
             className={clsx(
               "rounded-2xl text-sm leading-relaxed max-w-full break-words overflow-hidden",
-              msg.tipo === "imagem" || msg.tipo === "audio" || msg.tipo === "documento" ? "" : "px-3.5 py-2",
+              msg.tipo === "imagem" || msg.tipo === "documento" ? "" : "px-3.5 py-2",
               isMe ? "bg-vine-700 text-white rounded-br-sm" : "bg-white border border-gray-100 text-gray-800 rounded-bl-sm shadow-sm"
             )}
           >
@@ -540,17 +656,6 @@ function MessageBubble({
                   onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
                 />
                 {msg.conteudo && <p className="px-3.5 py-2 text-sm">{msg.conteudo}</p>}
-              </div>
-            ) : msg.tipo === "audio" && msg.mediaUrl ? (
-              <div className="px-2 py-2">
-                {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-                <audio
-                  src={msg.mediaUrl}
-                  controls
-                  preload="metadata"
-                  className="h-9 max-w-[240px]"
-                  style={{ colorScheme: isMe ? "dark" : "light" }}
-                />
               </div>
             ) : msg.tipo === "documento" && msg.mediaUrl ? (
               <a
@@ -601,68 +706,71 @@ function MessageBubble({
           {msg.editadoEm && <span className="text-[10px] text-gray-400 italic">editado</span>}
           <span className="text-[10px] text-gray-400">{formatTime(msg.criadoEm)}</span>
         </div>
-      </div>
 
-      {/* Action buttons beside bubble — appear on hover */}
-      {(hover || emojiOpen) && !editing && (
-        <div className="flex flex-col items-center gap-1 self-center relative">
-          {emojiOpen && <div className="fixed inset-0 z-20" onClick={() => setEmojiOpen(false)} />}
-          <div className="relative">
-            {emojiOpen && (
-              <div className={clsx(
-                "absolute bottom-full mb-1 z-30 bg-white border border-gray-200 rounded-full shadow-lg px-1.5 py-1 flex gap-0.5",
-                isMe ? "right-0" : "left-0"
-              )}>
-                {QUICK_REACTIONS.map((emoji) => (
-                  <button
-                    key={emoji}
-                    onClick={() => { onReact(emoji); setEmojiOpen(false); }}
-                    className={clsx(
-                      "text-lg w-8 h-8 rounded-full flex items-center justify-center hover:bg-gray-100 transition",
-                      myReacted.includes(emoji) && "bg-vine-50 ring-1 ring-vine-300"
-                    )}
-                  >
-                    {emoji}
-                  </button>
-                ))}
-              </div>
+        {/* Botões de ação — absolutamente posicionados (sem impacto no layout) */}
+        {(hover || emojiOpen) && !editing && (
+          <div className={clsx(
+            "absolute top-1/2 -translate-y-1/2 flex flex-col items-center gap-1 z-10",
+            isMe ? "right-full pr-1.5" : "left-full pl-1.5"
+          )}>
+            {emojiOpen && <div className="fixed inset-0 z-20" onClick={() => setEmojiOpen(false)} />}
+            <div className="relative">
+              {emojiOpen && (
+                <div className={clsx(
+                  "absolute bottom-full mb-1 z-30 bg-white border border-gray-200 rounded-full shadow-lg px-1.5 py-1 flex gap-0.5",
+                  isMe ? "right-0" : "left-0"
+                )}>
+                  {QUICK_REACTIONS.map((emoji) => (
+                    <button
+                      key={emoji}
+                      onClick={() => { onReact(emoji); setEmojiOpen(false); }}
+                      className={clsx(
+                        "text-lg w-8 h-8 rounded-full flex items-center justify-center hover:bg-gray-100 transition",
+                        myReacted.includes(emoji) && "bg-vine-50 ring-1 ring-vine-300"
+                      )}
+                    >
+                      {emoji}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <button
+                onClick={() => setEmojiOpen(!emojiOpen)}
+                className="w-6 h-6 rounded-full bg-white border border-gray-200 shadow-sm flex items-center justify-center text-[14px] hover:border-vine-300 transition"
+                title="Reagir"
+              >
+                😊
+              </button>
+            </div>
+            <button
+              onClick={() => onReply(msg)}
+              className="w-6 h-6 rounded-full bg-white border border-gray-200 shadow-sm flex items-center justify-center text-gray-400 hover:text-vine-600 hover:border-vine-300 transition"
+              title="Responder"
+            >
+              <Reply className="w-3 h-3" />
+            </button>
+            {isMe && (
+              <button
+                onClick={startEdit}
+                className="w-6 h-6 rounded-full bg-white border border-gray-200 shadow-sm flex items-center justify-center text-gray-400 hover:text-vine-600 hover:border-vine-300 transition"
+                title="Editar"
+              >
+                <Pencil className="w-3 h-3" />
+              </button>
             )}
             <button
-              onClick={() => setEmojiOpen(!emojiOpen)}
-              className="w-6 h-6 rounded-full bg-white border border-gray-200 shadow-sm flex items-center justify-center text-[14px] hover:border-vine-300 transition"
-              title="Reagir"
+              onClick={() => onStar(msg.id)}
+              className={clsx(
+                "w-6 h-6 rounded-full bg-white border shadow-sm flex items-center justify-center transition hover:border-vine-300",
+                isStarred ? "border-gold-300 text-gold-500" : "border-gray-200 text-gray-400"
+              )}
+              title="Favoritar"
             >
-              😊
+              <Star className={clsx("w-3 h-3", isStarred && "fill-gold-500")} />
             </button>
           </div>
-          <button
-            onClick={() => onReply(msg)}
-            className="w-6 h-6 rounded-full bg-white border border-gray-200 shadow-sm flex items-center justify-center text-gray-400 hover:text-vine-600 hover:border-vine-300 transition"
-            title="Responder"
-          >
-            <Reply className="w-3 h-3" />
-          </button>
-          {isMe && (
-            <button
-              onClick={startEdit}
-              className="w-6 h-6 rounded-full bg-white border border-gray-200 shadow-sm flex items-center justify-center text-gray-400 hover:text-vine-600 hover:border-vine-300 transition"
-              title="Editar"
-            >
-              <Pencil className="w-3 h-3" />
-            </button>
-          )}
-          <button
-            onClick={() => onStar(msg.id)}
-            className={clsx(
-              "w-6 h-6 rounded-full bg-white border shadow-sm flex items-center justify-center transition hover:border-vine-300",
-              isStarred ? "border-gold-300 text-gold-500" : "border-gray-200 text-gray-400"
-            )}
-            title="Favoritar"
-          >
-            <Star className={clsx("w-3 h-3", isStarred && "fill-gold-500")} />
-          </button>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }
