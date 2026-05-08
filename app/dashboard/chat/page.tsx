@@ -732,7 +732,9 @@ export default function ChatPage() {
   const [showNewGroupModal, setShowNewGroupModal] = useState(false);
   const [conversaIds, setConversaIds] = useState<string[]>([]);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const realtimeGlobalRef = useRef<any>(null);
+  const broadcastChannelsRef = useRef<Map<string, any>>(new Map());
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const updatesChannelRef = useRef<any>(null);
 
   useEffect(() => {
     if (!ctxMenu) return;
@@ -852,59 +854,64 @@ export default function ChatPage() {
     setGrupos(prev => prev.map(g => g.id === conversaId ? { ...g, mensagens: msgs } : g));
   }
 
-  // ── realtime — subscription com filtro explícito por conversa_id ──
+  // ── broadcast: subscribe a cada conversa (WebSocket puro, sem banco) ──
   useEffect(() => {
     if (!user?.id || conversaIds.length === 0) return;
-
-    if (realtimeGlobalRef.current) supabase.removeChannel(realtimeGlobalRef.current);
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const handleInsert = (cid: string) => (payload: any) => {
-      const msg = rowToMensagem(payload.new);
-      setDms(prev => prev.map(dm => dm.id === cid ? {
-        ...dm,
-        mensagens: dm.mensagens.some(m => m.id === msg.id) ? dm.mensagens : [...dm.mensagens, msg],
-      } : dm));
-      setGrupos(prev => prev.map(g => g.id === cid ? {
-        ...g,
-        mensagens: g.mensagens.some(m => m.id === msg.id) ? g.mensagens : [...g.mensagens, msg],
-      } : g));
-    };
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const handleUpdate = (cid: string) => (payload: any) => {
-      const msg = rowToMensagem(payload.new);
-      setDms(prev => prev.map(dm => dm.id === cid ? {
-        ...dm,
-        mensagens: dm.mensagens.map(m => m.id === msg.id ? msg : m),
-      } : dm));
-      setGrupos(prev => prev.map(g => g.id === cid ? {
-        ...g,
-        mensagens: g.mensagens.map(m => m.id === msg.id ? msg : m),
-      } : g));
-    };
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let ch: any = supabase.channel(`chat_user_${user.id}`);
-    for (const cid of conversaIds) {
-      ch = ch
+    const map = broadcastChannelsRef.current;
+    const toAdd = conversaIds.filter(id => !map.has(id));
+    for (const cid of toAdd) {
+      const ch = supabase.channel(`room:${cid}`)
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .on("postgres_changes" as any, {
-          event: "INSERT", schema: "public", table: "chat_mensagens",
-          filter: `conversa_id=eq.${cid}`,
-        }, handleInsert(cid))
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .on("postgres_changes" as any, {
-          event: "UPDATE", schema: "public", table: "chat_mensagens",
-          filter: `conversa_id=eq.${cid}`,
-        }, handleUpdate(cid));
+        .on("broadcast", { event: "msg" }, ({ payload }: { payload: any }) => {
+          const msg = payload as MensagemConversa;
+          setDms(prev => prev.map(dm => dm.id === cid ? {
+            ...dm,
+            mensagens: dm.mensagens.some(m => m.id === msg.id) ? dm.mensagens : [...dm.mensagens, msg],
+          } : dm));
+          setGrupos(prev => prev.map(g => g.id === cid ? {
+            ...g,
+            mensagens: g.mensagens.some(m => m.id === msg.id) ? g.mensagens : [...g.mensagens, msg],
+          } : g));
+        })
+        .subscribe();
+      map.set(cid, ch);
     }
-    ch.subscribe();
-
-    realtimeGlobalRef.current = ch;
-    return () => { supabase.removeChannel(ch); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversaIds.join(","), user?.id]);
+
+  // Limpa canais de broadcast ao desmontar
+  useEffect(() => {
+    return () => {
+      broadcastChannelsRef.current.forEach(ch => supabase.removeChannel(ch));
+      broadcastChannelsRef.current.clear();
+      if (updatesChannelRef.current) supabase.removeChannel(updatesChannelRef.current);
+    };
+  }, []);
+
+  // ── postgres_changes: só para UPDATE (edições) e novas participações ──
+  useEffect(() => {
+    if (!user?.id) return;
+    if (updatesChannelRef.current) supabase.removeChannel(updatesChannelRef.current);
+    const ch = supabase.channel(`chat_updates_${user.id}`)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .on("postgres_changes" as any, {
+        event: "UPDATE", schema: "public", table: "chat_mensagens",
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      }, (payload: any) => {
+        const msg = rowToMensagem(payload.new);
+        const cid = payload.new.conversa_id as string;
+        setDms(prev => prev.map(dm => dm.id === cid ? {
+          ...dm, mensagens: dm.mensagens.map(m => m.id === msg.id ? msg : m),
+        } : dm));
+        setGrupos(prev => prev.map(g => g.id === cid ? {
+          ...g, mensagens: g.mensagens.map(m => m.id === msg.id ? msg : m),
+        } : g));
+      })
+      .subscribe();
+    updatesChannelRef.current = ch;
+    return () => { supabase.removeChannel(ch); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
 
   // ── carrega histórico ao abrir conversa ────────────────────────────
   useEffect(() => {
@@ -1029,6 +1036,9 @@ export default function ChatPage() {
     };
     setDms((prev) => prev.map((dm) => dm.id === dmId ? { ...dm, mensagens: [...dm.mensagens, msg] } : dm));
     setReplyTo(null);
+    // Broadcast: entrega instantânea via WebSocket
+    broadcastChannelsRef.current.get(dmId)?.send({ type: "broadcast", event: "msg", payload: msg });
+    // DB: persistência em background
     supabase.from("chat_mensagens").insert({
       id: msgId, conversa_id: dmId, autor_id: u.id, autor_nome: u.nome, conteudo: text,
       resposta_a_id: replySnapshot?.id ?? null,
@@ -1053,6 +1063,9 @@ export default function ChatPage() {
     };
     setGrupos((prev) => prev.map((g) => g.id === grupoId ? { ...g, mensagens: [...g.mensagens, msg] } : g));
     setReplyTo(null);
+    // Broadcast: entrega instantânea via WebSocket
+    broadcastChannelsRef.current.get(grupoId)?.send({ type: "broadcast", event: "msg", payload: msg });
+    // DB: persistência em background
     supabase.from("chat_mensagens").insert({
       id: msgId, conversa_id: grupoId, autor_id: u.id, autor_nome: u.nome, conteudo: text,
       resposta_a_id: replySnapshot?.id ?? null,
