@@ -65,7 +65,7 @@ type ActiveChat = { tipo: "direto"; id: string } | { tipo: "grupo"; id: string }
 
 function Toast({ msg }: { msg: string }) {
   return (
-    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-gray-900 text-white text-sm px-5 py-2.5 rounded-full shadow-xl pointer-events-none">
+    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[200] bg-gray-900 text-white text-sm px-5 py-2.5 rounded-full shadow-xl pointer-events-none">
       {msg}
     </div>
   );
@@ -899,14 +899,17 @@ export default function ChatPage() {
       setShowNewDmModal(false);
       return;
     }
-    const { data: novaConversa } = await supabase
-      .from("chat_conversas").insert({ tipo: "direto" }).select().single();
-    if (!novaConversa) return;
-    await supabase.from("chat_participantes").insert([
-      { conversa_id: (novaConversa as { id: string }).id, user_id: u.id },
-      { conversa_id: (novaConversa as { id: string }).id, user_id: userId },
-    ]);
-    const cid = (novaConversa as { id: string }).id;
+    const res = await fetch("/api/chat/criar-conversa", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tipo: "direto", participantes: [u.id, userId] }),
+    });
+    const json = await res.json();
+    if (!res.ok || !json.id) {
+      showToast("Erro ao criar conversa: " + (json.error ?? res.statusText));
+      return;
+    }
+    const cid: string = json.id;
     setDms((prev) => [...prev, {
       id: cid,
       participantes: [u.id, userId] as [string, string],
@@ -919,15 +922,21 @@ export default function ChatPage() {
 
   async function createGroup(nome: string, emoji: string, membros: string[]) {
     const allMembros = membros.includes(u.id) ? membros : [...membros, u.id];
-    const { data: novoGrupo } = await supabase.from("chat_conversas").insert({
-      tipo: "grupo", nome, emoji, cor: "bg-vine-700",
-      descricao: `Grupo criado por ${u.nome}`, admin_id: u.id, somente_admin: false,
-    }).select().single();
-    if (!novoGrupo) return;
-    const cid = (novoGrupo as { id: string }).id;
-    await supabase.from("chat_participantes").insert(
-      allMembros.map(uid => ({ conversa_id: cid, user_id: uid }))
-    );
+    const res = await fetch("/api/chat/criar-conversa", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        tipo: "grupo", nome, emoji, cor: "bg-vine-700",
+        descricao: `Grupo criado por ${u.nome}`, admin_id: u.id, somente_admin: false,
+        participantes: allMembros,
+      }),
+    });
+    const json = await res.json();
+    if (!res.ok || !json.id) {
+      showToast("Erro ao criar grupo: " + (json.error ?? res.statusText));
+      return;
+    }
+    const cid: string = json.id;
     setGrupos((prev) => [...prev, {
       id: cid, nome, tipo: "geral", emoji, cor: "bg-vine-700",
       descricao: `Grupo criado por ${u.nome}`, adminId: u.id,
