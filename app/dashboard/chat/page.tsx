@@ -730,6 +730,7 @@ export default function ChatPage() {
   const [ctxMenu, setCtxMenu] = useState<{ id: string; type: "dm" | "grupo" } | null>(null);
   const [showNewDmModal, setShowNewDmModal] = useState(false);
   const [showNewGroupModal, setShowNewGroupModal] = useState(false);
+  const [conversaIds, setConversaIds] = useState<string[]>([]);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const realtimeGlobalRef = useRef<any>(null);
 
@@ -794,6 +795,19 @@ export default function ChatPage() {
     const newDms: ConversaDireta[] = [];
     const newGrupos: Grupo[] = [];
 
+    // Buscar nomes dos outros participantes direto da tabela perfis
+    const outrosIds = [...new Set(
+      Object.values(participantesPorConversa).flat().filter(id => id !== user.id)
+    )];
+    const nomePorId: Record<string, string> = {};
+    if (outrosIds.length > 0) {
+      const { data: perfisData } = await supabase
+        .from("perfis").select("id, nome").in("id", outrosIds);
+      for (const p of (perfisData ?? []) as { id: string; nome: string }[]) {
+        nomePorId[p.id] = p.nome;
+      }
+    }
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     for (const c of (conversas ?? []) as any[]) {
       const membrosIds = participantesPorConversa[c.id] ?? [];
@@ -802,7 +816,7 @@ export default function ChatPage() {
 
       if (c.tipo === "direto") {
         const otherId = membrosIds.find((id: string) => id !== user.id) ?? "";
-        const otherNome = usuarios.find(mu => mu.id === otherId)?.nome ?? "Usuário";
+        const otherNome = nomePorId[otherId] ?? usuarios.find(mu => mu.id === otherId)?.nome ?? "Usuário";
         newDms.push({
           id: c.id,
           participantes: [user.id, otherId] as [string, string],
@@ -822,6 +836,7 @@ export default function ChatPage() {
 
     setDms(newDms);
     setGrupos(newGrupos);
+    setConversaIds([...newDms.map(d => d.id), ...newGrupos.map(g => g.id)]);
   }
 
   async function carregarMensagens(conversaId: string) {
@@ -837,51 +852,59 @@ export default function ChatPage() {
     setGrupos(prev => prev.map(g => g.id === conversaId ? { ...g, mensagens: msgs } : g));
   }
 
-  // ── realtime global — escuta TODAS as conversas do usuário ─────────
+  // ── realtime — subscription com filtro explícito por conversa_id ──
   useEffect(() => {
-    if (!user?.id) return;
+    if (!user?.id || conversaIds.length === 0) return;
 
     if (realtimeGlobalRef.current) supabase.removeChannel(realtimeGlobalRef.current);
 
-    const channel = supabase.channel(`chat_global_${user.id}`)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .on("postgres_changes" as any, {
-        event: "INSERT", schema: "public", table: "chat_mensagens",
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      }, (payload: any) => {
-        const msg = rowToMensagem(payload.new);
-        const cid = payload.new.conversa_id as string;
-        setDms(prev => prev.map(dm => dm.id === cid ? {
-          ...dm,
-          mensagens: dm.mensagens.some(m => m.id === msg.id) ? dm.mensagens : [...dm.mensagens, msg],
-        } : dm));
-        setGrupos(prev => prev.map(g => g.id === cid ? {
-          ...g,
-          mensagens: g.mensagens.some(m => m.id === msg.id) ? g.mensagens : [...g.mensagens, msg],
-        } : g));
-      })
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .on("postgres_changes" as any, {
-        event: "UPDATE", schema: "public", table: "chat_mensagens",
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      }, (payload: any) => {
-        const msg = rowToMensagem(payload.new);
-        const cid = payload.new.conversa_id as string;
-        setDms(prev => prev.map(dm => dm.id === cid ? {
-          ...dm,
-          mensagens: dm.mensagens.map(m => m.id === msg.id ? msg : m),
-        } : dm));
-        setGrupos(prev => prev.map(g => g.id === cid ? {
-          ...g,
-          mensagens: g.mensagens.map(m => m.id === msg.id ? msg : m),
-        } : g));
-      })
-      .subscribe();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const handleInsert = (cid: string) => (payload: any) => {
+      const msg = rowToMensagem(payload.new);
+      setDms(prev => prev.map(dm => dm.id === cid ? {
+        ...dm,
+        mensagens: dm.mensagens.some(m => m.id === msg.id) ? dm.mensagens : [...dm.mensagens, msg],
+      } : dm));
+      setGrupos(prev => prev.map(g => g.id === cid ? {
+        ...g,
+        mensagens: g.mensagens.some(m => m.id === msg.id) ? g.mensagens : [...g.mensagens, msg],
+      } : g));
+    };
 
-    realtimeGlobalRef.current = channel;
-    return () => { supabase.removeChannel(channel); };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const handleUpdate = (cid: string) => (payload: any) => {
+      const msg = rowToMensagem(payload.new);
+      setDms(prev => prev.map(dm => dm.id === cid ? {
+        ...dm,
+        mensagens: dm.mensagens.map(m => m.id === msg.id ? msg : m),
+      } : dm));
+      setGrupos(prev => prev.map(g => g.id === cid ? {
+        ...g,
+        mensagens: g.mensagens.map(m => m.id === msg.id ? msg : m),
+      } : g));
+    };
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let ch: any = supabase.channel(`chat_user_${user.id}`);
+    for (const cid of conversaIds) {
+      ch = ch
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .on("postgres_changes" as any, {
+          event: "INSERT", schema: "public", table: "chat_mensagens",
+          filter: `conversa_id=eq.${cid}`,
+        }, handleInsert(cid))
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .on("postgres_changes" as any, {
+          event: "UPDATE", schema: "public", table: "chat_mensagens",
+          filter: `conversa_id=eq.${cid}`,
+        }, handleUpdate(cid));
+    }
+    ch.subscribe();
+
+    realtimeGlobalRef.current = ch;
+    return () => { supabase.removeChannel(ch); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id]);
+  }, [conversaIds.join(","), user?.id]);
 
   // ── carrega histórico ao abrir conversa ────────────────────────────
   useEffect(() => {
@@ -953,6 +976,7 @@ export default function ChatPage() {
       participantesNomes: [u.nome, userNome] as [string, string],
       mensagens: [],
     }]);
+    setConversaIds(prev => prev.includes(cid) ? prev : [...prev, cid]);
     openChat({ tipo: "direto", id: cid });
     setShowNewDmModal(false);
   }
@@ -979,6 +1003,7 @@ export default function ChatPage() {
       descricao: `Grupo criado por ${u.nome}`, adminId: u.id,
       somenteAdmin: false, institucional: false, membros: allMembros, mensagens: [],
     }]);
+    setConversaIds(prev => prev.includes(cid) ? prev : [...prev, cid]);
     openChat({ tipo: "grupo", id: cid });
     setShowNewGroupModal(false);
   }
@@ -1004,7 +1029,6 @@ export default function ChatPage() {
     };
     setDms((prev) => prev.map((dm) => dm.id === dmId ? { ...dm, mensagens: [...dm.mensagens, msg] } : dm));
     setReplyTo(null);
-    // fire-and-forget — UI não espera
     supabase.from("chat_mensagens").insert({
       id: msgId, conversa_id: dmId, autor_id: u.id, autor_nome: u.nome, conteudo: text,
       resposta_a_id: replySnapshot?.id ?? null,
@@ -1012,8 +1036,9 @@ export default function ChatPage() {
       resposta_a_conteudo: replySnapshot?.conteudo ?? null,
     }).then(({ error }) => {
       if (error) {
+        console.error("sendDm error:", error.message, error.code);
         setDms((prev) => prev.map((dm) => dm.id === dmId ? { ...dm, mensagens: dm.mensagens.filter((m) => m.id !== msgId) } : dm));
-        showToast("Erro ao enviar mensagem.");
+        showToast("Erro ao enviar: " + error.message);
       }
     });
   }
@@ -1028,7 +1053,6 @@ export default function ChatPage() {
     };
     setGrupos((prev) => prev.map((g) => g.id === grupoId ? { ...g, mensagens: [...g.mensagens, msg] } : g));
     setReplyTo(null);
-    // fire-and-forget — UI não espera
     supabase.from("chat_mensagens").insert({
       id: msgId, conversa_id: grupoId, autor_id: u.id, autor_nome: u.nome, conteudo: text,
       resposta_a_id: replySnapshot?.id ?? null,
@@ -1036,8 +1060,9 @@ export default function ChatPage() {
       resposta_a_conteudo: replySnapshot?.conteudo ?? null,
     }).then(({ error }) => {
       if (error) {
+        console.error("sendGrupo error:", error.message, error.code);
         setGrupos((prev) => prev.map((g) => g.id === grupoId ? { ...g, mensagens: g.mensagens.filter((m) => m.id !== msgId) } : g));
-        showToast("Erro ao enviar mensagem.");
+        showToast("Erro ao enviar: " + error.message);
       }
     });
   }
