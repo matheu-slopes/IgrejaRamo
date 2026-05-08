@@ -599,7 +599,7 @@ function MessageBubble({
 
   return (
     <div
-      className={clsx("flex gap-2 max-w-[80%]", isMe ? "ml-auto flex-row-reverse" : "")}
+      className={clsx("flex gap-2 max-w-[92%]", isMe ? "ml-auto flex-row-reverse" : "")}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
     >
@@ -671,7 +671,7 @@ function MessageBubble({
                 <img
                   src={msg.mediaUrl}
                   alt="imagem"
-                  className="max-w-[260px] max-h-[320px] object-cover cursor-pointer rounded-2xl"
+                  className="max-w-[320px] max-h-[400px] object-cover cursor-pointer rounded-2xl"
                   onClick={() => window.open(msg.mediaUrl, "_blank")}
                   onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
                 />
@@ -829,7 +829,7 @@ function ConversationMessages({
   }
 
   return (
-    <div className="flex-1 overflow-y-auto px-4 py-4 space-y-1 bg-gray-50">
+    <div className="flex-1 overflow-y-auto px-2 py-4 space-y-1 bg-gray-50">
       {searchQuery && filtered.length > 0 && (
         <p className="text-center text-xs text-gray-400 mb-3">
           {filtered.length} resultado{filtered.length !== 1 ? "s" : ""} encontrado{filtered.length !== 1 ? "s" : ""}
@@ -2387,7 +2387,7 @@ export default function ChatPage() {
   // ─── Layout ───────────────────────────────────────────────────────
 
   return (
-    <div className="max-w-5xl mx-auto">
+    <div>
       {toast && <Toast msg={toast} />}
       {showNewDmModal && <NewDmModal currentUserId={u.id} dms={dms} usuarios={usuarios} onStart={startDm} onClose={() => setShowNewDmModal(false)} />}
       {showNewGroupModal && <NewGroupModal currentUserId={u.id} usuarios={usuarios} onClose={() => setShowNewGroupModal(false)} onCreate={createGroup} />}

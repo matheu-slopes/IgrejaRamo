@@ -607,7 +607,7 @@ function ChatTab({
                 {m.fixada && (
                   <div className="absolute -left-1 top-1/2 -translate-y-1/2 w-0.5 h-4/5 bg-gold-400 rounded-full" />
                 )}
-                <div className="relative">
+                <div className="relative max-w-[88%]">
                   {/* Action buttons: MoreVertical + Emoji reaction */}
                   <div className={clsx(
                     "absolute top-2 z-10 flex flex-col gap-0.5 opacity-0 group-hover:opacity-100 transition",
@@ -701,12 +701,12 @@ function ChatTab({
                   )}
 
                   <div className={clsx(
-                    "rounded-2xl text-sm shadow-sm relative overflow-hidden",
+                    "rounded-2xl text-base shadow-sm relative overflow-hidden",
                     (!m.tipo || m.tipo === "texto")
-                      ? clsx("max-w-[75%] min-w-[80px] px-4 py-2.5", isMe ? "bg-vine-700 text-white rounded-tr-sm" : "bg-white text-gray-800 rounded-tl-sm border border-gray-100")
+                      ? clsx("w-full min-w-[120px] px-4 py-3", isMe ? "bg-vine-700 text-white rounded-tr-sm" : "bg-white text-gray-800 rounded-tl-sm border border-gray-100")
                       : m.tipo === "imagem"
-                        ? clsx("max-w-[280px] p-0 border-0 bg-transparent shadow-md", isMe ? "rounded-tr-sm" : "rounded-tl-sm")
-                        : clsx("max-w-[280px]", isMe ? "bg-transparent rounded-tr-sm" : "bg-transparent rounded-tl-sm")
+                        ? clsx("max-w-[320px] p-0 border-0 bg-transparent shadow-md", isMe ? "rounded-tr-sm" : "rounded-tl-sm")
+                        : clsx("max-w-[320px]", isMe ? "bg-transparent rounded-tr-sm" : "bg-transparent rounded-tl-sm")
                   )}>
                     {/* Quoted reply */}
                     {m.respostaA && (
@@ -714,13 +714,13 @@ function ChatTab({
                         "mb-1.5 rounded-lg px-2.5 py-1.5 border-l-2",
                         isMe ? "bg-vine-600/50 border-white/40" : "bg-gray-100 border-vine-400"
                       )}>
-                        <p className={clsx("text-[10px] font-semibold", isMe ? "text-white/70" : "text-vine-600")}>{m.respostaA.autorNome}</p>
-                        <p className={clsx("text-xs truncate", isMe ? "text-white/60" : "text-gray-500")}>{m.respostaA.conteudo}</p>
+                        <p className={clsx("text-xs font-semibold", isMe ? "text-white/70" : "text-vine-600")}>{m.respostaA.autorNome}</p>
+                        <p className={clsx("text-sm truncate", isMe ? "text-white/60" : "text-gray-500")}>{m.respostaA.conteudo}</p>
                       </div>
                     )}
 
                     {!isMe && (!m.tipo || m.tipo === "texto") && (
-                      <p className={clsx("text-[10px] font-semibold mb-1",
+                      <p className={clsx("text-xs font-semibold mb-1",
                         m.autorRole === "lider" || m.autorRole === "pastor" ? "text-gold-500" : "text-vine-500"
                       )}>
                         {m.autorNome}
@@ -748,7 +748,7 @@ function ChatTab({
                           </div>
                         </div>
                       ) : (
-                        <p className="leading-relaxed">{renderTextoComLinks(m.conteudo, isMe)}</p>
+                        <p className="leading-relaxed text-base">{renderTextoComLinks(m.conteudo, isMe)}</p>
                       )
                     )}
 
@@ -771,9 +771,9 @@ function ChatTab({
                     {/* Áudio — player com fundo neutro visível */}
                     {m.tipo === "audio" && m.mediaUrl && (
                       <div className={clsx("px-3 py-2 rounded-2xl border", isMe ? "bg-vine-50 border-vine-200" : "bg-gray-100 border-gray-200")} style={{ minWidth: 280 }}>
-                        {!isMe && <p className="text-[10px] font-semibold text-vine-600 mb-1">{m.autorNome}</p>}
+                        {!isMe && <p className="text-xs font-semibold text-vine-600 mb-1">{m.autorNome}</p>}
                         <audio controls preload="metadata" src={m.mediaUrl} className="h-7 w-full rounded-full" style={{ minWidth: 260 }} />
-                        <p className={clsx("text-[10px] text-right mt-0.5", isMe ? "text-vine-400" : "text-gray-400")}>
+                        <p className={clsx("text-xs text-right mt-0.5", isMe ? "text-vine-400" : "text-gray-400")}>
                           {new Date(m.criadoEm).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
                         </p>
                       </div>
@@ -782,9 +782,9 @@ function ChatTab({
                     {/* Rodapé da mensagem */}
                     {(!m.tipo || m.tipo === "texto") && (
                       <div className={clsx("flex items-center gap-1.5 justify-end mt-1")}>
-                        {isFav && <Star className="w-3 h-3 text-amber-400 fill-amber-400" />}
-                        {m.fixada && <Pin className="w-3 h-3 text-gold-500" />}
-                        <p className={clsx("text-[10px]", isMe ? "text-white/50" : "text-gray-400")}>
+                        {isFav && <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />}
+                        {m.fixada && <Pin className="w-3.5 h-3.5 text-gold-500" />}
+                        <p className={clsx("text-xs", isMe ? "text-white/50" : "text-gray-400")}>
                           {new Date(m.criadoEm).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
                         </p>
                       </div>
