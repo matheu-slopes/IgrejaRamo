@@ -326,6 +326,12 @@ export default function DashboardLayout({
   const { user, isLoading, logout, atualizarUsuario } = useAuth();
   const router = useRouter();
 
+  const [senhaModal, setSenhaModal] = useState(false);
+  const [novaSenhaPrimeiro, setNovaSenhaPrimeiro] = useState("");
+  const [showSenhaPrimeiro, setShowSenhaPrimeiro] = useState(false);
+  const [salvandoPrimeiro, setSalvandoPrimeiro] = useState(false);
+  const [erroPrimeiro, setErroPrimeiro] = useState("");
+
   function handleLogout() {
     logout();
     router.push("/login");
@@ -336,6 +342,29 @@ export default function DashboardLayout({
       router.push("/login");
     }
   }, [user, isLoading, router]);
+
+  useEffect(() => {
+    if (!isLoading && user?.primeiroAcesso) {
+      setSenhaModal(true);
+    }
+  }, [isLoading, user?.primeiroAcesso]);
+
+  async function salvarPrimeiraSenha() {
+    if (!user) return;
+    if (novaSenhaPrimeiro.length < 6) { setErroPrimeiro("Mínimo 6 caracteres."); return; }
+    setSalvandoPrimeiro(true); setErroPrimeiro("");
+    const res = await fetch("/api/alterar-senha", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: user.id, novaSenha: novaSenhaPrimeiro }),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) { setErroPrimeiro(json.error ?? "Erro ao alterar senha."); setSalvandoPrimeiro(false); return; }
+    await atualizarUsuario(user.id, { primeiroAcesso: false });
+    setSenhaModal(false);
+    setNovaSenhaPrimeiro("");
+    setSalvandoPrimeiro(false);
+  }
 
   if (isLoading || !user) {
     return (
@@ -365,6 +394,43 @@ export default function DashboardLayout({
 
         <main className="p-6">{children}</main>
       </div>
+
+      {/* Modal primeiro acesso — troca de senha obrigatória */}
+      {senhaModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-7 space-y-5">
+            <div className="text-center space-y-1">
+              <div className="w-12 h-12 bg-vine-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                <KeyRound className="w-6 h-6 text-vine-700" />
+              </div>
+              <h2 className="text-lg font-bold text-gray-900">Crie sua senha pessoal</h2>
+              <p className="text-sm text-gray-500">Por segurança, troque a senha padrão antes de continuar.</p>
+            </div>
+            <div className="relative">
+              <input
+                type={showSenhaPrimeiro ? "text" : "password"}
+                value={novaSenhaPrimeiro}
+                onChange={(e) => { setNovaSenhaPrimeiro(e.target.value); setErroPrimeiro(""); }}
+                onKeyDown={(e) => { if (e.key === "Enter") salvarPrimeiraSenha(); }}
+                placeholder="Nova senha (mín. 6 caracteres)"
+                autoFocus
+                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-vine-400 focus:ring-1 focus:ring-vine-100 pr-10"
+              />
+              <button type="button" onClick={() => setShowSenhaPrimeiro((v) => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                {showSenhaPrimeiro ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+            {erroPrimeiro && <p className="text-xs text-red-500 -mt-2">{erroPrimeiro}</p>}
+            <button
+              onClick={salvarPrimeiraSenha}
+              disabled={salvandoPrimeiro || !novaSenhaPrimeiro}
+              className="w-full py-3 bg-vine-700 text-white rounded-xl text-sm font-semibold hover:bg-vine-800 transition disabled:opacity-50"
+            >
+              {salvandoPrimeiro ? "Salvando..." : "Salvar e continuar"}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
     </ChatUnreadProvider>
   );

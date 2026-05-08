@@ -14,18 +14,19 @@ import { temPermissao as checkPermissao } from "@/lib/permissions";
 // Converte linha da tabela `perfis` para o tipo User do app
 function rowToUser(row: Record<string, unknown>): User {
   return {
-    id:           row.id as string,
-    nome:         row.nome as string,
-    email:        row.email as string,
-    telefone:     (row.telefone as string) ?? undefined,
-    foto:         (row.foto as string) ?? undefined,
-    role:         row.role as User["role"],
-    ministerios:  (row.ministerios as User["ministerios"]) ?? [],
-    dataIngresso: row.data_ingresso as string,
-    ativo:        row.ativo as boolean,
-    permissoes:   (row.permissoes as Permissao[])?.length
-                    ? (row.permissoes as Permissao[])
-                    : undefined,
+    id:             row.id as string,
+    nome:           row.nome as string,
+    email:          row.email as string,
+    telefone:       (row.telefone as string) ?? undefined,
+    foto:           (row.foto as string) ?? undefined,
+    role:           row.role as User["role"],
+    ministerios:    (row.ministerios as User["ministerios"]) ?? [],
+    dataIngresso:   row.data_ingresso as string,
+    ativo:          row.ativo as boolean,
+    primeiroAcesso: (row.primeiro_acesso as boolean) ?? false,
+    permissoes:     (row.permissoes as Permissao[])?.length
+                      ? (row.permissoes as Permissao[])
+                      : undefined,
   };
 }
 
@@ -183,6 +184,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (dados.ministerios !== undefined) payload.ministerios   = dados.ministerios;
     if (dados.dataIngresso !== undefined) payload.data_ingresso = dados.dataIngresso;
     if (dados.ativo       !== undefined) payload.ativo         = dados.ativo;
+    if (dados.primeiroAcesso !== undefined) payload.primeiro_acesso = dados.primeiroAcesso;
     if (dados.permissoes  !== undefined) payload.permissoes    = dados.permissoes ?? [];
 
     await supabase.from("perfis").update(payload).eq("id", id);
