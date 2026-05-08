@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
+import { useChatUnread } from "@/contexts/ChatUnreadContext";
 import clsx from "clsx";
 import {
   Church,
@@ -56,6 +57,7 @@ export default function Sidebar() {
   const { user, logout, temPermissao } = useAuth();
   const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
+  const { totalUnread } = useChatUnread();
 
   function isActive(href: string) {
     const [hPath, hQuery] = href.split("?");
@@ -104,22 +106,38 @@ export default function Sidebar() {
 
       {/* Main nav */}
       <nav className="flex-1 overflow-y-auto py-4 space-y-1 px-2 scrollbar-thin scrollbar-thumb-vine-800 scrollbar-track-transparent" style={{ scrollbarWidth: "thin", scrollbarColor: "#2d4a2d transparent" }}>
-        {navMain.map(({ href, label, icon: Icon }) => (
-          <Link
-            key={href}
-            href={href}
-            className={clsx(
-              "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition",
-              pathname === href
-                ? "bg-vine-700 text-white"
-                : "text-vine-300 hover:bg-vine-800 hover:text-white"
-            )}
-            title={collapsed ? label : undefined}
-          >
-            <Icon className="w-5 h-5 shrink-0" />
-            {!collapsed && <span>{label}</span>}
-          </Link>
-        ))}
+        {navMain.map(({ href, label, icon: Icon }) => {
+          const isChat = href === "/dashboard/chat";
+          const hasBadge = isChat && totalUnread > 0 && pathname !== "/dashboard/chat";
+          return (
+            <Link
+              key={href}
+              href={href}
+              className={clsx(
+                "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition",
+                pathname === href
+                  ? "bg-vine-700 text-white"
+                  : "text-vine-300 hover:bg-vine-800 hover:text-white"
+              )}
+              title={collapsed ? label : undefined}
+            >
+              <div className="relative shrink-0">
+                <Icon className="w-5 h-5" />
+                {hasBadge && (
+                  <span className="absolute -top-1.5 -right-1.5 min-w-[14px] h-[14px] rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center px-0.5">
+                    {totalUnread > 99 ? "99+" : totalUnread}
+                  </span>
+                )}
+              </div>
+              {!collapsed && <span>{label}</span>}
+              {!collapsed && hasBadge && (
+                <span className="ml-auto min-w-[18px] h-[18px] rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center px-1">
+                  {totalUnread > 99 ? "99+" : totalUnread}
+                </span>
+              )}
+            </Link>
+          );
+        })}
 
         {/* Ministérios section */}
         {!collapsed && (

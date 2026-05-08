@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
+import { ChatUnreadProvider } from "@/contexts/ChatUnreadContext";
 import Sidebar from "@/components/Sidebar";
 import NotificationBell from "@/components/dashboard/NotificationBell";
 import { User, Permissao } from "@/types";
@@ -296,6 +297,7 @@ export default function DashboardLayout({
   }
 
   return (
+    <ChatUnreadProvider>
     <div className="flex h-screen overflow-hidden bg-gray-50">
       <Sidebar />
       <div className="flex-1 overflow-y-auto">
@@ -315,5 +317,6 @@ export default function DashboardLayout({
         <main className="p-6">{children}</main>
       </div>
     </div>
+    </ChatUnreadProvider>
   );
 }

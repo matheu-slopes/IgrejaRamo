@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, ReactNode } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useChatUnread } from "@/contexts/ChatUnreadContext";
 import { supabase } from "@/lib/supabase";
 import { ConversaDireta, Grupo, MensagemConversa } from "@/types";
 import {
@@ -713,6 +714,7 @@ function GrupoAvatar({ grupo, size = "md" }: { grupo: Grupo; size?: "sm" | "md" 
 
 export default function ChatPage() {
   const { user, usuarios } = useAuth();
+  const { setTotalUnread } = useChatUnread();
   const [tab, setTab] = useState<ChatTab>("direto");
   const [activeChat, setActiveChat] = useState<ActiveChat>(null);
   const [search, setSearch] = useState("");
@@ -735,6 +737,7 @@ export default function ChatPage() {
   const broadcastChannelsRef = useRef<Map<string, any>>(new Map());
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const updatesChannelRef = useRef<any>(null);
+  const activeChatRef = useRef<ActiveChat>(null);
 
   useEffect(() => {
     if (!ctxMenu) return;
@@ -814,7 +817,7 @@ export default function ChatPage() {
     for (const c of (conversas ?? []) as any[]) {
       const membrosIds = participantesPorConversa[c.id] ?? [];
       const lastMsg = lastMsgPorConversa[c.id];
-      const mensagens = lastMsg ? [lastMsg] : [];
+      const mensagens = lastMsg ? [{ ...lastMsg, lida: true }] : [];
 
       if (c.tipo === "direto") {
         const otherId = membrosIds.find((id: string) => id !== user.id) ?? "";
@@ -849,9 +852,19 @@ export default function ChatPage() {
       .limit(100);
     if (!data) return;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const msgs = (data as any[]).map(rowToMensagem);
-    setDms(prev => prev.map(dm => dm.id === conversaId ? { ...dm, mensagens: msgs } : dm));
-    setGrupos(prev => prev.map(g => g.id === conversaId ? { ...g, mensagens: msgs } : g));
+    const dbMsgs = (data as any[]).map(row => ({ ...rowToMensagem(row), lida: true }));
+    const dbIds = new Set(dbMsgs.map((m: MensagemConversa) => m.id));
+    // Merge: mantém mensagens otimistas (enviadas mas insert ainda em voo) que não estão no banco ainda
+    setDms(prev => prev.map(dm => {
+      if (dm.id !== conversaId) return dm;
+      const pending = dm.mensagens.filter(m => !dbIds.has(m.id));
+      return { ...dm, mensagens: [...dbMsgs, ...pending] };
+    }));
+    setGrupos(prev => prev.map(g => {
+      if (g.id !== conversaId) return g;
+      const pending = g.mensagens.filter(m => !dbIds.has(m.id));
+      return { ...g, mensagens: [...dbMsgs, ...pending] };
+    }));
   }
 
   // ── broadcast: subscribe a cada conversa (WebSocket puro, sem banco) ──
@@ -863,7 +876,10 @@ export default function ChatPage() {
       const ch = supabase.channel(`room:${cid}`)
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .on("broadcast", { event: "msg" }, ({ payload }: { payload: any }) => {
-          const msg = payload as MensagemConversa;
+          const raw = payload as MensagemConversa;
+          const isActive = activeChatRef.current?.id === cid;
+          const isMine = raw.autorId === user?.id;
+          const msg: MensagemConversa = { ...raw, lida: isMine || isActive };
           setDms(prev => prev.map(dm => dm.id === cid ? {
             ...dm,
             mensagens: dm.mensagens.some(m => m.id === msg.id) ? dm.mensagens : [...dm.mensagens, msg],
@@ -919,6 +935,17 @@ export default function ChatPage() {
     carregarMensagens(activeChat.id);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeChat?.id]);
+
+  // ── atualiza totalUnread no contexto ─────────────────────────────
+  useEffect(() => {
+    if (!user?.id) return;
+    const uid = user.id;
+    const total =
+      dms.reduce((s, dm) => s + dm.mensagens.filter(m => m.autorId !== uid && !m.lida).length, 0) +
+      grupos.reduce((s, g) => s + g.mensagens.filter(m => m.autorId !== uid && !m.lida).length, 0);
+    setTotalUnread(total);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dms, grupos]);
 
   function showToast(msg: string) {
     setToast(msg);
@@ -1038,18 +1065,26 @@ export default function ChatPage() {
     setReplyTo(null);
     // Broadcast: entrega instantânea via WebSocket
     broadcastChannelsRef.current.get(dmId)?.send({ type: "broadcast", event: "msg", payload: msg });
-    // DB: persistência em background
-    supabase.from("chat_mensagens").insert({
-      id: msgId, conversa_id: dmId, autor_id: u.id, autor_nome: u.nome, conteudo: text,
-      resposta_a_id: replySnapshot?.id ?? null,
-      resposta_a_autor_nome: replySnapshot?.autorNome ?? null,
-      resposta_a_conteudo: replySnapshot?.conteudo ?? null,
-    }).then(({ error }) => {
-      if (error) {
-        console.error("sendDm error:", error.message, error.code);
-        setDms((prev) => prev.map((dm) => dm.id === dmId ? { ...dm, mensagens: dm.mensagens.filter((m) => m.id !== msgId) } : dm));
-        showToast("Erro ao enviar: " + error.message);
-      }
+    // DB: persistência via API route (service role + keepalive garante salvar mesmo em reload)
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      fetch("/api/chat/mensagem", {
+        method: "POST",
+        keepalive: true,
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${session?.access_token ?? ""}` },
+        body: JSON.stringify({
+          id: msgId, conversa_id: dmId, autor_id: u.id, autor_nome: u.nome, conteudo: text,
+          resposta_a_id: replySnapshot?.id ?? null,
+          resposta_a_autor_nome: replySnapshot?.autorNome ?? null,
+          resposta_a_conteudo: replySnapshot?.conteudo ?? null,
+        }),
+      }).then(async (r) => {
+        if (!r.ok) {
+          const j = await r.json().catch(() => ({}));
+          console.error("sendDm error:", j.error);
+          setDms((prev) => prev.map((dm) => dm.id === dmId ? { ...dm, mensagens: dm.mensagens.filter((m) => m.id !== msgId) } : dm));
+          showToast("Erro ao enviar: " + (j.error ?? r.statusText));
+        }
+      });
     });
   }
 
@@ -1065,18 +1100,26 @@ export default function ChatPage() {
     setReplyTo(null);
     // Broadcast: entrega instantânea via WebSocket
     broadcastChannelsRef.current.get(grupoId)?.send({ type: "broadcast", event: "msg", payload: msg });
-    // DB: persistência em background
-    supabase.from("chat_mensagens").insert({
-      id: msgId, conversa_id: grupoId, autor_id: u.id, autor_nome: u.nome, conteudo: text,
-      resposta_a_id: replySnapshot?.id ?? null,
-      resposta_a_autor_nome: replySnapshot?.autorNome ?? null,
-      resposta_a_conteudo: replySnapshot?.conteudo ?? null,
-    }).then(({ error }) => {
-      if (error) {
-        console.error("sendGrupo error:", error.message, error.code);
-        setGrupos((prev) => prev.map((g) => g.id === grupoId ? { ...g, mensagens: g.mensagens.filter((m) => m.id !== msgId) } : g));
-        showToast("Erro ao enviar: " + error.message);
-      }
+    // DB: persistência via API route (service role + keepalive garante salvar mesmo em reload)
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      fetch("/api/chat/mensagem", {
+        method: "POST",
+        keepalive: true,
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${session?.access_token ?? ""}` },
+        body: JSON.stringify({
+          id: msgId, conversa_id: grupoId, autor_id: u.id, autor_nome: u.nome, conteudo: text,
+          resposta_a_id: replySnapshot?.id ?? null,
+          resposta_a_autor_nome: replySnapshot?.autorNome ?? null,
+          resposta_a_conteudo: replySnapshot?.conteudo ?? null,
+        }),
+      }).then(async (r) => {
+        if (!r.ok) {
+          const j = await r.json().catch(() => ({}));
+          console.error("sendGrupo error:", j.error);
+          setGrupos((prev) => prev.map((g) => g.id === grupoId ? { ...g, mensagens: g.mensagens.filter((m) => m.id !== msgId) } : g));
+          showToast("Erro ao enviar: " + (j.error ?? r.statusText));
+        }
+      });
     });
   }
 
@@ -1147,9 +1190,20 @@ export default function ChatPage() {
 
   function openChat(chat: ActiveChat) {
     setActiveChat(chat);
+    activeChatRef.current = chat;
     setInfoOpen(false);
     setChatSearchOpen(false);
     setChatSearchQuery("");
+    // Marca todas as mensagens da conversa aberta como lidas
+    if (chat?.tipo === "direto") {
+      setDms(prev => prev.map(dm => dm.id === chat.id
+        ? { ...dm, mensagens: dm.mensagens.map(m => ({ ...m, lida: true })) }
+        : dm));
+    } else if (chat?.tipo === "grupo") {
+      setGrupos(prev => prev.map(g => g.id === chat.id
+        ? { ...g, mensagens: g.mensagens.map(m => ({ ...m, lida: true })) }
+        : g));
+    }
   }
 
   // ── Chat header ───────────────────────────────────────────────────
