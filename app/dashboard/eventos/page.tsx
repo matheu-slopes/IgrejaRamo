@@ -1,38 +1,211 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { Ministerio } from "@/types";
+import { Ministerio, Evento } from "@/types";
 import { EventosTab } from "@/components/dashboard/EventosTab";
+import { supabase } from "@/lib/supabase";
+import { Plus, ChevronRight, MapPin } from "lucide-react";
 import clsx from "clsx";
 
-const TODOS: Ministerio[] = ["Louvor","Mídias","Cantina","Infantil","Ação Social","Jovens","Ensino"];
-const EMOJI: Record<string,string> = {Louvor:"🎸","Mídias":"📹",Cantina:"🧹",Infantil:"🧒","Ação Social":"🤝",Jovens:"⚡",Ensino:"📖"};
+const TODOS: Ministerio[] = ["Louvor", "Mídias", "Cantina", "Infantil", "Ação Social", "Jovens", "Ensino"];
+const EMOJI: Record<string, string> = {
+  Louvor: "🎸", "Mídias": "📹", Cantina: "🧹",
+  Infantil: "🧒", "Ação Social": "🤝", Jovens: "⚡", Ensino: "📖",
+};
+
+function EventoMiniCard({ ev }: { ev: Evento }) {
+  const d = ev.data ? new Date(ev.data + "T00:00:00") : null;
+  const isPast = ev.data < new Date().toISOString().split("T")[0];
+  return (
+    <div className={clsx(
+      "flex-shrink-0 w-52 rounded-2xl border border-gray-100 border-t-4 border-t-gold-400 bg-white shadow-sm p-4 space-y-2.5 transition hover:shadow-md",
+      isPast && "opacity-50"
+    )}>
+      {d && (
+        <div className="flex items-center gap-3">
+          <div className="text-center w-10 shrink-0">
+            <p className="text-[10px] font-bold text-gray-400 uppercase leading-none">
+              {d.toLocaleDateString("pt-BR", { weekday: "short" }).replace(".", "")}
+            </p>
+            <p className="text-3xl font-bold text-gray-800 leading-tight">{d.getDate()}</p>
+            <p className="text-[10px] font-bold text-gray-400 uppercase leading-none">
+              {d.toLocaleDateString("pt-BR", { month: "short" }).replace(".", "")}
+            </p>
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-bold text-gray-800 leading-tight line-clamp-2">{ev.titulo}</p>
+            <p className="text-xs text-gray-400 mt-0.5">{ev.horario}</p>
+            {ev.publico
+              ? <span className="inline-block text-[10px] bg-blue-100 text-blue-700 font-bold px-2 py-0.5 rounded-full mt-1">Público</span>
+              : <span className="inline-block text-[10px] bg-gray-100 text-gray-400 font-bold px-2 py-0.5 rounded-full mt-1">Interno</span>
+            }
+          </div>
+        </div>
+      )}
+      {ev.local && (
+        <div className="flex items-center gap-1.5 text-xs text-gray-400 truncate">
+          <MapPin className="w-3 h-3 shrink-0" />
+          <span className="truncate">{ev.local}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MinistryEventRow({
+  ministerio, isLider, podeEditar, onOpen, reloadKey,
+}: {
+  ministerio: Ministerio; isLider: boolean; podeEditar: boolean;
+  onOpen: (m: Ministerio) => void; reloadKey: number;
+}) {
+  const [eventos, setEventos] = useState<Evento[]>([]);
+  const hojeStr = new Date().toISOString().split("T")[0];
+
+  useEffect(() => {
+    supabase
+      .from("eventos")
+      .select()
+      .eq("ministerio", ministerio)
+      .order("data", { ascending: true })
+      .then(({ data }) => {
+        if (data) setEventos(data.map((e: Record<string, unknown>) => ({
+          id: e.id as string,
+          titulo: e.titulo as string,
+          descricao: (e.descricao as string) ?? undefined,
+          data: e.data as string,
+          horario: e.horario as string,
+          local: e.local as string,
+          publico: e.publico as boolean,
+          ministerio: e.ministerio as Ministerio,
+          criadoPor: (e.criado_por as string) ?? "",
+        })));
+      });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ministerio, reloadKey]);
+
+  const proximos = eventos.filter((e) => e.data >= hojeStr);
+  const passados = eventos.filter((e) => e.data < hojeStr).reverse();
+
+  return (
+    <div className="flex border-b border-gray-100 last:border-0">
+      {/* Nome do ministério */}
+      <button
+        onClick={() => onOpen(ministerio)}
+        className="w-48 shrink-0 flex items-center gap-3 px-5 py-5 text-left hover:bg-gray-50 transition group"
+      >
+        <span className="text-2xl leading-none">{EMOJI[ministerio] ?? "📋"}</span>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-bold text-gray-800 truncate group-hover:text-vine-700 transition">{ministerio}</p>
+          <p className="text-xs text-gray-400 mt-0.5">{eventos.length} evento{eventos.length !== 1 ? "s" : ""}</p>
+        </div>
+        <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-vine-500 shrink-0 transition" />
+      </button>
+
+      {/* Divisor vertical */}
+      <div className="w-px bg-gray-100 my-4 shrink-0" />
+
+      {/* Eventos em scroll horizontal */}
+      <div className="flex-1 min-w-0 px-5 py-4 flex items-center">
+        {eventos.length === 0 ? (
+          <div className="flex items-center gap-3">
+            <p className="text-sm text-gray-300 italic">Sem eventos criados.</p>
+            {isLider && (
+              <button
+                onClick={() => onOpen(ministerio)}
+                className="flex items-center gap-1.5 text-sm text-vine-600 hover:text-vine-800 font-semibold border border-vine-200 hover:border-vine-400 px-3 py-2 rounded-xl transition"
+              >
+                <Plus className="w-4 h-4" /> Criar
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="flex gap-3 overflow-x-auto pb-1 scrollbar-thin scrollbar-thumb-gray-200 w-full">
+            {proximos.map((ev) => (
+              <EventoMiniCard key={ev.id} ev={ev} />
+            ))}
+            {proximos.length > 0 && passados.length > 0 && (
+              <div className="flex items-center px-2 shrink-0">
+                <div className="h-20 w-px bg-gray-200" />
+              </div>
+            )}
+            {passados.map((ev) => (
+              <EventoMiniCard key={ev.id} ev={ev} />
+            ))}
+            {isLider && (
+              <button
+                onClick={() => onOpen(ministerio)}
+                className="flex-shrink-0 flex flex-col items-center justify-center gap-1.5 w-20 rounded-2xl border-2 border-dashed border-gray-200 text-gray-400 hover:border-vine-300 hover:text-vine-600 transition min-h-[6rem]"
+              >
+                <Plus className="w-5 h-5" />
+                <span className="text-xs font-semibold">Novo</span>
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export default function EventosDashboardPage() {
   const { user, temPermissao } = useAuth();
   const isAdmin = user?.role === "admin" || user?.role === "pastor";
   const meus = (user?.ministerios ?? []) as Ministerio[];
   const lista = isAdmin ? TODOS : meus;
-  const [sel, setSel] = useState<Ministerio>(lista[0] ?? "Louvor");
-  if (lista.length === 0) return <div className="py-24 text-center text-sm text-gray-400">Você não pertence a nenhum ministério.</div>;
+  const [editing, setEditing] = useState<Ministerio | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
+
+  if (lista.length === 0)
+    return (
+      <div className="py-24 text-center text-sm text-gray-400">
+        Você não pertence a nenhum ministério.
+      </div>
+    );
+
+  if (editing) {
+    return (
+      <div className="flex flex-col gap-4">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => { setEditing(null); setReloadKey((k) => k + 1); }}
+            className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 font-semibold transition"
+          >
+            ← Voltar
+          </button>
+          <span className="text-gray-300">/</span>
+          <h1 className="text-base font-bold text-vine-950">
+            {EMOJI[editing]} {editing}
+          </h1>
+        </div>
+        <EventosTab
+          ministerio={editing}
+          isLider={temPermissao("criar_evento")}
+          podeEditar={temPermissao("editar_evento")}
+        />
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col gap-4">
       <div>
         <h1 className="text-2xl font-sans font-semibold text-vine-950">Eventos</h1>
-        <p className="text-sm text-gray-500 mt-0.5">Agenda de eventos dos ministérios.</p>
+        <p className="text-sm text-gray-500 mt-0.5">Clique num ministério para gerenciar os eventos.</p>
       </div>
-      {lista.length > 1 && (
-        <div className="flex flex-wrap gap-2">
-          {lista.map((m) => (
-            <button key={m} onClick={() => setSel(m)}
-              className={clsx("flex items-center gap-1.5 text-sm font-semibold px-4 py-2 rounded-xl border transition",
-                sel === m ? "bg-vine-700 text-white border-vine-700 shadow-sm" : "bg-white text-gray-600 border-gray-200 hover:border-vine-300 hover:text-vine-700"
-              )}><span>{EMOJI[m] ?? "📋"}</span> {m}</button>
-          ))}
-        </div>
-      )}
-      <EventosTab ministerio={sel} isLider={temPermissao("criar_evento")} podeEditar={temPermissao("editar_evento")} />
+
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        {lista.map((m) => (
+          <MinistryEventRow
+            key={m}
+            ministerio={m}
+            isLider={temPermissao("criar_evento")}
+            podeEditar={temPermissao("editar_evento")}
+            onOpen={setEditing}
+            reloadKey={reloadKey}
+          />
+        ))}
+      </div>
     </div>
   );
 }
