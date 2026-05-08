@@ -1476,9 +1476,11 @@ export default function ChatPage() {
     if (!user?.id) return;
     if (updatesChannelRef.current) supabase.removeChannel(updatesChannelRef.current);
     const ch = supabase.channel(`chat_updates_${user.id}`)
-      // ── INSERT: fallback para mensagens que o broadcast perdeu ──────
-      // Se o WebSocket sofreu uma reconexão, o broadcast pode ter sido perdido.
-      // O postgres_changes garante que a mensagem aparece assim que salva no banco.
+      // ── INSERT: fallback + correção de clock skew ──────────────────
+      // O postgres_changes traz o timestamp AUTORITATIVO do servidor (criado_em = NOW()).
+      // Isso corrige clock skew: se o relógio do remetente estava adiantado/atrasado,
+      // o timestamp da mensagem é corrigido e a lista é re-ordenada.
+      // Também serve de fallback caso o broadcast WebSocket tenha sido perdido.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .on("postgres_changes" as any, {
         event: "INSERT", schema: "public", table: "chat_mensagens",
@@ -1486,16 +1488,23 @@ export default function ChatPage() {
       }, (payload: any) => {
         const row = payload.new;
         const cid = row.conversa_id as string;
-        // Ignora conversas que o usuário não participa e próprias mensagens (já otimistas)
         if (!conversaIdsRef.current.includes(cid)) return;
-        if (row.autor_id === user.id) return;
-        const msg: MensagemConversa = { ...rowToMensagem(row), lida: activeChatRef.current?.id === cid };
-        const insertSorted = (msgs: MensagemConversa[]) => {
-          if (msgs.some(m => m.id === msg.id)) return msgs;
-          return [...msgs, msg].sort((a, b) => new Date(a.criadoEm).getTime() - new Date(b.criadoEm).getTime());
+        const serverTime = row.criado_em as string;
+        const msg: MensagemConversa = {
+          ...rowToMensagem(row),
+          lida: row.autor_id === user.id || activeChatRef.current?.id === cid,
         };
-        setDms(prev => prev.map(dm => dm.id === cid ? { ...dm, mensagens: insertSorted(dm.mensagens) } : dm));
-        setGrupos(prev => prev.map(g => g.id === cid ? { ...g, mensagens: insertSorted(g.mensagens) } : g));
+        // upsertSorted: se mensagem já existe (veio por broadcast ou otimista),
+        // atualiza só o criadoEm com o tempo do servidor e re-ordena.
+        // Se não existe (broadcast perdido), insere normalmente.
+        const upsertSorted = (msgs: MensagemConversa[]) => {
+          const updated = msgs.some(m => m.id === msg.id)
+            ? msgs.map(m => m.id === msg.id ? { ...m, criadoEm: serverTime } : m)
+            : [...msgs, msg];
+          return updated.sort((a, b) => new Date(a.criadoEm).getTime() - new Date(b.criadoEm).getTime());
+        };
+        setDms(prev => prev.map(dm => dm.id === cid ? { ...dm, mensagens: upsertSorted(dm.mensagens) } : dm));
+        setGrupos(prev => prev.map(g => g.id === cid ? { ...g, mensagens: upsertSorted(g.mensagens) } : g));
       })
       // ── UPDATE: edições de mensagens ────────────────────────────────
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
