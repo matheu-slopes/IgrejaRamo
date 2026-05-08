@@ -7,7 +7,7 @@ import { supabase } from "@/lib/supabase";
 import { ConversaDireta, Grupo, MensagemConversa } from "@/types";
 import {
   MessageSquare, Users, Send, ArrowLeft, Search, Lock, Plus,
-  Phone, Video, Info, Smile, Paperclip, Mic, Star, X, FileText,
+  Info, Smile, Paperclip, Mic, Star, X, FileText,
   Image as ImageIcon, MoreVertical, Trash2, LogOut, Check, Archive, Pencil, Reply,
 } from "lucide-react";
 import clsx from "clsx";
@@ -119,21 +119,64 @@ function AttachMenu({ onAction, onClose }: { onAction: (label: string) => void; 
 // ─── ComposeBar ───────────────────────────────────────────────────
 
 function ComposeBar({
-  onSend, disabled, onToast,
+  onSend, onSendImage, disabled, onToast,
 }: {
   onSend: (t: string) => void;
+  onSendImage: (file: File) => void;
   disabled?: boolean;
   onToast: (msg: string) => void;
 }) {
   const [text, setText] = useState("");
   const [showEmoji, setShowEmoji] = useState(false);
   const [showAttach, setShowAttach] = useState(false);
+  const [imgPreview, setImgPreview] = useState<{ file: File; url: string } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   function handleSend() {
+    if (imgPreview) {
+      onSendImage(imgPreview.file);
+      URL.revokeObjectURL(imgPreview.url);
+      setImgPreview(null);
+      setShowAttach(false);
+      return;
+    }
     if (!text.trim() || disabled) return;
     onSend(text.trim());
     setText("");
     setShowEmoji(false);
+  }
+
+  // Comprime a imagem via canvas antes de enviar (reduz ~80% do tamanho)
+  function compressImage(file: File): Promise<File> {
+    return new Promise((resolve) => {
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        const MAX = 1280;
+        const scale = Math.min(1, MAX / Math.max(img.width, img.height));
+        const w = Math.round(img.width * scale);
+        const h = Math.round(img.height * scale);
+        const canvas = document.createElement("canvas");
+        canvas.width = w; canvas.height = h;
+        canvas.getContext("2d")!.drawImage(img, 0, 0, w, h);
+        URL.revokeObjectURL(url);
+        canvas.toBlob(blob => {
+          resolve(blob ? new File([blob], file.name.replace(/\.\w+$/, ".jpg"), { type: "image/jpeg" }) : file);
+        }, "image/jpeg", 0.82);
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
+      img.src = url;
+    });
+  }
+
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const raw = e.target.files?.[0];
+    e.target.value = "";
+    if (!raw) return;
+    if (!raw.type.startsWith("image/")) { onToast("Apenas imagens são suportadas"); return; }
+    const compressed = await compressImage(raw);
+    setImgPreview({ file: compressed, url: URL.createObjectURL(compressed) });
+    setShowAttach(false);
   }
 
   if (disabled) {
@@ -147,6 +190,19 @@ function ComposeBar({
 
   return (
     <div className="border-t border-gray-100 bg-white px-3 py-3 shrink-0">
+      {/* Preview da imagem selecionada */}
+      {imgPreview && (
+        <div className="relative mb-2 inline-block">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={imgPreview.url} alt="preview" className="max-h-32 rounded-xl border border-gray-200 object-cover" />
+          <button
+            onClick={() => { URL.revokeObjectURL(imgPreview.url); setImgPreview(null); }}
+            className="absolute -top-1.5 -right-1.5 bg-gray-700 text-white rounded-full w-5 h-5 flex items-center justify-center hover:bg-red-600 transition"
+          >
+            <X className="w-3 h-3" />
+          </button>
+        </div>
+      )}
       <div className="flex items-end gap-2 relative">
         {showEmoji && (
           <EmojiPicker
@@ -155,11 +211,32 @@ function ComposeBar({
           />
         )}
         {showAttach && (
-          <AttachMenu
-            onAction={(label) => onToast(`${label}: disponivel em breve`)}
-            onClose={() => setShowAttach(false)}
-          />
+          <div className="absolute bottom-full left-0 mb-2 bg-white border border-gray-200 rounded-2xl shadow-lg py-2 z-30 min-w-[150px]">
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition"
+            >
+              <ImageIcon className="w-4 h-4 text-purple-500" />
+              Foto
+            </button>
+            <button
+              onClick={() => { onToast("Documentos: disponível em breve"); setShowAttach(false); }}
+              className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition"
+            >
+              <FileText className="w-4 h-4 text-blue-500" />
+              Documento
+            </button>
+          </div>
         )}
+
+        {/* Input de arquivo oculto */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={handleFileChange}
+        />
 
         {/* Attach */}
         <button
@@ -177,7 +254,7 @@ function ComposeBar({
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
             }}
-            placeholder="Digite uma mensagem..."
+            placeholder={imgPreview ? "Legenda (opcional)..." : "Digite uma mensagem..."}
             rows={1}
             className="w-full resize-none rounded-2xl border border-gray-200 bg-gray-50 px-4 py-2.5 pr-10 text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-vine-300 focus:border-vine-400 leading-relaxed max-h-32 overflow-y-auto"
           />
@@ -190,7 +267,7 @@ function ComposeBar({
         </div>
 
         {/* Send / Mic */}
-        {text.trim() ? (
+        {(text.trim() || imgPreview) ? (
           <button
             onClick={handleSend}
             className="w-10 h-10 rounded-full bg-vine-700 text-white flex items-center justify-center shrink-0 hover:bg-vine-800 active:scale-95 transition"
@@ -302,11 +379,26 @@ function MessageBubble({
         ) : (
           <div
             className={clsx(
-              "px-3.5 py-2 rounded-2xl text-sm leading-relaxed max-w-full break-words",
+              "rounded-2xl text-sm leading-relaxed max-w-full break-words overflow-hidden",
+              msg.tipo === "imagem" ? "" : "px-3.5 py-2",
               isMe ? "bg-vine-700 text-white rounded-br-sm" : "bg-white border border-gray-100 text-gray-800 rounded-bl-sm shadow-sm"
             )}
           >
-            {msg.conteudo}
+            {msg.tipo === "imagem" && msg.mediaUrl ? (
+              <div>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={msg.mediaUrl}
+                  alt="imagem"
+                  className="max-w-[260px] max-h-[320px] object-cover cursor-pointer rounded-2xl"
+                  onClick={() => window.open(msg.mediaUrl, "_blank")}
+                  onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                />
+                {msg.conteudo && <p className="px-3.5 py-2 text-sm">{msg.conteudo}</p>}
+              </div>
+            ) : (
+              msg.conteudo
+            )}
           </div>
         )}
 
@@ -714,7 +806,7 @@ function GrupoAvatar({ grupo, size = "md" }: { grupo: Grupo; size?: "sm" | "md" 
 
 export default function ChatPage() {
   const { user, usuarios } = useAuth();
-  const { setTotalUnread } = useChatUnread();
+  const { setTotalUnread, setActiveChatId } = useChatUnread();
   const [tab, setTab] = useState<ChatTab>("direto");
   const [activeChat, setActiveChat] = useState<ActiveChat>(null);
   const [search, setSearch] = useState("");
@@ -774,7 +866,9 @@ export default function ChatPage() {
       id: row.id,
       autorId: row.autor_id,
       autorNome: row.autor_nome ?? "?",
-      conteudo: row.conteudo,
+      conteudo: row.conteudo ?? "",
+      tipo: row.tipo ?? "texto",
+      mediaUrl: row.media_url ?? undefined,
       criadoEm: row.criado_em,
       editadoEm: row.editado_em ?? undefined,
       respostaA: row.resposta_a_id ? {
@@ -988,6 +1082,13 @@ export default function ChatPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dms, grupos]);
 
+  // ── sincroniza activeChatId no contexto global ───────────────────
+  useEffect(() => {
+    setActiveChatId(activeChat?.id ?? null);
+    return () => { setActiveChatId(null); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeChat?.id]);
+
   function showToast(msg: string) {
     setToast(msg);
     setTimeout(() => setToast(null), 2500);
@@ -1164,6 +1265,58 @@ export default function ChatPage() {
     });
   }
 
+  async function sendImage(conversaId: string, tipo: "direto" | "grupo", file: File) {
+    const msgId = crypto.randomUUID();
+    const localUrl = URL.createObjectURL(file);
+    const msg: MensagemConversa = {
+      id: msgId, autorId: u.id, autorNome: u.nome,
+      conteudo: "", tipo: "imagem", mediaUrl: localUrl,
+      criadoEm: new Date().toISOString(), lida: true,
+    };
+    // Optimistic: mostra imagem local imediatamente
+    if (tipo === "direto") setDms(prev => prev.map(dm => dm.id === conversaId ? { ...dm, mensagens: [...dm.mensagens, msg] } : dm));
+    else setGrupos(prev => prev.map(g => g.id === conversaId ? { ...g, mensagens: [...g.mensagens, msg] } : g));
+    // Broadcast local (quem está na conversa recebe antes do upload)
+    broadcastChannelsRef.current.get(conversaId)?.send({ type: "broadcast", event: "msg", payload: msg });
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("conversa_id", conversaId);
+      const upRes = await fetch("/api/chat/upload-imagem", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${session?.access_token ?? ""}` },
+        body: fd,
+      });
+      if (!upRes.ok) { const j = await upRes.json().catch(() => ({})); throw new Error(j.error ?? "Upload falhou"); }
+      const { url: finalUrl } = await upRes.json();
+
+      // Substitui URL local pela URL final
+      const updater = (m: MensagemConversa) => m.id === msgId ? { ...m, mediaUrl: finalUrl } : m;
+      if (tipo === "direto") setDms(prev => prev.map(dm => dm.id === conversaId ? { ...dm, mensagens: dm.mensagens.map(updater) } : dm));
+      else setGrupos(prev => prev.map(g => g.id === conversaId ? { ...g, mensagens: g.mensagens.map(updater) } : g));
+      URL.revokeObjectURL(localUrl);
+
+      // Broadcast com URL definitiva
+      const finalMsg = { ...msg, mediaUrl: finalUrl };
+      broadcastChannelsRef.current.get(conversaId)?.send({ type: "broadcast", event: "msg", payload: finalMsg });
+
+      // Persiste no banco
+      fetch("/api/chat/mensagem", {
+        method: "POST", keepalive: true,
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token ?? ""}` },
+        body: JSON.stringify({ id: msgId, conversa_id: conversaId, autor_id: u.id, autor_nome: u.nome, conteudo: "", tipo: "imagem", media_url: finalUrl }),
+      });
+    } catch (err: unknown) {
+      const msg2 = err instanceof Error ? err.message : "Erro ao enviar imagem";
+      showToast(msg2);
+      if (tipo === "direto") setDms(prev => prev.map(dm => dm.id === conversaId ? { ...dm, mensagens: dm.mensagens.filter(m => m.id !== msgId) } : dm));
+      else setGrupos(prev => prev.map(g => g.id === conversaId ? { ...g, mensagens: g.mensagens.filter(m => m.id !== msgId) } : g));
+      URL.revokeObjectURL(localUrl);
+    }
+  }
+
   function editMsg(msgId: string, newText: string) {
     if (!activeChat) return;
     const updater = (msgs: MensagemConversa[]) =>
@@ -1232,6 +1385,7 @@ export default function ChatPage() {
   function openChat(chat: ActiveChat) {
     setActiveChat(chat);
     activeChatRef.current = chat;
+    setActiveChatId(chat?.id ?? null);
     setInfoOpen(false);
     setChatSearchOpen(false);
     setChatSearchQuery("");
@@ -1280,20 +1434,6 @@ export default function ChatPage() {
             title="Pesquisar na conversa"
           >
             <Search className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => showToast("Chamada de voz: disponivel em breve")}
-            className="w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:text-vine-600 hover:bg-gray-100 transition"
-            title="Ligar"
-          >
-            <Phone className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => showToast("Chamada de video: disponivel em breve")}
-            className="w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:text-vine-600 hover:bg-gray-100 transition"
-            title="Video chamada"
-          >
-            <Video className="w-4 h-4" />
           </button>
           <button
             onClick={() => setInfoOpen((v) => !v)}
@@ -1392,6 +1532,7 @@ export default function ChatPage() {
 
           <ComposeBar
             onSend={(t) => activeChat.tipo === "direto" ? sendDm(activeChat.id, t) : sendGrupo(activeChat.id, t)}
+            onSendImage={(f) => sendImage(activeChat.id, activeChat.tipo, f)}
             disabled={locked}
             onToast={showToast}
           />
@@ -1500,7 +1641,7 @@ export default function ChatPage() {
                       </div>
                       {last && (
                         <p className={clsx("text-xs truncate mt-0.5", unread > 0 ? "text-gray-700 font-medium" : "text-gray-400")}>
-                          {last.autorId === u.id ? "Voce: " : ""}{last.conteudo}
+                          {last.autorId === u.id ? "Voce: " : ""}{last.tipo === "imagem" ? "📷 Foto" : last.conteudo}
                         </p>
                       )}
                     </div>
@@ -1568,7 +1709,7 @@ export default function ChatPage() {
                           </div>
                           {last ? (
                             <p className={clsx("text-xs truncate mt-0.5", unread > 0 ? "text-gray-700 font-medium" : "text-gray-400")}>
-                              {last.autorId === u.id ? "Voce: " : last.autorNome.split(" ")[0] + ": "}{last.conteudo}
+                              {last.autorId === u.id ? "Voce: " : last.autorNome.split(" ")[0] + ": "}{last.tipo === "imagem" ? "📷 Foto" : last.conteudo}
                             </p>
                           ) : (
                             <p className="text-xs text-gray-300 mt-0.5 italic">{g.descricao}</p>

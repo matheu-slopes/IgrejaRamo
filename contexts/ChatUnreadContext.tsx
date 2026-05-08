@@ -8,11 +8,13 @@ import { supabase } from "@/lib/supabase";
 type ChatUnreadCtx = {
   totalUnread: number;
   setTotalUnread: (n: number) => void;
+  setActiveChatId: (id: string | null) => void;
 };
 
 const ChatUnreadContext = createContext<ChatUnreadCtx>({
   totalUnread: 0,
   setTotalUnread: () => {},
+  setActiveChatId: () => {},
 });
 
 // ── helpers localStorage ────────────────────────────────────────────
@@ -42,6 +44,12 @@ export function ChatUnreadProvider({ children }: { children: ReactNode }) {
   const channelsRef = useRef<Map<string, any>>(new Map());
   const pathnameRef = useRef(pathname);
   const userIdRef = useRef<string | undefined>(undefined);
+  // ID da conversa aberta no chat page (null quando fora do chat)
+  const activeChatIdRef = useRef<string | null>(null);
+
+  function setActiveChatId(id: string | null) {
+    activeChatIdRef.current = id;
+  }
 
   // Mantém pathnameRef sempre atualizado dentro dos closures
   useEffect(() => { pathnameRef.current = pathname; }, [pathname]);
@@ -84,8 +92,8 @@ export function ChatUnreadProvider({ children }: { children: ReactNode }) {
         .on("broadcast", { event: "msg" }, ({ payload }: { payload: any }) => {
           // Ignora mensagens próprias
           if (payload?.autorId === uid) return;
-          // Ignora se o usuário está na página de chat (chat page cuida do count)
-          if (pathnameRef.current === "/dashboard/chat") return;
+          // Ignora apenas se: está na página de chat E esta conversa específica está ativa
+          if (pathnameRef.current === "/dashboard/chat" && activeChatIdRef.current === cid) return;
           setTotalUnreadState(prev => {
             const next = prev + 1;
             saveCount(uid, next);
@@ -107,7 +115,7 @@ export function ChatUnreadProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <ChatUnreadContext.Provider value={{ totalUnread, setTotalUnread }}>
+    <ChatUnreadContext.Provider value={{ totalUnread, setTotalUnread, setActiveChatId }}>
       {children}
     </ChatUnreadContext.Provider>
   );

@@ -27,6 +27,8 @@ export async function POST(req: NextRequest) {
     autor_id,
     autor_nome,
     conteudo,
+    tipo,
+    media_url,
     resposta_a_id,
     resposta_a_autor_nome,
     resposta_a_conteudo,
@@ -37,7 +39,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Não autorizado" }, { status: 403 });
   }
 
-  if (!id || !conversa_id || !autor_id || !conteudo) {
+  if (!id || !conversa_id || !autor_id || (!conteudo && !media_url)) {
     return NextResponse.json({ error: "Campos obrigatórios faltando" }, { status: 400 });
   }
 
@@ -46,7 +48,9 @@ export async function POST(req: NextRequest) {
     conversa_id,
     autor_id,
     autor_nome,
-    conteudo,
+    conteudo: conteudo ?? "",
+    tipo: tipo ?? "texto",
+    media_url: media_url ?? null,
     resposta_a_id: resposta_a_id ?? null,
     resposta_a_autor_nome: resposta_a_autor_nome ?? null,
     resposta_a_conteudo: resposta_a_conteudo ?? null,
