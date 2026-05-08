@@ -1197,7 +1197,15 @@ export default function ChatPage() {
     try {
       const raw = localStorage.getItem(cacheKey(uid));
       if (!raw) return null;
-      return JSON.parse(raw);
+      const parsed = JSON.parse(raw);
+      // Remove mensagens que ficaram presas como "⏳ enviando mídia…"
+      // (upload não concluído antes de recarregar a página)
+      const limpar = (msgs: MensagemConversa[]) =>
+        msgs.filter((m) => m.conteudo !== "⏳ enviando mídia…");
+      return {
+        dms:    parsed.dms?.map((d: ConversaDireta) => ({ ...d, mensagens: limpar(d.mensagens) })) ?? [],
+        grupos: parsed.grupos?.map((g: Grupo) => ({ ...g, mensagens: limpar(g.mensagens) })) ?? [],
+      };
     } catch { return null; }
   }
 
