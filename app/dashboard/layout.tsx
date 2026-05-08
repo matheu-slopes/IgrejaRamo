@@ -10,6 +10,7 @@ import { User, Permissao } from "@/types";
 import {
   LogOut, Pencil, Check, X, Camera, ChevronRight, User as UserIcon,
   Mail, Phone, Calendar, Layers, Shield, Settings, HelpCircle,
+  KeyRound, Eye, EyeOff,
 } from "lucide-react";
 import clsx from "clsx";
 
@@ -33,13 +34,18 @@ function ProfileDropdown({
   onUpdate: (dados: Partial<User>) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const [view, setView] = useState<"menu" | "perfil" | "dados">("menu");
+  const [view, setView] = useState<"menu" | "perfil" | "dados" | "senha">("menu");
   const [editingName, setEditingName] = useState(false);
+  const [novaSenha, setNovaSenha] = useState("");
+  const [showSenha, setShowSenha] = useState(false);
+  const [salvandoSenha, setSalvandoSenha] = useState(false);
+  const [erroSenha, setErroSenha] = useState("");
+  const [okSenha, setOkSenha] = useState(false);
   const [newName, setNewName] = useState(user.nome);
   const photoRef = useRef<HTMLInputElement>(null);
   const nameInputRef = useRef<HTMLInputElement>(null);
 
-  function close() { setOpen(false); setView("menu"); setEditingName(false); }
+  function close() { setOpen(false); setView("menu"); setEditingName(false); setNovaSenha(""); setErroSenha(""); setOkSenha(false); }
 
   function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -110,6 +116,7 @@ function ProfileDropdown({
                   {[
                     { icon: UserIcon, label: "Meu perfil",       action: () => setView("perfil") },
                     { icon: Layers,   label: "Meus ministérios", action: () => setView("dados")  },
+                    { icon: KeyRound, label: "Trocar senha",      action: () => setView("senha")  },
                   ].map(({ icon: Icon, label, action }) => (
                     <button key={label} onClick={action}
                       className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition text-left"
@@ -149,6 +156,52 @@ function ProfileDropdown({
                   >
                     <LogOut className="w-4 h-4 shrink-0" />
                     Sair da conta
+                  </button>
+                </div>
+              </>
+            )}
+
+            {/* ─── VIEW: TROCAR SENHA ─── */}
+            {view === "senha" && (
+              <>
+                <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-100">
+                  <button onClick={() => { setView("menu"); setNovaSenha(""); setErroSenha(""); setOkSenha(false); }} className="text-gray-400 hover:text-gray-600 transition">
+                    <ChevronRight className="w-4 h-4 rotate-180" />
+                  </button>
+                  <p className="text-sm font-semibold text-gray-800">Trocar senha</p>
+                </div>
+                <div className="px-4 py-4 space-y-3">
+                  <div className="relative">
+                    <input
+                      type={showSenha ? "text" : "password"}
+                      value={novaSenha}
+                      onChange={(e) => { setNovaSenha(e.target.value); setErroSenha(""); setOkSenha(false); }}
+                      placeholder="Nova senha (mín. 6 caracteres)"
+                      className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-vine-400 focus:ring-1 focus:ring-vine-100 pr-10"
+                    />
+                    <button type="button" onClick={() => setShowSenha((v) => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                      {showSenha ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                  {erroSenha && <p className="text-xs text-red-500">{erroSenha}</p>}
+                  <button
+                    disabled={salvandoSenha || !novaSenha}
+                    onClick={async () => {
+                      if (novaSenha.length < 6) { setErroSenha("Mínimo 6 caracteres."); return; }
+                      setSalvandoSenha(true); setErroSenha("");
+                      const res = await fetch("/api/alterar-senha", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ userId: user.id, novaSenha }),
+                      });
+                      const json = await res.json().catch(() => ({}));
+                      setSalvandoSenha(false);
+                      if (res.ok) { setOkSenha(true); setNovaSenha(""); }
+                      else setErroSenha(json.error ?? "Erro ao alterar senha.");
+                    }}
+                    className={okSenha ? "w-full py-2.5 rounded-xl text-sm font-semibold border bg-green-50 text-green-700 border-green-200" : "w-full py-2.5 rounded-xl text-sm font-semibold border bg-vine-700 text-white border-vine-700 hover:bg-vine-800 disabled:opacity-50"}
+                  >
+                    {salvandoSenha ? "Salvando..." : okSenha ? "Senha alterada!" : "Salvar nova senha"}
                   </button>
                 </div>
               </>
@@ -281,10 +334,6 @@ export default function DashboardLayout({
   useEffect(() => {
     if (!isLoading && !user) {
       router.push("/login");
-    }
-    // Membros só acessam o portal de membro — sem dashboard interno
-    if (!isLoading && user && user.role === "membro") {
-      router.push("/membro");
     }
   }, [user, isLoading, router]);
 

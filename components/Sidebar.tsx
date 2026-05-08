@@ -147,7 +147,15 @@ export default function Sidebar() {
         )}
         {collapsed && <div className="border-t border-vine-800 my-3 mx-1" />}
 
-        {ministerios.map(({ label, icon: Icon, href }) => (
+        {ministerios
+          .filter((m) =>
+            user?.role === "admin" || user?.role === "pastor"
+              ? true
+              : user?.ministerios?.some(
+                  (um) => um.toLowerCase() === m.label.toLowerCase()
+                )
+          )
+          .map(({ label, icon: Icon, href }) => (
           <Link
             key={label}
             href={href}
