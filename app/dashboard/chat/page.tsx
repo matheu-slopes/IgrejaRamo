@@ -1698,23 +1698,29 @@ export default function ChatPage() {
     return u.role === "admin" || u.role === "pastor" || u.role === "lider";
   }
 
-  function sendDm(dmId: string, text: string) {
+  async function sendDm(dmId: string, text: string) {
     const msgId = crypto.randomUUID();
     const replySnapshot = replyTo;
+    const clientTime = new Date().toISOString();
     const msg: MensagemConversa = {
       id: msgId, autorId: u.id, autorNome: u.nome,
-      conteudo: text, criadoEm: new Date().toISOString(), lida: true,
+      conteudo: text, criadoEm: clientTime, lida: true,
       respostaA: replySnapshot ? { id: replySnapshot.id, autorNome: replySnapshot.autorNome, conteudo: replySnapshot.conteudo } : undefined,
     };
-    setDms((prev) => prev.map((dm) => dm.id === dmId ? { ...dm, mensagens: [...dm.mensagens, msg] } : dm));
+    // 1) Optimistic: você vê sua mensagem imediatamente
+    setDms((prev) => prev.map((dm) => dm.id === dmId ? {
+      ...dm,
+      mensagens: [...dm.mensagens, msg].sort((a, b) => new Date(a.criadoEm).getTime() - new Date(b.criadoEm).getTime()),
+    } : dm));
     setReplyTo(null);
-    // Broadcast: entrega instantânea via WebSocket
-    broadcastChannelsRef.current.get(dmId)?.send({ type: "broadcast", event: "msg", payload: msg });
-    // DB: persistência via API route (service role + keepalive garante salvar mesmo em reload)
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      fetch("/api/chat/mensagem", {
-        method: "POST",
-        keepalive: true,
+
+    // 2) Persiste no DB primeiro — o servidor retorna o criado_em autoritativo (NOW())
+    // O broadcast SÓ acontece depois, carregando o timestamp do servidor.
+    // Isso garante que todos os clientes ordenam mensagens pelo relógio do servidor.
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const r = await fetch("/api/chat/mensagem", {
+        method: "POST", keepalive: true,
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${session?.access_token ?? ""}` },
         body: JSON.stringify({
           id: msgId, conversa_id: dmId, autor_id: u.id, autor_nome: u.nome, conteudo: text,
@@ -1722,34 +1728,54 @@ export default function ChatPage() {
           resposta_a_autor_nome: replySnapshot?.autorNome ?? null,
           resposta_a_conteudo: replySnapshot?.conteudo ?? null,
         }),
-      }).then(async (r) => {
-        if (!r.ok) {
-          const j = await r.json().catch(() => ({}));
-          console.error("sendDm error:", j.error);
-          setDms((prev) => prev.map((dm) => dm.id === dmId ? { ...dm, mensagens: dm.mensagens.filter((m) => m.id !== msgId) } : dm));
-          showToast("Erro ao enviar: " + (j.error ?? r.statusText));
-        }
       });
-    });
+      if (!r.ok) {
+        const j = await r.json().catch(() => ({}));
+        console.error("sendDm error:", j.error);
+        setDms((prev) => prev.map((dm) => dm.id === dmId ? { ...dm, mensagens: dm.mensagens.filter((m) => m.id !== msgId) } : dm));
+        showToast("Erro ao enviar: " + (j.error ?? r.statusText));
+        return;
+      }
+      const j = await r.json().catch(() => ({}));
+      const serverTime: string = j.criado_em ?? clientTime;
+      // 3) Atualiza seu estado local com o tempo do servidor + re-ordena
+      const finalMsg = { ...msg, criadoEm: serverTime };
+      setDms((prev) => prev.map((dm) => dm.id === dmId ? {
+        ...dm,
+        mensagens: dm.mensagens
+          .map((m) => m.id === msgId ? finalMsg : m)
+          .sort((a, b) => new Date(a.criadoEm).getTime() - new Date(b.criadoEm).getTime()),
+      } : dm));
+      // 4) Broadcast com timestamp do servidor — amigo recebe na ordem correta
+      broadcastChannelsRef.current.get(dmId)?.send({ type: "broadcast", event: "msg", payload: finalMsg });
+    } catch (err) {
+      console.error("sendDm network error:", err);
+      setDms((prev) => prev.map((dm) => dm.id === dmId ? { ...dm, mensagens: dm.mensagens.filter((m) => m.id !== msgId) } : dm));
+      showToast("Sem conexão — mensagem não enviada");
+    }
   }
 
-  function sendGrupo(grupoId: string, text: string) {
+  async function sendGrupo(grupoId: string, text: string) {
     const msgId = crypto.randomUUID();
     const replySnapshot = replyTo;
+    const clientTime = new Date().toISOString();
     const msg: MensagemConversa = {
       id: msgId, autorId: u.id, autorNome: u.nome,
-      conteudo: text, criadoEm: new Date().toISOString(), lida: true,
+      conteudo: text, criadoEm: clientTime, lida: true,
       respostaA: replySnapshot ? { id: replySnapshot.id, autorNome: replySnapshot.autorNome, conteudo: replySnapshot.conteudo } : undefined,
     };
-    setGrupos((prev) => prev.map((g) => g.id === grupoId ? { ...g, mensagens: [...g.mensagens, msg] } : g));
+    // 1) Optimistic local
+    setGrupos((prev) => prev.map((g) => g.id === grupoId ? {
+      ...g,
+      mensagens: [...g.mensagens, msg].sort((a, b) => new Date(a.criadoEm).getTime() - new Date(b.criadoEm).getTime()),
+    } : g));
     setReplyTo(null);
-    // Broadcast: entrega instantânea via WebSocket
-    broadcastChannelsRef.current.get(grupoId)?.send({ type: "broadcast", event: "msg", payload: msg });
-    // DB: persistência via API route (service role + keepalive garante salvar mesmo em reload)
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      fetch("/api/chat/mensagem", {
-        method: "POST",
-        keepalive: true,
+
+    // 2) DB primeiro → timestamp do servidor
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const r = await fetch("/api/chat/mensagem", {
+        method: "POST", keepalive: true,
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${session?.access_token ?? ""}` },
         body: JSON.stringify({
           id: msgId, conversa_id: grupoId, autor_id: u.id, autor_nome: u.nome, conteudo: text,
@@ -1757,15 +1783,31 @@ export default function ChatPage() {
           resposta_a_autor_nome: replySnapshot?.autorNome ?? null,
           resposta_a_conteudo: replySnapshot?.conteudo ?? null,
         }),
-      }).then(async (r) => {
-        if (!r.ok) {
-          const j = await r.json().catch(() => ({}));
-          console.error("sendGrupo error:", j.error);
-          setGrupos((prev) => prev.map((g) => g.id === grupoId ? { ...g, mensagens: g.mensagens.filter((m) => m.id !== msgId) } : g));
-          showToast("Erro ao enviar: " + (j.error ?? r.statusText));
-        }
       });
-    });
+      if (!r.ok) {
+        const j = await r.json().catch(() => ({}));
+        console.error("sendGrupo error:", j.error);
+        setGrupos((prev) => prev.map((g) => g.id === grupoId ? { ...g, mensagens: g.mensagens.filter((m) => m.id !== msgId) } : g));
+        showToast("Erro ao enviar: " + (j.error ?? r.statusText));
+        return;
+      }
+      const j = await r.json().catch(() => ({}));
+      const serverTime: string = j.criado_em ?? clientTime;
+      // 3) Atualiza estado local com tempo do servidor
+      const finalMsg = { ...msg, criadoEm: serverTime };
+      setGrupos((prev) => prev.map((g) => g.id === grupoId ? {
+        ...g,
+        mensagens: g.mensagens
+          .map((m) => m.id === msgId ? finalMsg : m)
+          .sort((a, b) => new Date(a.criadoEm).getTime() - new Date(b.criadoEm).getTime()),
+      } : g));
+      // 4) Broadcast com timestamp do servidor
+      broadcastChannelsRef.current.get(grupoId)?.send({ type: "broadcast", event: "msg", payload: finalMsg });
+    } catch (err) {
+      console.error("sendGrupo network error:", err);
+      setGrupos((prev) => prev.map((g) => g.id === grupoId ? { ...g, mensagens: g.mensagens.filter((m) => m.id !== msgId) } : g));
+      showToast("Sem conexão — mensagem não enviada");
+    }
   }
 
   async function sendImage(conversaId: string, tipo: "direto" | "grupo", file: File) {

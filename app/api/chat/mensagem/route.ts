@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Campos obrigatórios faltando" }, { status: 400 });
   }
 
-  const { error } = await admin.from("chat_mensagens").insert({
+  const { data: inserted, error } = await admin.from("chat_mensagens").insert({
     id,
     conversa_id,
     autor_id,
@@ -54,12 +54,14 @@ export async function POST(req: NextRequest) {
     resposta_a_id: resposta_a_id ?? null,
     resposta_a_autor_nome: resposta_a_autor_nome ?? null,
     resposta_a_conteudo: resposta_a_conteudo ?? null,
-  });
+  }).select("criado_em").single();
 
   if (error) {
     console.error("chat/mensagem insert error:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ ok: true });
+  // Retorna o criado_em atribuído pelo servidor (NOW()) para o cliente usar no broadcast
+  // Garante que a ordem das mensagens usa sempre o relógio do servidor, não do cliente
+  return NextResponse.json({ ok: true, criado_em: inserted.criado_em });
 }
