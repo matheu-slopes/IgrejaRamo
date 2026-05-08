@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Ministerio, Escala, FuncaoEscala } from "@/types";
 import { EscalasTab } from "@/components/dashboard/EscalasTab";
+import { EscalaModal } from "@/components/dashboard/EscalaModal";
 import { supabase } from "@/lib/supabase";
 import { Plus, ChevronRight } from "lucide-react";
 import clsx from "clsx";
@@ -53,75 +54,6 @@ function corCard(culto: string) {
   return "border-t-vine-500";
 }
 
-// ── Barra de dias com culto ───────────────────────────────────────────────────
-function DiasComEscalas({
-  todasEscalas, userId, selectedDate, onDayClick,
-}: {
-  todasEscalas: Escala[]; userId: string;
-  selectedDate: string | null; onDayClick: (date: string) => void;
-}) {
-  const hojeStr = new Date().toISOString().split("T")[0];
-
-  const dias = useMemo(() => {
-    const set = new Set<string>();
-    for (const e of todasEscalas) set.add(e.data);
-    return [...set].sort();
-  }, [todasEscalas]);
-
-  if (dias.length === 0) return null;
-
-  return (
-    <div className="flex gap-2 overflow-x-auto pb-0.5 scrollbar-none">
-      {dias.map((iso) => {
-        const d = new Date(iso + "T00:00:00");
-        const escalasNoDia = todasEscalas.filter((e) => e.data === iso);
-        const isHoje = iso === hojeStr;
-        const isSel = iso === selectedDate;
-        const isPast = iso < hojeStr;
-        const temMinha = escalasNoDia.some((e) => e.itens.some((it) => it.voluntarioId === userId));
-        return (
-          <button
-            key={iso}
-            onClick={() => onDayClick(iso)}
-            className={clsx(
-              "flex-shrink-0 flex flex-col items-center gap-1 px-3 py-2 rounded-xl border transition select-none",
-              isSel ? "bg-vine-600 border-vine-600 shadow-sm" :
-              temMinha ? "bg-vine-50 border-vine-200 hover:border-vine-400" :
-              isPast ? "border-gray-100 opacity-40 hover:opacity-70" :
-              "bg-white border-gray-100 hover:border-gray-300",
-            )}
-          >
-            <span className={clsx(
-              "text-[10px] font-bold uppercase leading-none",
-              isSel ? "text-white/70" : "text-gray-400"
-            )}>
-              {d.toLocaleDateString("pt-BR", { weekday: "short" }).replace(".", "")}
-            </span>
-            <span className={clsx(
-              "text-base font-bold leading-none",
-              isSel ? "text-white" : isHoje ? "text-vine-600" : "text-gray-700"
-            )}>
-              {d.getDate()}
-            </span>
-            <span className={clsx(
-              "text-[9px] font-semibold uppercase leading-none",
-              isSel ? "text-white/70" : "text-gray-400"
-            )}>
-              {d.toLocaleDateString("pt-BR", { month: "short" }).replace(".", "")}
-            </span>
-            <div className="flex gap-0.5 mt-0.5">
-              {escalasNoDia.slice(0, 4).map((e, j) => (
-                <span key={j} title={e.ministerio}
-                  className={clsx("w-1 h-1 rounded-full", isSel ? "bg-white/60" : COR_MIN[e.ministerio] ?? "bg-gray-300")}
-                />
-              ))}
-            </div>
-          </button>
-        );
-      })}
-    </div>
-  );
-}
 
 // ── Detalhe do dia selecionado ────────────────────────────────────────────────
 function DiaSelecionado({ date, escalas, userId, onOpenMinisterio }: {
@@ -296,10 +228,10 @@ function corEscalaLeft(culto: string) {
 }
 
 function TabelaEscalas({
-  todasEscalas, lista, userId, isLider, onOpen, selectedDate,
+  todasEscalas, lista, userId, isLider, onOpen, onOpenEscala,
 }: {
   todasEscalas: Escala[]; lista: Ministerio[]; userId: string; isLider: boolean;
-  onOpen: (m: Ministerio) => void; selectedDate: string | null;
+  onOpen: (m: Ministerio) => void; onOpenEscala: (esc: Escala) => void;
 }) {
   const hojeStr = new Date().toISOString().split("T")[0];
 
@@ -368,14 +300,13 @@ function TabelaEscalas({
                   )}
                   {escalas.map((esc) => {
                     const d = new Date(esc.data + "T00:00:00");
-                    const isSel = selectedDate === esc.data;
                     const temMinha = esc.itens.some((it) => it.voluntarioId === userId);
                     return (
-                      <button key={esc.id} onClick={() => onOpen(esc.ministerio)}
+                      <button key={esc.id} onClick={() => onOpenEscala(esc)}
                         className={clsx(
                           "w-full text-left rounded-lg border-l-4 px-2 py-1.5 space-y-1 transition hover:shadow-sm",
                           corEscalaLeft(esc.culto),
-                          isSel ? "bg-vine-50 shadow-sm" : "bg-gray-50 hover:bg-white",
+                          "bg-gray-50 hover:bg-white",
                           temMinha && "ring-1 ring-vine-300",
                         )}
                       >
@@ -458,9 +389,9 @@ function BarraDatas({
 
 // ── Aba Minhas Escalas ────────────────────────────────────────────────────────
 function MinhasEscalasList({
-  escalas, userId, onOpenMinisterio,
+  escalas, userId, onOpenEscala,
 }: {
-  escalas: Escala[]; userId: string; onOpenMinisterio: (m: Ministerio) => void;
+  escalas: Escala[]; userId: string; onOpenEscala: (esc: Escala) => void;
 }) {
   if (escalas.length === 0)
     return (
@@ -473,7 +404,7 @@ function MinhasEscalasList({
       {escalas.map((esc) => {
         const d = new Date(esc.data + "T00:00:00");
         return (
-          <button key={esc.id} onClick={() => onOpenMinisterio(esc.ministerio)}
+          <button key={esc.id} onClick={() => onOpenEscala(esc)}
             className="flex items-center gap-4 bg-white rounded-2xl border border-gray-100 px-5 py-4 text-left hover:shadow-md hover:border-vine-200 transition"
           >
             {/* Data */}
@@ -523,7 +454,7 @@ export default function EscalasDashboardPage() {
   const lista = isAdmin ? TODOS : meus;
   const [editing, setEditing] = useState<Ministerio | null>(null);
   const [todasEscalas, setTodasEscalas] = useState<Escala[]>([]);
-  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [modalEscala, setModalEscala] = useState<Escala | null>(null);
   const [aba, setAba] = useState<"minhas" | "culto">("culto");
 
   async function carregarTodas() {
@@ -554,10 +485,6 @@ export default function EscalasDashboardPage() {
     }
     return map;
   }, [todasEscalas]);
-
-  const escalasNoDiaSel = selectedDate
-    ? todasEscalas.filter((e) => e.data === selectedDate)
-    : [];
 
   if (lista.length === 0)
     return (
@@ -627,28 +554,10 @@ export default function EscalasDashboardPage() {
         <MinhasEscalasList
           escalas={minhasEscalas}
           userId={user?.id ?? ""}
-          onOpenMinisterio={setEditing}
+          onOpenEscala={setModalEscala}
         />
       ) : (
         <>
-          {/* Dias com culto */}
-          <DiasComEscalas
-            todasEscalas={todasEscalas}
-            userId={user?.id ?? ""}
-            selectedDate={selectedDate}
-            onDayClick={(d) => setSelectedDate((prev) => (prev === d ? null : d))}
-          />
-
-          {/* Detalhe do dia clicado */}
-          {selectedDate && escalasNoDiaSel.length > 0 && (
-            <DiaSelecionado
-              date={selectedDate}
-              escalas={escalasNoDiaSel}
-              userId={user?.id ?? ""}
-              onOpenMinisterio={setEditing}
-            />
-          )}
-
           {/* Tabela por dia da semana */}
           <TabelaEscalas
             todasEscalas={todasEscalas}
@@ -656,9 +565,29 @@ export default function EscalasDashboardPage() {
             userId={user?.id ?? ""}
             isLider={temPermissao("criar_escala")}
             onOpen={setEditing}
-            selectedDate={selectedDate}
+            onOpenEscala={setModalEscala}
           />
         </>
+      )}
+
+      {/* Modal de escala */}
+      {modalEscala && (
+        <EscalaModal
+          escala={modalEscala}
+          podeEditar={
+            isAdmin ||
+            (temPermissao("criar_escala") && lista.includes(modalEscala.ministerio))
+          }
+          onClose={() => setModalEscala(null)}
+          onUpdate={(updated) => {
+            setTodasEscalas((prev) => prev.map((e) => e.id === updated.id ? updated : e));
+            setModalEscala(updated);
+          }}
+          onDelete={(id) => {
+            setTodasEscalas((prev) => prev.filter((e) => e.id !== id));
+            setModalEscala(null);
+          }}
+        />
       )}
     </div>
   );
