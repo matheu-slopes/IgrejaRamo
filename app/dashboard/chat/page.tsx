@@ -7,8 +7,9 @@ import { supabase } from "@/lib/supabase";
 import { ConversaDireta, Grupo, MensagemConversa } from "@/types";
 import {
   MessageSquare, Users, Send, ArrowLeft, Search, Lock, Plus,
-  Info, Smile, Paperclip, Mic, Star, X, FileText,
+  Info, Smile, Paperclip, Mic, Star, X, FileText, Square, MicOff,
   Image as ImageIcon, MoreVertical, Trash2, LogOut, Check, Archive, Pencil, Reply,
+  Download,
 } from "lucide-react";
 import clsx from "clsx";
 
@@ -119,10 +120,12 @@ function AttachMenu({ onAction, onClose }: { onAction: (label: string) => void; 
 // ─── ComposeBar ───────────────────────────────────────────────────
 
 function ComposeBar({
-  onSend, onSendImage, disabled, onToast,
+  onSend, onSendImage, onSendAudio, onSendDoc, disabled, onToast,
 }: {
   onSend: (t: string) => void;
   onSendImage: (file: File) => void;
+  onSendAudio: (blob: Blob, name: string) => void;
+  onSendDoc: (file: File) => void;
   disabled?: boolean;
   onToast: (msg: string) => void;
 }) {
@@ -130,7 +133,17 @@ function ComposeBar({
   const [showEmoji, setShowEmoji] = useState(false);
   const [showAttach, setShowAttach] = useState(false);
   const [imgPreview, setImgPreview] = useState<{ file: File; url: string } | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [docPreview, setDocPreview] = useState<File | null>(null);
+  // ── Gravação de áudio ──
+  const [recording, setRecording] = useState(false);
+  const [recSeconds, setRecSeconds] = useState(0);
+  const [audioPreview, setAudioPreview] = useState<{ blob: Blob; url: string; name: string } | null>(null);
+  const mediaRecRef = useRef<MediaRecorder | null>(null);
+  const chunksRef   = useRef<Blob[]>([]);
+  const timerRef    = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const fileInputRef    = useRef<HTMLInputElement>(null);
+  const docInputRef     = useRef<HTMLInputElement>(null);
 
   function handleSend() {
     if (imgPreview) {
@@ -140,13 +153,25 @@ function ComposeBar({
       setShowAttach(false);
       return;
     }
+    if (docPreview) {
+      onSendDoc(docPreview);
+      setDocPreview(null);
+      setShowAttach(false);
+      return;
+    }
+    if (audioPreview) {
+      onSendAudio(audioPreview.blob, audioPreview.name);
+      URL.revokeObjectURL(audioPreview.url);
+      setAudioPreview(null);
+      return;
+    }
     if (!text.trim() || disabled) return;
     onSend(text.trim());
     setText("");
     setShowEmoji(false);
   }
 
-  // Comprime a imagem via canvas antes de enviar (reduz ~80% do tamanho)
+  // Comprime a imagem via canvas antes de enviar
   function compressImage(file: File): Promise<File> {
     return new Promise((resolve) => {
       const img = new Image();
@@ -179,6 +204,69 @@ function ComposeBar({
     setShowAttach(false);
   }
 
+  function handleDocChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const raw = e.target.files?.[0];
+    e.target.value = "";
+    if (!raw) return;
+    if (raw.size > 20 * 1024 * 1024) { onToast("Documento muito grande (máx 20 MB)"); return; }
+    setDocPreview(raw);
+    setShowAttach(false);
+  }
+
+  // ── Gravação ──
+  async function startRecording() {
+    if (recording) return;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+        ? "audio/webm;codecs=opus"
+        : MediaRecorder.isTypeSupported("audio/ogg;codecs=opus")
+        ? "audio/ogg;codecs=opus"
+        : "audio/webm";
+      const rec = new MediaRecorder(stream, { mimeType });
+      chunksRef.current = [];
+      rec.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
+      rec.onstop = () => {
+        stream.getTracks().forEach((t) => t.stop());
+        const blob = new Blob(chunksRef.current, { type: rec.mimeType });
+        const ext = rec.mimeType.includes("ogg") ? "ogg" : "webm";
+        const name = `audio_${Date.now()}.${ext}`;
+        setAudioPreview({ blob, url: URL.createObjectURL(blob), name });
+        setRecording(false);
+        setRecSeconds(0);
+        if (timerRef.current) clearInterval(timerRef.current);
+      };
+      rec.start(250);
+      mediaRecRef.current = rec;
+      setRecording(true);
+      setRecSeconds(0);
+      timerRef.current = setInterval(() => setRecSeconds((s) => s + 1), 1000);
+    } catch {
+      onToast("Microfone não disponível ou permissão negada");
+    }
+  }
+
+  function stopRecording() {
+    mediaRecRef.current?.stop();
+    if (timerRef.current) clearInterval(timerRef.current);
+  }
+
+  function cancelRecording() {
+    mediaRecRef.current?.stream.getTracks().forEach((t) => t.stop());
+    mediaRecRef.current?.stop();
+    if (timerRef.current) clearInterval(timerRef.current);
+    setRecording(false);
+    setRecSeconds(0);
+    chunksRef.current = [];
+  }
+
+  function formatSecs(s: number) {
+    const m = Math.floor(s / 60).toString().padStart(2, "0");
+    return `${m}:${(s % 60).toString().padStart(2, "0")}`;
+  }
+
+  const hasContent = text.trim() || imgPreview || docPreview || audioPreview;
+
   if (disabled) {
     return (
       <div className="border-t border-gray-100 bg-gray-50 px-4 py-3 flex items-center gap-2 text-gray-400 shrink-0">
@@ -188,9 +276,35 @@ function ComposeBar({
     );
   }
 
+  // ── UI de gravação ativo ──
+  if (recording) {
+    return (
+      <div className="border-t border-gray-100 bg-white px-3 py-3 shrink-0">
+        <div className="flex items-center gap-3 bg-red-50 rounded-2xl border border-red-200 px-4 py-2.5">
+          <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse shrink-0" />
+          <span className="text-sm text-red-600 font-medium tabular-nums flex-1">{formatSecs(recSeconds)}</span>
+          <button
+            onClick={cancelRecording}
+            className="text-gray-400 hover:text-gray-600 transition"
+            title="Cancelar"
+          >
+            <X className="w-4 h-4" />
+          </button>
+          <button
+            onClick={stopRecording}
+            className="w-9 h-9 rounded-full bg-red-500 text-white flex items-center justify-center hover:bg-red-600 transition"
+            title="Parar gravação"
+          >
+            <Square className="w-4 h-4 fill-white" />
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="border-t border-gray-100 bg-white px-3 py-3 shrink-0">
-      {/* Preview da imagem selecionada */}
+      {/* Preview da imagem */}
       {imgPreview && (
         <div className="relative mb-2 inline-block">
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -203,6 +317,34 @@ function ComposeBar({
           </button>
         </div>
       )}
+      {/* Preview do documento */}
+      {docPreview && (
+        <div className="flex items-center gap-2 mb-2 bg-blue-50 border border-blue-200 rounded-xl px-3 py-2">
+          <FileText className="w-5 h-5 text-blue-500 shrink-0" />
+          <span className="text-xs text-gray-700 truncate flex-1">{docPreview.name}</span>
+          <button
+            onClick={() => setDocPreview(null)}
+            className="text-gray-400 hover:text-red-500 transition shrink-0"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+      {/* Preview do áudio */}
+      {audioPreview && (
+        <div className="flex items-center gap-2 mb-2 bg-vine-50 border border-vine-200 rounded-xl px-3 py-2">
+          <Mic className="w-4 h-4 text-vine-600 shrink-0" />
+          {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+          <audio src={audioPreview.url} controls className="h-8 flex-1 min-w-0" />
+          <button
+            onClick={() => { URL.revokeObjectURL(audioPreview.url); setAudioPreview(null); }}
+            className="text-gray-400 hover:text-red-500 transition shrink-0"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
       <div className="flex items-end gap-2 relative">
         {showEmoji && (
           <EmojiPicker
@@ -220,7 +362,7 @@ function ComposeBar({
               Foto
             </button>
             <button
-              onClick={() => { onToast("Documentos: disponível em breve"); setShowAttach(false); }}
+              onClick={() => docInputRef.current?.click()}
               className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition"
             >
               <FileText className="w-4 h-4 text-blue-500" />
@@ -229,13 +371,15 @@ function ComposeBar({
           </div>
         )}
 
-        {/* Input de arquivo oculto */}
+        {/* Input de imagem oculto */}
+        <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
+        {/* Input de documento oculto */}
         <input
-          ref={fileInputRef}
+          ref={docInputRef}
           type="file"
-          accept="image/*"
+          accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt"
           className="hidden"
-          onChange={handleFileChange}
+          onChange={handleDocChange}
         />
 
         {/* Attach */}
@@ -254,7 +398,7 @@ function ComposeBar({
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
             }}
-            placeholder={imgPreview ? "Legenda (opcional)..." : "Digite uma mensagem..."}
+            placeholder={imgPreview || docPreview || audioPreview ? "Legenda (opcional)..." : "Digite uma mensagem..."}
             rows={1}
             className="w-full resize-none rounded-2xl border border-gray-200 bg-gray-50 px-4 py-2.5 pr-10 text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-vine-300 focus:border-vine-400 leading-relaxed max-h-32 overflow-y-auto"
           />
@@ -267,7 +411,7 @@ function ComposeBar({
         </div>
 
         {/* Send / Mic */}
-        {(text.trim() || imgPreview) ? (
+        {hasContent ? (
           <button
             onClick={handleSend}
             className="w-10 h-10 rounded-full bg-vine-700 text-white flex items-center justify-center shrink-0 hover:bg-vine-800 active:scale-95 transition"
@@ -276,8 +420,9 @@ function ComposeBar({
           </button>
         ) : (
           <button
-            onClick={() => onToast("Gravacao de audio: disponivel em breve")}
+            onClick={startRecording}
             className="w-10 h-10 rounded-full bg-vine-700 text-white flex items-center justify-center shrink-0 hover:bg-vine-800 active:scale-95 transition"
+            title="Gravar áudio"
           >
             <Mic className="w-4 h-4" />
           </button>
@@ -380,7 +525,7 @@ function MessageBubble({
           <div
             className={clsx(
               "rounded-2xl text-sm leading-relaxed max-w-full break-words overflow-hidden",
-              msg.tipo === "imagem" ? "" : "px-3.5 py-2",
+              msg.tipo === "imagem" || msg.tipo === "audio" || msg.tipo === "documento" ? "" : "px-3.5 py-2",
               isMe ? "bg-vine-700 text-white rounded-br-sm" : "bg-white border border-gray-100 text-gray-800 rounded-bl-sm shadow-sm"
             )}
           >
@@ -396,6 +541,35 @@ function MessageBubble({
                 />
                 {msg.conteudo && <p className="px-3.5 py-2 text-sm">{msg.conteudo}</p>}
               </div>
+            ) : msg.tipo === "audio" && msg.mediaUrl ? (
+              <div className="px-2 py-2">
+                {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+                <audio
+                  src={msg.mediaUrl}
+                  controls
+                  className="h-9 max-w-[240px]"
+                  style={{ colorScheme: isMe ? "dark" : "light" }}
+                />
+              </div>
+            ) : msg.tipo === "documento" && msg.mediaUrl ? (
+              <a
+                href={msg.mediaUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={clsx(
+                  "flex items-center gap-2.5 px-3.5 py-2.5 rounded-2xl min-w-[160px] max-w-[240px] transition",
+                  isMe ? "hover:bg-vine-800" : "hover:bg-gray-50"
+                )}
+              >
+                <FileText className={clsx("w-8 h-8 shrink-0", isMe ? "text-vine-200" : "text-blue-500")} />
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium leading-tight truncate">{msg.conteudo || "Documento"}</p>
+                  <p className={clsx("text-[10px] mt-0.5", isMe ? "text-vine-300" : "text-gray-400")}>
+                    Toque para abrir
+                  </p>
+                </div>
+                <Download className={clsx("w-3.5 h-3.5 shrink-0", isMe ? "text-vine-300" : "text-gray-400")} />
+              </a>
             ) : (
               msg.conteudo
             )}
@@ -1317,6 +1491,56 @@ export default function ChatPage() {
     }
   }
 
+  async function sendArquivo(conversaId: string, tipo: "direto" | "grupo", fileOrBlob: File | Blob, tipoMsg: "audio" | "documento", nomeArquivo: string) {
+    const msgId = crypto.randomUUID();
+    const localUrl = URL.createObjectURL(fileOrBlob);
+    const msg: MensagemConversa = {
+      id: msgId, autorId: u.id, autorNome: u.nome,
+      conteudo: tipoMsg === "documento" ? nomeArquivo : "",
+      tipo: tipoMsg, mediaUrl: localUrl,
+      criadoEm: new Date().toISOString(), lida: true,
+    };
+    if (tipo === "direto") setDms(prev => prev.map(dm => dm.id === conversaId ? { ...dm, mensagens: [...dm.mensagens, msg] } : dm));
+    else setGrupos(prev => prev.map(g => g.id === conversaId ? { ...g, mensagens: [...g.mensagens, msg] } : g));
+    broadcastChannelsRef.current.get(conversaId)?.send({ type: "broadcast", event: "msg", payload: msg });
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const file = fileOrBlob instanceof File ? fileOrBlob : new File([fileOrBlob], nomeArquivo, { type: fileOrBlob.type });
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("conversa_id", conversaId);
+      fd.append("file_type", tipoMsg);
+      const upRes = await fetch("/api/chat/upload-arquivo", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${session?.access_token ?? ""}` },
+        body: fd,
+      });
+      if (!upRes.ok) { const j = await upRes.json().catch(() => ({})); throw new Error(j.error ?? "Upload falhou"); }
+      const { url: finalUrl } = await upRes.json();
+
+      const updater = (m: MensagemConversa) => m.id === msgId ? { ...m, mediaUrl: finalUrl } : m;
+      if (tipo === "direto") setDms(prev => prev.map(dm => dm.id === conversaId ? { ...dm, mensagens: dm.mensagens.map(updater) } : dm));
+      else setGrupos(prev => prev.map(g => g.id === conversaId ? { ...g, mensagens: g.mensagens.map(updater) } : g));
+      URL.revokeObjectURL(localUrl);
+
+      const finalMsg = { ...msg, mediaUrl: finalUrl };
+      broadcastChannelsRef.current.get(conversaId)?.send({ type: "broadcast", event: "msg", payload: finalMsg });
+
+      fetch("/api/chat/mensagem", {
+        method: "POST", keepalive: true,
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token ?? ""}` },
+        body: JSON.stringify({ id: msgId, conversa_id: conversaId, autor_id: u.id, autor_nome: u.nome, conteudo: tipoMsg === "documento" ? nomeArquivo : "", tipo: tipoMsg, media_url: finalUrl }),
+      });
+    } catch (err: unknown) {
+      const errMsg = err instanceof Error ? err.message : "Erro ao enviar arquivo";
+      showToast(errMsg);
+      if (tipo === "direto") setDms(prev => prev.map(dm => dm.id === conversaId ? { ...dm, mensagens: dm.mensagens.filter(m => m.id !== msgId) } : dm));
+      else setGrupos(prev => prev.map(g => g.id === conversaId ? { ...g, mensagens: g.mensagens.filter(m => m.id !== msgId) } : g));
+      URL.revokeObjectURL(localUrl);
+    }
+  }
+
   function editMsg(msgId: string, newText: string) {
     if (!activeChat) return;
     const updater = (msgs: MensagemConversa[]) =>
@@ -1533,6 +1757,8 @@ export default function ChatPage() {
           <ComposeBar
             onSend={(t) => activeChat.tipo === "direto" ? sendDm(activeChat.id, t) : sendGrupo(activeChat.id, t)}
             onSendImage={(f) => sendImage(activeChat.id, activeChat.tipo, f)}
+            onSendAudio={(blob, name) => sendArquivo(activeChat.id, activeChat.tipo, blob, "audio", name)}
+            onSendDoc={(f) => sendArquivo(activeChat.id, activeChat.tipo, f, "documento", f.name)}
             disabled={locked}
             onToast={showToast}
           />
@@ -1641,7 +1867,7 @@ export default function ChatPage() {
                       </div>
                       {last && (
                         <p className={clsx("text-xs truncate mt-0.5", unread > 0 ? "text-gray-700 font-medium" : "text-gray-400")}>
-                          {last.autorId === u.id ? "Voce: " : ""}{last.tipo === "imagem" ? "📷 Foto" : last.conteudo}
+                          {last.autorId === u.id ? "Voce: " : ""}{last.tipo === "imagem" ? "📷 Foto" : last.tipo === "audio" ? "🎤 Áudio" : last.tipo === "documento" ? "📎 " + (last.conteudo || "Documento") : last.conteudo}
                         </p>
                       )}
                     </div>
@@ -1709,7 +1935,7 @@ export default function ChatPage() {
                           </div>
                           {last ? (
                             <p className={clsx("text-xs truncate mt-0.5", unread > 0 ? "text-gray-700 font-medium" : "text-gray-400")}>
-                              {last.autorId === u.id ? "Voce: " : last.autorNome.split(" ")[0] + ": "}{last.tipo === "imagem" ? "📷 Foto" : last.conteudo}
+                              {last.autorId === u.id ? "Voce: " : last.autorNome.split(" ")[0] + ": "}{last.tipo === "imagem" ? "📷 Foto" : last.tipo === "audio" ? "🎤 Áudio" : last.tipo === "documento" ? "📎 " + (last.conteudo || "Documento") : last.conteudo}
                             </p>
                           ) : (
                             <p className="text-xs text-gray-300 mt-0.5 italic">{g.descricao}</p>

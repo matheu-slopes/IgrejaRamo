@@ -137,7 +137,7 @@ export interface Escala {
 // ─────────────────────────────────────────────
 // Conversas internas do ministério
 // ─────────────────────────────────────────────
-export type TipoMensagem = "texto" | "imagem" | "audio";
+export type TipoMensagem = "texto" | "imagem" | "audio" | "documento";
 
 export interface MuralMensagem {
   id: string;
