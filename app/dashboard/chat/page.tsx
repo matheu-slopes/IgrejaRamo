@@ -980,7 +980,7 @@ function GrupoAvatar({ grupo, size = "md" }: { grupo: Grupo; size?: "sm" | "md" 
 
 export default function ChatPage() {
   const { user, usuarios } = useAuth();
-  const { setTotalUnread, setActiveChatId } = useChatUnread();
+  const { setTotalUnread, setActiveChatId, consumeInbox } = useChatUnread();
   const [tab, setTab] = useState<ChatTab>("direto");
   const [activeChat, setActiveChat] = useState<ActiveChat>(null);
   const [search, setSearch] = useState("");
@@ -1149,6 +1149,23 @@ export default function ChatPage() {
     setConversaIds([...newDms.map(d => d.id), ...newGrupos.map(g => g.id)]);
     // Persiste no cache para a próxima vez
     salvarCache(user.id, newDms, newGrupos);
+
+    // Injeta mensagens que chegaram via broadcast enquanto o chat estava desmontado.
+    // Resolve a race condition: broadcast chega antes do keepalive salvar no banco,
+    // e também garante mensagens perdidas quando o usuário estava em outra página.
+    const inbox = consumeInbox();
+    if (inbox.size > 0) {
+      setDms(prev => prev.map(dm => {
+        const inboxMsg = inbox.get(dm.id);
+        if (!inboxMsg || dm.mensagens.some(m => m.id === inboxMsg.id)) return dm;
+        return { ...dm, mensagens: [...dm.mensagens, { ...inboxMsg, tipo: (inboxMsg.tipo as MensagemConversa["tipo"]) }] };
+      }));
+      setGrupos(prev => prev.map(g => {
+        const inboxMsg = inbox.get(g.id);
+        if (!inboxMsg || g.mensagens.some(m => m.id === inboxMsg.id)) return g;
+        return { ...g, mensagens: [...g.mensagens, { ...inboxMsg, tipo: (inboxMsg.tipo as MensagemConversa["tipo"]) }] };
+      }));
+    }
   }
 
   async function carregarMensagens(conversaId: string) {

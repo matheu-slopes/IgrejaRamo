@@ -5,16 +5,25 @@ import { usePathname } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
 
+// Mensagem mínima guardada no inbox (não importa o type completo para evitar dep circular)
+type InboxMsg = {
+  id: string; autorId: string; autorNome: string; conteudo: string;
+  tipo: string; mediaUrl?: string; criadoEm: string; lida: boolean;
+};
+
 type ChatUnreadCtx = {
   totalUnread: number;
   setTotalUnread: (n: number) => void;
   setActiveChatId: (id: string | null) => void;
+  /** Drena e retorna todas as mensagens recebidas enquanto o chat estava desmontado */
+  consumeInbox: () => Map<string, InboxMsg>;
 };
 
 const ChatUnreadContext = createContext<ChatUnreadCtx>({
   totalUnread: 0,
   setTotalUnread: () => {},
   setActiveChatId: () => {},
+  consumeInbox: () => new Map(),
 });
 
 // ── helpers localStorage ────────────────────────────────────────────
@@ -46,9 +55,17 @@ export function ChatUnreadProvider({ children }: { children: ReactNode }) {
   const userIdRef = useRef<string | undefined>(undefined);
   // ID da conversa aberta no chat page (null quando fora do chat)
   const activeChatIdRef = useRef<string | null>(null);
+  // Inbox: mensagens recebidas via broadcast enquanto o chat page estava desmontado
+  const inboxRef = useRef<Map<string, InboxMsg>>(new Map());
 
   function setActiveChatId(id: string | null) {
     activeChatIdRef.current = id;
+  }
+
+  function consumeInbox(): Map<string, InboxMsg> {
+    const snapshot = new Map(inboxRef.current);
+    inboxRef.current.clear();
+    return snapshot;
   }
 
   // Mantém pathnameRef sempre atualizado dentro dos closures
@@ -94,11 +111,27 @@ export function ChatUnreadProvider({ children }: { children: ReactNode }) {
           if (payload?.autorId === uid) return;
           // Ignora apenas se: está na página de chat E esta conversa específica está ativa
           if (pathnameRef.current === "/dashboard/chat" && activeChatIdRef.current === cid) return;
-          setTotalUnreadState(prev => {
-            const next = prev + 1;
-            saveCount(uid, next);
-            return next;
+
+          // Guarda no inbox para o chat page recuperar quando montar
+          inboxRef.current.set(cid, {
+            id:        payload.id,
+            autorId:   payload.autorId,
+            autorNome: payload.autorNome,
+            conteudo:  payload.conteudo ?? "",
+            tipo:      payload.tipo ?? "texto",
+            mediaUrl:  payload.mediaUrl,
+            criadoEm:  payload.criadoEm ?? new Date().toISOString(),
+            lida:      false,
           });
+
+          // Incrementa badge apenas quando fora do chat (ou em conversa diferente)
+          if (pathnameRef.current !== "/dashboard/chat") {
+            setTotalUnreadState(prev => {
+              const next = prev + 1;
+              saveCount(uid, next);
+              return next;
+            });
+          }
         })
         .subscribe();
       map.set(cid, ch);
@@ -115,7 +148,7 @@ export function ChatUnreadProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <ChatUnreadContext.Provider value={{ totalUnread, setTotalUnread, setActiveChatId }}>
+    <ChatUnreadContext.Provider value={{ totalUnread, setTotalUnread, setActiveChatId, consumeInbox }}>
       {children}
     </ChatUnreadContext.Provider>
   );
