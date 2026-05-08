@@ -1402,20 +1402,24 @@ export default function ChatPage() {
         mediaUrl: im.mediaUrl, criadoEm: im.criadoEm, lida: false,
       }));
 
-    // Ordena por criadoEm para garantir sequência correta independente da origem
+    // MIN(cacheTime, dbTime): cache tem o tempo do broadcast (envio real do cliente),
+    // banco tem o tempo do INSERT no servidor. O menor reflete o envio real.
     const sortByTime = (arr: MensagemConversa[]) =>
       arr.slice().sort((a, b) => new Date(a.criadoEm).getTime() - new Date(b.criadoEm).getTime());
 
     setDms(prev => prev.map(dm => {
       if (dm.id !== conversaId) return dm;
-      // Mantém mensagens otimistas (enviadas mas insert ainda em voo)
       const pending = dm.mensagens.filter(m => !dbIds.has(m.id));
-      // Preserva mediaUrl do cache caso a coluna não exista no banco
-      // (ex: banco retorna media_url=null mas cache tem a URL correta)
       const cacheById = new Map(dm.mensagens.map(m => [m.id, m]));
       const mergedDb = dbMsgs.map(dbMsg => {
         const cached = cacheById.get(dbMsg.id);
-        return (!dbMsg.mediaUrl && cached?.mediaUrl) ? { ...dbMsg, mediaUrl: cached.mediaUrl } : dbMsg;
+        // Preserva mediaUrl do cache se o banco não tem
+        const mediaUrl = (!dbMsg.mediaUrl && cached?.mediaUrl) ? cached.mediaUrl : dbMsg.mediaUrl;
+        // MIN(cacheTime, dbTime) para corrigir delay de insert no banco
+        const criadoEm = cached && new Date(cached.criadoEm).getTime() < new Date(dbMsg.criadoEm).getTime()
+          ? cached.criadoEm
+          : dbMsg.criadoEm;
+        return { ...dbMsg, mediaUrl, criadoEm };
       });
       const pendingIds = new Set(pending.map(m => m.id));
       const uniqueInbox = inboxExtra.filter(m => !pendingIds.has(m.id));
@@ -1427,7 +1431,11 @@ export default function ChatPage() {
       const cacheById = new Map(g.mensagens.map(m => [m.id, m]));
       const mergedDb = dbMsgs.map(dbMsg => {
         const cached = cacheById.get(dbMsg.id);
-        return (!dbMsg.mediaUrl && cached?.mediaUrl) ? { ...dbMsg, mediaUrl: cached.mediaUrl } : dbMsg;
+        const mediaUrl = (!dbMsg.mediaUrl && cached?.mediaUrl) ? cached.mediaUrl : dbMsg.mediaUrl;
+        const criadoEm = cached && new Date(cached.criadoEm).getTime() < new Date(dbMsg.criadoEm).getTime()
+          ? cached.criadoEm
+          : dbMsg.criadoEm;
+        return { ...dbMsg, mediaUrl, criadoEm };
       });
       const pendingIds = new Set(pending.map(m => m.id));
       const uniqueInbox = inboxExtra.filter(m => !pendingIds.has(m.id));
@@ -1477,9 +1485,9 @@ export default function ChatPage() {
     if (updatesChannelRef.current) supabase.removeChannel(updatesChannelRef.current);
     const ch = supabase.channel(`chat_updates_${user.id}`)
       // ── INSERT: fallback + correção de clock skew ──────────────────
-      // O postgres_changes traz o timestamp AUTORITATIVO do servidor (criado_em = NOW()).
-      // Isso corrige clock skew: se o relógio do remetente estava adiantado/atrasado,
-      // o timestamp da mensagem é corrigido e a lista é re-ordenada.
+      // Usa MIN(broadcastTime, serverTime) para ordenação:
+      //  - Se relógio do remetente estava ADIANTADO: broadcast > server → usa serverTime (correto)
+      //  - Se INSERT chegou ao banco com DELAY de rede: server > broadcast → usa broadcastTime (correto)
       // Também serve de fallback caso o broadcast WebSocket tenha sido perdido.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .on("postgres_changes" as any, {
@@ -1494,13 +1502,19 @@ export default function ChatPage() {
           ...rowToMensagem(row),
           lida: row.autor_id === user.id || activeChatRef.current?.id === cid,
         };
-        // upsertSorted: se mensagem já existe (veio por broadcast ou otimista),
-        // atualiza só o criadoEm com o tempo do servidor e re-ordena.
-        // Se não existe (broadcast perdido), insere normalmente.
+        // MIN(broadcastTime, serverTime): mantém o timestamp mais antigo entre os dois
         const upsertSorted = (msgs: MensagemConversa[]) => {
-          const updated = msgs.some(m => m.id === msg.id)
-            ? msgs.map(m => m.id === msg.id ? { ...m, criadoEm: serverTime } : m)
-            : [...msgs, msg];
+          const existing = msgs.find(m => m.id === msg.id);
+          let bestTime = serverTime;
+          if (existing) {
+            // Mantém o menor timestamp: broadcast pode refletir envio real antes do DB INSERT
+            bestTime = new Date(existing.criadoEm).getTime() < new Date(serverTime).getTime()
+              ? existing.criadoEm
+              : serverTime;
+          }
+          const updated = existing
+            ? msgs.map(m => m.id === msg.id ? { ...m, criadoEm: bestTime } : m)
+            : [...msgs, { ...msg, criadoEm: bestTime }];
           return updated.sort((a, b) => new Date(a.criadoEm).getTime() - new Date(b.criadoEm).getTime());
         };
         setDms(prev => prev.map(dm => dm.id === cid ? { ...dm, mensagens: upsertSorted(dm.mensagens) } : dm));
