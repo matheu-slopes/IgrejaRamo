@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { ChatUnreadProvider } from "@/contexts/ChatUnreadContext";
 import Sidebar from "@/components/Sidebar";
+import BottomNav from "@/components/dashboard/BottomNav";
 import NotificationBell from "@/components/dashboard/NotificationBell";
 import { User, Permissao } from "@/types";
 import {
@@ -299,23 +300,41 @@ export default function DashboardLayout({
   return (
     <ChatUnreadProvider>
     <div className="flex h-screen overflow-hidden bg-gray-50">
+      {/* Sidebar — apenas desktop */}
       <Sidebar />
-      <div className="flex-1 overflow-y-auto">
+
+      <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
         {/* Top bar */}
-        <header className="sticky top-0 z-20 bg-white border-b border-gray-100 px-6 h-14 flex items-center justify-between shadow-sm">
-          <div />
-          <div className="flex items-center gap-3">
-            <NotificationBell />
-            <ProfileDropdown
-              user={user}
-              onLogout={handleLogout}
-              onUpdate={(dados) => atualizarUsuario(user.id, dados)}
-            />
+        <header className="sticky top-0 z-20 bg-white border-b border-gray-100 shadow-sm"
+          style={{ paddingTop: "env(safe-area-inset-top)" }}
+        >
+          <div className="h-14 px-4 md:px-6 flex items-center justify-between">
+            {/* Mobile: logo + nome da igreja */}
+            <div className="flex items-center gap-2 md:hidden">
+              <span className="text-gold-500 text-lg">✦</span>
+              <span className="font-bold text-vine-950 text-base">Ramo da Vida</span>
+            </div>
+            {/* Desktop: espaço vazio (título fica no conteúdo) */}
+            <div className="hidden md:block" />
+            <div className="flex items-center gap-2 md:gap-3">
+              <NotificationBell />
+              <ProfileDropdown
+                user={user}
+                onLogout={handleLogout}
+                onUpdate={(dados) => atualizarUsuario(user.id, dados)}
+              />
+            </div>
           </div>
         </header>
 
-        <main className="p-6">{children}</main>
+        {/* Conteúdo principal */}
+        <main className="flex-1 overflow-y-auto p-4 md:p-6 pb-[calc(4.5rem+env(safe-area-inset-bottom))] md:pb-6">
+          {children}
+        </main>
       </div>
+
+      {/* Bottom nav — apenas mobile */}
+      <BottomNav />
     </div>
     </ChatUnreadProvider>
   );

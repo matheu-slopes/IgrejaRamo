@@ -2391,22 +2391,22 @@ export default function ChatPage() {
       {toast && <Toast msg={toast} />}
       {showNewDmModal && <NewDmModal currentUserId={u.id} dms={dms} usuarios={usuarios} onStart={startDm} onClose={() => setShowNewDmModal(false)} />}
       {showNewGroupModal && <NewGroupModal currentUserId={u.id} usuarios={usuarios} onClose={() => setShowNewGroupModal(false)} onCreate={createGroup} />}
-      <div className="mb-4">
-        <h1 className="text-2xl font-sans font-semibold text-vine-950">Mensagens</h1>
-        <p className="text-sm text-gray-500 mt-1">
+      <div className="mb-3">
+        <h1 className="text-xl md:text-2xl font-sans font-semibold text-vine-950">Mensagens</h1>
+        <p className="text-sm text-gray-500 mt-0.5 hidden sm:block">
           Conversas diretas, chat do culto e canais de ministério.
         </p>
       </div>
 
-      <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden" style={{ height: "calc(100vh - 200px)", minHeight: 520 }}>
+      <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden" style={{ height: "calc(100dvh - 180px)", minHeight: 400 }}>
         <div className="flex h-full">
           {/* Left list */}
-          <div className={clsx("flex flex-col border-r border-gray-100 shrink-0 w-full lg:w-80", activeChat !== null ? "hidden lg:flex" : "flex")}>
+          <div className={clsx("flex flex-col border-r border-gray-100 shrink-0 w-full md:w-72 lg:w-80", activeChat !== null ? "hidden md:flex" : "flex")}>
             {renderList()}
           </div>
 
           {/* Right chat area */}
-          <div className={clsx("flex-1 flex min-w-0", activeChat === null ? "hidden lg:flex" : "flex")}>
+          <div className={clsx("flex-1 flex min-w-0", activeChat === null ? "hidden md:flex" : "flex")}>
             {activeChat ? renderChatPanel() : (
               <div className="flex flex-col items-center justify-center w-full text-gray-300 gap-3">
                 <MessageSquare className="w-12 h-12 opacity-30" />
