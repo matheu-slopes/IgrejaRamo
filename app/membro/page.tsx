@@ -59,7 +59,7 @@ export default function MembroPortalPage() {
     });
     const json = await res.json().catch(() => ({}));
     setSalvandoSenha(false);
-    if (res.ok) { setOkSenha(true); setNovaSenha(""); setTimeout(() => setOkSenha(false), 3000); }
+    if (res.ok) { setOkSenha(true); setNovaSenha(""); setTimeout(() => { logout(); router.push("/login"); }, 2000); }
     else setErroSenha(json.error ?? "Erro ao alterar senha.");
   }
 
