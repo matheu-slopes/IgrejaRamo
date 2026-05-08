@@ -1154,10 +1154,17 @@ export default function ChatPage() {
 
   function salvarCache(uid: string, newDms: ConversaDireta[], newGrupos: Grupo[]) {
     try {
-      // Limita a 200 mensagens e remove mensagens com blob: URLs (inválidas após reload)
+      // Mensagens com blob: URL = upload ainda em andamento.
+      // Salva com mediaUrl removida e tipo="texto" temporariamente, para não perder
+      // o texto e o horário. Quando o upload terminar, o cache será atualizado com a URL real.
       const clean = (msgs: MensagemConversa[]) =>
-        msgs.filter(m => !m.mediaUrl?.startsWith("blob:")).slice(-200);
-      const dmsSave   = newDms.map(d  => ({ ...d,  mensagens: clean(d.mensagens)  }));
+        msgs
+          .slice(-200)
+          .map(m => m.mediaUrl?.startsWith("blob:")
+            ? { ...m, mediaUrl: undefined, conteudo: m.conteudo || "⏳ enviando mídia…" }
+            : m
+          );
+      const dmsSave    = newDms.map(d => ({ ...d, mensagens: clean(d.mensagens) }));
       const gruposSave = newGrupos.map(g => ({ ...g, mensagens: clean(g.mensagens) }));
       localStorage.setItem(cacheKey(uid), JSON.stringify({ dms: dmsSave, grupos: gruposSave }));
     } catch { /* private mode ou storage cheio */ }
@@ -1432,14 +1439,12 @@ export default function ChatPage() {
           const isActive = activeChatRef.current?.id === cid;
           const isMine = raw.autorId === user?.id;
           const msg: MensagemConversa = { ...raw, lida: isMine || isActive };
-          setDms(prev => prev.map(dm => dm.id === cid ? {
-            ...dm,
-            mensagens: dm.mensagens.some(m => m.id === msg.id) ? dm.mensagens : [...dm.mensagens, msg],
-          } : dm));
-          setGrupos(prev => prev.map(g => g.id === cid ? {
-            ...g,
-            mensagens: g.mensagens.some(m => m.id === msg.id) ? g.mensagens : [...g.mensagens, msg],
-          } : g));
+          const insertSorted = (msgs: MensagemConversa[]) => {
+            if (msgs.some(m => m.id === msg.id)) return msgs;
+            return [...msgs, msg].sort((a, b) => new Date(a.criadoEm).getTime() - new Date(b.criadoEm).getTime());
+          };
+          setDms(prev => prev.map(dm => dm.id === cid ? { ...dm, mensagens: insertSorted(dm.mensagens) } : dm));
+          setGrupos(prev => prev.map(g => g.id === cid ? { ...g, mensagens: insertSorted(g.mensagens) } : g));
         })
         .subscribe();
       map.set(cid, ch);
@@ -1475,14 +1480,12 @@ export default function ChatPage() {
         if (!conversaIdsRef.current.includes(cid)) return;
         if (row.autor_id === user.id) return;
         const msg: MensagemConversa = { ...rowToMensagem(row), lida: activeChatRef.current?.id === cid };
-        setDms(prev => prev.map(dm => dm.id === cid ? {
-          ...dm,
-          mensagens: dm.mensagens.some(m => m.id === msg.id) ? dm.mensagens : [...dm.mensagens, msg],
-        } : dm));
-        setGrupos(prev => prev.map(g => g.id === cid ? {
-          ...g,
-          mensagens: g.mensagens.some(m => m.id === msg.id) ? g.mensagens : [...g.mensagens, msg],
-        } : g));
+        const insertSorted = (msgs: MensagemConversa[]) => {
+          if (msgs.some(m => m.id === msg.id)) return msgs;
+          return [...msgs, msg].sort((a, b) => new Date(a.criadoEm).getTime() - new Date(b.criadoEm).getTime());
+        };
+        setDms(prev => prev.map(dm => dm.id === cid ? { ...dm, mensagens: insertSorted(dm.mensagens) } : dm));
+        setGrupos(prev => prev.map(g => g.id === cid ? { ...g, mensagens: insertSorted(g.mensagens) } : g));
       })
       // ── UPDATE: edições de mensagens ────────────────────────────────
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
