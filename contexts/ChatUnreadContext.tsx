@@ -40,8 +40,17 @@ function saveToLocalInbox(uid: string, cid: string, msg: any) {
   try {
     const key = `chat_inbox_${uid}`;
     const raw = localStorage.getItem(key);
-    const inbox: Record<string, unknown> = raw ? JSON.parse(raw) : {};
-    inbox[cid] = msg;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const inbox: Record<string, any[]> = raw ? JSON.parse(raw) : {};
+    // Garante que é sempre um array (compatível com formato antigo de objeto único)
+    if (!Array.isArray(inbox[cid])) {
+      inbox[cid] = inbox[cid] ? [inbox[cid]] : [];
+    }
+    // Deduplica por id para não adicionar a mesma mensagem duas vezes
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    if (!inbox[cid].some((m: any) => m.id === msg.id)) {
+      inbox[cid].push(msg);
+    }
     localStorage.setItem(key, JSON.stringify(inbox));
   } catch {}
 }

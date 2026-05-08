@@ -1005,6 +1005,13 @@ export default function ChatPage() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const updatesChannelRef = useRef<any>(null);
   const activeChatRef = useRef<ActiveChat>(null);
+  // Refs para leitura síncrona no beforeunload e closures
+  const dmsRef = useRef<ConversaDireta[]>([]);
+  const gruposRef = useRef<Grupo[]>([]);
+  const conversaIdsRef = useRef<string[]>([]);
+  // Inbox de mensagens recebidas enquanto estava em outra página
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const inboxRef = useRef<Record<string, any[]>>({});
 
   useEffect(() => {
     if (!ctxMenu) return;
@@ -1018,9 +1025,9 @@ export default function ChatPage() {
 
   function salvarCache(uid: string, newDms: ConversaDireta[], newGrupos: Grupo[]) {
     try {
-      // Limita a 50 mensagens e remove mensagens com blob: URLs (inválidas após reload)
+      // Limita a 200 mensagens e remove mensagens com blob: URLs (inválidas após reload)
       const clean = (msgs: MensagemConversa[]) =>
-        msgs.filter(m => !m.mediaUrl?.startsWith("blob:")).slice(-50);
+        msgs.filter(m => !m.mediaUrl?.startsWith("blob:")).slice(-200);
       const dmsSave   = newDms.map(d  => ({ ...d,  mensagens: clean(d.mensagens)  }));
       const gruposSave = newGrupos.map(g => ({ ...g, mensagens: clean(g.mensagens) }));
       localStorage.setItem(cacheKey(uid), JSON.stringify({ dms: dmsSave, grupos: gruposSave }));
@@ -1058,20 +1065,64 @@ export default function ChatPage() {
   // ── carregar conversas ────────────────────────────────────────────
   useEffect(() => {
     if (!user?.id) return;
-    // 1) Carrega cache imediatamente (zero latência)
+    const uid = user.id;
+
+    // 1) Carrega cache + inbox de forma SÍNCRONA (zero latência, sem race conditions)
     if (!cacheLoadedRef.current) {
       cacheLoadedRef.current = true;
-      const cached = lerCache(user.id);
-      if (cached) {
-        setDms(cached.dms);
-        setGrupos(cached.grupos);
-        setConversaIds([
-          ...cached.dms.map((d: ConversaDireta) => d.id),
-          ...cached.grupos.map((g: Grupo) => g.id),
-        ]);
-      }
+
+      // ── Lê e limpa inbox ANTES de qualquer operação assíncrona ──────
+      // Motivo: se lido depois de fetch assíncrono, o inbox pode ser
+      // sobrescrito ou sobreposto por outros setDms concorrentes.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const inbox: Record<string, any[]> = {};
+      try {
+        const raw = localStorage.getItem(`chat_inbox_${uid}`);
+        if (raw) {
+          localStorage.removeItem(`chat_inbox_${uid}`);
+          const parsed = JSON.parse(raw);
+          for (const cid of Object.keys(parsed)) {
+            const entry = parsed[cid];
+            inbox[cid] = Array.isArray(entry) ? entry : (entry ? [entry] : []);
+          }
+        }
+      } catch { /* localStorage indisponível */ }
+      inboxRef.current = inbox; // mantém para uso em carregarMensagens também
+
+      // ── Mescla inbox no cache antes de setar estado ─────────────────
+      const cached = lerCache(uid);
+      const baseDms: ConversaDireta[]   = cached?.dms    ?? [];
+      const baseGrupos: Grupo[]         = cached?.grupos ?? [];
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const buildInboxMsg = (im: any): MensagemConversa => ({
+        id: im.id, autorId: im.autorId, autorNome: im.autorNome,
+        conteudo: im.conteudo ?? "", tipo: im.tipo ?? "texto",
+        mediaUrl: im.mediaUrl, criadoEm: im.criadoEm, lida: false,
+      });
+
+      const mergeInboxInto = <T extends { id: string; mensagens: MensagemConversa[] }>(list: T[]): T[] =>
+        list.map(conv => {
+          const arr = inbox[conv.id];
+          if (!arr?.length) return conv;
+          const existIds = new Set(conv.mensagens.map(m => m.id));
+          const novas = arr.filter(im => !existIds.has(im.id)).map(buildInboxMsg);
+          return novas.length > 0
+            ? { ...conv, mensagens: [...conv.mensagens, ...novas] }
+            : conv;
+        });
+
+      const mergedDms    = mergeInboxInto(baseDms);
+      const mergedGrupos = mergeInboxInto(baseGrupos);
+
+      setDms(mergedDms);
+      setGrupos(mergedGrupos);
+      const ids = [...mergedDms.map(d => d.id), ...mergedGrupos.map(g => g.id)];
+      setConversaIds(ids);
+      conversaIdsRef.current = ids;
     }
-    // 2) Busca do servidor em background
+
+    // 2) Busca do servidor em background (mescla, nunca substitui)
     carregarConversas();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
@@ -1144,45 +1195,41 @@ export default function ChatPage() {
       }
     }
 
-    setDms(newDms);
-    setGrupos(newGrupos);
-    setConversaIds([...newDms.map(d => d.id), ...newGrupos.map(g => g.id)]);
-    // Persiste no cache para a próxima vez
-    salvarCache(user.id, newDms, newGrupos);
-
-    // ── Injeta mensagens do inbox (localStorage) ─────────────────
-    // Mensagens que chegaram via broadcast enquanto o usuário estava em outra página.
-    // São mescladas APÓS setDms para aparecerem como última mensagem na lista.
-    try {
-      const inboxKey = `chat_inbox_${user.id}`;
-      const inboxRaw = localStorage.getItem(inboxKey);
-      if (inboxRaw) {
-        localStorage.removeItem(inboxKey);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const inbox = JSON.parse(inboxRaw) as Record<string, any>;
-        const hasMsgs = Object.keys(inbox).length > 0;
-        if (hasMsgs) {
-          setDms(prev => prev.map(dm => {
-            const im = inbox[dm.id];
-            if (!im || dm.mensagens.some(m => m.id === im.id)) return dm;
-            return { ...dm, mensagens: [...dm.mensagens, {
-              id: im.id, autorId: im.autorId, autorNome: im.autorNome,
-              conteudo: im.conteudo ?? "", tipo: im.tipo ?? "texto",
-              mediaUrl: im.mediaUrl, criadoEm: im.criadoEm, lida: false,
-            }] };
-          }));
-          setGrupos(prev => prev.map(g => {
-            const im = inbox[g.id];
-            if (!im || g.mensagens.some(m => m.id === im.id)) return g;
-            return { ...g, mensagens: [...g.mensagens, {
-              id: im.id, autorId: im.autorId, autorNome: im.autorNome,
-              conteudo: im.conteudo ?? "", tipo: im.tipo ?? "texto",
-              mediaUrl: im.mediaUrl, criadoEm: im.criadoEm, lida: false,
-            }] };
-          }));
-        }
-      }
-    } catch { /* localStorage indisponível */ }
+    // ── MERGE: nunca substituir mensagens existentes ─────────────────
+    // Mantém todas as mensagens já no estado (cache + broadcasts recebidos).
+    // Adiciona apenas as que vieram do banco e ainda não existem no estado.
+    // Isso evita apagar mensagens de broadcast recebidas entre o carregamento
+    // do cache e a conclusão desta query assíncrona.
+    setDms(prev => {
+      const prevMap = new Map(prev.map(d => [d.id, d]));
+      return newDms.map(newDm => {
+        const existing = prevMap.get(newDm.id);
+        if (!existing) return newDm;
+        const existingIds = new Set(existing.mensagens.map(m => m.id));
+        const apenasNovas = newDm.mensagens.filter(m => !existingIds.has(m.id));
+        const merged = [...existing.mensagens, ...apenasNovas].sort(
+          (a, b) => new Date(a.criadoEm).getTime() - new Date(b.criadoEm).getTime()
+        );
+        return { ...newDm, mensagens: merged };
+      });
+    });
+    setGrupos(prev => {
+      const prevMap = new Map(prev.map(g => [g.id, g]));
+      return newGrupos.map(newG => {
+        const existing = prevMap.get(newG.id);
+        if (!existing) return newG;
+        const existingIds = new Set(existing.mensagens.map(m => m.id));
+        const apenasNovas = newG.mensagens.filter(m => !existingIds.has(m.id));
+        const merged = [...existing.mensagens, ...apenasNovas].sort(
+          (a, b) => new Date(a.criadoEm).getTime() - new Date(b.criadoEm).getTime()
+        );
+        return { ...newG, mensagens: merged };
+      });
+    });
+    const allIds = [...newDms.map(d => d.id), ...newGrupos.map(g => g.id)];
+    setConversaIds(allIds);
+    conversaIdsRef.current = allIds;
+    // Cache: o auto-save useEffect[dms,grupos] salva os dados MESCLADOS
   }
 
   async function carregarMensagens(conversaId: string) {
@@ -1190,21 +1237,38 @@ export default function ChatPage() {
       .from("chat_mensagens").select("*")
       .eq("conversa_id", conversaId)
       .order("criado_em", { ascending: true })
-      .limit(100);
+      .limit(500);
     if (!data) return;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const dbMsgs = (data as any[]).map(row => ({ ...rowToMensagem(row), lida: true }));
     const dbIds = new Set(dbMsgs.map((m: MensagemConversa) => m.id));
-    // Merge: mantém mensagens otimistas (enviadas mas insert ainda em voo) que não estão no banco ainda
+
+    // Mensagens do inbox para esta conversa que ainda não estão no banco
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const inboxExtra: MensagemConversa[] = (inboxRef.current[conversaId] ?? [])
+      .filter((im: { id: string }) => !dbIds.has(im.id))
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .map((im: any): MensagemConversa => ({
+        id: im.id, autorId: im.autorId, autorNome: im.autorNome,
+        conteudo: im.conteudo ?? "", tipo: im.tipo ?? "texto",
+        mediaUrl: im.mediaUrl, criadoEm: im.criadoEm, lida: false,
+      }));
+
     setDms(prev => prev.map(dm => {
       if (dm.id !== conversaId) return dm;
+      // Mantém mensagens otimistas (enviadas mas insert ainda em voo)
       const pending = dm.mensagens.filter(m => !dbIds.has(m.id));
-      return { ...dm, mensagens: [...dbMsgs, ...pending] };
+      // Dedup: pending pode sobrepor inboxExtra
+      const pendingIds = new Set(pending.map(m => m.id));
+      const uniqueInbox = inboxExtra.filter(m => !pendingIds.has(m.id));
+      return { ...dm, mensagens: [...dbMsgs, ...pending, ...uniqueInbox] };
     }));
     setGrupos(prev => prev.map(g => {
       if (g.id !== conversaId) return g;
       const pending = g.mensagens.filter(m => !dbIds.has(m.id));
-      return { ...g, mensagens: [...dbMsgs, ...pending] };
+      const pendingIds = new Set(pending.map(m => m.id));
+      const uniqueInbox = inboxExtra.filter(m => !pendingIds.has(m.id));
+      return { ...g, mensagens: [...dbMsgs, ...pending, ...uniqueInbox] };
     }));
     // cache salvo automaticamente pelo useEffect [dms, grupos]
   }
@@ -1251,6 +1315,30 @@ export default function ChatPage() {
     if (!user?.id) return;
     if (updatesChannelRef.current) supabase.removeChannel(updatesChannelRef.current);
     const ch = supabase.channel(`chat_updates_${user.id}`)
+      // ── INSERT: fallback para mensagens que o broadcast perdeu ──────
+      // Se o WebSocket sofreu uma reconexão, o broadcast pode ter sido perdido.
+      // O postgres_changes garante que a mensagem aparece assim que salva no banco.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .on("postgres_changes" as any, {
+        event: "INSERT", schema: "public", table: "chat_mensagens",
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      }, (payload: any) => {
+        const row = payload.new;
+        const cid = row.conversa_id as string;
+        // Ignora conversas que o usuário não participa e próprias mensagens (já otimistas)
+        if (!conversaIdsRef.current.includes(cid)) return;
+        if (row.autor_id === user.id) return;
+        const msg: MensagemConversa = { ...rowToMensagem(row), lida: activeChatRef.current?.id === cid };
+        setDms(prev => prev.map(dm => dm.id === cid ? {
+          ...dm,
+          mensagens: dm.mensagens.some(m => m.id === msg.id) ? dm.mensagens : [...dm.mensagens, msg],
+        } : dm));
+        setGrupos(prev => prev.map(g => g.id === cid ? {
+          ...g,
+          mensagens: g.mensagens.some(m => m.id === msg.id) ? g.mensagens : [...g.mensagens, msg],
+        } : g));
+      })
+      // ── UPDATE: edições de mensagens ────────────────────────────────
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .on("postgres_changes" as any, {
         event: "UPDATE", schema: "public", table: "chat_mensagens",
@@ -1293,9 +1381,27 @@ export default function ChatPage() {
   // Cobre mensagens chegadas por broadcast que antes eram perdidas no reload
   useEffect(() => {
     if (!user?.id) return;
+    // Mantém refs atualizadas para uso síncrono (beforeunload, closures)
+    dmsRef.current = dms;
+    gruposRef.current = grupos;
     salvarCache(user.id, dms, grupos);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dms, grupos]);
+
+  // ── mantém conversaIdsRef sempre atualizado ───────────────────────
+  useEffect(() => { conversaIdsRef.current = conversaIds; }, [conversaIds]);
+
+  // ── salva cache de forma síncrona ao fechar a aba ─────────────────
+  // O useEffect[dms,grupos] pode não ter rodado antes do unload.
+  // O beforeunload garante que o cache tenha os dados mais recentes.
+  useEffect(() => {
+    if (!user?.id) return;
+    const uid = user.id;
+    const handler = () => salvarCache(uid, dmsRef.current, gruposRef.current);
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
 
   // ── sincroniza activeChatId no contexto global ───────────────────
   useEffect(() => {
