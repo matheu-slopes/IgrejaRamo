@@ -368,26 +368,46 @@ function ChatTab({
     }]);
     setTexto(""); setImagemPreview(null); setAudioUrl(null); setRespostaA(null); setImagemFile(null);
 
-    // 2. Upload de mídia para Storage (se houver)
+    // 2. Upload de mídia via API (service role — evita problema de permissão do bucket)
     let uploadedUrl: string | null = null;
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) throw new Error("Sem sessão");
+
       if (tipo === "imagem" && imagemFile) {
-        const ext = imagemFile.name.split(".").pop() ?? "jpg";
-        const path = `ministerio/${ministerio}/${tempId}.${ext}`;
-        const { error: upErr } = await supabase.storage.from("chat-imagens").upload(path, imagemFile, { upsert: false });
-        if (upErr) throw upErr;
-        uploadedUrl = supabase.storage.from("chat-imagens").getPublicUrl(path).data.publicUrl;
+        const fd = new FormData();
+        fd.append("file", imagemFile);
+        fd.append("conversa_id", `ministerio_${ministerio}`);
+        const res = await fetch("/api/chat/upload-imagem", {
+          method: "POST",
+          headers: { authorization: `Bearer ${token}` },
+          body: fd,
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error ?? "Upload falhou");
+        uploadedUrl = json.url;
         setMsgs((prev) => prev.map((m) => m.id === tempId ? { ...m, mediaUrl: uploadedUrl ?? undefined } : m));
       } else if (tipo === "audio" && audioBlobRef.current) {
-        const path = `ministerio/${ministerio}/${tempId}.webm`;
-        const { error: upErr } = await supabase.storage.from("chat-midias").upload(path, audioBlobRef.current, { upsert: false, contentType: "audio/webm" });
-        if (upErr) throw upErr;
-        uploadedUrl = supabase.storage.from("chat-midias").getPublicUrl(path).data.publicUrl;
+        const audioFile = new File([audioBlobRef.current], "audio.webm", { type: "audio/webm" });
+        const fd = new FormData();
+        fd.append("file", audioFile);
+        fd.append("conversa_id", `ministerio_${ministerio}`);
+        fd.append("file_type", "audio");
+        const res = await fetch("/api/chat/upload-arquivo", {
+          method: "POST",
+          headers: { authorization: `Bearer ${token}` },
+          body: fd,
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error ?? "Upload falhou");
+        uploadedUrl = json.url;
         setMsgs((prev) => prev.map((m) => m.id === tempId ? { ...m, mediaUrl: uploadedUrl ?? undefined } : m));
       }
-    } catch {
+    } catch (err) {
       setMsgs((prev) => prev.filter((m) => m.id !== tempId));
       alert("Erro ao enviar mídia. Tente novamente.");
+      console.error(err);
       return;
     }
 
@@ -405,9 +425,27 @@ function ChatTab({
   function handleImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    setImagemFile(file);
-    setImagemPreview(URL.createObjectURL(file)); // preview local imediato
     e.target.value = "";
+
+    // Comprime via Canvas antes de guardar (máx 1280px, qualidade 80%)
+    const img = new Image();
+    const objectUrl = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      const MAX = 1280;
+      const scale = Math.min(1, MAX / Math.max(img.width, img.height));
+      const canvas = document.createElement("canvas");
+      canvas.width  = Math.round(img.width  * scale);
+      canvas.height = Math.round(img.height * scale);
+      canvas.getContext("2d")!.drawImage(img, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob((blob) => {
+        if (!blob) return;
+        const compressed = new File([blob], file.name.replace(/\.[^.]+$/, ".jpg"), { type: "image/jpeg" });
+        setImagemFile(compressed);
+        setImagemPreview(URL.createObjectURL(compressed));
+      }, "image/jpeg", 0.8);
+    };
+    img.src = objectUrl;
   }
 
   async function iniciarGravacao() {
