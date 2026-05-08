@@ -22,9 +22,9 @@ export default function LoginPage() {
     setError("");
     setLoading(true);
     try {
-      const ok = await login(email, password);
-      if (ok) {
-        router.push("/dashboard");
+      const result = await login(email, password);
+      if (result) {
+        router.push(result.role === "membro" ? "/membro" : "/dashboard");
       } else {
         setError("E-mail ou senha incorretos. Verifique e tente novamente.");
       }
