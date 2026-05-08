@@ -754,7 +754,7 @@ export default function ChatPage() {
     if (!user?.id) return;
     carregarConversas();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id, usuarios]);
+  }, [user?.id]);
 
   async function carregarConversas() {
     if (!user) return;
@@ -767,7 +767,7 @@ export default function ChatPage() {
     const [{ data: conversas }, { data: todosParticipantes }, { data: ultimasMsgs }] = await Promise.all([
       supabase.from("chat_conversas").select("*").in("id", ids),
       supabase.from("chat_participantes").select("conversa_id, user_id").in("conversa_id", ids),
-      supabase.from("chat_mensagens").select("*").in("conversa_id", ids).order("criado_em", { ascending: false }),
+      supabase.from("chat_mensagens").select("*").in("conversa_id", ids).order("criado_em", { ascending: false }).limit(ids.length * 3),
     ]);
 
     const participantesPorConversa: Record<string, string[]> = {};
@@ -818,7 +818,9 @@ export default function ChatPage() {
   async function carregarMensagens(conversaId: string) {
     const { data } = await supabase
       .from("chat_mensagens").select("*")
-      .eq("conversa_id", conversaId).order("criado_em", { ascending: true });
+      .eq("conversa_id", conversaId)
+      .order("criado_em", { ascending: true })
+      .limit(100);
     if (!data) return;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const msgs = (data as any[]).map(rowToMensagem);
@@ -843,10 +845,16 @@ export default function ChatPage() {
         filter: `conversa_id=eq.${cid}`,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       }, (payload: any) => {
-        if (payload.new?.autor_id === user?.id) return; // otimista já adicionado
         const msg = rowToMensagem(payload.new);
-        setDms(prev => prev.map(dm => dm.id === cid ? { ...dm, mensagens: [...dm.mensagens, msg] } : dm));
-        setGrupos(prev => prev.map(g => g.id === cid ? { ...g, mensagens: [...g.mensagens, msg] } : g));
+        // dedup por ID — evita duplicar mensagem já adicionada otimisticamente
+        setDms(prev => prev.map(dm => dm.id === cid ? {
+          ...dm,
+          mensagens: dm.mensagens.some(m => m.id === msg.id) ? dm.mensagens : [...dm.mensagens, msg],
+        } : dm));
+        setGrupos(prev => prev.map(g => g.id === cid ? {
+          ...g,
+          mensagens: g.mensagens.some(m => m.id === msg.id) ? g.mensagens : [...g.mensagens, msg],
+        } : g));
       })
       .subscribe();
 
@@ -957,49 +965,56 @@ export default function ChatPage() {
     return u.role === "admin" || u.role === "pastor" || u.role === "lider";
   }
 
-  async function sendDm(dmId: string, text: string) {
-    const replyData = replyTo ? {
-      resposta_a_id: replyTo.id,
-      resposta_a_autor_nome: replyTo.autorNome,
-      resposta_a_conteudo: replyTo.conteudo,
-    } : {};
-    // Optimistic
-    const tempId = `tmp_${Date.now()}`;
+  function sendDm(dmId: string, text: string) {
+    const msgId = crypto.randomUUID();
+    const replySnapshot = replyTo;
     const msg: MensagemConversa = {
-      id: tempId, autorId: u.id, autorNome: u.nome,
+      id: msgId, autorId: u.id, autorNome: u.nome,
       conteudo: text, criadoEm: new Date().toISOString(), lida: true,
-      respostaA: replyTo ? { id: replyTo.id, autorNome: replyTo.autorNome, conteudo: replyTo.conteudo } : undefined,
+      respostaA: replySnapshot ? { id: replySnapshot.id, autorNome: replySnapshot.autorNome, conteudo: replySnapshot.conteudo } : undefined,
     };
     setDms((prev) => prev.map((dm) => dm.id === dmId ? { ...dm, mensagens: [...dm.mensagens, msg] } : dm));
     setReplyTo(null);
-    await supabase.from("chat_mensagens").insert({
-      conversa_id: dmId, autor_id: u.id, autor_nome: u.nome, conteudo: text, ...replyData,
+    // fire-and-forget — UI não espera
+    supabase.from("chat_mensagens").insert({
+      id: msgId, conversa_id: dmId, autor_id: u.id, autor_nome: u.nome, conteudo: text,
+      resposta_a_id: replySnapshot?.id ?? null,
+      resposta_a_autor_nome: replySnapshot?.autorNome ?? null,
+      resposta_a_conteudo: replySnapshot?.conteudo ?? null,
+    }).then(({ error }) => {
+      if (error) {
+        setDms((prev) => prev.map((dm) => dm.id === dmId ? { ...dm, mensagens: dm.mensagens.filter((m) => m.id !== msgId) } : dm));
+        showToast("Erro ao enviar mensagem.");
+      }
     });
   }
 
-  async function sendGrupo(grupoId: string, text: string) {
-    const replyData = replyTo ? {
-      resposta_a_id: replyTo.id,
-      resposta_a_autor_nome: replyTo.autorNome,
-      resposta_a_conteudo: replyTo.conteudo,
-    } : {};
-    const tempId = `tmp_${Date.now()}`;
+  function sendGrupo(grupoId: string, text: string) {
+    const msgId = crypto.randomUUID();
+    const replySnapshot = replyTo;
     const msg: MensagemConversa = {
-      id: tempId, autorId: u.id, autorNome: u.nome,
+      id: msgId, autorId: u.id, autorNome: u.nome,
       conteudo: text, criadoEm: new Date().toISOString(), lida: true,
-      respostaA: replyTo ? { id: replyTo.id, autorNome: replyTo.autorNome, conteudo: replyTo.conteudo } : undefined,
+      respostaA: replySnapshot ? { id: replySnapshot.id, autorNome: replySnapshot.autorNome, conteudo: replySnapshot.conteudo } : undefined,
     };
     setGrupos((prev) => prev.map((g) => g.id === grupoId ? { ...g, mensagens: [...g.mensagens, msg] } : g));
     setReplyTo(null);
-    await supabase.from("chat_mensagens").insert({
-      conversa_id: grupoId, autor_id: u.id, autor_nome: u.nome, conteudo: text, ...replyData,
+    // fire-and-forget — UI não espera
+    supabase.from("chat_mensagens").insert({
+      id: msgId, conversa_id: grupoId, autor_id: u.id, autor_nome: u.nome, conteudo: text,
+      resposta_a_id: replySnapshot?.id ?? null,
+      resposta_a_autor_nome: replySnapshot?.autorNome ?? null,
+      resposta_a_conteudo: replySnapshot?.conteudo ?? null,
+    }).then(({ error }) => {
+      if (error) {
+        setGrupos((prev) => prev.map((g) => g.id === grupoId ? { ...g, mensagens: g.mensagens.filter((m) => m.id !== msgId) } : g));
+        showToast("Erro ao enviar mensagem.");
+      }
     });
   }
 
-  async function editMsg(msgId: string, newText: string) {
+  function editMsg(msgId: string, newText: string) {
     if (!activeChat) return;
-    await supabase.from("chat_mensagens")
-      .update({ conteudo: newText, editado_em: new Date().toISOString() }).eq("id", msgId);
     const updater = (msgs: MensagemConversa[]) =>
       msgs.map((m) => m.id === msgId ? { ...m, conteudo: newText, editadoEm: new Date().toISOString() } : m);
     if (activeChat.tipo === "direto") {
@@ -1007,6 +1022,9 @@ export default function ChatPage() {
     } else {
       setGrupos((prev) => prev.map((g) => g.id === activeChat.id ? { ...g, mensagens: updater(g.mensagens) } : g));
     }
+    // fire-and-forget
+    supabase.from("chat_mensagens")
+      .update({ conteudo: newText, editado_em: new Date().toISOString() }).eq("id", msgId);
   }
 
   function toggleReaction(msgId: string, emoji: string) {
