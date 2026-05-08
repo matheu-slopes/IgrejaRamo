@@ -31,7 +31,7 @@ function rowToUser(row: Record<string, unknown>): User {
 
 interface AuthContextType {
   user: User | null;
-  login: (email: string, password: string) => Promise<boolean>;
+  login: (email: string, password: string) => Promise<false | { role: string }>;
   logout: () => void;
   isLoading: boolean;
   /** Verifica se o usuário logado tem uma determinada permissão */
@@ -136,7 +136,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function login(email: string, password: string): Promise<boolean> {
+  async function login(email: string, password: string): Promise<false | { role: string }> {
     try {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error || !data.user) return false;
@@ -146,7 +146,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } catch {
         // login ok, mas perfil não carregou — onAuthStateChange vai tentar de novo
       }
-      return true;
+      const { data: perfil } = await supabase.from("perfis").select("role").eq("id", data.user.id).single();
+      return { role: perfil?.role ?? "membro" };
     } catch {
       return false;
     }
