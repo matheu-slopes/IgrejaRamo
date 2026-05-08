@@ -81,28 +81,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: uploadError.message }, { status: 500 });
   }
 
-  // Tenta URL pública primeiro (funciona se bucket for público)
-  // Fallback: signed URL com 10 anos de validade (funciona em bucket privado também)
+  // Ambos os buckets são públicos — getPublicUrl é suficiente
   const { data: { publicUrl } } = admin.storage
     .from("chat-midias")
     .getPublicUrl(path);
 
-  // Verifica se a URL pública está acessível (bucket pode não ser público)
-  let finalUrl = publicUrl;
-  try {
-    const probe = await fetch(publicUrl, { method: "HEAD" });
-    if (probe.status === 403 || probe.status === 401) {
-      // Bucket não é público — usa signed URL com validade de 10 anos
-      const { data: signed, error: signedError } = await admin.storage
-        .from("chat-midias")
-        .createSignedUrl(path, 315360000); // 10 anos em segundos
-      if (!signedError && signed?.signedUrl) {
-        finalUrl = signed.signedUrl;
-      }
-    }
-  } catch {
-    // Se o probe falhar por rede, continua com publicUrl
-  }
-
-  return NextResponse.json({ url: finalUrl, filename: safeName });
+  return NextResponse.json({ url: publicUrl, filename: safeName });
 }
