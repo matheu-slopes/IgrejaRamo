@@ -30,8 +30,18 @@ export default function NotificationBell() {
   const [notifs, setNotifs] = useState<Notificacao[]>([]);
   const [open, setOpen] = useState(false);
 
+  function rowToNotif(n: any): Notificacao {
+    return {
+      id: n.id, titulo: n.titulo, corpo: n.corpo,
+      tipo: n.tipo, lida: n.lida, criadaEm: n.criada_em,
+      link: n.link, ministerio: n.ministerio,
+    };
+  }
+
   useEffect(() => {
     if (!user) return;
+
+    // Carga inicial
     supabase
       .from("notificacoes")
       .select()
@@ -39,16 +49,35 @@ export default function NotificationBell() {
       .order("criada_em", { ascending: false })
       .limit(20)
       .then(({ data }) => {
-        if (data) {
-          setNotifs(
-            data.map((n) => ({
-              id: n.id, titulo: n.titulo, corpo: n.corpo,
-              tipo: n.tipo, lida: n.lida, criadaEm: n.criada_em,
-              link: n.link, ministerio: n.ministerio,
-            }))
-          );
-        }
+        if (data) setNotifs(data.map(rowToNotif));
       });
+
+    // Realtime: novas notificações chegam sem precisar recarregar
+    const ch = supabase
+      .channel(`notifs_${user.id}`)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .on("postgres_changes" as any, {
+        event: "INSERT",
+        schema: "public",
+        table: "notificacoes",
+        filter: `usuario_id=eq.${user.id}`,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      }, (payload: any) => {
+        setNotifs((prev) => [rowToNotif(payload.new), ...prev].slice(0, 50));
+      })
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .on("postgres_changes" as any, {
+        event: "UPDATE",
+        schema: "public",
+        table: "notificacoes",
+        filter: `usuario_id=eq.${user.id}`,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      }, (payload: any) => {
+        setNotifs((prev) => prev.map((n) => n.id === payload.new.id ? rowToNotif(payload.new) : n));
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(ch); };
   }, [user]);
 
   const naoLidas = notifs.filter((n) => !n.lida).length;

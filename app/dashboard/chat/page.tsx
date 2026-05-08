@@ -1018,9 +1018,11 @@ export default function ChatPage() {
 
   function salvarCache(uid: string, newDms: ConversaDireta[], newGrupos: Grupo[]) {
     try {
-      // Limita a 50 mensagens por conversa para não explodir o localStorage
-      const dmsSave = newDms.map(d => ({ ...d, mensagens: d.mensagens.slice(-50) }));
-      const gruposSave = newGrupos.map(g => ({ ...g, mensagens: g.mensagens.slice(-50) }));
+      // Limita a 50 mensagens e remove mensagens com blob: URLs (inválidas após reload)
+      const clean = (msgs: MensagemConversa[]) =>
+        msgs.filter(m => !m.mediaUrl?.startsWith("blob:")).slice(-50);
+      const dmsSave   = newDms.map(d  => ({ ...d,  mensagens: clean(d.mensagens)  }));
+      const gruposSave = newGrupos.map(g => ({ ...g, mensagens: clean(g.mensagens) }));
       localStorage.setItem(cacheKey(uid), JSON.stringify({ dms: dmsSave, grupos: gruposSave }));
     } catch { /* private mode ou storage cheio */ }
   }
@@ -1170,10 +1172,7 @@ export default function ChatPage() {
       const pending = g.mensagens.filter(m => !dbIds.has(m.id));
       return { ...g, mensagens: [...dbMsgs, ...pending] };
     }));
-    // Atualiza cache com o histórico completo da conversa
-    if (user?.id) {
-      setDms(prev => { salvarCache(user.id, prev, grupos); return prev; });
-    }
+    // cache salvo automaticamente pelo useEffect [dms, grupos]
   }
 
   // ── broadcast: subscribe a cada conversa (WebSocket puro, sem banco) ──
@@ -1253,6 +1252,14 @@ export default function ChatPage() {
       dms.reduce((s, dm) => s + dm.mensagens.filter(m => m.autorId !== uid && !m.lida).length, 0) +
       grupos.reduce((s, g) => s + g.mensagens.filter(m => m.autorId !== uid && !m.lida).length, 0);
     setTotalUnread(total);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dms, grupos]);
+
+  // ── auto-salva cache sempre que dms/grupos mudam ─────────────────
+  // Cobre mensagens chegadas por broadcast que antes eram perdidas no reload
+  useEffect(() => {
+    if (!user?.id) return;
+    salvarCache(user.id, dms, grupos);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dms, grupos]);
 
@@ -1447,11 +1454,10 @@ export default function ChatPage() {
       conteudo: "", tipo: "imagem", mediaUrl: localUrl,
       criadoEm: new Date().toISOString(), lida: true,
     };
-    // Optimistic: mostra imagem local imediatamente
+    // Optimistic: mostra imagem local imediatamente (só para o remetente)
     if (tipo === "direto") setDms(prev => prev.map(dm => dm.id === conversaId ? { ...dm, mensagens: [...dm.mensagens, msg] } : dm));
     else setGrupos(prev => prev.map(g => g.id === conversaId ? { ...g, mensagens: [...g.mensagens, msg] } : g));
-    // Broadcast local (quem está na conversa recebe antes do upload)
-    broadcastChannelsRef.current.get(conversaId)?.send({ type: "broadcast", event: "msg", payload: msg });
+    // Não faz broadcast ainda — blob: URL só funciona localmente
 
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -1472,7 +1478,7 @@ export default function ChatPage() {
       else setGrupos(prev => prev.map(g => g.id === conversaId ? { ...g, mensagens: g.mensagens.map(updater) } : g));
       URL.revokeObjectURL(localUrl);
 
-      // Broadcast com URL definitiva
+      // Broadcast só agora, com URL definitiva (outros usuários podem exibir)
       const finalMsg = { ...msg, mediaUrl: finalUrl };
       broadcastChannelsRef.current.get(conversaId)?.send({ type: "broadcast", event: "msg", payload: finalMsg });
 
@@ -1502,7 +1508,7 @@ export default function ChatPage() {
     };
     if (tipo === "direto") setDms(prev => prev.map(dm => dm.id === conversaId ? { ...dm, mensagens: [...dm.mensagens, msg] } : dm));
     else setGrupos(prev => prev.map(g => g.id === conversaId ? { ...g, mensagens: [...g.mensagens, msg] } : g));
-    broadcastChannelsRef.current.get(conversaId)?.send({ type: "broadcast", event: "msg", payload: msg });
+    // Não faz broadcast ainda — blob: URL só funciona localmente
 
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -1524,6 +1530,7 @@ export default function ChatPage() {
       else setGrupos(prev => prev.map(g => g.id === conversaId ? { ...g, mensagens: g.mensagens.map(updater) } : g));
       URL.revokeObjectURL(localUrl);
 
+      // Broadcast só agora, com URL definitiva
       const finalMsg = { ...msg, mediaUrl: finalUrl };
       broadcastChannelsRef.current.get(conversaId)?.send({ type: "broadcast", event: "msg", payload: finalMsg });
 

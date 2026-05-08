@@ -45,17 +45,19 @@ export async function POST(req: NextRequest) {
   }
 
   const mime = file.type;
+  // Normaliza MIME: remove parâmetros extras (ex: "audio/webm;codecs=opus" → "audio/webm")
+  const mimeBase = mime.split(";")[0].trim();
   let ext: string | undefined;
   let prefix: string;
 
   if (fileType === "audio") {
-    ext = AUDIO_TYPES[mime];
-    if (!ext) return NextResponse.json({ error: "Tipo de áudio não suportado" }, { status: 400 });
+    ext = AUDIO_TYPES[mimeBase];
+    if (!ext) return NextResponse.json({ error: `Tipo de áudio não suportado: ${mimeBase}` }, { status: 400 });
     if (file.size > MAX_AUDIO_BYTES) return NextResponse.json({ error: "Áudio muito grande (máx 10 MB)" }, { status: 413 });
     prefix = "audio";
   } else if (fileType === "documento") {
-    ext = DOC_TYPES[mime];
-    if (!ext) return NextResponse.json({ error: "Tipo de documento não suportado" }, { status: 400 });
+    ext = DOC_TYPES[mimeBase];
+    if (!ext) return NextResponse.json({ error: `Tipo de documento não suportado: ${mimeBase}` }, { status: 400 });
     if (file.size > MAX_DOC_BYTES) return NextResponse.json({ error: "Documento muito grande (máx 20 MB)" }, { status: 413 });
     prefix = "doc";
   } else {
@@ -69,7 +71,8 @@ export async function POST(req: NextRequest) {
   const { error: uploadError } = await admin.storage
     .from("chat-midias")
     .upload(path, await file.arrayBuffer(), {
-      contentType: mime,
+      // Usa o MIME base (sem codecs) para garantir compatibilidade cross-browser
+      contentType: mimeBase,
       upsert: false,
     });
 
