@@ -60,6 +60,14 @@ function youtubeEmbedUrl(url: string) {
   return null;
 }
 
+function isDirectVideoUrl(url: string) {
+  try {
+    return /\.(mp4|webm|mov|avi)(\?|$)/i.test(new URL(url).pathname);
+  } catch {
+    return /\.(mp4|webm|mov|avi)(\?|$)/i.test(url);
+  }
+}
+
 function ConteudoRico({ blocos }: { blocos: DevocionalBloco[] }) {
   return (
     <div className="space-y-5">
@@ -88,7 +96,9 @@ function ConteudoRico({ blocos }: { blocos: DevocionalBloco[] }) {
           return (
             <figure key={bloco.id} className="space-y-2">
               <div className="relative w-full overflow-hidden rounded-2xl border border-gray-100 bg-gray-950 aspect-video">
-                {embedUrl ? (
+                {isDirectVideoUrl(bloco.url) ? (
+                  <video src={bloco.url} controls className="h-full w-full object-cover" />
+                ) : embedUrl ? (
                   <iframe
                     src={embedUrl}
                     title={bloco.legenda || "Vídeo do devocional"}

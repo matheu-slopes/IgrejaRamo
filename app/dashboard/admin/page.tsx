@@ -9,9 +9,9 @@ import {
 } from "@/lib/permissions";
 import {
   Shield, Users, Plus, Search, Pencil, Power, X,
-  ChevronRight, Check, RotateCcw, UserPlus, AlertCircle,
+  ChevronRight, ChevronUp, ChevronDown, Check, RotateCcw, UserPlus, AlertCircle,
   Layers, Lock, Unlock, Trash2, Save, Link2, MapPin, Pin,
-  Eye, EyeOff, Bell, BookOpen, Image as ImageIcon, Video, Type, Quote,
+  Eye, EyeOff, Bell, BookOpen, Image as ImageIcon, Video, Type, Quote, PlayCircle, Calendar as CalendarIcon,
 } from "lucide-react";
 import clsx from "clsx";
 import { User, Role, Ministerio, Permissao, CanalMinisterio, Local } from "@/types";
@@ -1093,6 +1093,7 @@ type DevocionalBloco =
   | { id: string; tipo: "video"; url: string; legenda?: string }
   | { id: string; tipo: "citacao"; texto: string; referencia?: string }
   | { id: string; tipo: "separador" };
+interface DevocionalForm { titulo: string; subtitulo: string; conteudo: string; versiculo: string; referencia: string; imagem_url: string; data: string; ativo: boolean; blocos: DevocionalBloco[]; }
 interface Devocional { id: string; titulo: string; subtitulo: string | null; conteudo: string; versiculo: string | null; referencia: string | null; imagem_url: string | null; data: string; ativo: boolean; blocos?: DevocionalBloco[]; "versículo"?: string | null; }
 
 function criarBlocoDevocional(tipo: DevocionalBloco["tipo"]): DevocionalBloco {
@@ -1139,6 +1140,158 @@ function resumoDevocional(dev: Devocional) {
   if (midia?.tipo === "imagem") return "Devocional com imagem";
   if (midia?.tipo === "video") return "Devocional com vídeo";
   return "Conteúdo personalizado";
+}
+
+function youtubeEmbedUrlDevocional(url: string) {
+  try {
+    const parsed = new URL(url);
+    const host = parsed.hostname.replace("www.", "");
+    if (host === "youtu.be") return `https://www.youtube.com/embed/${parsed.pathname.slice(1)}`;
+    if (host.includes("youtube.com")) {
+      const id = parsed.searchParams.get("v") || parsed.pathname.split("/").pop();
+      return id ? `https://www.youtube.com/embed/${id}` : null;
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+function isDirectVideoUrlDevocional(url: string) {
+  try {
+    return /\.(mp4|webm|mov|avi)(\?|$)/i.test(new URL(url).pathname);
+  } catch {
+    return /\.(mp4|webm|mov|avi)(\?|$)/i.test(url);
+  }
+}
+
+function formatarDataDevocional(data: string) {
+  return new Date(data + "T00:00:00").toLocaleDateString("pt-BR", {
+    weekday: "long", day: "numeric", month: "long", year: "numeric",
+  });
+}
+
+function DevocionalBlocosPreview({ blocos }: { blocos: DevocionalBloco[] }) {
+  return (
+    <div className="space-y-5">
+      {limparBlocosDevocional(blocos).map((bloco) => {
+        if (bloco.tipo === "texto") {
+          return <div key={bloco.id} className="text-gray-700 text-base leading-relaxed whitespace-pre-line">{bloco.texto}</div>;
+        }
+
+        if (bloco.tipo === "imagem") {
+          return (
+            <figure key={bloco.id} className="space-y-2">
+              <div className="relative w-full overflow-hidden rounded-2xl border border-gray-100 bg-gray-50 aspect-[16/9]">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={bloco.url} alt={bloco.legenda || "Imagem do devocional"} className="h-full w-full object-cover" />
+              </div>
+              {bloco.legenda && <figcaption className="text-xs text-gray-400 text-center">{bloco.legenda}</figcaption>}
+            </figure>
+          );
+        }
+
+        if (bloco.tipo === "video") {
+          const embedUrl = youtubeEmbedUrlDevocional(bloco.url);
+          return (
+            <figure key={bloco.id} className="space-y-2">
+              <div className="relative w-full overflow-hidden rounded-2xl border border-gray-100 bg-gray-950 aspect-video">
+                {isDirectVideoUrlDevocional(bloco.url) ? (
+                  <video src={bloco.url} controls className="h-full w-full object-cover" />
+                ) : embedUrl ? (
+                  <iframe
+                    src={embedUrl}
+                    title={bloco.legenda || "Vídeo do devocional"}
+                    className="absolute inset-0 h-full w-full"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                    allowFullScreen
+                  />
+                ) : (
+                  <a href={bloco.url} target="_blank" rel="noopener noreferrer" className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-white/80 hover:text-white transition">
+                    <PlayCircle className="w-12 h-12" />
+                    <span className="text-sm font-semibold">Abrir vídeo</span>
+                  </a>
+                )}
+              </div>
+              {bloco.legenda && <figcaption className="text-xs text-gray-400 text-center">{bloco.legenda}</figcaption>}
+            </figure>
+          );
+        }
+
+        if (bloco.tipo === "citacao") {
+          return (
+            <blockquote key={bloco.id} className="rounded-2xl bg-vine-50 border border-vine-100 px-5 py-4">
+              <Quote className="w-5 h-5 text-vine-400 mb-2" />
+              <p className="text-vine-900 italic leading-relaxed">{bloco.texto}</p>
+              {bloco.referencia && <cite className="text-vine-600 text-sm not-italic font-semibold mt-2 block">{bloco.referencia}</cite>}
+            </blockquote>
+          );
+        }
+
+        return <hr key={bloco.id} className="border-gray-100" />;
+      })}
+    </div>
+  );
+}
+
+function DevocionalPreviewModal({ dev, onClose }: { dev: Devocional | DevocionalForm; onClose: () => void }) {
+  const blocos = dev.blocos ?? parseBlocosDevocional(dev.conteudo);
+  const titulo = dev.titulo.trim() || "Título do devocional";
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-gray-950/60 px-4 py-6 backdrop-blur-sm">
+      <div className="w-full max-w-3xl overflow-hidden rounded-2xl bg-cream shadow-2xl">
+        <div className="sticky top-0 z-10 flex items-center justify-between bg-vine-950 px-4 py-4 text-white">
+          <div className="flex items-center gap-2">
+            <BookOpen className="w-5 h-5 text-gold-400" />
+            <span className="font-semibold text-base">Devocional Diário</span>
+          </div>
+          <button onClick={onClose} className="rounded-xl p-2 text-white/70 transition hover:bg-white/10 hover:text-white">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="mx-auto max-w-2xl px-4 py-10">
+          <article className="overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-sm">
+            {dev.imagem_url ? (
+              <div className="relative h-52 w-full">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={dev.imagem_url} alt={titulo} className="h-full w-full object-cover" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
+              </div>
+            ) : (
+              <div className="flex h-32 items-center justify-center bg-gradient-to-br from-vine-800 to-vine-950">
+                <BookOpen className="w-12 h-12 text-white/30" />
+              </div>
+            )}
+
+            <div className="space-y-5 p-7">
+              <div className="flex items-center gap-2 text-xs text-gray-400">
+                <CalendarIcon className="w-3.5 h-3.5" />
+                <span className="capitalize">{formatarDataDevocional(dev.data)}</span>
+              </div>
+
+              <div>
+                <h1 className="text-2xl font-bold leading-tight text-gray-900">{titulo}</h1>
+                {dev.subtitulo && <p className="mt-1 text-sm text-gray-500">{dev.subtitulo}</p>}
+              </div>
+
+              {dev.versiculo && (
+                <blockquote className="border-l-4 border-vine-400 py-1 pl-4">
+                  <p className="text-base italic leading-relaxed text-vine-800">&ldquo;{dev.versiculo}&rdquo;</p>
+                  {dev.referencia && <cite className="mt-1 block text-sm font-semibold not-italic text-vine-500">— {dev.referencia}</cite>}
+                </blockquote>
+              )}
+
+              <DevocionalBlocosPreview blocos={blocos} />
+            </div>
+          </article>
+
+          <div className="mt-8 text-center text-xs text-gray-400">Igreja Ramo da Vida · Devocional Diário</div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function ConteudoTab({ initSecao }: { initSecao?: string }) {
@@ -1215,11 +1368,15 @@ function ConteudoTab({ initSecao }: { initSecao?: string }) {
 
   // ── Devocional ──
   const [devs, setDevs] = useState<Devocional[]>([]);
-  const novoDevInicial = () => ({ titulo: "", subtitulo: "", conteudo: "", versiculo: "", referencia: "", imagem_url: "", data: new Date().toISOString().slice(0, 10), ativo: true, blocos: [criarBlocoDevocional("texto")] });
+  const novoDevInicial = (): DevocionalForm => ({ titulo: "", subtitulo: "", conteudo: "", versiculo: "", referencia: "", imagem_url: "", data: new Date().toISOString().slice(0, 10), ativo: true, blocos: [criarBlocoDevocional("texto")] });
   const [novoDev, setNovoDev] = useState(novoDevInicial);
   const [adicionandoDev, setAdicionandoDev] = useState(false);
   const [salvandoDev, setSalvandoDev] = useState(false);
   const [editandoDev, setEditandoDev] = useState<Devocional | null>(null);
+  const [previewDevOpen, setPreviewDevOpen] = useState(false);
+  const [uploadingBlocoId, setUploadingBlocoId] = useState<string | null>(null);
+  const [uploadingCapaDev, setUploadingCapaDev] = useState(false);
+  const [erroUploadDev, setErroUploadDev] = useState<string | null>(null);
 
   useEffect(() => {
     supabase.from("devocionais").select().order("data", { ascending: false }).limit(20).then(({ data }) => {
@@ -1281,8 +1438,9 @@ function ConteudoTab({ initSecao }: { initSecao?: string }) {
   const inputCls = "w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-vine-400 bg-gray-50";
   const textareaCls = "w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-vine-400 bg-gray-50 resize-none";
   const devAtual = editandoDev ?? novoDev;
+  const maxVideoBytes = 50 * 1024 * 1024;
 
-  function atualizarDev(patch: Partial<typeof novoDev>) {
+  function atualizarDev(patch: Partial<DevocionalForm>) {
     if (editandoDev) setEditandoDev({ ...editandoDev, ...patch });
     else setNovoDev((prev) => ({ ...prev, ...patch }));
   }
@@ -1315,6 +1473,126 @@ function ConteudoTab({ initSecao }: { initSecao?: string }) {
       const next = blocos.filter((_, i) => i !== index);
       return next.length > 0 ? next : [criarBlocoDevocional("texto")];
     });
+  }
+
+  function formatBytes(bytes: number) {
+    if (bytes < 1024 * 1024) return `${Math.ceil(bytes / 1024)} KB`;
+    return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  }
+
+  function compactarImagemDevocional(file: File): Promise<File> {
+    return new Promise((resolve, reject) => {
+      if (!file.type.startsWith("image/")) {
+        reject(new Error("Selecione um arquivo de imagem"));
+        return;
+      }
+
+      const img = new Image();
+      const objectUrl = URL.createObjectURL(file);
+      img.onload = () => {
+        const maxSide = 1280;
+        const scale = Math.min(1, maxSide / Math.max(img.width, img.height));
+        const width = Math.max(1, Math.round(img.width * scale));
+        const height = Math.max(1, Math.round(img.height * scale));
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        canvas.getContext("2d")?.drawImage(img, 0, 0, width, height);
+        URL.revokeObjectURL(objectUrl);
+        canvas.toBlob((blob) => {
+          if (!blob) {
+            resolve(file);
+            return;
+          }
+          const compactada = new File([blob], file.name.replace(/\.[^.]+$/, ".jpg"), { type: "image/jpeg" });
+          resolve(compactada.size < file.size ? compactada : file);
+        }, "image/jpeg", 0.72);
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(objectUrl);
+        reject(new Error("Não foi possível ler a imagem"));
+      };
+      img.src = objectUrl;
+    });
+  }
+
+  async function enviarComTimeout(endpoint: string, formData: FormData, token: string, timeoutMs = 45000) {
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: { authorization: `Bearer ${token}` },
+        body: formData,
+        signal: controller.signal,
+      });
+      const json = await response.json().catch(() => ({} as { error?: string; url?: string }));
+      if (!response.ok) throw new Error(json.error ?? "Falha ao enviar arquivo");
+      if (!json.url) throw new Error("Upload concluído sem URL de retorno");
+      return json as { url: string };
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        throw new Error("Tempo esgotado ao enviar. Tente uma imagem menor ou verifique a conexão.");
+      }
+      throw error;
+    } finally {
+      window.clearTimeout(timeoutId);
+    }
+  }
+
+  async function subirMidiaDevocional(index: number, file: File, tipo: "imagem" | "video") {
+    const bloco = devAtual.blocos?.[index];
+    if (!bloco || (bloco.tipo !== "imagem" && bloco.tipo !== "video")) return;
+
+    setErroUploadDev(null);
+    setUploadingBlocoId(bloco.id);
+    try {
+      if (tipo === "video" && file.size > maxVideoBytes) {
+        throw new Error(`Vídeo muito grande (${formatBytes(file.size)}). Use até ${formatBytes(maxVideoBytes)}.`);
+      }
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      if (!token) throw new Error("Sessão expirada — faça login novamente");
+
+      const arquivoFinal = tipo === "imagem" ? await compactarImagemDevocional(file) : file;
+      const formData = new FormData();
+      formData.append("file", arquivoFinal);
+      formData.append("conversa_id", `devocional_${devAtual.data}`);
+
+      const endpoint = tipo === "imagem" ? "/api/chat/upload-imagem" : "/api/chat/upload-arquivo";
+      if (tipo === "video") formData.append("file_type", "video");
+
+      const json = await enviarComTimeout(endpoint, formData, token, tipo === "video" ? 90000 : 45000);
+
+      atualizarBlocoDev(index, { url: json.url });
+    } catch (error) {
+      setErroUploadDev(error instanceof Error ? error.message : "Erro ao enviar arquivo");
+    } finally {
+      setUploadingBlocoId(null);
+    }
+  }
+
+  async function subirCapaDevocional(file: File) {
+    setErroUploadDev(null);
+    setUploadingCapaDev(true);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      if (!token) throw new Error("Sessão expirada — faça login novamente");
+
+      const arquivoFinal = await compactarImagemDevocional(file);
+      const formData = new FormData();
+      formData.append("file", arquivoFinal);
+      formData.append("conversa_id", `devocional_capa_${devAtual.data}`);
+
+      const json = await enviarComTimeout("/api/chat/upload-imagem", formData, token);
+
+      atualizarDev({ imagem_url: json.url });
+    } catch (error) {
+      setErroUploadDev(error instanceof Error ? error.message : "Erro ao enviar imagem");
+    } finally {
+      setUploadingCapaDev(false);
+    }
   }
 
   return (
@@ -1383,13 +1661,25 @@ function ConteudoTab({ initSecao }: { initSecao?: string }) {
               <p className="font-semibold text-gray-800 text-sm">Devocional diário</p>
               <p className="text-xs text-gray-400 mt-0.5">O mais recente ativo aparece na página inicial</p>
             </div>
-            <button onClick={() => setAdicionandoDev(true)} className="flex items-center gap-1.5 bg-vine-700 hover:bg-vine-800 text-white text-xs font-semibold px-3 py-2 rounded-xl transition">
-              <Plus className="w-3.5 h-3.5" /> Novo devocional
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setPreviewDevOpen(true)}
+                disabled={!adicionandoDev && !editandoDev}
+                className="flex items-center gap-1.5 rounded-xl border border-vine-100 bg-white px-3 py-2 text-xs font-semibold text-vine-700 transition hover:bg-vine-50 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <Eye className="w-3.5 h-3.5" /> Preview
+              </button>
+              <button onClick={() => { setEditandoDev(null); setAdicionandoDev(true); }} className="flex items-center gap-1.5 bg-vine-700 hover:bg-vine-800 text-white text-xs font-semibold px-3 py-2 rounded-xl transition">
+                <Plus className="w-3.5 h-3.5" /> Novo devocional
+              </button>
+            </div>
           </div>
 
           {(adicionandoDev || editandoDev) && (
             <div className="px-5 py-4 border-b border-vine-50 bg-vine-50/30 space-y-3">
+              {erroUploadDev && (
+                <p className="rounded-xl border border-red-100 bg-red-50 px-3 py-2 text-xs text-red-600">{erroUploadDev}</p>
+              )}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <input className={inputCls} placeholder="Título*" value={editandoDev ? editandoDev.titulo : novoDev.titulo} onChange={(e) => editandoDev ? setEditandoDev({ ...editandoDev, titulo: e.target.value }) : setNovoDev((p) => ({ ...p, titulo: e.target.value }))} />
                 <input className={inputCls} placeholder="Subtítulo" value={editandoDev ? (editandoDev.subtitulo ?? "") : novoDev.subtitulo} onChange={(e) => editandoDev ? setEditandoDev({ ...editandoDev, subtitulo: e.target.value }) : setNovoDev((p) => ({ ...p, subtitulo: e.target.value }))} />
@@ -1451,7 +1741,21 @@ function ConteudoTab({ initSecao }: { initSecao?: string }) {
 
                       {bloco.tipo === "imagem" && (
                         <div className="space-y-2">
-                          <input className={inputCls} placeholder="URL da imagem*" value={bloco.url} onChange={(e) => atualizarBlocoDev(index, { url: e.target.value })} />
+                          <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-vine-200 bg-vine-50/60 px-3 py-3 text-sm font-semibold text-vine-700 transition hover:bg-vine-50">
+                            <ImageIcon className="w-4 h-4" />
+                            {uploadingBlocoId === bloco.id ? "Enviando imagem..." : bloco.url ? "Trocar imagem" : "Subir imagem"}
+                            <input
+                              type="file"
+                              accept="image/jpeg,image/png,image/webp,image/gif"
+                              className="hidden"
+                              disabled={uploadingBlocoId === bloco.id}
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                e.target.value = "";
+                                if (file) subirMidiaDevocional(index, file, "imagem");
+                              }}
+                            />
+                          </label>
                           <input className={inputCls} placeholder="Legenda da imagem" value={bloco.legenda ?? ""} onChange={(e) => atualizarBlocoDev(index, { legenda: e.target.value })} />
                           {bloco.url && (
                             <div className="overflow-hidden rounded-xl border border-gray-100 bg-gray-50">
@@ -1464,8 +1768,25 @@ function ConteudoTab({ initSecao }: { initSecao?: string }) {
 
                       {bloco.tipo === "video" && (
                         <div className="space-y-2">
-                          <input className={inputCls} placeholder="URL do vídeo*" value={bloco.url} onChange={(e) => atualizarBlocoDev(index, { url: e.target.value })} />
+                          <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-vine-200 bg-vine-50/60 px-3 py-3 text-sm font-semibold text-vine-700 transition hover:bg-vine-50">
+                            <Video className="w-4 h-4" />
+                            {uploadingBlocoId === bloco.id ? "Enviando vídeo..." : bloco.url ? "Trocar vídeo" : "Subir vídeo"}
+                            <input
+                              type="file"
+                              accept="video/mp4,video/webm,video/quicktime,video/x-msvideo"
+                              className="hidden"
+                              disabled={uploadingBlocoId === bloco.id}
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                e.target.value = "";
+                                if (file) subirMidiaDevocional(index, file, "video");
+                              }}
+                            />
+                          </label>
                           <input className={inputCls} placeholder="Legenda do vídeo" value={bloco.legenda ?? ""} onChange={(e) => atualizarBlocoDev(index, { legenda: e.target.value })} />
+                          {bloco.url && (
+                            <video src={bloco.url} controls className="aspect-video w-full rounded-xl border border-gray-100 bg-gray-950 object-cover" />
+                          )}
                         </div>
                       )}
 
@@ -1490,7 +1811,29 @@ function ConteudoTab({ initSecao }: { initSecao?: string }) {
                 <input className={inputCls} placeholder="Referência bíblica" value={editandoDev ? (editandoDev.referencia ?? "") : novoDev.referencia} onChange={(e) => editandoDev ? setEditandoDev({ ...editandoDev, referencia: e.target.value }) : setNovoDev((p) => ({ ...p, referencia: e.target.value }))} />
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <input className={inputCls} placeholder="URL de imagem (opcional)" value={editandoDev ? (editandoDev.imagem_url ?? "") : novoDev.imagem_url} onChange={(e) => editandoDev ? setEditandoDev({ ...editandoDev, imagem_url: e.target.value }) : setNovoDev((p) => ({ ...p, imagem_url: e.target.value }))} />
+                <div className="space-y-2">
+                  <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-vine-200 bg-white px-3 py-2 text-sm font-semibold text-vine-700 transition hover:bg-vine-50">
+                    <ImageIcon className="w-4 h-4" />
+                    {uploadingCapaDev ? "Enviando capa..." : devAtual.imagem_url ? "Trocar imagem principal" : "Subir imagem principal"}
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,image/gif"
+                      className="hidden"
+                      disabled={uploadingCapaDev}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        e.target.value = "";
+                        if (file) subirCapaDevocional(file);
+                      }}
+                    />
+                  </label>
+                  {devAtual.imagem_url && (
+                    <div className="overflow-hidden rounded-xl border border-gray-100 bg-gray-50">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={devAtual.imagem_url} alt="Imagem principal" className="h-24 w-full object-cover" />
+                    </div>
+                  )}
+                </div>
                 <input type="date" className={inputCls} value={editandoDev ? editandoDev.data : novoDev.data} onChange={(e) => editandoDev ? setEditandoDev({ ...editandoDev, data: e.target.value }) : setNovoDev((p) => ({ ...p, data: e.target.value }))} />
               </div>
               <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none">
@@ -1535,6 +1878,10 @@ function ConteudoTab({ initSecao }: { initSecao?: string }) {
             )}
           </div>
         </div>
+      )}
+
+      {secao === "devocional" && previewDevOpen && (adicionandoDev || editandoDev) && (
+        <DevocionalPreviewModal dev={devAtual} onClose={() => setPreviewDevOpen(false)} />
       )}
     </div>
   );
