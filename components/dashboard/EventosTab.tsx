@@ -24,6 +24,8 @@ export function EventosTab({
     titulo: "", descricao: "", data: "", horario: "", local: "", publico: false, ministerio,
   });
   const [calendarMenu, setCalendarMenu] = useState<string | null>(null);
+  const [criando, setCriando] = useState(false);
+  const [erroCriar, setErroCriar] = useState("");
 
   useEffect(() => {
     supabase.from("eventos").select().eq("ministerio", ministerio).order("data").then(({ data }) => {
@@ -44,13 +46,23 @@ export function EventosTab({
   }, [ministerio]);
 
   async function criarEvento() {
-    if (!form.titulo || !form.data || !form.horario || !form.local) return;
-    const { data: inserted } = await supabase.from("eventos").insert({
+    if (!form.titulo || !form.data || !form.horario || !form.local) {
+      setErroCriar("Preencha todos os campos obrigatórios.");
+      return;
+    }
+    setCriando(true);
+    setErroCriar("");
+    const { data: inserted, error } = await supabase.from("eventos").insert({
       titulo: form.titulo, descricao: form.descricao || null,
       data: form.data, horario: form.horario, local: form.local,
       publico: form.publico, ministerio,
       criado_por: user?.id,
     }).select().single();
+    setCriando(false);
+    if (error) {
+      setErroCriar(error.message);
+      return;
+    }
     if (inserted) {
       setEventos((prev) => [...prev, {
         id: inserted.id, titulo: inserted.titulo,
@@ -133,18 +145,20 @@ export function EventosTab({
               Visível na página pública
             </label>
           </div>
+          {erroCriar && <p className="text-xs text-red-500 font-medium">{erroCriar}</p>}
           <div className="flex gap-2 justify-end">
             <button
-              onClick={() => setShowForm(false)}
+              onClick={() => { setShowForm(false); setErroCriar(""); }}
               className="text-sm text-gray-500 px-4 py-1.5 rounded-xl hover:bg-gray-100 transition"
             >
               Cancelar
             </button>
             <button
               onClick={criarEvento}
-              className="text-sm bg-gold-500 text-vine-950 font-semibold px-4 py-1.5 rounded-xl hover:bg-gold-400 transition"
+              disabled={criando}
+              className="text-sm bg-gold-500 text-vine-950 font-semibold px-4 py-1.5 rounded-xl hover:bg-gold-400 transition disabled:opacity-50"
             >
-              Criar evento
+              {criando ? "Salvando..." : "Criar evento"}
             </button>
           </div>
         </div>
