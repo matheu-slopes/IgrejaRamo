@@ -16,7 +16,7 @@ const EMOJI: Record<string, string> = {
 
 function EventoMiniCard({ ev }: { ev: Evento }) {
   const d = ev.data ? new Date(ev.data + "T00:00:00") : null;
-  const isPast = ev.data < new Date().toISOString().split("T")[0];
+  const isPast = ev.data && ev.data < new Date().toISOString().split("T")[0];
   return (
     <div className={clsx(
       "flex-shrink-0 w-52 rounded-2xl border border-gray-100 border-t-4 border-t-gold-400 bg-white shadow-sm p-4 space-y-2.5 transition hover:shadow-md",
@@ -84,8 +84,8 @@ function MinistryEventRow({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ministerio, reloadKey]);
 
-  const proximos = eventos.filter((e) => e.data >= hojeStr);
-  const passados = eventos.filter((e) => e.data < hojeStr).reverse();
+  const proximos = eventos.filter((e) => e.data && e.data >= hojeStr);
+  const passados = eventos.filter((e) => e.data && e.data < hojeStr).reverse();
 
   return (
     <>
