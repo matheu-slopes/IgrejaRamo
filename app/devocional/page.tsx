@@ -3,8 +3,20 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowLeft, BookOpen, Calendar, ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowLeft, BookOpen, Calendar, ChevronLeft, ChevronRight, PlayCircle, Quote } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+
+type DevocionalBloco =
+  | { id: string; tipo: "texto"; texto: string }
+  | { id: string; tipo: "imagem"; url: string; legenda?: string }
+  | { id: string; tipo: "video"; url: string; legenda?: string }
+  | { id: string; tipo: "citacao"; texto: string; referencia?: string }
+  | { id: string; tipo: "separador" };
+
+interface DevocionalConteudoRico {
+  versao: 1;
+  blocos: DevocionalBloco[];
+}
 
 interface Devocional {
   id: string;
@@ -16,6 +28,100 @@ interface Devocional {
   imagem_url: string | null;
   data: string;
   ativo: boolean;
+}
+
+function parseConteudo(conteudo: string): DevocionalBloco[] {
+  try {
+    const parsed = JSON.parse(conteudo) as Partial<DevocionalConteudoRico>;
+    if (parsed?.versao === 1 && Array.isArray(parsed.blocos)) {
+      return parsed.blocos.filter((bloco): bloco is DevocionalBloco => Boolean(bloco && "tipo" in bloco));
+    }
+  } catch {
+    // Conteúdos antigos continuam sendo texto puro.
+  }
+
+  return conteudo.trim()
+    ? [{ id: "legacy-text", tipo: "texto", texto: conteudo }]
+    : [];
+}
+
+function youtubeEmbedUrl(url: string) {
+  try {
+    const parsed = new URL(url);
+    const host = parsed.hostname.replace("www.", "");
+    if (host === "youtu.be") return `https://www.youtube.com/embed/${parsed.pathname.slice(1)}`;
+    if (host.includes("youtube.com")) {
+      const id = parsed.searchParams.get("v") || parsed.pathname.split("/").pop();
+      return id ? `https://www.youtube.com/embed/${id}` : null;
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+function ConteudoRico({ blocos }: { blocos: DevocionalBloco[] }) {
+  return (
+    <div className="space-y-5">
+      {blocos.map((bloco) => {
+        if (bloco.tipo === "texto") {
+          return (
+            <div key={bloco.id} className="text-gray-700 text-base leading-relaxed whitespace-pre-line">
+              {bloco.texto}
+            </div>
+          );
+        }
+
+        if (bloco.tipo === "imagem") {
+          return (
+            <figure key={bloco.id} className="space-y-2">
+              <div className="relative w-full overflow-hidden rounded-2xl border border-gray-100 bg-gray-50 aspect-[16/9]">
+                <Image src={bloco.url} alt={bloco.legenda || "Imagem do devocional"} fill className="object-cover" unoptimized />
+              </div>
+              {bloco.legenda && <figcaption className="text-xs text-gray-400 text-center">{bloco.legenda}</figcaption>}
+            </figure>
+          );
+        }
+
+        if (bloco.tipo === "video") {
+          const embedUrl = youtubeEmbedUrl(bloco.url);
+          return (
+            <figure key={bloco.id} className="space-y-2">
+              <div className="relative w-full overflow-hidden rounded-2xl border border-gray-100 bg-gray-950 aspect-video">
+                {embedUrl ? (
+                  <iframe
+                    src={embedUrl}
+                    title={bloco.legenda || "Vídeo do devocional"}
+                    className="absolute inset-0 h-full w-full"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                    allowFullScreen
+                  />
+                ) : (
+                  <a href={bloco.url} target="_blank" rel="noopener noreferrer" className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-white/80 hover:text-white transition">
+                    <PlayCircle className="w-12 h-12" />
+                    <span className="text-sm font-semibold">Abrir vídeo</span>
+                  </a>
+                )}
+              </div>
+              {bloco.legenda && <figcaption className="text-xs text-gray-400 text-center">{bloco.legenda}</figcaption>}
+            </figure>
+          );
+        }
+
+        if (bloco.tipo === "citacao") {
+          return (
+            <blockquote key={bloco.id} className="rounded-2xl bg-vine-50 border border-vine-100 px-5 py-4">
+              <Quote className="w-5 h-5 text-vine-400 mb-2" />
+              <p className="text-vine-900 italic leading-relaxed">{bloco.texto}</p>
+              {bloco.referencia && <cite className="text-vine-600 text-sm not-italic font-semibold mt-2 block">{bloco.referencia}</cite>}
+            </blockquote>
+          );
+        }
+
+        return <hr key={bloco.id} className="border-gray-100" />;
+      })}
+    </div>
+  );
 }
 
 export default function DevocionalPage() {
@@ -37,6 +143,7 @@ export default function DevocionalPage() {
   }, []);
 
   const dev = devs[idx] ?? null;
+  const blocos = dev ? parseConteudo(dev.conteudo) : [];
 
   function formatarData(data: string) {
     return new Date(data + "T00:00:00").toLocaleDateString("pt-BR", {
@@ -144,9 +251,7 @@ export default function DevocionalPage() {
                 )}
 
                 {/* Conteúdo */}
-                <div className="text-gray-700 text-base leading-relaxed whitespace-pre-line">
-                  {dev.conteudo}
-                </div>
+                <ConteudoRico blocos={blocos} />
               </div>
             </article>
 

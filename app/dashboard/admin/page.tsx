@@ -11,7 +11,7 @@ import {
   Shield, Users, Plus, Search, Pencil, Power, X,
   ChevronRight, Check, RotateCcw, UserPlus, AlertCircle,
   Layers, Lock, Unlock, Trash2, Save, Link2, MapPin, Pin,
-  Eye, EyeOff, Bell, BookOpen,
+  Eye, EyeOff, Bell, BookOpen, Image as ImageIcon, Video, Type, Quote,
 } from "lucide-react";
 import clsx from "clsx";
 import { User, Role, Ministerio, Permissao, CanalMinisterio, Local } from "@/types";
@@ -1087,7 +1087,59 @@ function LocaisTab() {
 // ─── ConteudoTab ──────────────────────────────────────────────────────────────
 
 interface Aviso { id: string; titulo: string; conteudo: string; criado_em: string; destinatarios: string; }
-interface Devocional { id: string; titulo: string; subtitulo: string | null; conteudo: string; versiculo: string | null; referencia: string | null; imagem_url: string | null; data: string; ativo: boolean; }
+type DevocionalBloco =
+  | { id: string; tipo: "texto"; texto: string }
+  | { id: string; tipo: "imagem"; url: string; legenda?: string }
+  | { id: string; tipo: "video"; url: string; legenda?: string }
+  | { id: string; tipo: "citacao"; texto: string; referencia?: string }
+  | { id: string; tipo: "separador" };
+interface Devocional { id: string; titulo: string; subtitulo: string | null; conteudo: string; versiculo: string | null; referencia: string | null; imagem_url: string | null; data: string; ativo: boolean; blocos?: DevocionalBloco[]; "versículo"?: string | null; }
+
+function criarBlocoDevocional(tipo: DevocionalBloco["tipo"]): DevocionalBloco {
+  const id = `bloco-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  if (tipo === "imagem") return { id, tipo, url: "", legenda: "" };
+  if (tipo === "video") return { id, tipo, url: "", legenda: "" };
+  if (tipo === "citacao") return { id, tipo, texto: "", referencia: "" };
+  if (tipo === "separador") return { id, tipo };
+  return { id, tipo: "texto", texto: "" };
+}
+
+function parseBlocosDevocional(conteudo: string): DevocionalBloco[] {
+  try {
+    const parsed = JSON.parse(conteudo) as { versao?: number; blocos?: DevocionalBloco[] };
+    if (parsed.versao === 1 && Array.isArray(parsed.blocos)) return parsed.blocos;
+  } catch {
+    // Conteúdo antigo em texto puro.
+  }
+  return conteudo.trim() ? [{ ...criarBlocoDevocional("texto"), texto: conteudo }] : [criarBlocoDevocional("texto")];
+}
+
+function limparBlocosDevocional(blocos: DevocionalBloco[]) {
+  return blocos.filter((bloco) => {
+    if (bloco.tipo === "texto" || bloco.tipo === "citacao") return bloco.texto.trim();
+    if (bloco.tipo === "imagem" || bloco.tipo === "video") return bloco.url.trim();
+    return true;
+  });
+}
+
+function serializarBlocosDevocional(blocos: DevocionalBloco[]) {
+  return JSON.stringify({ versao: 1, blocos: limparBlocosDevocional(blocos) });
+}
+
+function normalizarDevocional(raw: Devocional): Devocional {
+  const versiculo = raw.versiculo ?? raw["versículo"] ?? null;
+  return { ...raw, versiculo, blocos: parseBlocosDevocional(raw.conteudo) };
+}
+
+function resumoDevocional(dev: Devocional) {
+  const blocos = dev.blocos ?? parseBlocosDevocional(dev.conteudo);
+  const texto = blocos.find((bloco) => bloco.tipo === "texto" && bloco.texto.trim());
+  if (texto?.tipo === "texto") return texto.texto;
+  const midia = blocos.find((bloco) => bloco.tipo === "imagem" || bloco.tipo === "video");
+  if (midia?.tipo === "imagem") return "Devocional com imagem";
+  if (midia?.tipo === "video") return "Devocional com vídeo";
+  return "Conteúdo personalizado";
+}
 
 function ConteudoTab({ initSecao }: { initSecao?: string }) {
   const [secao, setSecao] = useState<"avisos" | "devocional">(
@@ -1163,52 +1215,62 @@ function ConteudoTab({ initSecao }: { initSecao?: string }) {
 
   // ── Devocional ──
   const [devs, setDevs] = useState<Devocional[]>([]);
-  const [novoDev, setNovoDev] = useState({ titulo: "", subtitulo: "", conteudo: "", versiculo: "", referencia: "", imagem_url: "", data: new Date().toISOString().slice(0, 10), ativo: true });
+  const novoDevInicial = () => ({ titulo: "", subtitulo: "", conteudo: "", versiculo: "", referencia: "", imagem_url: "", data: new Date().toISOString().slice(0, 10), ativo: true, blocos: [criarBlocoDevocional("texto")] });
+  const [novoDev, setNovoDev] = useState(novoDevInicial);
   const [adicionandoDev, setAdicionandoDev] = useState(false);
   const [salvandoDev, setSalvandoDev] = useState(false);
   const [editandoDev, setEditandoDev] = useState<Devocional | null>(null);
 
   useEffect(() => {
     supabase.from("devocionais").select().order("data", { ascending: false }).limit(20).then(({ data }) => {
-      if (data) setDevs(data as Devocional[]);
+      if (data) setDevs((data as Devocional[]).map(normalizarDevocional));
     });
   }, []);
 
   async function criarDevocional() {
-    if (!novoDev.titulo.trim() || !novoDev.conteudo.trim()) return;
+    const blocos = limparBlocosDevocional(novoDev.blocos);
+    if (!novoDev.titulo.trim() || blocos.length === 0) return;
     setSalvandoDev(true);
     const { data } = await supabase.from("devocionais").insert({
       titulo: novoDev.titulo.trim(),
       subtitulo: novoDev.subtitulo.trim() || null,
-      conteudo: novoDev.conteudo.trim(),
+      conteudo: serializarBlocosDevocional(blocos),
       "versículo": novoDev.versiculo.trim() || null,
       referencia: novoDev.referencia.trim() || null,
       imagem_url: novoDev.imagem_url.trim() || null,
       data: novoDev.data,
       ativo: novoDev.ativo,
     }).select().single();
-    if (data) setDevs((prev) => [data as Devocional, ...prev]);
-    setNovoDev({ titulo: "", subtitulo: "", conteudo: "", versiculo: "", referencia: "", imagem_url: "", data: new Date().toISOString().slice(0, 10), ativo: true });
+    if (data) setDevs((prev) => [normalizarDevocional(data as Devocional), ...prev]);
+    setNovoDev(novoDevInicial());
     setAdicionandoDev(false);
     setSalvandoDev(false);
   }
 
   async function salvarEdicaoDev() {
     if (!editandoDev) return;
+    const blocos = limparBlocosDevocional(editandoDev.blocos ?? parseBlocosDevocional(editandoDev.conteudo));
+    if (!editandoDev.titulo.trim() || blocos.length === 0) return;
+    const atualizado = { ...editandoDev, conteudo: serializarBlocosDevocional(blocos), blocos };
     setSalvandoDev(true);
     await supabase.from("devocionais").update({
-      titulo: editandoDev.titulo,
-      subtitulo: editandoDev.subtitulo || null,
-      conteudo: editandoDev.conteudo,
-      "versículo": editandoDev.versiculo || null,
-      referencia: editandoDev.referencia || null,
-      imagem_url: editandoDev.imagem_url || null,
-      data: editandoDev.data,
-      ativo: editandoDev.ativo,
+      titulo: atualizado.titulo.trim(),
+      subtitulo: atualizado.subtitulo || null,
+      conteudo: atualizado.conteudo,
+      "versículo": atualizado.versiculo || null,
+      referencia: atualizado.referencia || null,
+      imagem_url: atualizado.imagem_url || null,
+      data: atualizado.data,
+      ativo: atualizado.ativo,
     }).eq("id", editandoDev.id);
-    setDevs((prev) => prev.map((d) => d.id === editandoDev.id ? editandoDev : d));
+    setDevs((prev) => prev.map((d) => d.id === editandoDev.id ? atualizado : d));
     setEditandoDev(null);
     setSalvandoDev(false);
+  }
+
+  function iniciarEdicaoDev(dev: Devocional) {
+    setAdicionandoDev(false);
+    setEditandoDev({ ...dev, blocos: dev.blocos ?? parseBlocosDevocional(dev.conteudo) });
   }
 
   function removerDev(id: string) {
@@ -1218,6 +1280,42 @@ function ConteudoTab({ initSecao }: { initSecao?: string }) {
 
   const inputCls = "w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-vine-400 bg-gray-50";
   const textareaCls = "w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-vine-400 bg-gray-50 resize-none";
+  const devAtual = editandoDev ?? novoDev;
+
+  function atualizarDev(patch: Partial<typeof novoDev>) {
+    if (editandoDev) setEditandoDev({ ...editandoDev, ...patch });
+    else setNovoDev((prev) => ({ ...prev, ...patch }));
+  }
+
+  function atualizarBlocosDev(updater: (blocos: DevocionalBloco[]) => DevocionalBloco[]) {
+    const blocosAtuais = devAtual.blocos ?? [criarBlocoDevocional("texto")];
+    atualizarDev({ blocos: updater(blocosAtuais) });
+  }
+
+  function atualizarBlocoDev(index: number, patch: Partial<DevocionalBloco>) {
+    atualizarBlocosDev((blocos) => blocos.map((bloco, i) => i === index ? { ...bloco, ...patch } as DevocionalBloco : bloco));
+  }
+
+  function adicionarBlocoDev(tipo: DevocionalBloco["tipo"]) {
+    atualizarBlocosDev((blocos) => [...blocos, criarBlocoDevocional(tipo)]);
+  }
+
+  function moverBlocoDev(index: number, direcao: -1 | 1) {
+    atualizarBlocosDev((blocos) => {
+      const destino = index + direcao;
+      if (destino < 0 || destino >= blocos.length) return blocos;
+      const next = [...blocos];
+      [next[index], next[destino]] = [next[destino], next[index]];
+      return next;
+    });
+  }
+
+  function removerBlocoDev(index: number) {
+    atualizarBlocosDev((blocos) => {
+      const next = blocos.filter((_, i) => i !== index);
+      return next.length > 0 ? next : [criarBlocoDevocional("texto")];
+    });
+  }
 
   return (
     <div className="space-y-4">
@@ -1292,16 +1390,106 @@ function ConteudoTab({ initSecao }: { initSecao?: string }) {
 
           {(adicionandoDev || editandoDev) && (
             <div className="px-5 py-4 border-b border-vine-50 bg-vine-50/30 space-y-3">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <input className={inputCls} placeholder="Título*" value={editandoDev ? editandoDev.titulo : novoDev.titulo} onChange={(e) => editandoDev ? setEditandoDev({ ...editandoDev, titulo: e.target.value }) : setNovoDev((p) => ({ ...p, titulo: e.target.value }))} />
                 <input className={inputCls} placeholder="Subtítulo" value={editandoDev ? (editandoDev.subtitulo ?? "") : novoDev.subtitulo} onChange={(e) => editandoDev ? setEditandoDev({ ...editandoDev, subtitulo: e.target.value }) : setNovoDev((p) => ({ ...p, subtitulo: e.target.value }))} />
               </div>
-              <textarea className={textareaCls} rows={6} placeholder="Conteúdo do devocional*" value={editandoDev ? editandoDev.conteudo : novoDev.conteudo} onChange={(e) => editandoDev ? setEditandoDev({ ...editandoDev, conteudo: e.target.value }) : setNovoDev((p) => ({ ...p, conteudo: e.target.value }))} />
-              <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  {([
+                    { tipo: "texto", label: "Texto", icon: Type },
+                    { tipo: "imagem", label: "Imagem", icon: ImageIcon },
+                    { tipo: "video", label: "Vídeo", icon: Video },
+                    { tipo: "citacao", label: "Citação", icon: Quote },
+                    { tipo: "separador", label: "Divisor", icon: Layers },
+                  ] as { tipo: DevocionalBloco["tipo"]; label: string; icon: React.ElementType }[]).map(({ tipo, label, icon: Icon }) => (
+                    <button
+                      key={tipo}
+                      type="button"
+                      onClick={() => adicionarBlocoDev(tipo)}
+                      className="flex items-center gap-1.5 rounded-xl border border-vine-100 bg-white px-3 py-2 text-xs font-semibold text-vine-700 hover:bg-vine-50 transition"
+                    >
+                      <Icon className="w-3.5 h-3.5" /> {label}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="space-y-2">
+                  {(devAtual.blocos ?? [criarBlocoDevocional("texto")]).map((bloco, index) => (
+                    <div key={bloco.id} className="rounded-2xl border border-gray-200 bg-white p-3 space-y-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-gray-400">
+                          {bloco.tipo === "texto" && <Type className="w-3.5 h-3.5" />}
+                          {bloco.tipo === "imagem" && <ImageIcon className="w-3.5 h-3.5" />}
+                          {bloco.tipo === "video" && <Video className="w-3.5 h-3.5" />}
+                          {bloco.tipo === "citacao" && <Quote className="w-3.5 h-3.5" />}
+                          {bloco.tipo === "separador" && <Layers className="w-3.5 h-3.5" />}
+                          {bloco.tipo}
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <button type="button" onClick={() => moverBlocoDev(index, -1)} disabled={index === 0} className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 disabled:opacity-30 transition">
+                            <ChevronUp className="w-4 h-4" />
+                          </button>
+                          <button type="button" onClick={() => moverBlocoDev(index, 1)} disabled={index === (devAtual.blocos?.length ?? 1) - 1} className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 disabled:opacity-30 transition">
+                            <ChevronDown className="w-4 h-4" />
+                          </button>
+                          <button type="button" onClick={() => removerBlocoDev(index)} className="p-1.5 rounded-lg text-gray-400 hover:bg-red-50 hover:text-red-500 transition">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+
+                      {bloco.tipo === "texto" && (
+                        <textarea
+                          className={textareaCls}
+                          rows={5}
+                          placeholder="Texto do devocional*"
+                          value={bloco.texto}
+                          onChange={(e) => atualizarBlocoDev(index, { texto: e.target.value })}
+                        />
+                      )}
+
+                      {bloco.tipo === "imagem" && (
+                        <div className="space-y-2">
+                          <input className={inputCls} placeholder="URL da imagem*" value={bloco.url} onChange={(e) => atualizarBlocoDev(index, { url: e.target.value })} />
+                          <input className={inputCls} placeholder="Legenda da imagem" value={bloco.legenda ?? ""} onChange={(e) => atualizarBlocoDev(index, { legenda: e.target.value })} />
+                          {bloco.url && (
+                            <div className="overflow-hidden rounded-xl border border-gray-100 bg-gray-50">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src={bloco.url} alt="Prévia" className="h-44 w-full object-cover" />
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {bloco.tipo === "video" && (
+                        <div className="space-y-2">
+                          <input className={inputCls} placeholder="URL do vídeo*" value={bloco.url} onChange={(e) => atualizarBlocoDev(index, { url: e.target.value })} />
+                          <input className={inputCls} placeholder="Legenda do vídeo" value={bloco.legenda ?? ""} onChange={(e) => atualizarBlocoDev(index, { legenda: e.target.value })} />
+                        </div>
+                      )}
+
+                      {bloco.tipo === "citacao" && (
+                        <div className="space-y-2">
+                          <textarea className={textareaCls} rows={3} placeholder="Citação*" value={bloco.texto} onChange={(e) => atualizarBlocoDev(index, { texto: e.target.value })} />
+                          <input className={inputCls} placeholder="Referência" value={bloco.referencia ?? ""} onChange={(e) => atualizarBlocoDev(index, { referencia: e.target.value })} />
+                        </div>
+                      )}
+
+                      {bloco.tipo === "separador" && (
+                        <div className="py-3">
+                          <div className="h-px bg-gray-200" />
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <input className={inputCls} placeholder="Versículo (ex: João 3:16)" value={editandoDev ? (editandoDev.versiculo ?? "") : novoDev.versiculo} onChange={(e) => editandoDev ? setEditandoDev({ ...editandoDev, versiculo: e.target.value }) : setNovoDev((p) => ({ ...p, versiculo: e.target.value }))} />
                 <input className={inputCls} placeholder="Referência bíblica" value={editandoDev ? (editandoDev.referencia ?? "") : novoDev.referencia} onChange={(e) => editandoDev ? setEditandoDev({ ...editandoDev, referencia: e.target.value }) : setNovoDev((p) => ({ ...p, referencia: e.target.value }))} />
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <input className={inputCls} placeholder="URL de imagem (opcional)" value={editandoDev ? (editandoDev.imagem_url ?? "") : novoDev.imagem_url} onChange={(e) => editandoDev ? setEditandoDev({ ...editandoDev, imagem_url: e.target.value }) : setNovoDev((p) => ({ ...p, imagem_url: e.target.value }))} />
                 <input type="date" className={inputCls} value={editandoDev ? editandoDev.data : novoDev.data} onChange={(e) => editandoDev ? setEditandoDev({ ...editandoDev, data: e.target.value }) : setNovoDev((p) => ({ ...p, data: e.target.value }))} />
               </div>
@@ -1328,12 +1516,12 @@ function ConteudoTab({ initSecao }: { initSecao?: string }) {
                     {d.ativo ? <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">Ativo</span> : <span className="text-xs bg-gray-100 text-gray-400 px-2 py-0.5 rounded-full font-medium">Inativo</span>}
                   </div>
                   {d.subtitulo && <p className="text-xs text-gray-500 mt-0.5">{d.subtitulo}</p>}
-                  <p className="text-xs text-gray-400 mt-0.5 line-clamp-2">{d.conteudo}</p>
+                  <p className="text-xs text-gray-400 mt-0.5 line-clamp-2">{resumoDevocional(d)}</p>
                   {d.versiculo && <p className="text-xs text-vine-600 mt-1 italic">&ldquo;{d.versiculo}&rdquo; {d.referencia && `— ${d.referencia}`}</p>}
                   <p className="text-xs text-gray-400 mt-1">{new Date(d.data + "T00:00:00").toLocaleDateString("pt-BR")}</p>
                 </div>
                 <div className="flex gap-1 shrink-0">
-                  <button onClick={() => setEditandoDev(d)} className="p-1.5 hover:bg-vine-50 rounded-lg text-gray-300 hover:text-vine-600 transition">
+                  <button onClick={() => iniciarEdicaoDev(d)} className="p-1.5 hover:bg-vine-50 rounded-lg text-gray-300 hover:text-vine-600 transition">
                     <Pencil className="w-4 h-4" />
                   </button>
                   <button onClick={() => removerDev(d.id)} className="p-1.5 hover:bg-red-50 rounded-lg text-gray-300 hover:text-red-400 transition">
