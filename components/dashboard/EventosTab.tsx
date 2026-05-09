@@ -52,26 +52,26 @@ export function EventosTab({
     }
     setCriando(true);
     setErroCriar("");
-    const { data: inserted, error } = await supabase.from("eventos").insert({
+    const { error } = await supabase.from("eventos").insert({
       titulo: form.titulo, descricao: form.descricao || null,
       data: form.data, horario: form.horario, local: form.local,
       publico: form.publico, ministerio,
       criado_por: user?.id,
-    }).select().single();
+    });
     setCriando(false);
     if (error) {
       setErroCriar(error.message);
       return;
     }
-    if (inserted) {
-      setEventos((prev) => [...prev, {
-        id: inserted.id, titulo: inserted.titulo,
-        descricao: inserted.descricao ?? "",
-        data: inserted.data, horario: inserted.horario,
-        local: inserted.local, publico: inserted.publico,
-        ministerio: inserted.ministerio, criadoPor: inserted.criado_por,
-      }]);
-    }
+    // Recarrega a lista após insert (evita depender do SELECT com RLS)
+    const { data: lista } = await supabase.from("eventos").select().eq("ministerio", ministerio).order("data");
+    if (lista) setEventos(lista.map((e: Record<string, unknown>) => ({
+      id: e.id as string, titulo: e.titulo as string,
+      descricao: (e.descricao as string) ?? "",
+      data: e.data as string, horario: e.horario as string,
+      local: e.local as string, publico: e.publico as boolean,
+      ministerio: e.ministerio as Ministerio, criadoPor: (e.criado_por as string) ?? "",
+    })));
     setForm({ titulo: "", descricao: "", data: "", horario: "", local: "", publico: false, ministerio });
     setShowForm(false);
   }

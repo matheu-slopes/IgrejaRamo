@@ -378,6 +378,9 @@ CREATE POLICY "perfil_update" ON perfis FOR UPDATE USING (auth.uid() = id);
 
 -- Eventos públicos visíveis para todos sem login
 CREATE POLICY "eventos_publicos" ON eventos FOR SELECT USING (publico = TRUE OR auth.uid() IS NOT NULL);
+CREATE POLICY "eventos_insert"   ON eventos FOR INSERT WITH CHECK (auth.uid() IS NOT NULL);
+CREATE POLICY "eventos_update"   ON eventos FOR UPDATE USING (auth.uid() IS NOT NULL);
+CREATE POLICY "eventos_delete"   ON eventos FOR DELETE USING (auth.uid() IS NOT NULL);
 
 -- Notificações: cada usuário vê apenas as suas
 CREATE POLICY "notificacoes_own" ON notificacoes FOR SELECT USING (usuario_id = auth.uid());
