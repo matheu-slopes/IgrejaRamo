@@ -30,7 +30,6 @@ export const DEFAULTS_POR_ROLE: Record<Role, Permissao[]> = {
     "fixar_mensagem",
     "criar_aviso",
     "ver_relatorios",
-    "ver_dashboard",
   ],
   pastor: [
     "criar_evento",
@@ -42,7 +41,6 @@ export const DEFAULTS_POR_ROLE: Record<Role, Permissao[]> = {
     "fixar_mensagem",
     "criar_aviso",
     "ver_relatorios",
-    "ver_dashboard",
   ],
   lider: [
     "criar_evento",
@@ -53,11 +51,9 @@ export const DEFAULTS_POR_ROLE: Record<Role, Permissao[]> = {
     "enviar_chat",
     "fixar_mensagem",
     "criar_aviso",
-    "ver_dashboard",
   ],
   voluntario: [
     "enviar_chat",
-    "ver_dashboard",
   ],
   membro: [
     // Membros só acessam o portal de membro — sem acesso ao dashboard interno
@@ -78,12 +74,11 @@ export const PERMISSAO_LABEL: Record<Permissao, { label: string; descricao: stri
   editar_evento:                { label: "Editar/remover eventos",  descricao: "Editar e excluir eventos existentes",                       grupo: "Agenda"        },
   criar_escala:                 { label: "Criar escalas",           descricao: "Criar e editar escalas de serviço",                         grupo: "Agenda"        },
   gerenciar_membros_ministerio: { label: "Gerenciar membros",       descricao: "Adicionar, remover e editar membros de um ministério",       grupo: "Ministério"    },
-  ver_dashboard:                { label: "Acessar dashboard",       descricao: "Entrar na área interna do sistema",                         grupo: "Acesso"        },
 };
 
 export const TODAS_PERMISSOES = Object.keys(PERMISSAO_LABEL) as Permissao[];
 
-export const GRUPOS_PERMISSAO = ["Administração", "Comunicação", "Agenda", "Ministério", "Acesso"] as const;
+export const GRUPOS_PERMISSAO = ["Administração", "Comunicação", "Agenda", "Ministério"] as const;
 
 // ─── Função principal ─────────────────────────────────────────────
 

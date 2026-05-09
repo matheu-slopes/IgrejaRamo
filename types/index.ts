@@ -19,8 +19,7 @@ export type Permissao =
   | "enviar_chat"                 // enviar mensagens no chat do canal
   | "fixar_mensagem"              // fixar mensagens no chat
   | "criar_aviso"                 // criar avisos/notificações para o grupo
-  | "ver_relatorios"              // ver relatórios e estatísticas
-  | "ver_dashboard";              // acessar o dashboard interno
+  | "ver_relatorios";              // ver relatórios e estatísticas
 
 export type Ministerio =
   | "Ensino"

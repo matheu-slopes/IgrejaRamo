@@ -175,19 +175,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function atualizarUsuario(id: string, dados: Partial<User>) {
-    const payload: Record<string, unknown> = {};
-    if (dados.nome        !== undefined) payload.nome          = dados.nome;
-    if (dados.email       !== undefined) payload.email         = dados.email;
-    if (dados.telefone    !== undefined) payload.telefone      = dados.telefone;
-    if (dados.foto        !== undefined) payload.foto          = dados.foto;
-    if (dados.role        !== undefined) payload.role          = dados.role;
-    if (dados.ministerios !== undefined) payload.ministerios   = dados.ministerios;
-    if (dados.dataIngresso !== undefined) payload.data_ingresso = dados.dataIngresso;
-    if (dados.ativo       !== undefined) payload.ativo         = dados.ativo;
-    if (dados.primeiroAcesso !== undefined) payload.primeiro_acesso = dados.primeiroAcesso;
-    if (dados.permissoes  !== undefined) payload.permissoes    = dados.permissoes ?? [];
-
-    await supabase.from("perfis").update(payload).eq("id", id);
+    await fetch("/api/atualizar-perfil", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, ...dados }),
+    });
     setUsuarios((prev) => prev.map((u) => u.id === id ? { ...u, ...dados } : u));
     if (user?.id === id) setUser((prev) => prev ? { ...prev, ...dados } : prev);
   }
