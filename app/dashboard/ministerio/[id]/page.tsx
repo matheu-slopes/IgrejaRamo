@@ -8,7 +8,7 @@ import {
   Plus, Trash2, Pencil, X, Check, Calendar, ExternalLink,
   Pin, ChevronDown, ShieldCheck, ChevronUp,
   Star, Mic, Square, Image as ImageIcon, Grid3x3, Link2,
-  Phone, Video as VideoIcon, MoreVertical, PhoneOff,
+  MoreVertical,
   Music2, ChevronUp as ArrowUp, ChevronDown as ArrowDown, Save, Eye, EyeOff, UserCheck,
   Reply,
 } from "lucide-react";
@@ -37,7 +37,6 @@ export default function CanalMinisterioPage() {
   const [tab, setTab] = useState<Tab>("chat");
   const [canalBase, setCanalBase] = useState<{ ministerio: string; descricao: string; chatBloqueado: boolean; cor: string } | null>(null);
   const [chatBloqueado, setChatBloqueado] = useState(false);
-  const [chamada, setChamada] = useState<"audio" | "video" | null>(null);
 
   useEffect(() => {
     // Timeout de segurança: se demorar mais de 3s, usa fallback e não trava
@@ -86,21 +85,6 @@ export default function CanalMinisterioPage() {
             <p className="text-sm opacity-70 mt-1">{canalBase.descricao}</p>
           </div>
           <div className="flex items-center gap-2">
-            {/* Chamadas */}
-            <button
-              onClick={() => setChamada("audio")}
-              className="flex items-center gap-1.5 text-sm font-medium px-3 py-2 rounded-full border border-white/30 text-white/80 hover:bg-white/10 transition"
-              title="Chamada de áudio em grupo"
-            >
-              <Phone className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => setChamada("video")}
-              className="flex items-center gap-1.5 text-sm font-medium px-3 py-2 rounded-full border border-white/30 text-white/80 hover:bg-white/10 transition"
-              title="Chamada de vídeo em grupo"
-            >
-              <VideoIcon className="w-4 h-4" />
-            </button>
             {tab === "chat" && (
               <button
                 onClick={() => podeBloquearChat && setChatBloqueado(!chatBloqueado)}
@@ -149,36 +133,6 @@ export default function CanalMinisterioPage() {
       {tab === "membros" && <MembrosTab ministerio={slug} isLider={podeGerenciarMembros} podeAtribuirPermissoes={podeAtribuirPermissoes} />}
       {tab === "eventos" && <EventosTab ministerio={slug} isLider={podeCriarEvento} podeEditar={podeEditarEvento} />}
       {tab === "escalas" && <EscalasTab ministerio={slug} isLider={temPermissao("criar_escala")} />}
-
-      {/* Modal de chamada */}
-      {chamada && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className={clsx("rounded-3xl p-8 flex flex-col items-center gap-6 shadow-2xl text-white w-80", corBg)}>
-            <div className="w-16 h-16 rounded-full bg-white/20 flex items-center justify-center">
-              {chamada === "audio" ? <Phone className="w-7 h-7" /> : <VideoIcon className="w-7 h-7" />}
-            </div>
-            <div className="text-center">
-              <p className="font-sans text-xl font-semibold">{slug}</p>
-              <p className="text-white/70 text-sm mt-1">
-                {chamada === "audio" ? "Chamada de áudio em grupo" : "Chamada de vídeo em grupo"}
-              </p>
-            </div>
-            <div className="flex items-center gap-2 bg-white/10 rounded-full px-4 py-2">
-              <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-              <span className="text-sm text-white/80">Conectando membros do canal…</span>
-            </div>
-            <p className="text-xs text-white/50 text-center">
-              Funcionalidade de chamada em grupo disponível com integração WebRTC / servidor de sinalização.
-            </p>
-            <button
-              onClick={() => setChamada(null)}
-              className="flex items-center gap-2 bg-red-500 hover:bg-red-600 text-white font-semibold px-6 py-3 rounded-full transition"
-            >
-              <PhoneOff className="w-4 h-4" /> Encerrar chamada
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
