@@ -5,10 +5,14 @@
 @layer base {
   html {
     scroll-behavior: smooth;
+    /* suporte a safe-area para notch/home indicator */
+    -webkit-tap-highlight-color: transparent;
   }
   body {
     font-feature-settings: "kern" 1, "liga" 1, "calt" 1;
     background-color: #F7F2EA;
+    /* evita zoom em inputs no iOS */
+    touch-action: manipulation;
   }
 
   /* Granulado sutil para dar profundidade ao fundo cream */

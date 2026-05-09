@@ -13,6 +13,20 @@ import {
 } from "lucide-react";
 import clsx from "clsx";
 
+// ─── Helper: retorna sempre um access_token fresco ────────────────
+// getSession() usa cache local sem validar expiração. Se o token
+// estiver a menos de 60 s do vencimento (ou já vencido), força refresh.
+async function getFreshToken(): Promise<string> {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) return "";
+  const expiresAt = session.expires_at ?? 0; // segundos desde epoch
+  if (Date.now() / 1000 > expiresAt - 60) {
+    const { data } = await supabase.auth.refreshSession();
+    return data.session?.access_token ?? "";
+  }
+  return session.access_token;
+}
+
 // ─── AudioPlayer ─────────────────────────────────────────────────
 // O MediaRecorder não escreve duração nos metadados do WebM.
 // O hack: seek para 1e101 força o browser a varrer o arquivo e calcular a duração real.
@@ -1183,7 +1197,15 @@ export default function ChatPage() {
     try {
       const raw = localStorage.getItem(cacheKey(uid));
       if (!raw) return null;
-      return JSON.parse(raw);
+      const parsed = JSON.parse(raw);
+      // Remove mensagens que ficaram presas como "⏳ enviando mídia…"
+      // (upload não concluído antes de recarregar a página)
+      const limpar = (msgs: MensagemConversa[]) =>
+        msgs.filter((m) => m.conteudo !== "⏳ enviando mídia…");
+      return {
+        dms:    parsed.dms?.map((d: ConversaDireta) => ({ ...d, mensagens: limpar(d.mensagens) })) ?? [],
+        grupos: parsed.grupos?.map((g: Grupo) => ({ ...g, mensagens: limpar(g.mensagens) })) ?? [],
+      };
     } catch { return null; }
   }
 
@@ -1718,10 +1740,10 @@ export default function ChatPage() {
     // O broadcast SÓ acontece depois, carregando o timestamp do servidor.
     // Isso garante que todos os clientes ordenam mensagens pelo relógio do servidor.
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const token = await getFreshToken();
       const r = await fetch("/api/chat/mensagem", {
         method: "POST", keepalive: true,
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${session?.access_token ?? ""}` },
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
         body: JSON.stringify({
           id: msgId, conversa_id: dmId, autor_id: u.id, autor_nome: u.nome, conteudo: text,
           resposta_a_id: replySnapshot?.id ?? null,
@@ -1773,10 +1795,10 @@ export default function ChatPage() {
 
     // 2) DB primeiro → timestamp do servidor
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const token = await getFreshToken();
       const r = await fetch("/api/chat/mensagem", {
         method: "POST", keepalive: true,
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${session?.access_token ?? ""}` },
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
         body: JSON.stringify({
           id: msgId, conversa_id: grupoId, autor_id: u.id, autor_nome: u.nome, conteudo: text,
           resposta_a_id: replySnapshot?.id ?? null,
@@ -1824,13 +1846,13 @@ export default function ChatPage() {
     // Não faz broadcast ainda — blob: URL só funciona localmente
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const token = await getFreshToken();
       const fd = new FormData();
       fd.append("file", file);
       fd.append("conversa_id", conversaId);
       const upRes = await fetch("/api/chat/upload-imagem", {
         method: "POST",
-        headers: { Authorization: `Bearer ${session?.access_token ?? ""}` },
+        headers: { Authorization: `Bearer ${token}` },
         body: fd,
       });
       if (!upRes.ok) { const j = await upRes.json().catch(() => ({})); throw new Error(j.error ?? "Upload falhou"); }
@@ -1849,7 +1871,7 @@ export default function ChatPage() {
       // Persiste no banco
       fetch("/api/chat/mensagem", {
         method: "POST", keepalive: true,
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token ?? ""}` },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ id: msgId, conversa_id: conversaId, autor_id: u.id, autor_nome: u.nome, conteudo: "", tipo: "imagem", media_url: finalUrl }),
       });
     } catch (err: unknown) {
@@ -1875,7 +1897,7 @@ export default function ChatPage() {
     // Não faz broadcast ainda — blob: URL só funciona localmente
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const token = await getFreshToken();
       const file = fileOrBlob instanceof File ? fileOrBlob : new File([fileOrBlob], nomeArquivo, { type: fileOrBlob.type });
       const fd = new FormData();
       fd.append("file", file);
@@ -1883,7 +1905,7 @@ export default function ChatPage() {
       fd.append("file_type", tipoMsg);
       const upRes = await fetch("/api/chat/upload-arquivo", {
         method: "POST",
-        headers: { Authorization: `Bearer ${session?.access_token ?? ""}` },
+        headers: { Authorization: `Bearer ${token}` },
         body: fd,
       });
       if (!upRes.ok) { const j = await upRes.json().catch(() => ({})); throw new Error(j.error ?? "Upload falhou"); }
@@ -1901,7 +1923,7 @@ export default function ChatPage() {
       // Persiste no banco — tratamento de erro igual ao sendDm
       fetch("/api/chat/mensagem", {
         method: "POST", keepalive: true,
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token ?? ""}` },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ id: msgId, conversa_id: conversaId, autor_id: u.id, autor_nome: u.nome, conteudo: tipoMsg === "documento" ? nomeArquivo : "", tipo: tipoMsg, media_url: finalUrl }),
       }).then(async (r) => {
         if (!r.ok) {
@@ -2391,22 +2413,22 @@ export default function ChatPage() {
       {toast && <Toast msg={toast} />}
       {showNewDmModal && <NewDmModal currentUserId={u.id} dms={dms} usuarios={usuarios} onStart={startDm} onClose={() => setShowNewDmModal(false)} />}
       {showNewGroupModal && <NewGroupModal currentUserId={u.id} usuarios={usuarios} onClose={() => setShowNewGroupModal(false)} onCreate={createGroup} />}
-      <div className="mb-4">
-        <h1 className="text-2xl font-sans font-semibold text-vine-950">Mensagens</h1>
-        <p className="text-sm text-gray-500 mt-1">
+      <div className="mb-3">
+        <h1 className="text-xl md:text-2xl font-sans font-semibold text-vine-950">Mensagens</h1>
+        <p className="text-sm text-gray-500 mt-0.5 hidden sm:block">
           Conversas diretas, chat do culto e canais de ministério.
         </p>
       </div>
 
-      <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden" style={{ height: "calc(100vh - 200px)", minHeight: 520 }}>
+      <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden" style={{ height: "calc(100dvh - 180px)", minHeight: 400 }}>
         <div className="flex h-full">
           {/* Left list */}
-          <div className={clsx("flex flex-col border-r border-gray-100 shrink-0 w-full lg:w-80", activeChat !== null ? "hidden lg:flex" : "flex")}>
+          <div className={clsx("flex flex-col border-r border-gray-100 shrink-0 w-full md:w-72 lg:w-80", activeChat !== null ? "hidden md:flex" : "flex")}>
             {renderList()}
           </div>
 
           {/* Right chat area */}
-          <div className={clsx("flex-1 flex min-w-0", activeChat === null ? "hidden lg:flex" : "flex")}>
+          <div className={clsx("flex-1 flex min-w-0", activeChat === null ? "hidden md:flex" : "flex")}>
             {activeChat ? renderChatPanel() : (
               <div className="flex flex-col items-center justify-center w-full text-gray-300 gap-3">
                 <MessageSquare className="w-12 h-12 opacity-30" />

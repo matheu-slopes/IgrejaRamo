@@ -139,13 +139,13 @@ export default function DashboardPage() {
   if (!user) return null;
 
   return (
-    <div className="max-w-5xl mx-auto space-y-8">
+    <div className="max-w-5xl mx-auto space-y-5 md:space-y-8">
       {/* Page title */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">
+        <h1 className="text-xl md:text-2xl font-bold text-gray-900">
           Olá, {user.nome.split(" ")[0]}! 👋
         </h1>
-        <p className="text-gray-500 text-sm mt-1">
+        <p className="text-gray-500 text-sm mt-0.5">
           Aqui está um resumo da sua semana na igreja.
         </p>
       </div>

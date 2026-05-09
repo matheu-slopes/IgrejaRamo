@@ -235,7 +235,6 @@ function TabelaEscalas({
 }) {
   const hojeStr = new Date().toISOString().split("T")[0];
 
-  // porMinDow[ministerio][dow] = Escala[]
   const porMinDow = useMemo(() => {
     const map: Partial<Record<Ministerio, Record<number, Escala[]>>> = {};
     for (const e of todasEscalas) {
@@ -248,100 +247,181 @@ function TabelaEscalas({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [todasEscalas]);
 
-  const COL_MIN = "w-36 shrink-0";
-  const COL_DIA = "flex-1 min-w-0";
-
-  return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-      {/* Cabeçalho */}
-      <div className="flex border-b border-gray-100">
-        {/* célula vazia do canto */}
-        <div className={clsx(COL_MIN, "px-4 py-3 border-r border-gray-100 shrink-0")} />
-        {DIAS_SEMANA.map((dia) => (
-          <div key={dia.dow} className={clsx(COL_DIA, "px-3 py-3 text-center border-r border-gray-100 last:border-r-0")}>
-            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">{dia.label}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* Linhas por ministério */}
+  // ── Versão Mobile: cards por ministério ──────────────────────────────────
+  const MobileView = () => (
+    <div className="space-y-3 md:hidden">
       {lista.map((m) => {
-        const dowMap = porMinDow[m] ?? { 0: [], 1: [], 2: [], 4: [], 6: [] };
+        const escalasMin = todasEscalas
+          .filter((e) => e.ministerio === m && e.data >= hojeStr)
+          .sort((a, b) => a.data.localeCompare(b.data));
         return (
-          <div key={m} className="flex border-b border-gray-100 last:border-0">
-            {/* Nome do ministério */}
+          <div key={m} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            {/* Header do ministério */}
             <button
               onClick={() => onOpen(m)}
-              className={clsx(COL_MIN, "flex items-center gap-2.5 px-4 py-4 border-r border-gray-100 hover:bg-gray-50 transition group text-left shrink-0")}
+              className="w-full flex items-center gap-3 px-4 py-3 border-b border-gray-100 text-left hover:bg-gray-50 transition active:bg-gray-100"
             >
-              <span className="text-xl leading-none">{EMOJI[m] ?? "📋"}</span>
-              <div className="min-w-0">
-                <p className="text-xs font-bold text-gray-700 truncate group-hover:text-vine-700 transition">{m}</p>
-                <ChevronRight className="w-3 h-3 text-gray-300 group-hover:text-vine-400 mt-0.5 transition" />
+              <span className="text-2xl leading-none">{EMOJI[m] ?? "📋"}</span>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold text-gray-800">{m}</p>
+                <p className="text-xs text-gray-400">{escalasMin.length} escala{escalasMin.length !== 1 ? "s" : ""} próxima{escalasMin.length !== 1 ? "s" : ""}</p>
               </div>
+              <ChevronRight className="w-4 h-4 text-gray-300 shrink-0" />
             </button>
-
-            {/* Células por dia */}
-            {DIAS_SEMANA.map((dia) => {
-              const escalas = (dowMap[dia.dow] ?? []).sort((a, b) => a.data.localeCompare(b.data));
-              return (
-                <div key={dia.dow} className={clsx(COL_DIA, "p-2 space-y-1.5 border-r border-gray-100 last:border-r-0 min-h-[60px]")}>
-                  {escalas.length === 0 && (
-                    <div className="flex items-center justify-center h-full min-h-[44px]">
-                      {isLider ? (
-                        <button onClick={() => onOpen(m)}
-                          className="w-full h-full flex items-center justify-center rounded-lg border border-dashed border-gray-150 text-gray-200 hover:border-vine-300 hover:text-vine-400 transition min-h-[44px]">
-                          <Plus className="w-3.5 h-3.5" />
-                        </button>
-                      ) : (
-                        <span className="text-gray-150 text-sm select-none">—</span>
+            {/* Escalas */}
+            {escalasMin.length === 0 ? (
+              <div className="px-4 py-3 text-sm text-gray-300 italic">
+                {isLider
+                  ? <button onClick={() => onOpen(m)} className="text-vine-500 font-semibold text-sm">+ Criar escala</button>
+                  : "Sem escalas criadas."}
+              </div>
+            ) : (
+              <div className="divide-y divide-gray-50">
+                {escalasMin.slice(0, 3).map((esc) => {
+                  const d = new Date(esc.data + "T00:00:00");
+                  const temMinha = esc.itens.some((it) => it.voluntarioId === userId);
+                  return (
+                    <button key={esc.id} onClick={() => onOpenEscala(esc)}
+                      className={clsx(
+                        "w-full flex items-center gap-3 px-4 py-3 text-left transition active:bg-gray-50",
+                        temMinha && "bg-vine-50"
                       )}
-                    </div>
-                  )}
-                  {escalas.map((esc) => {
-                    const d = new Date(esc.data + "T00:00:00");
-                    const temMinha = esc.itens.some((it) => it.voluntarioId === userId);
-                    return (
-                      <button key={esc.id} onClick={() => onOpenEscala(esc)}
-                        className={clsx(
-                          "w-full text-left rounded-lg border-l-4 px-2 py-1.5 space-y-1 transition hover:shadow-sm",
-                          corEscalaLeft(esc.culto),
-                          "bg-gray-50 hover:bg-white",
-                          temMinha && "ring-1 ring-vine-300",
-                        )}
-                      >
-                        <div className="flex items-center justify-between gap-1">
-                          <span className="text-[10px] font-semibold text-gray-400">
-                            {String(d.getDate()).padStart(2, "0")}/{String(d.getMonth() + 1).padStart(2, "0")}
-                          </span>
-                          {temMinha && <span className="w-1.5 h-1.5 rounded-full bg-vine-400 shrink-0" />}
-                        </div>
-                        <p className="text-[11px] font-bold text-gray-700 leading-tight">{esc.culto}</p>
+                    >
+                      <div className={clsx("w-1 self-stretch rounded-full shrink-0", corEscalaLeft(esc.culto).replace("border-l-", "bg-"))} />
+                      <div className="w-10 text-center shrink-0">
+                        <p className="text-[10px] font-bold text-gray-400 uppercase leading-none">
+                          {d.toLocaleDateString("pt-BR", { weekday: "short" }).replace(".", "")}
+                        </p>
+                        <p className="text-xl font-bold text-gray-800 leading-tight">{d.getDate()}</p>
+                        <p className="text-[10px] text-gray-400 uppercase leading-none">
+                          {d.toLocaleDateString("pt-BR", { month: "short" }).replace(".", "")}
+                        </p>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-bold text-gray-800">{esc.culto}</p>
+                        <p className="text-xs text-gray-400">{esc.horario}</p>
                         {esc.itens.length > 0 && (
-                          <div className="flex flex-wrap gap-0.5">
-                            {esc.itens.slice(0, 2).map((it, i) => (
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {esc.itens.slice(0, 3).map((it, i) => (
                               <span key={i} className={clsx(
-                                "text-[9px] px-1 py-0.5 rounded font-medium leading-none",
-                                it.voluntarioId === userId ? "bg-vine-200 text-vine-900" : "bg-gray-200 text-gray-500"
-                              )}>
-                                {it.voluntarioNome.split(" ")[0]}
-                              </span>
+                                "text-[10px] px-1.5 py-0.5 rounded font-medium",
+                                it.voluntarioId === userId ? "bg-vine-200 text-vine-900" : "bg-gray-100 text-gray-500"
+                              )}>{it.voluntarioNome.split(" ")[0]}</span>
                             ))}
-                            {esc.itens.length > 2 && (
-                              <span className="text-[9px] text-gray-300">+{esc.itens.length - 2}</span>
-                            )}
+                            {esc.itens.length > 3 && <span className="text-[10px] text-gray-300">+{esc.itens.length - 3}</span>}
                           </div>
                         )}
-                      </button>
-                    );
-                  })}
-                </div>
-              );
-            })}
+                      </div>
+                      {temMinha && <span className="w-2 h-2 rounded-full bg-vine-400 shrink-0" />}
+                      <ChevronRight className="w-4 h-4 text-gray-200 shrink-0" />
+                    </button>
+                  );
+                })}
+                {escalasMin.length > 3 && (
+                  <button onClick={() => onOpen(m)} className="w-full px-4 py-2.5 text-xs text-vine-600 font-semibold text-center hover:bg-gray-50 transition">
+                    Ver mais {escalasMin.length - 3} escalas →
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         );
       })}
     </div>
+  );
+
+  const COL_MIN = "w-36 shrink-0";
+  const COL_DIA = "flex-1 min-w-0";
+
+  // ── Versão Desktop: tabela ────────────────────────────────────────────────
+  return (
+    <>
+      <MobileView />
+      <div className="hidden md:block bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        {/* Cabeçalho */}
+        <div className="flex border-b border-gray-100">
+          <div className={clsx(COL_MIN, "px-4 py-3 border-r border-gray-100 shrink-0")} />
+          {DIAS_SEMANA.map((dia) => (
+            <div key={dia.dow} className={clsx(COL_DIA, "px-3 py-3 text-center border-r border-gray-100 last:border-r-0")}>
+              <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">{dia.label}</p>
+            </div>
+          ))}
+        </div>
+        {lista.map((m) => {
+          const dowMap = porMinDow[m] ?? { 0: [], 1: [], 2: [], 4: [], 6: [] };
+          return (
+            <div key={m} className="flex border-b border-gray-100 last:border-0">
+              <button
+                onClick={() => onOpen(m)}
+                className={clsx(COL_MIN, "flex items-center gap-2.5 px-4 py-4 border-r border-gray-100 hover:bg-gray-50 transition group text-left shrink-0")}
+              >
+                <span className="text-xl leading-none">{EMOJI[m] ?? "📋"}</span>
+                <div className="min-w-0">
+                  <p className="text-xs font-bold text-gray-700 truncate group-hover:text-vine-700 transition">{m}</p>
+                  <ChevronRight className="w-3 h-3 text-gray-300 group-hover:text-vine-400 mt-0.5 transition" />
+                </div>
+              </button>
+              {DIAS_SEMANA.map((dia) => {
+                const escalas = (dowMap[dia.dow] ?? []).sort((a, b) => a.data.localeCompare(b.data));
+                return (
+                  <div key={dia.dow} className={clsx(COL_DIA, "p-2 space-y-1.5 border-r border-gray-100 last:border-r-0 min-h-[60px]")}>
+                    {escalas.length === 0 && (
+                      <div className="flex items-center justify-center h-full min-h-[44px]">
+                        {isLider ? (
+                          <button onClick={() => onOpen(m)}
+                            className="w-full h-full flex items-center justify-center rounded-lg border border-dashed border-gray-150 text-gray-200 hover:border-vine-300 hover:text-vine-400 transition min-h-[44px]">
+                            <Plus className="w-3.5 h-3.5" />
+                          </button>
+                        ) : (
+                          <span className="text-gray-150 text-sm select-none">—</span>
+                        )}
+                      </div>
+                    )}
+                    {escalas.map((esc) => {
+                      const d = new Date(esc.data + "T00:00:00");
+                      const temMinha = esc.itens.some((it) => it.voluntarioId === userId);
+                      return (
+                        <button key={esc.id} onClick={() => onOpenEscala(esc)}
+                          className={clsx(
+                            "w-full text-left rounded-lg border-l-4 px-2 py-1.5 space-y-1 transition hover:shadow-sm",
+                            corEscalaLeft(esc.culto),
+                            "bg-gray-50 hover:bg-white",
+                            temMinha && "ring-1 ring-vine-300",
+                          )}
+                        >
+                          <div className="flex items-center justify-between gap-1">
+                            <span className="text-[10px] font-semibold text-gray-400">
+                              {String(d.getDate()).padStart(2, "0")}/{String(d.getMonth() + 1).padStart(2, "0")}
+                            </span>
+                            {temMinha && <span className="w-1.5 h-1.5 rounded-full bg-vine-400 shrink-0" />}
+                          </div>
+                          <p className="text-[11px] font-bold text-gray-700 leading-tight">{esc.culto}</p>
+                          {esc.itens.length > 0 && (
+                            <div className="flex flex-wrap gap-0.5">
+                              {esc.itens.slice(0, 2).map((it, i) => (
+                                <span key={i} className={clsx(
+                                  "text-[9px] px-1 py-0.5 rounded font-medium leading-none",
+                                  it.voluntarioId === userId ? "bg-vine-200 text-vine-900" : "bg-gray-200 text-gray-500"
+                                )}>
+                                  {it.voluntarioNome.split(" ")[0]}
+                                </span>
+                              ))}
+                              {esc.itens.length > 2 && (
+                                <span className="text-[9px] text-gray-300">+{esc.itens.length - 2}</span>
+                              )}
+                            </div>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })}
+      </div>
+    </>
   );
 }
 
@@ -514,24 +594,24 @@ export default function EscalasDashboardPage() {
   }
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-4 md:gap-5">
       {/* Cabeçalho + abas */}
-      <div className="flex items-end justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-sans font-semibold text-vine-950">Escalas</h1>
-          <p className="text-sm text-gray-500 mt-0.5">
+          <h1 className="text-xl md:text-2xl font-sans font-semibold text-vine-950">Escalas</h1>
+          <p className="text-sm text-gray-500 mt-0.5 hidden sm:block">
             {aba === "minhas" ? "Todas as escalas em que você participa." : "Calendário e escalas de todos os ministérios."}
           </p>
         </div>
-        <div className="flex gap-1 bg-gray-100 rounded-xl p-1 shrink-0">
+        <div className="flex gap-1 bg-gray-100 rounded-xl p-1 self-start sm:self-auto">
           <button
             onClick={() => setAba("minhas")}
             className={clsx(
-              "flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-semibold transition",
+              "flex items-center gap-1.5 px-3 md:px-4 py-1.5 rounded-lg text-sm font-semibold transition",
               aba === "minhas" ? "bg-white shadow-sm text-vine-700" : "text-gray-500 hover:text-gray-700"
             )}
           >
-            ☆ Minhas Escalas
+            ☆ Minhas
             {minhasEscalas.length > 0 && (
               <span className={clsx("text-xs font-bold px-1.5 py-0.5 rounded-full", aba === "minhas" ? "bg-vine-100 text-vine-700" : "bg-gray-200 text-gray-500")}>
                 {minhasEscalas.length}
@@ -541,11 +621,11 @@ export default function EscalasDashboardPage() {
           <button
             onClick={() => setAba("culto")}
             className={clsx(
-              "flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-semibold transition",
+              "flex items-center gap-1.5 px-3 md:px-4 py-1.5 rounded-lg text-sm font-semibold transition",
               aba === "culto" ? "bg-white shadow-sm text-vine-700" : "text-gray-500 hover:text-gray-700"
             )}
           >
-            ▼ Escala do Culto
+            ▼ Do Culto
           </button>
         </div>
       </div>

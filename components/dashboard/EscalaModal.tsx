@@ -226,9 +226,15 @@ export function EscalaModal({ escala, podeEditar, onClose, onUpdate, onDelete }:
     <div
       ref={backdropRef}
       onClick={handleBackdropClick}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+      className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/40 backdrop-blur-sm md:p-4"
     >
-      <div className="relative w-full max-w-2xl max-h-[90vh] flex flex-col bg-white rounded-2xl shadow-2xl overflow-hidden">
+      <div className="relative w-full md:max-w-2xl max-h-[92vh] md:max-h-[90vh] flex flex-col bg-white md:rounded-2xl rounded-t-2xl shadow-2xl overflow-hidden"
+        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+      >
+        {/* Drag handle — mobile only */}
+        <div className="md:hidden flex justify-center pt-2.5 pb-1 shrink-0">
+          <div className="w-8 h-1 bg-gray-200 rounded-full" />
+        </div>
 
         {/* ── Header ── */}
         <div className={clsx("px-6 py-4 border-b border-gray-100", corBg(form.culto))}>

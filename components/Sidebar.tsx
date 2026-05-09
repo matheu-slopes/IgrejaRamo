@@ -77,7 +77,7 @@ export default function Sidebar() {
   return (
     <aside
       className={clsx(
-        "relative flex flex-col h-screen bg-vine-950 text-vine-100 transition-all duration-300 shrink-0",
+        "relative hidden md:flex flex-col h-screen bg-vine-950 text-vine-100 transition-all duration-300 shrink-0",
         collapsed ? "w-16" : "w-60"
       )}
     >
@@ -139,38 +139,43 @@ export default function Sidebar() {
           );
         })}
 
-        {/* Ministérios section */}
-        {!collapsed && (
-          <p className="px-3 pt-5 pb-1 text-xs font-bold uppercase tracking-widest text-vine-500">
-            Ministérios
-          </p>
-        )}
-        {collapsed && <div className="border-t border-vine-800 my-3 mx-1" />}
-
-        {ministerios
-          .filter((m) =>
+        {/* Meus Ministérios — filtrado pelo perfil do usuário */}
+        {(() => {
+          const meusItens = ministerios.filter((m) =>
             user?.role === "admin" || user?.role === "pastor"
               ? true
               : user?.ministerios?.some(
                   (um) => um.toLowerCase() === m.label.toLowerCase()
                 )
-          )
-          .map(({ label, icon: Icon, href }) => (
-          <Link
-            key={label}
-            href={href}
-            className={clsx(
-              "flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition",
-              pathname.includes("/ministerio/") && decodeURIComponent(pathname).includes(label)
-                ? "bg-vine-700 text-white"
-                : "text-vine-400 hover:bg-vine-800 hover:text-white"
-            )}
-            title={collapsed ? label : undefined}
-          >
-            <Icon className="w-4 h-4 shrink-0" />
-            {!collapsed && <span>{label}</span>}
-          </Link>
-        ))}
+          );
+          if (meusItens.length === 0) return null;
+          return (
+            <>
+              {!collapsed && (
+                <p className="px-3 pt-5 pb-1 text-xs font-bold uppercase tracking-widest text-vine-500">
+                  Meus Ministérios
+                </p>
+              )}
+              {collapsed && <div className="border-t border-vine-800 my-3 mx-1" />}
+              {meusItens.map(({ label, icon: Icon, href }) => (
+                <Link
+                  key={label}
+                  href={href}
+                  className={clsx(
+                    "flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition",
+                    pathname.includes("/ministerio/") && decodeURIComponent(pathname).includes(label)
+                      ? "bg-vine-700 text-white"
+                      : "text-vine-400 hover:bg-vine-800 hover:text-white"
+                  )}
+                  title={collapsed ? label : undefined}
+                >
+                  <Icon className="w-4 h-4 shrink-0" />
+                  {!collapsed && <span>{label}</span>}
+                </Link>
+              ))}
+            </>
+          );
+        })()}
 
         {/* Admin quick links — apenas admin */}
         {user?.role === "admin" && (

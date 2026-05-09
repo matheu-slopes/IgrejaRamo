@@ -88,63 +88,102 @@ function MinistryEventRow({
   const passados = eventos.filter((e) => e.data < hojeStr).reverse();
 
   return (
-    <div className="flex border-b border-gray-100 last:border-0">
-      {/* Nome do ministério */}
-      <button
-        onClick={() => onOpen(ministerio)}
-        className="w-48 shrink-0 flex items-center gap-3 px-5 py-5 text-left hover:bg-gray-50 transition group"
-      >
-        <span className="text-2xl leading-none">{EMOJI[ministerio] ?? "📋"}</span>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-bold text-gray-800 truncate group-hover:text-vine-700 transition">{ministerio}</p>
-          <p className="text-xs text-gray-400 mt-0.5">{eventos.length} evento{eventos.length !== 1 ? "s" : ""}</p>
+    <>
+      {/* ── Mobile: card vertical ── */}
+      <div className="md:hidden flex border-b border-gray-100 last:border-0">
+        <div className="w-full">
+          <button
+            onClick={() => onOpen(ministerio)}
+            className="w-full flex items-center gap-3 px-4 py-3.5 text-left active:bg-gray-50 transition"
+          >
+            <span className="text-2xl leading-none">{EMOJI[ministerio] ?? "📋"}</span>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-bold text-gray-800">{ministerio}</p>
+              <p className="text-xs text-gray-400">{eventos.length} evento{eventos.length !== 1 ? "s" : ""}</p>
+            </div>
+            {isLider && (
+              <span className="text-xs bg-vine-50 text-vine-600 font-semibold px-2.5 py-1 rounded-full border border-vine-200">
+                + Novo
+              </span>
+            )}
+            <ChevronRight className="w-4 h-4 text-gray-300 shrink-0" />
+          </button>
+          {proximos.length > 0 && (
+            <div className="px-4 pb-3 space-y-2">
+              {proximos.slice(0, 2).map((ev) => {
+                const d = ev.data ? new Date(ev.data + "T00:00:00") : null;
+                return (
+                  <div key={ev.id} className="flex items-center gap-3 bg-gray-50 rounded-xl px-3 py-2.5">
+                    {d && (
+                      <div className="text-center w-9 shrink-0">
+                        <p className="text-[10px] font-bold text-gray-400 uppercase leading-none">{d.toLocaleDateString("pt-BR", { weekday: "short" }).replace(".", "")}</p>
+                        <p className="text-lg font-bold text-gray-800 leading-tight">{d.getDate()}</p>
+                        <p className="text-[10px] text-gray-400 uppercase leading-none">{d.toLocaleDateString("pt-BR", { month: "short" }).replace(".", "")}</p>
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-gray-800 truncate">{ev.titulo}</p>
+                      <p className="text-xs text-gray-400">{ev.horario}{ev.local && ` · ${ev.local}`}</p>
+                    </div>
+                    {ev.publico
+                      ? <span className="text-[10px] bg-blue-100 text-blue-700 font-bold px-1.5 py-0.5 rounded-full shrink-0">Público</span>
+                      : <span className="text-[10px] bg-gray-100 text-gray-400 font-bold px-1.5 py-0.5 rounded-full shrink-0">Interno</span>
+                    }
+                  </div>
+                );
+              })}
+              {proximos.length > 2 && (
+                <button onClick={() => onOpen(ministerio)} className="w-full text-center text-xs text-vine-600 font-semibold py-1">
+                  Ver mais {proximos.length - 2} eventos →
+                </button>
+              )}
+            </div>
+          )}
         </div>
-        <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-vine-500 shrink-0 transition" />
-      </button>
-
-      {/* Divisor vertical */}
-      <div className="w-px bg-gray-100 my-4 shrink-0" />
-
-      {/* Eventos em scroll horizontal */}
-      <div className="flex-1 min-w-0 px-5 py-4 flex items-center">
-        {eventos.length === 0 ? (
-          <div className="flex items-center gap-3">
-            <p className="text-sm text-gray-300 italic">Sem eventos criados.</p>
-            {isLider && (
-              <button
-                onClick={() => onOpen(ministerio)}
-                className="flex items-center gap-1.5 text-sm text-vine-600 hover:text-vine-800 font-semibold border border-vine-200 hover:border-vine-400 px-3 py-2 rounded-xl transition"
-              >
-                <Plus className="w-4 h-4" /> Criar
-              </button>
-            )}
-          </div>
-        ) : (
-          <div className="flex gap-3 overflow-x-auto pb-1 scrollbar-thin scrollbar-thumb-gray-200 w-full">
-            {proximos.map((ev) => (
-              <EventoMiniCard key={ev.id} ev={ev} />
-            ))}
-            {proximos.length > 0 && passados.length > 0 && (
-              <div className="flex items-center px-2 shrink-0">
-                <div className="h-20 w-px bg-gray-200" />
-              </div>
-            )}
-            {passados.map((ev) => (
-              <EventoMiniCard key={ev.id} ev={ev} />
-            ))}
-            {isLider && (
-              <button
-                onClick={() => onOpen(ministerio)}
-                className="flex-shrink-0 flex flex-col items-center justify-center gap-1.5 w-20 rounded-2xl border-2 border-dashed border-gray-200 text-gray-400 hover:border-vine-300 hover:text-vine-600 transition min-h-[6rem]"
-              >
-                <Plus className="w-5 h-5" />
-                <span className="text-xs font-semibold">Novo</span>
-              </button>
-            )}
-          </div>
-        )}
       </div>
-    </div>
+
+      {/* ── Desktop: scroll horizontal ── */}
+      <div className="hidden md:flex border-b border-gray-100 last:border-0">
+        <button
+          onClick={() => onOpen(ministerio)}
+          className="w-48 shrink-0 flex items-center gap-3 px-5 py-5 text-left hover:bg-gray-50 transition group"
+        >
+          <span className="text-2xl leading-none">{EMOJI[ministerio] ?? "📋"}</span>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-bold text-gray-800 truncate group-hover:text-vine-700 transition">{ministerio}</p>
+            <p className="text-xs text-gray-400 mt-0.5">{eventos.length} evento{eventos.length !== 1 ? "s" : ""}</p>
+          </div>
+          <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-vine-500 shrink-0 transition" />
+        </button>
+        <div className="w-px bg-gray-100 my-4 shrink-0" />
+        <div className="flex-1 min-w-0 px-5 py-4 flex items-center">
+          {eventos.length === 0 ? (
+            <div className="flex items-center gap-3">
+              <p className="text-sm text-gray-300 italic">Sem eventos criados.</p>
+              {isLider && (
+                <button onClick={() => onOpen(ministerio)} className="flex items-center gap-1.5 text-sm text-vine-600 hover:text-vine-800 font-semibold border border-vine-200 hover:border-vine-400 px-3 py-2 rounded-xl transition">
+                  <Plus className="w-4 h-4" /> Criar
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="flex gap-3 overflow-x-auto pb-1 scrollbar-thin scrollbar-thumb-gray-200 w-full">
+              {proximos.map((ev) => <EventoMiniCard key={ev.id} ev={ev} />)}
+              {proximos.length > 0 && passados.length > 0 && (
+                <div className="flex items-center px-2 shrink-0"><div className="h-20 w-px bg-gray-200" /></div>
+              )}
+              {passados.map((ev) => <EventoMiniCard key={ev.id} ev={ev} />)}
+              {isLider && (
+                <button onClick={() => onOpen(ministerio)} className="flex-shrink-0 flex flex-col items-center justify-center gap-1.5 w-20 rounded-2xl border-2 border-dashed border-gray-200 text-gray-400 hover:border-vine-300 hover:text-vine-600 transition min-h-[6rem]">
+                  <Plus className="w-5 h-5" />
+                  <span className="text-xs font-semibold">Novo</span>
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </>
   );
 }
 
@@ -190,8 +229,8 @@ export default function EventosDashboardPage() {
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <h1 className="text-2xl font-sans font-semibold text-vine-950">Eventos</h1>
-        <p className="text-sm text-gray-500 mt-0.5">Clique num ministério para gerenciar os eventos.</p>
+        <h1 className="text-xl md:text-2xl font-sans font-semibold text-vine-950">Eventos</h1>
+        <p className="text-sm text-gray-500 mt-0.5 hidden sm:block">Clique num ministério para gerenciar os eventos.</p>
       </div>
 
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
