@@ -69,12 +69,15 @@ export default function AdminPage() {
   const [painel, setPainel] = useState<Painel>("lista");
   const [editando, setEditando] = useState<User | null>(null);
 
-  if (!temPermissao("gerenciar_usuarios")) {
+  const podeGerenciar = temPermissao("gerenciar_usuarios");
+  const podeCriarAviso = temPermissao("criar_aviso");
+
+  if (!podeGerenciar && !podeCriarAviso) {
     return (
       <div className="flex flex-col items-center justify-center h-72 text-center gap-3">
         <Shield className="w-10 h-10 text-gray-200" />
         <p className="text-gray-500 font-medium">Acesso restrito</p>
-        <p className="text-sm text-gray-400">Você não tem permissão para acessar o painel de administração.</p>
+        <p className="text-sm text-gray-400">Você não tem permissão para acessar esta área.</p>
       </div>
     );
   }
@@ -87,19 +90,19 @@ export default function AdminPage() {
   return (
     <div className="max-w-5xl space-y-6">
 
-      {adminTab === "ministerios" && (
+      {adminTab === "ministerios" && podeGerenciar && (
         <MinisteriosTab usuarios={usuarios} temPermissao={temPermissao} />
       )}
 
-      {adminTab === "locais" && (
+      {adminTab === "locais" && podeGerenciar && (
         <LocaisTab />
       )}
 
-      {adminTab === "conteudo" && (
-        <ConteudoTab initSecao={initSecao} />
+      {(adminTab === "conteudo" || (!podeGerenciar && podeCriarAviso)) && (
+        <ConteudoTab initSecao={adminTab !== "conteudo" ? "avisos" : initSecao} />
       )}
 
-      {adminTab === "usuarios" && <>
+      {adminTab === "usuarios" && podeGerenciar && <>
       <div className="flex items-center justify-between">
         <div>
           <div className="flex items-center gap-2 mb-0.5">
@@ -480,6 +483,40 @@ function EditarUsuarioPanel({
             })}
           </div>
         </div>
+
+        {/* Líder de Ministérios */}
+        {podeatribuir && (
+          <div>
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Líder de Ministério</p>
+            <p className="text-[10px] text-gray-400 mb-2 leading-relaxed">
+              Dá privilégios de organização (escala, membros, eventos, avisos) dentro do ministério, independente do role global.
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {MINISTERIOS.map((m) => {
+                const eLider = (usuario.liderMinisterios ?? []).includes(m);
+                return (
+                  <button
+                    key={m}
+                    onClick={() => onChange({
+                      liderMinisterios: eLider
+                        ? (usuario.liderMinisterios ?? []).filter((x) => x !== m)
+                        : [...(usuario.liderMinisterios ?? []), m],
+                    })}
+                    className={clsx(
+                      "text-xs px-2.5 py-1 rounded-full border transition flex items-center gap-1",
+                      eLider
+                        ? "bg-gold-100 text-gold-800 border-gold-300 font-semibold"
+                        : "border-gray-200 text-gray-400 hover:border-gold-300 hover:text-gold-700"
+                    )}
+                  >
+                    {eLider && <ShieldCheck className="w-3 h-3" />}
+                    {m}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Permissões individuais */}
         <div>
@@ -1086,7 +1123,7 @@ function LocaisTab() {
 
 // ─── ConteudoTab ──────────────────────────────────────────────────────────────
 
-interface Aviso { id: string; titulo: string; conteudo: string; criado_em: string; destinatarios: string; }
+interface Aviso { id: string; titulo: string; conteudo: string; criado_em: string; destinatarios: string | string[]; visivel_home: boolean; ministerios?: string[] | null; }
 type DevocionalBloco =
   | { id: string; tipo: "texto"; texto: string }
   | { id: string; tipo: "imagem"; url: string; legenda?: string }
@@ -1301,13 +1338,18 @@ function ConteudoTab({ initSecao }: { initSecao?: string }) {
 
   // ── Avisos ──
   const [avisos, setAvisos] = useState<Aviso[]>([]);
-  const [novoAviso, setNovoAviso] = useState({ titulo: "", conteudo: "", destinatarios: "todos" });
+  const novoAvisoInicial = () => ({ titulo: "", conteudo: "", visivelHome: false, destinatariosTodos: true, rolesSel: [] as Role[], ministerios: [] as Ministerio[] });
+  const [novoAviso, setNovoAviso] = useState(novoAvisoInicial);
   const [adicionandoAviso, setAdicionandoAviso] = useState(false);
   const [salvandoAviso, setSalvandoAviso] = useState(false);
   const [erroAviso, setErroAviso] = useState<string | null>(null);
+  const [editandoAvisoId, setEditandoAvisoId] = useState<string | null>(null);
+  const [editAviso, setEditAviso] = useState(novoAvisoInicial);
+  const [salvandoEdicaoAviso, setSalvandoEdicaoAviso] = useState(false);
+  const [erroEdicaoAviso, setErroEdicaoAviso] = useState<string | null>(null);
 
   useEffect(() => {
-    supabase.from("avisos").select("id,titulo,conteudo,criado_em,destinatarios").order("criado_em", { ascending: false }).limit(30).then(({ data, error }) => {
+    supabase.from("avisos").select("id,titulo,conteudo,criado_em,destinatarios,visivel_home,ministerios").order("criado_em", { ascending: false }).limit(30).then(({ data, error }) => {
       if (error) console.error("avisos fetch:", error);
       if (data) setAvisos(data as Aviso[]);
     });
@@ -1315,15 +1357,19 @@ function ConteudoTab({ initSecao }: { initSecao?: string }) {
 
   async function criarAviso() {
     if (!novoAviso.titulo.trim() || !novoAviso.conteudo.trim()) return;
+    if (!novoAviso.visivelHome && !novoAviso.destinatariosTodos && novoAviso.rolesSel.length === 0) {
+      setErroAviso("Selecione ao menos um destinatário no dashboard ou marque para exibir na página inicial.");
+      return;
+    }
     setErroAviso(null);
     setSalvandoAviso(true);
+    const destinatarios = novoAviso.destinatariosTodos ? "todos" : novoAviso.rolesSel;
 
     const timeout = new Promise<never>((_, reject) =>
       setTimeout(() => reject(new Error("Tempo esgotado — verifique a conexão ou as políticas RLS no Supabase")), 8000)
     );
 
     try {
-      // Garante sessão ativa antes de tentar o insert
       const { data: sessionData } = await supabase.auth.getSession();
       if (!sessionData.session) {
         setErroAviso("Sessão expirada — faça login novamente");
@@ -1333,7 +1379,9 @@ function ConteudoTab({ initSecao }: { initSecao?: string }) {
       const query = supabase.from("avisos").insert({
         titulo: novoAviso.titulo.trim(),
         conteudo: novoAviso.conteudo.trim(),
-        destinatarios: novoAviso.destinatarios,
+        destinatarios: destinatarios,
+        visivel_home: novoAviso.visivelHome,
+        ministerios: novoAviso.ministerios,
       });
 
       const { error } = await Promise.race([query, timeout]) as Awaited<typeof query>;
@@ -1342,14 +1390,13 @@ function ConteudoTab({ initSecao }: { initSecao?: string }) {
         console.error("Erro ao criar aviso:", error);
         setErroAviso(`${error.message} (code: ${error.code})`);
       } else {
-        // Recarrega a lista do banco após inserir
         const { data: lista } = await supabase
           .from("avisos")
-          .select("id,titulo,conteudo,criado_em,destinatarios")
+          .select("id,titulo,conteudo,criado_em,destinatarios,visivel_home,ministerios")
           .order("criado_em", { ascending: false })
           .limit(30);
         if (lista) setAvisos(lista as Aviso[]);
-        setNovoAviso({ titulo: "", conteudo: "", destinatarios: "todos" });
+        setNovoAviso(novoAvisoInicial());
         setAdicionandoAviso(false);
       }
     } catch (e: unknown) {
@@ -1364,6 +1411,53 @@ function ConteudoTab({ initSecao }: { initSecao?: string }) {
   function removerAviso(id: string) {
     supabase.from("avisos").delete().eq("id", id).then(() => {});
     setAvisos((prev) => prev.filter((a) => a.id !== id));
+  }
+
+  function abrirEdicaoAviso(a: Aviso) {
+    const destTodos = a.destinatarios === "todos";
+    setEditAviso({
+      titulo: a.titulo,
+      conteudo: a.conteudo,
+      visivelHome: a.visivel_home,
+      destinatariosTodos: destTodos,
+      rolesSel: destTodos ? [] : ((a.destinatarios as Role[]) ?? []),
+      ministerios: (a.ministerios ?? []) as Ministerio[],
+    });
+    setErroEdicaoAviso(null);
+    setEditandoAvisoId(a.id);
+  }
+
+  async function salvarEdicaoAviso() {
+    if (!editandoAvisoId) return;
+    if (!editAviso.titulo.trim() || !editAviso.conteudo.trim()) return;
+    if (!editAviso.visivelHome && !editAviso.destinatariosTodos && editAviso.rolesSel.length === 0) {
+      setErroEdicaoAviso("Selecione ao menos um destinatário no dashboard ou marque para exibir na página inicial.");
+      return;
+    }
+    setErroEdicaoAviso(null);
+    setSalvandoEdicaoAviso(true);
+    const destinatarios = editAviso.destinatariosTodos ? "todos" : editAviso.rolesSel;
+    const { error } = await supabase.from("avisos").update({
+      titulo: editAviso.titulo.trim(),
+      conteudo: editAviso.conteudo.trim(),
+      destinatarios,
+      visivel_home: editAviso.visivelHome,
+      ministerios: editAviso.ministerios,
+    }).eq("id", editandoAvisoId);
+    setSalvandoEdicaoAviso(false);
+    if (error) {
+      setErroEdicaoAviso(error.message);
+    } else {
+      setAvisos((prev) => prev.map((a) => a.id === editandoAvisoId ? {
+        ...a,
+        titulo: editAviso.titulo.trim(),
+        conteudo: editAviso.conteudo.trim(),
+        destinatarios,
+        visivel_home: editAviso.visivelHome,
+        ministerios: editAviso.ministerios,
+      } : a));
+      setEditandoAvisoId(null);
+    }
   }
 
   // ── Devocional ──
@@ -1603,10 +1697,10 @@ function ConteudoTab({ initSecao }: { initSecao?: string }) {
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
           <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
             <div>
-              <p className="font-semibold text-gray-800 text-sm">Avisos públicos</p>
-              <p className="text-xs text-gray-400 mt-0.5">Aparecem no mural da página inicial</p>
+              <p className="font-semibold text-gray-800 text-sm">Avisos</p>
+              <p className="text-xs text-gray-400 mt-0.5">Controle quem vê cada aviso — página inicial, dashboard ou roles específicos</p>
             </div>
-            <button onClick={() => setAdicionandoAviso(true)} className="flex items-center gap-1.5 bg-vine-700 hover:bg-vine-800 text-white text-xs font-semibold px-3 py-2 rounded-xl transition">
+            <button onClick={() => setAdicionandoAviso(true)} disabled={adicionandoAviso} className="flex items-center gap-1.5 bg-vine-700 hover:bg-vine-800 text-white text-xs font-semibold px-3 py-2 rounded-xl transition disabled:opacity-40">
               <Plus className="w-3.5 h-3.5" /> Novo aviso
             </button>
           </div>
@@ -1615,16 +1709,96 @@ function ConteudoTab({ initSecao }: { initSecao?: string }) {
             <div className="px-5 py-4 border-b border-vine-50 bg-vine-50/30 space-y-3">
               <input className={inputCls} placeholder="Título do aviso" value={novoAviso.titulo} onChange={(e) => setNovoAviso((p) => ({ ...p, titulo: e.target.value }))} />
               <textarea className={textareaCls} rows={3} placeholder="Conteúdo do aviso..." value={novoAviso.conteudo} onChange={(e) => setNovoAviso((p) => ({ ...p, conteudo: e.target.value }))} />
-              <select className={inputCls} value={novoAviso.destinatarios} onChange={(e) => setNovoAviso((p) => ({ ...p, destinatarios: e.target.value }))}>
-                <option value="todos">Todos (público)</option>
-                <option value="membros">Apenas membros</option>
-                <option value="lideranca">Apenas liderança</option>
-              </select>
+
+              {/* Visibilidade */}
+              <div className="space-y-3 pt-1 border-t border-gray-100">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider pt-2">Visibilidade</p>
+
+                {/* Home */}
+                <label className="flex items-start gap-2.5 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={novoAviso.visivelHome}
+                    onChange={(e) => setNovoAviso((p) => ({ ...p, visivelHome: e.target.checked }))}
+                    className="accent-vine-700 w-4 h-4 mt-0.5"
+                  />
+                  <div>
+                    <span className="text-sm font-medium text-gray-700">Exibir na página inicial do site</span>
+                    <p className="text-xs text-gray-400">Visível para qualquer visitante, sem necessidade de login</p>
+                  </div>
+                </label>
+
+                {/* Dashboard */}
+                <div className="space-y-2">
+                  <p className="text-xs font-medium text-gray-500">Quem vê no dashboard?</p>
+                  <p className="text-[11px] text-gray-400">Pastores e admins sempre veem todos os avisos.</p>
+                  <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={novoAviso.destinatariosTodos}
+                      onChange={(e) => setNovoAviso((p) => ({ ...p, destinatariosTodos: e.target.checked, rolesSel: [] }))}
+                      className="accent-vine-700 w-4 h-4"
+                    />
+                    <span className="text-sm text-gray-700">Todos os membros cadastrados</span>
+                  </label>
+                  {!novoAviso.destinatariosTodos && (
+                    <div className="grid grid-cols-2 gap-1.5 ml-6">
+                      {ROLES.filter((r) => r !== "admin" && r !== "pastor").map((role) => (
+                        <label key={role} className="flex items-center gap-2 cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            checked={novoAviso.rolesSel.includes(role)}
+                            onChange={(e) => setNovoAviso((p) => ({
+                              ...p,
+                              rolesSel: e.target.checked
+                                ? [...p.rolesSel, role]
+                                : p.rolesSel.filter((r) => r !== role),
+                            }))}
+                            className="accent-vine-700 w-4 h-4"
+                          />
+                          <span className="text-sm text-gray-700">{ROLE_LABEL[role]}</span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Ministério específico */}
+                <div className="space-y-1.5">
+                  <p className="text-xs font-medium text-gray-500">Filtrar por ministério <span className="text-gray-300">(opcional)</span></p>
+                  <p className="text-[11px] text-gray-400">Se selecionado, líderes/voluntários de outros ministérios não verão este aviso. Pode selecionar um ou mais.</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {MINISTERIOS.map((m) => {
+                      const sel = novoAviso.ministerios.includes(m);
+                      return (
+                        <button
+                          key={m}
+                          type="button"
+                          onClick={() => setNovoAviso((p) => ({
+                            ...p,
+                            ministerios: sel ? p.ministerios.filter((x) => x !== m) : [...p.ministerios, m],
+                          }))}
+                          className={clsx(
+                            "text-xs px-2.5 py-1 rounded-full border transition",
+                            sel
+                              ? "bg-gold-100 text-gold-800 border-gold-300 font-semibold"
+                              : "bg-white text-gray-500 border-gray-200 hover:border-gold-200 hover:text-gold-700"
+                          )}
+                        >{m}</button>
+                      );
+                    })}
+                  </div>
+                  {novoAviso.ministerios.length === 0 && (
+                    <p className="text-[11px] text-gray-400">Nenhum selecionado = visível para todos os ministérios</p>
+                  )}
+                </div>
+              </div>
+
               {erroAviso && (
                 <p className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">{erroAviso}</p>
               )}
               <div className="flex gap-2 justify-end">
-                <button onClick={() => { setAdicionandoAviso(false); setErroAviso(null); }} className="px-4 py-2 rounded-xl text-sm text-gray-500 hover:bg-gray-100 transition">Cancelar</button>
+                <button onClick={() => { setAdicionandoAviso(false); setErroAviso(null); setNovoAviso(novoAvisoInicial()); }} className="px-4 py-2 rounded-xl text-sm text-gray-500 hover:bg-gray-100 transition">Cancelar</button>
                 <button onClick={criarAviso} disabled={salvandoAviso} className="flex items-center gap-1.5 bg-vine-700 hover:bg-vine-800 text-white text-sm font-semibold px-4 py-2 rounded-xl transition disabled:opacity-60">
                   <Save className="w-3.5 h-3.5" /> {salvandoAviso ? "Publicando..." : "Publicar"}
                 </button>
@@ -1633,20 +1807,115 @@ function ConteudoTab({ initSecao }: { initSecao?: string }) {
           )}
 
           <div className="divide-y divide-gray-50">
-            {avisos.map((a) => (
-              <div key={a.id} className="flex items-start gap-3 px-5 py-4 hover:bg-gray-50/50">
-                <Bell className="w-4 h-4 text-vine-400 mt-0.5 shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-sm text-gray-800">{a.titulo}</p>
-                  <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{a.conteudo}</p>
-                  <p className="text-xs text-gray-400 mt-1">{new Date(a.criado_em).toLocaleDateString("pt-BR")} · {typeof a.destinatarios === "string" ? a.destinatarios : "todos"}</p>
+            {avisos.map((a) => {
+              const destLabel = (() => {
+                if (a.destinatarios === "todos") return "Todos os membros";
+                if (Array.isArray(a.destinatarios) && a.destinatarios.length > 0)
+                  return (a.destinatarios as string[]).map((r) => ROLE_LABEL[r as Role] ?? r).join(", ");
+                return "Apenas página inicial";
+              })();
+              const editando = editandoAvisoId === a.id;
+              return (
+                <div key={a.id} className={clsx("px-5 py-4", editando ? "bg-vine-50/40" : "hover:bg-gray-50/50")}>
+                  {editando ? (
+                    <div className="space-y-3">
+                      <input className={inputCls} placeholder="Título do aviso" value={editAviso.titulo} onChange={(e) => setEditAviso((p) => ({ ...p, titulo: e.target.value }))} />
+                      <textarea className={textareaCls} rows={3} placeholder="Conteúdo do aviso..." value={editAviso.conteudo} onChange={(e) => setEditAviso((p) => ({ ...p, conteudo: e.target.value }))} />
+                      <div className="space-y-3 pt-1 border-t border-gray-100">
+                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider pt-2">Visibilidade</p>
+                        <label className="flex items-start gap-2.5 cursor-pointer select-none">
+                          <input type="checkbox" checked={editAviso.visivelHome} onChange={(e) => setEditAviso((p) => ({ ...p, visivelHome: e.target.checked }))} className="accent-vine-700 w-4 h-4 mt-0.5" />
+                          <div>
+                            <span className="text-sm font-medium text-gray-700">Exibir na página inicial do site</span>
+                            <p className="text-xs text-gray-400">Visível para qualquer visitante, sem necessidade de login</p>
+                          </div>
+                        </label>
+                        <div className="space-y-2">
+                          <p className="text-xs font-medium text-gray-500">Quem vê no dashboard?</p>
+                          <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                            <input type="checkbox" checked={editAviso.destinatariosTodos} onChange={(e) => setEditAviso((p) => ({ ...p, destinatariosTodos: e.target.checked, rolesSel: [] }))} className="accent-vine-700 w-4 h-4" />
+                            <span className="text-sm text-gray-700">Todos os membros cadastrados</span>
+                          </label>
+                          {!editAviso.destinatariosTodos && (
+                            <div className="grid grid-cols-2 gap-1.5 ml-6">
+                              {ROLES.filter((r) => r !== "admin" && r !== "pastor").map((role) => (
+                                <label key={role} className="flex items-center gap-2 cursor-pointer select-none">
+                                  <input type="checkbox" checked={editAviso.rolesSel.includes(role)} onChange={(e) => setEditAviso((p) => ({ ...p, rolesSel: e.target.checked ? [...p.rolesSel, role] : p.rolesSel.filter((r) => r !== role) }))} className="accent-vine-700 w-4 h-4" />
+                                  <span className="text-sm text-gray-700">{ROLE_LABEL[role]}</span>
+                                </label>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        <div className="space-y-1.5">
+                          <p className="text-xs font-medium text-gray-500">Filtrar por ministério <span className="text-gray-300">(opcional)</span></p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {MINISTERIOS.map((m) => {
+                              const sel = editAviso.ministerios.includes(m);
+                              return (
+                                <button
+                                  key={m}
+                                  type="button"
+                                  onClick={() => setEditAviso((p) => ({
+                                    ...p,
+                                    ministerios: sel ? p.ministerios.filter((x) => x !== m) : [...p.ministerios, m],
+                                  }))}
+                                  className={clsx(
+                                    "text-xs px-2.5 py-1 rounded-full border transition",
+                                    sel
+                                      ? "bg-gold-100 text-gold-800 border-gold-300 font-semibold"
+                                      : "bg-white text-gray-500 border-gray-200 hover:border-gold-200 hover:text-gold-700"
+                                  )}
+                                >{m}</button>
+                              );
+                            })}
+                          </div>
+                          {editAviso.ministerios.length === 0 && (
+                            <p className="text-[11px] text-gray-400">Nenhum selecionado = visível para todos os ministérios</p>
+                          )}
+                        </div>
+                      </div>
+                      {erroEdicaoAviso && (
+                        <p className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">{erroEdicaoAviso}</p>
+                      )}
+                      <div className="flex gap-2 justify-end">
+                        <button onClick={() => setEditandoAvisoId(null)} className="px-4 py-2 rounded-xl text-sm text-gray-500 hover:bg-gray-100 transition">Cancelar</button>
+                        <button onClick={salvarEdicaoAviso} disabled={salvandoEdicaoAviso} className="flex items-center gap-1.5 bg-vine-700 hover:bg-vine-800 text-white text-sm font-semibold px-4 py-2 rounded-xl transition disabled:opacity-60">
+                          <Save className="w-3.5 h-3.5" /> {salvandoEdicaoAviso ? "Salvando..." : "Salvar"}
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-start gap-3">
+                      <Bell className="w-4 h-4 text-vine-400 mt-0.5 shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-sm text-gray-800">{a.titulo}</p>
+                        <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{a.conteudo}</p>
+                        <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                          {a.visivel_home && (
+                            <span className="text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-full">Página inicial</span>
+                          )}
+                          <span className="text-[10px] font-medium bg-vine-50 text-vine-700 border border-vine-100 px-2 py-0.5 rounded-full">{destLabel}</span>
+                          {a.ministerios?.map((m) => (
+                            <span key={m} className="text-[10px] font-medium bg-gold-50 text-gold-700 border border-gold-200 px-2 py-0.5 rounded-full">{m}</span>
+                          ))}
+                          <span className="text-xs text-gray-400">{new Date(a.criado_em).toLocaleDateString("pt-BR")}</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button onClick={() => abrirEdicaoAviso(a)} className="p-1.5 hover:bg-vine-50 rounded-lg text-gray-300 hover:text-vine-500 transition">
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                        <button onClick={() => removerAviso(a.id)} className="p-1.5 hover:bg-red-50 rounded-lg text-gray-300 hover:text-red-400 transition">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
-                <button onClick={() => removerAviso(a.id)} className="p-1.5 hover:bg-red-50 rounded-lg text-gray-300 hover:text-red-400 transition shrink-0">
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
-            ))}
-            {avisos.length === 0 && (
+              );
+            })}
+            {avisos.length === 0 && !adicionandoAviso && (
               <div className="px-5 py-10 text-center text-gray-400 text-sm">Nenhum aviso publicado ainda.</div>
             )}
           </div>

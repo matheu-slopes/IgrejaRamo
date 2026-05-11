@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
   });
 
   const body = await req.json();
-  const { email, senha, nome, telefone, role, ministerios, dataIngresso, ativo, permissoes } = body;
+  const { email, senha, nome, telefone, role, ministerios, liderMinisterios, dataIngresso, ativo, permissoes } = body;
 
   if (!email || !senha || !nome) {
     return NextResponse.json({ error: "Campos obrigatórios ausentes." }, { status: 400 });
@@ -32,15 +32,16 @@ export async function POST(req: NextRequest) {
   }
 
   await admin.from("perfis").upsert({
-    id:            data.user.id,
+    id:                data.user.id,
     nome,
     email,
-    telefone:      telefone ?? null,
+    telefone:          telefone ?? null,
     role,
-    ministerios:   ministerios ?? [],
-    data_ingresso: dataIngresso ?? null,
-    ativo:         ativo ?? true,
-    permissoes:    permissoes ?? [],
+    ministerios:       ministerios ?? [],
+    lider_ministerios: liderMinisterios ?? [],
+    data_ingresso:     dataIngresso ?? null,
+    ativo:             ativo ?? true,
+    permissoes:        permissoes ?? [],
   });
 
   return NextResponse.json({ id: data.user.id });

@@ -27,6 +27,7 @@ export async function POST(req: NextRequest) {
   if (dados.foto        !== undefined) payload.foto          = dados.foto;
   if (dados.role        !== undefined) payload.role          = dados.role;
   if (dados.ministerios !== undefined) payload.ministerios   = dados.ministerios;
+  if (dados.liderMinisterios !== undefined) payload.lider_ministerios = dados.liderMinisterios ?? [];
   if (dados.dataIngresso !== undefined) payload.data_ingresso = dados.dataIngresso;
   if (dados.ativo       !== undefined) payload.ativo         = dados.ativo;
   if (dados.primeiroAcesso !== undefined) payload.primeiro_acesso = dados.primeiroAcesso;

@@ -31,7 +31,7 @@ const corMap: Record<string, string> = {
 export default function CanalMinisterioPage() {
   const params = useParams();
   const slug = decodeURIComponent(params.id as string) as Ministerio;
-  const { user, temPermissao } = useAuth();
+  const { user, temPermissao, temPermissaoNoMinisterio } = useAuth();
 
   // ── estado global ─────────────────────────────────────────────────────
   const [tab, setTab] = useState<Tab>("chat");
@@ -59,10 +59,11 @@ export default function CanalMinisterioPage() {
   }, [slug]);
 
   // ── permissão ─────────────────────────────────────────────────────
-  const podeBloquearChat    = temPermissao("bloquear_chat");
-  const podeGerenciarMembros = temPermissao("gerenciar_membros_ministerio");
-  const podeCriarEvento     = temPermissao("criar_evento");
-  const podeEditarEvento    = temPermissao("editar_evento");  const podeAtribuirPermissoes = temPermissao("atribuir_permissoes");
+  const podeBloquearChat     = temPermissaoNoMinisterio("bloquear_chat", slug);
+  const podeGerenciarMembros = temPermissaoNoMinisterio("gerenciar_membros_ministerio", slug);
+  const podeCriarEvento      = temPermissaoNoMinisterio("criar_evento", slug);
+  const podeEditarEvento     = temPermissaoNoMinisterio("editar_evento", slug);
+  const podeAtribuirPermissoes = temPermissao("atribuir_permissoes");
 
   if (!canalBase) {
     return (
@@ -129,10 +130,10 @@ export default function CanalMinisterioPage() {
       </div>
 
       {/* Conteúdo da tab */}
-      {tab === "chat"    && <ChatTab ministerio={slug} chatBloqueado={chatBloqueado} podeEnviar={temPermissao("enviar_chat")} podeFixar={temPermissao("fixar_mensagem")} user={user} />}
+      {tab === "chat"    && <ChatTab ministerio={slug} chatBloqueado={chatBloqueado} podeEnviar={temPermissaoNoMinisterio("enviar_chat", slug)} podeFixar={temPermissaoNoMinisterio("fixar_mensagem", slug)} user={user} />}
       {tab === "membros" && <MembrosTab ministerio={slug} isLider={podeGerenciarMembros} podeAtribuirPermissoes={podeAtribuirPermissoes} />}
       {tab === "eventos" && <EventosTab ministerio={slug} isLider={podeCriarEvento} podeEditar={podeEditarEvento} />}
-      {tab === "escalas" && <EscalasTab ministerio={slug} isLider={temPermissao("criar_escala")} />}
+      {tab === "escalas" && <EscalasTab ministerio={slug} isLider={temPermissaoNoMinisterio("criar_escala", slug)} />}
     </div>
   );
 }

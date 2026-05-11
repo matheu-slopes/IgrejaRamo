@@ -20,18 +20,17 @@ export default function MuralPublico() {
     supabase
       .from("avisos")
       .select()
+      .eq("visivel_home", true)
       .order("criado_em", { ascending: false })
       .limit(6)
       .then(({ data }) => {
         if (data) {
           setAvisos(
-            data
-              .filter((a) => a.destinatarios === "todos")
-              .map((a) => ({
-                id: a.id, titulo: a.titulo, conteudo: a.conteudo,
-                criadoEm: a.criado_em, destinatarios: a.destinatarios,
-                ministerio: a.ministerio,
-              }))
+            data.map((a) => ({
+              id: a.id, titulo: a.titulo, conteudo: a.conteudo,
+              criadoEm: a.criado_em, destinatarios: a.destinatarios,
+              ministerios: a.ministerios, visivelHome: a.visivel_home,
+            }))
           );
         }
       });

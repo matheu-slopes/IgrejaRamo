@@ -141,13 +141,18 @@ export default function Sidebar() {
 
         {/* Meus Ministérios — filtrado pelo perfil do usuário */}
         {(() => {
-          const meusItens = ministerios.filter((m) =>
-            user?.role === "admin" || user?.role === "pastor"
-              ? true
-              : user?.ministerios?.some(
-                  (um) => um.toLowerCase() === m.label.toLowerCase()
-                )
-          );
+          const meusItens = ministerios.filter((m) => {
+            if (user?.role === "admin" || user?.role === "pastor") return true;
+            // pertence ao ministério (membro/voluntário/líder)
+            const pertence = user?.ministerios?.some(
+              (um) => um.toLowerCase() === m.label.toLowerCase()
+            );
+            // ou é líder nomeado desse ministério
+            const eLider = user?.liderMinisterios?.some(
+              (um) => um.toLowerCase() === m.label.toLowerCase()
+            );
+            return pertence || eLider;
+          });
           if (meusItens.length === 0) return null;
           return (
             <>
@@ -157,28 +162,42 @@ export default function Sidebar() {
                 </p>
               )}
               {collapsed && <div className="border-t border-vine-800 my-3 mx-1" />}
-              {meusItens.map(({ label, icon: Icon, href }) => (
-                <Link
-                  key={label}
-                  href={href}
-                  className={clsx(
-                    "flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition",
-                    pathname.includes("/ministerio/") && decodeURIComponent(pathname).includes(label)
-                      ? "bg-vine-700 text-white"
-                      : "text-vine-400 hover:bg-vine-800 hover:text-white"
-                  )}
-                  title={collapsed ? label : undefined}
-                >
-                  <Icon className="w-4 h-4 shrink-0" />
-                  {!collapsed && <span>{label}</span>}
-                </Link>
-              ))}
+              {meusItens.map(({ label, icon: Icon, href }) => {
+                const eLider = user?.liderMinisterios?.some(
+                  (um) => um.toLowerCase() === label.toLowerCase()
+                );
+                return (
+                  <Link
+                    key={label}
+                    href={href}
+                    className={clsx(
+                      "flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition",
+                      pathname.includes("/ministerio/") && decodeURIComponent(pathname).includes(label)
+                        ? "bg-vine-700 text-white"
+                        : "text-vine-400 hover:bg-vine-800 hover:text-white"
+                    )}
+                    title={collapsed ? label : undefined}
+                  >
+                    <Icon className="w-4 h-4 shrink-0" />
+                    {!collapsed && (
+                      <span className="flex items-center gap-1">
+                        {label}
+                        {eLider && (
+                          <span className="ml-1 text-[9px] font-bold uppercase tracking-wide bg-gold-500 text-white rounded px-1 leading-4">
+                            líder
+                          </span>
+                        )}
+                      </span>
+                    )}
+                  </Link>
+                );
+              })}
             </>
           );
         })()}
 
-        {/* Admin quick links — apenas admin */}
-        {user?.role === "admin" && (
+        {/* Admin quick links — apenas admin / gerenciar_usuarios */}
+        {temPermissao("gerenciar_usuarios") && (
           <>
             {!collapsed && (
               <p className="px-3 pt-5 pb-1 text-xs font-bold uppercase tracking-widest text-vine-500">
@@ -187,6 +206,35 @@ export default function Sidebar() {
             )}
             {collapsed && <div className="border-t border-vine-800 my-3 mx-1" />}
             {navAdmin.map(({ href, label, icon: Icon }) => (
+              <Link
+                key={href}
+                href={href}
+                className={clsx(
+                  "flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition",
+                  isActive(href) ? "bg-vine-700 text-white" : "text-vine-400 hover:bg-vine-800 hover:text-white"
+                )}
+                title={collapsed ? label : undefined}
+              >
+                <Icon className="w-4 h-4 shrink-0" />
+                {!collapsed && <span>{label}</span>}
+              </Link>
+            ))}
+          </>
+        )}
+
+        {/* Avisos / Devocional — para líderes e pastores com criar_aviso mas sem gerenciar_usuarios */}
+        {!temPermissao("gerenciar_usuarios") && temPermissao("criar_aviso") && (
+          <>
+            {!collapsed && (
+              <p className="px-3 pt-5 pb-1 text-xs font-bold uppercase tracking-widest text-vine-500">
+                Conteúdo
+              </p>
+            )}
+            {collapsed && <div className="border-t border-vine-800 my-3 mx-1" />}
+            {[
+              { href: "/dashboard/admin?tab=conteudo&secao=avisos",     label: "Avisos",     icon: Bell     },
+              { href: "/dashboard/admin?tab=conteudo&secao=devocional", label: "Devocional", icon: BookOpen },
+            ].map(({ href, label, icon: Icon }) => (
               <Link
                 key={href}
                 href={href}

@@ -9,24 +9,27 @@ import {
 } from "react";
 import { User, Permissao } from "@/types";
 import { supabase } from "@/lib/supabase";
-import { temPermissao as checkPermissao } from "@/lib/permissions";
+import { temPermissao as checkPermissao, temPermissaoNoMinisterio as checkPermissaoMin } from "@/lib/permissions";
 
 // Converte linha da tabela `perfis` para o tipo User do app
 function rowToUser(row: Record<string, unknown>): User {
   return {
-    id:             row.id as string,
-    nome:           row.nome as string,
-    email:          row.email as string,
-    telefone:       (row.telefone as string) ?? undefined,
-    foto:           (row.foto as string) ?? undefined,
-    role:           row.role as User["role"],
-    ministerios:    (row.ministerios as User["ministerios"]) ?? [],
-    dataIngresso:   row.data_ingresso as string,
-    ativo:          row.ativo as boolean,
-    primeiroAcesso: (row.primeiro_acesso as boolean) ?? false,
-    permissoes:     (row.permissoes as Permissao[])?.length
-                      ? (row.permissoes as Permissao[])
-                      : undefined,
+    id:                row.id as string,
+    nome:              row.nome as string,
+    email:             row.email as string,
+    telefone:          (row.telefone as string) ?? undefined,
+    foto:              (row.foto as string) ?? undefined,
+    role:              row.role as User["role"],
+    ministerios:       (row.ministerios as User["ministerios"]) ?? [],
+    liderMinisterios:  (row.lider_ministerios as User["ministerios"])?.length
+                         ? (row.lider_ministerios as User["ministerios"])
+                         : undefined,
+    dataIngresso:      row.data_ingresso as string,
+    ativo:             row.ativo as boolean,
+    primeiroAcesso:    (row.primeiro_acesso as boolean) ?? false,
+    permissoes:        (row.permissoes as Permissao[])?.length
+                         ? (row.permissoes as Permissao[])
+                         : undefined,
   };
 }
 
@@ -35,8 +38,10 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<false | { role: string }>;
   logout: () => void;
   isLoading: boolean;
-  /** Verifica se o usuário logado tem uma determinada permissão */
+  /** Verifica se o usuário logado tem uma determinada permissão globalmente */
   temPermissao: (p: Permissao) => boolean;
+  /** Verifica permissão no contexto de um ministério específico (inclui líderes nomeados) */
+  temPermissaoNoMinisterio: (p: Permissao, ministerio: string) => boolean;
   /** Lista de todos os usuários — gerenciável pelo admin */
   usuarios: User[];
   /** Atualiza um usuário (role, permissoes, ativo, etc.) no Supabase */
@@ -174,6 +179,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return checkPermissao(user, p);
   }
 
+  function temPermissaoNoMinisterio(p: Permissao, ministerio: string): boolean {
+    return checkPermissaoMin(user, p, ministerio);
+  }
+
   async function atualizarUsuario(id: string, dados: Partial<User>) {
     await fetch("/api/atualizar-perfil", {
       method: "POST",
@@ -189,15 +198,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        email:         dados.email,
+        email:             dados.email,
         senha,
-        nome:          dados.nome,
-        telefone:      dados.telefone,
-        role:          dados.role,
-        ministerios:   dados.ministerios,
-        dataIngresso:  dados.dataIngresso,
-        ativo:         dados.ativo,
-        permissoes:    dados.permissoes ?? [],
+        nome:              dados.nome,
+        telefone:          dados.telefone,
+        role:              dados.role,
+        ministerios:       dados.ministerios,
+        liderMinisterios:  dados.liderMinisterios ?? [],
+        dataIngresso:      dados.dataIngresso,
+        ativo:             dados.ativo,
+        permissoes:        dados.permissoes ?? [],
       }),
     });
     const json = await res.json().catch(() => ({}));
@@ -214,7 +224,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, login, logout, isLoading, temPermissao, usuarios, atualizarUsuario, criarUsuario, removerUsuario }}
+      value={{ user, login, logout, isLoading, temPermissao, temPermissaoNoMinisterio, usuarios, atualizarUsuario, criarUsuario, removerUsuario }}
     >
       {children}
     </AuthContext.Provider>

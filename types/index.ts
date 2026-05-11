@@ -38,6 +38,12 @@ export interface User {
   foto?: string;
   role: Role;
   ministerios: Ministerio[];
+  /**
+   * Ministérios que este usuário LIDERA.
+   * Definido pelo admin/pastor. Garante privilégios de líder
+   * (criar escala, gerenciar membros, etc.) apenas no ministério em questão.
+   */
+  liderMinisterios?: Ministerio[];
   dataIngresso: string; // ISO date
   ativo: boolean;
   primeiroAcesso?: boolean;
@@ -68,8 +74,11 @@ export interface Aviso {
   titulo: string;
   conteudo: string;
   criadoEm: string;
+  /** "todos" = todos os membros cadastrados; array de roles = apenas esses roles */
   destinatarios: Role[] | "todos";
-  ministerio?: Ministerio;
+  ministerios?: Ministerio[];
+  /** Se true, aparece no mural da página inicial (sem login) */
+  visivelHome?: boolean;
 }
 
 // ─────────────────────────────────────────────

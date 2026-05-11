@@ -80,10 +80,23 @@ export const TODAS_PERMISSOES = Object.keys(PERMISSAO_LABEL) as Permissao[];
 
 export const GRUPOS_PERMISSAO = ["Administração", "Comunicação", "Agenda", "Ministério"] as const;
 
+// ─── Permissões que um líder de ministério possui no SEU ministério ───
+
+const PERMISSOES_LIDER_MINISTERIO: Permissao[] = [
+  "criar_evento",
+  "editar_evento",
+  "criar_escala",
+  "gerenciar_membros_ministerio",
+  "bloquear_chat",
+  "enviar_chat",
+  "fixar_mensagem",
+  "criar_aviso",
+];
+
 // ─── Função principal ─────────────────────────────────────────────
 
 /**
- * Verifica se um usuário tem determinada permissão.
+ * Verifica se um usuário tem determinada permissão globalmente.
  * Se o usuário tiver `permissoes` definidas (customização pelo admin),
  * usa esse array. Caso contrário, usa o default do role.
  */
@@ -91,6 +104,25 @@ export function temPermissao(user: User | null, permissao: Permissao): boolean {
   if (!user) return false;
   const lista = user.permissoes ?? DEFAULTS_POR_ROLE[user.role];
   return lista.includes(permissao);
+}
+
+/**
+ * Verifica se um usuário tem determinada permissão NO CONTEXTO de um ministério.
+ * Admin e pastor têm permissão global.
+ * Líderes nomeados (liderMinisterios) têm permissão apenas no seu ministério.
+ */
+export function temPermissaoNoMinisterio(
+  user: User | null,
+  permissao: Permissao,
+  ministerio: string
+): boolean {
+  if (!user) return false;
+  // Admin e pastor — permissão global
+  if (temPermissao(user, permissao)) return true;
+  // Usuário é líder nomeado deste ministério?
+  const eLider = user.liderMinisterios?.includes(ministerio as import("@/types").Ministerio);
+  if (eLider && PERMISSOES_LIDER_MINISTERIO.includes(permissao)) return true;
+  return false;
 }
 
 /**

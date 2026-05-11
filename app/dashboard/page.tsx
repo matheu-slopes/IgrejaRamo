@@ -89,16 +89,31 @@ export default function DashboardPage() {
         if (data) {
           setAvisosFiltrados(
             data
-              .filter(
-                (a) =>
+              .filter((a) => {
+                // Admin e pastor veem todos os avisos, sem exceção
+                if (user.role === "admin" || user.role === "pastor") return true;
+
+                // Verifica se o destinatário bate com o role do usuário
+                const destMatch =
                   a.destinatarios === "todos" ||
-                  (Array.isArray(a.destinatarios) && a.destinatarios.includes(user.role))
-              )
+                  (Array.isArray(a.destinatarios) &&
+                    a.destinatarios.length > 0 &&
+                    a.destinatarios.includes(user.role));
+                if (!destMatch) return false;
+
+                // Se o aviso é vinculado a um ministério específico,
+                // só aparece para quem pertence àquele ministério
+                if (a.ministerios?.length) {
+                  return (a.ministerios as string[]).some((m) => user.ministerios?.includes(m as import("@/types").Ministerio));
+                }
+
+                return true;
+              })
               .slice(0, 3)
               .map((a) => ({
                 id: a.id, titulo: a.titulo, conteudo: a.conteudo,
                 criadoEm: a.criado_em, destinatarios: a.destinatarios,
-                ministerio: a.ministerio,
+                ministerios: a.ministerios, visivelHome: a.visivel_home,
               }))
           );
         }

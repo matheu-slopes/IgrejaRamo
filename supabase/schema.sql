@@ -69,6 +69,7 @@ CREATE TABLE perfis (
   foto          TEXT,
   role          role_tipo   NOT NULL DEFAULT 'membro',
   ministerios   ministerio_tipo[] DEFAULT '{}',
+  lider_ministerios ministerio_tipo[] DEFAULT '{}',
   data_ingresso DATE        NOT NULL DEFAULT CURRENT_DATE,
   ativo         BOOLEAN     NOT NULL DEFAULT TRUE,
   permissoes    TEXT[]      DEFAULT '{}',
@@ -124,7 +125,9 @@ CREATE TABLE avisos (
   conteudo      TEXT             NOT NULL,
   criado_em     TIMESTAMPTZ      DEFAULT NOW(),
   destinatarios JSONB            NOT NULL DEFAULT '"todos"',
-  ministerio    ministerio_tipo
+  ministerios   ministerio_tipo[] DEFAULT '{}',
+  visivel_home  BOOLEAN          NOT NULL DEFAULT false,
+  criado_por    UUID             REFERENCES perfis(id) ON DELETE SET NULL
 );
 
 -- Aviso fixado no topo do dashboard (apenas 1 registro)
