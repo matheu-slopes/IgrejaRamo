@@ -24,10 +24,15 @@ interface Devocional {
   subtitulo: string | null;
   conteudo: string;
   versiculo: string | null;
+  "versículo"?: string | null;
   referencia: string | null;
   imagem_url: string | null;
   data: string;
   ativo: boolean;
+}
+
+function normalizarDevocional(raw: Devocional): Devocional {
+  return { ...raw, versiculo: raw.versiculo ?? raw["versículo"] ?? null };
 }
 
 function parseConteudo(conteudo: string): DevocionalBloco[] {
@@ -138,19 +143,47 @@ export default function DevocionalPage() {
   const [devs, setDevs] = useState<Devocional[]>([]);
   const [idx, setIdx] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [erro, setErro] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
-    supabase
-      .from("devocionais")
-      .select()
-      .eq("ativo", true)
-      .order("data", { ascending: false })
-      .limit(30)
-      .then(({ data }) => {
-        if (data) setDevs(data as Devocional[]);
-        setLoading(false);
+    let ativo = true;
+
+    async function carregarDevocionais() {
+      setLoading(true);
+      setErro(null);
+
+      const timeout = new Promise<{ timeout: true }>((resolve) => {
+        window.setTimeout(() => resolve({ timeout: true }), 45000);
       });
-  }, []);
+
+      try {
+        const query = supabase
+          .from("devocionais")
+          .select()
+          .eq("ativo", true)
+          .order("data", { ascending: false })
+          .limit(30);
+
+        const result = await Promise.race([query, timeout]);
+        if ("timeout" in result) {
+          if (ativo) setErro("O carregamento demorou mais que o esperado. Tente novamente em alguns segundos.");
+          return;
+        }
+
+        const { data, error } = result;
+        if (error) throw error;
+        if (ativo) setDevs(((data ?? []) as Devocional[]).map(normalizarDevocional));
+      } catch (error) {
+        if (ativo) setErro(error instanceof Error ? error.message : "Não foi possível carregar os devocionais.");
+      } finally {
+        if (ativo) setLoading(false);
+      }
+    }
+
+    carregarDevocionais();
+    return () => { ativo = false; };
+  }, [reloadKey]);
 
   const dev = devs[idx] ?? null;
   const blocos = dev ? parseConteudo(dev.conteudo) : [];
@@ -181,7 +214,21 @@ export default function DevocionalPage() {
           </div>
         )}
 
-        {!loading && devs.length === 0 && (
+        {!loading && erro && (
+          <div className="text-center py-24 text-gray-400">
+            <BookOpen className="w-12 h-12 mx-auto mb-3 opacity-30" />
+            <p className="font-medium text-gray-500">Não foi possível carregar o devocional.</p>
+            <p className="text-sm mt-1">{erro}</p>
+            <button
+              onClick={() => setReloadKey((key) => key + 1)}
+              className="mt-5 rounded-xl bg-vine-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-vine-800"
+            >
+              Tentar novamente
+            </button>
+          </div>
+        )}
+
+        {!loading && !erro && devs.length === 0 && (
           <div className="text-center py-24 text-gray-400">
             <BookOpen className="w-12 h-12 mx-auto mb-3 opacity-30" />
             <p className="font-medium">Nenhum devocional disponível no momento.</p>
@@ -189,7 +236,7 @@ export default function DevocionalPage() {
           </div>
         )}
 
-        {!loading && dev && (
+        {!loading && !erro && dev && (
           <>
             {/* Navegação entre devocionais */}
             {devs.length > 1 && (
@@ -250,6 +297,9 @@ export default function DevocionalPage() {
                   )}
                 </div>
 
+                {/* Conteúdo */}
+                <ConteudoRico blocos={blocos} />
+
                 {/* Versículo destaque */}
                 {dev.versiculo && (
                   <blockquote className="border-l-4 border-vine-400 pl-4 py-1">
@@ -259,9 +309,6 @@ export default function DevocionalPage() {
                     )}
                   </blockquote>
                 )}
-
-                {/* Conteúdo */}
-                <ConteudoRico blocos={blocos} />
               </div>
             </article>
 
