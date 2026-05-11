@@ -134,7 +134,7 @@ export const mockAvisos: Aviso[] = [
     conteudo: "O ensaio de louvor foi remarcado para quinta-feira às 19h.",
     criadoEm: "2026-04-13",
     destinatarios: ["lider", "voluntario"],
-    ministerio: "Louvor",
+    ministerios: ["Louvor"],
   },
   {
     id: "a4",

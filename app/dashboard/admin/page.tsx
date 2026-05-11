@@ -8,7 +8,7 @@ import {
   DEFAULTS_POR_ROLE, permissoesEfetivas,
 } from "@/lib/permissions";
 import {
-  Shield, Users, Plus, Search, Pencil, Power, X,
+  Shield, ShieldCheck, Users, Plus, Search, Pencil, Power, X,
   ChevronRight, ChevronUp, ChevronDown, Check, RotateCcw, UserPlus, AlertCircle,
   Layers, Lock, Unlock, Trash2, Save, Link2, MapPin, Pin,
   Eye, EyeOff, Bell, BookOpen, Image as ImageIcon, Video, Type, Quote, PlayCircle, Calendar as CalendarIcon,
@@ -1149,7 +1149,11 @@ function parseBlocosDevocional(conteudo: string): DevocionalBloco[] {
   } catch {
     // Conteúdo antigo em texto puro.
   }
-  return conteudo.trim() ? [{ ...criarBlocoDevocional("texto"), texto: conteudo }] : [criarBlocoDevocional("texto")];
+  if (conteudo.trim()) {
+    const b = criarBlocoDevocional("texto");
+    return [b.tipo === "texto" ? { ...b, texto: conteudo } : b];
+  }
+  return [criarBlocoDevocional("texto")];
 }
 
 function limparBlocosDevocional(blocos: DevocionalBloco[]) {

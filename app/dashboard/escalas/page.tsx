@@ -88,7 +88,7 @@ function labelMes(iso: string): string {
 
 // ─── Seção de músicas (repertório) ───────────────────────────────────────────
 
-function MusicasSection({ musicas }: { musicas: { titulo: string; artista: string; tom: string }[] }) {
+function MusicasSection({ musicas }: { musicas: { titulo: string; artista: string; tom?: string }[] }) {
   const [open, setOpen] = useState(false);
   return (
     <div className="px-4 py-3 bg-grape-50/30 border-t border-grape-100/50">
