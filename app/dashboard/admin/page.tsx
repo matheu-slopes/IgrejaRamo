@@ -1276,14 +1276,14 @@ function DevocionalPreviewModal({ dev, onClose }: { dev: Devocional | Devocional
                 {dev.subtitulo && <p className="mt-1 text-sm text-gray-500">{dev.subtitulo}</p>}
               </div>
 
+              <DevocionalBlocosPreview blocos={blocos} />
+
               {dev.versiculo && (
                 <blockquote className="border-l-4 border-vine-400 py-1 pl-4">
                   <p className="text-base italic leading-relaxed text-vine-800">&ldquo;{dev.versiculo}&rdquo;</p>
                   {dev.referencia && <cite className="mt-1 block text-sm font-semibold not-italic text-vine-500">— {dev.referencia}</cite>}
                 </blockquote>
               )}
-
-              <DevocionalBlocosPreview blocos={blocos} />
             </div>
           </article>
 
@@ -1684,6 +1684,32 @@ function ConteudoTab({ initSecao }: { initSecao?: string }) {
                 <input className={inputCls} placeholder="Título*" value={editandoDev ? editandoDev.titulo : novoDev.titulo} onChange={(e) => editandoDev ? setEditandoDev({ ...editandoDev, titulo: e.target.value }) : setNovoDev((p) => ({ ...p, titulo: e.target.value }))} />
                 <input className={inputCls} placeholder="Subtítulo" value={editandoDev ? (editandoDev.subtitulo ?? "") : novoDev.subtitulo} onChange={(e) => editandoDev ? setEditandoDev({ ...editandoDev, subtitulo: e.target.value }) : setNovoDev((p) => ({ ...p, subtitulo: e.target.value }))} />
               </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-vine-200 bg-white px-3 py-2 text-sm font-semibold text-vine-700 transition hover:bg-vine-50">
+                    <ImageIcon className="w-4 h-4" />
+                    {uploadingCapaDev ? "Enviando capa..." : devAtual.imagem_url ? "Trocar imagem principal" : "Subir imagem principal"}
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,image/gif"
+                      className="hidden"
+                      disabled={uploadingCapaDev}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        e.target.value = "";
+                        if (file) subirCapaDevocional(file);
+                      }}
+                    />
+                  </label>
+                  {devAtual.imagem_url && (
+                    <div className="overflow-hidden rounded-xl border border-gray-100 bg-gray-50">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={devAtual.imagem_url} alt="Imagem principal" className="h-24 w-full object-cover" />
+                    </div>
+                  )}
+                </div>
+                <input type="date" className={inputCls} value={editandoDev ? editandoDev.data : novoDev.data} onChange={(e) => editandoDev ? setEditandoDev({ ...editandoDev, data: e.target.value }) : setNovoDev((p) => ({ ...p, data: e.target.value }))} />
+              </div>
               <div className="space-y-3">
                 <div className="flex flex-wrap items-center gap-2">
                   {([
@@ -1809,32 +1835,6 @@ function ConteudoTab({ initSecao }: { initSecao?: string }) {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <input className={inputCls} placeholder="Versículo (ex: João 3:16)" value={editandoDev ? (editandoDev.versiculo ?? "") : novoDev.versiculo} onChange={(e) => editandoDev ? setEditandoDev({ ...editandoDev, versiculo: e.target.value }) : setNovoDev((p) => ({ ...p, versiculo: e.target.value }))} />
                 <input className={inputCls} placeholder="Referência bíblica" value={editandoDev ? (editandoDev.referencia ?? "") : novoDev.referencia} onChange={(e) => editandoDev ? setEditandoDev({ ...editandoDev, referencia: e.target.value }) : setNovoDev((p) => ({ ...p, referencia: e.target.value }))} />
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-vine-200 bg-white px-3 py-2 text-sm font-semibold text-vine-700 transition hover:bg-vine-50">
-                    <ImageIcon className="w-4 h-4" />
-                    {uploadingCapaDev ? "Enviando capa..." : devAtual.imagem_url ? "Trocar imagem principal" : "Subir imagem principal"}
-                    <input
-                      type="file"
-                      accept="image/jpeg,image/png,image/webp,image/gif"
-                      className="hidden"
-                      disabled={uploadingCapaDev}
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        e.target.value = "";
-                        if (file) subirCapaDevocional(file);
-                      }}
-                    />
-                  </label>
-                  {devAtual.imagem_url && (
-                    <div className="overflow-hidden rounded-xl border border-gray-100 bg-gray-50">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={devAtual.imagem_url} alt="Imagem principal" className="h-24 w-full object-cover" />
-                    </div>
-                  )}
-                </div>
-                <input type="date" className={inputCls} value={editandoDev ? editandoDev.data : novoDev.data} onChange={(e) => editandoDev ? setEditandoDev({ ...editandoDev, data: e.target.value }) : setNovoDev((p) => ({ ...p, data: e.target.value }))} />
               </div>
               <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none">
                 <input type="checkbox" checked={editandoDev ? editandoDev.ativo : novoDev.ativo} onChange={(e) => editandoDev ? setEditandoDev({ ...editandoDev, ativo: e.target.checked }) : setNovoDev((p) => ({ ...p, ativo: e.target.checked }))} className="rounded" />
