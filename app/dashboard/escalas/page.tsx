@@ -2,13 +2,13 @@
 
 import React, { useState, useEffect, useMemo } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { Ministerio, Escala, FuncaoEscala } from "@/types";
+import { Ministerio, Escala, FuncaoEscala, EscalaMusica } from "@/types";
 import { EscalasTab } from "@/components/dashboard/EscalasTab";
 import { EscalaModal } from "@/components/dashboard/EscalaModal";
 import { supabase } from "@/lib/supabase";
 import {
   ChevronLeft, ChevronRight, ChevronDown, ChevronUp,
-  Music2, Users, Calendar, Star, Settings2,
+  Music2, Users, Calendar, Star, Settings2, ClipboardCopy, Check,
 } from "lucide-react";
 import clsx from "clsx";
 
@@ -74,6 +74,8 @@ function parseEscala(e: Record<string, unknown>): Escala {
         titulo: m.titulo as string,
         artista: m.artista as string,
         tom: (m.tom as string) ?? "",
+        artistaSlug: (m.artista_slug as string) ?? undefined,
+        musicaSlug: (m.musica_slug as string) ?? undefined,
       })),
   };
 }
@@ -111,8 +113,33 @@ function parseInfantilObs(raw: string | undefined): { ageGroup: string; tema: st
 
 // ─── Seção de músicas (repertório) ───────────────────────────────────────────
 
-function MusicasSection({ musicas }: { musicas: { titulo: string; artista: string; tom?: string }[] }) {
+function MusicasSection({ musicas }: { musicas: EscalaMusica[] }) {
   const [open, setOpen] = useState(false);
+  const [copyLetraIdx, setCopyLetraIdx] = useState<number | null>(null);
+  const [copyLetraOk, setCopyLetraOk] = useState<number | null>(null);
+
+  async function copiarLetra(idx: number, m: EscalaMusica) {
+    if (copyLetraIdx === idx) return;
+    setCopyLetraIdx(idx);
+    try {
+      const artista = m.artistaSlug ?? m.artista;
+      const musica  = m.musicaSlug  ?? m.titulo;
+      const res = await fetch(`/api/buscar-letra?artista=${encodeURIComponent(artista)}&musica=${encodeURIComponent(musica)}`);
+      const data = await res.json();
+      if (data.letra) {
+        await navigator.clipboard.writeText(data.letra);
+        setCopyLetraOk(idx);
+        setTimeout(() => setCopyLetraOk(null), 2500);
+      } else {
+        alert(data.error ?? "Letra não encontrada.");
+      }
+    } catch {
+      alert("Erro ao buscar a letra.");
+    } finally {
+      setCopyLetraIdx(null);
+    }
+  }
+
   return (
     <div className="px-4 py-3 bg-grape-50/30 border-t border-grape-100/50">
       <button
@@ -142,6 +169,23 @@ function MusicasSection({ musicas }: { musicas: { titulo: string; artista: strin
                   {m.tom}
                 </span>
               )}
+              <button
+                onClick={(e) => { e.stopPropagation(); copiarLetra(i, m); }}
+                className={clsx(
+                  "flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-lg border transition whitespace-nowrap shrink-0",
+                  copyLetraOk === i
+                    ? "border-green-300 bg-green-50 text-green-700"
+                    : "border-gray-200 bg-white text-gray-500 hover:border-grape-300 hover:text-grape-700 hover:bg-grape-50"
+                )}
+              >
+                {copyLetraIdx === i ? (
+                  <span className="animate-pulse">...</span>
+                ) : copyLetraOk === i ? (
+                  <><Check className="w-3 h-3" /> Copiada!</>
+                ) : (
+                  <><ClipboardCopy className="w-3 h-3" /> Letra</>
+                )}
+              </button>
             </div>
           ))}
         </div>
