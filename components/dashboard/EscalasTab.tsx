@@ -227,6 +227,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
               titulo: m.titulo as string,
               artista: m.artista as string,
               tom: (m.tom as string) ?? "",
+              bpm: (m.bpm as number) ?? undefined,
               artistaSlug: (m.artista_slug as string) ?? undefined,
               musicaSlug: (m.musica_slug as string) ?? undefined,
             })),
@@ -452,7 +453,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
           const { error: insMus } = await supabase.from("escala_musicas").insert(
             form.musicas.map((m, idx) => ({
               escala_id: editId, musica_id: m.musicaId || null,
-              titulo: m.titulo, artista: m.artista, tom: m.tom, ordem: idx,
+              titulo: m.titulo, artista: m.artista, tom: m.tom, bpm: m.bpm ?? null, ordem: idx,
               artista_slug: m.artistaSlug ?? null, musica_slug: m.musicaSlug ?? null,
             }))
           );
@@ -483,7 +484,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
             const { error: insMus } = await supabase.from("escala_musicas").insert(
               form.musicas.map((m, idx) => ({
                 escala_id: inserted.id, musica_id: m.musicaId || null,
-                titulo: m.titulo, artista: m.artista, tom: m.tom, ordem: idx,
+                titulo: m.titulo, artista: m.artista, tom: m.tom, bpm: m.bpm ?? null, ordem: idx,
                 artista_slug: m.artistaSlug ?? null, musica_slug: m.musicaSlug ?? null,
               }))
             );
@@ -588,6 +589,14 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
     setForm((f) => ({
       ...f,
       musicas: f.musicas.map((m, i) => i === idx ? { ...m, tom } : m),
+    }));
+  }
+
+  function atualizarBpmNaEscala(idx: number, bpm: string) {
+    const n = parseInt(bpm, 10);
+    setForm((f) => ({
+      ...f,
+      musicas: f.musicas.map((m, i) => i === idx ? { ...m, bpm: bpm === "" ? undefined : isNaN(n) ? m.bpm : n } : m),
     }));
   }
 
@@ -1022,6 +1031,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
                             <th className="text-center text-xs font-semibold text-gray-400 px-2 py-2 w-7">#</th>
                             <th className="text-left text-xs font-semibold text-gray-500 px-3 py-2">Música</th>
                             <th className="text-left text-xs font-semibold text-gray-500 px-3 py-2">Tom</th>
+                            <th className="text-left text-xs font-semibold text-gray-500 px-3 py-2">BPM</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-50">
@@ -1037,6 +1047,13 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
                                   {m.tom && (
                                     <span className="text-xs font-bold bg-grape-100 text-grape-800 px-2 py-0.5 rounded-full">
                                       {m.tom}
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="px-3 py-2.5">
+                                  {m.bpm && (
+                                    <span className="text-xs font-semibold text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
+                                      {m.bpm}
                                     </span>
                                   )}
                                 </td>
@@ -1590,6 +1607,15 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
                       <option value="">Tom</option>
                       {TONS.map((t) => <option key={t}>{t}</option>)}
                     </select>
+                    <input
+                      type="number"
+                      min={40}
+                      max={300}
+                      value={em.bpm ?? ""}
+                      onChange={(e) => atualizarBpmNaEscala(i, e.target.value)}
+                      placeholder="BPM"
+                      className="text-xs border border-gray-200 rounded-lg px-2 py-1 outline-none bg-white w-16"
+                    />
                     {em.artistaSlug && em.musicaSlug && (
                       <button
                         onClick={() => toggleCifraForm(i)}
