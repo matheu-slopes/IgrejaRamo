@@ -21,14 +21,14 @@ export const TONS = [
 ];
 
 export const FUNCOES_POR_MIN: Record<string, string[]> = {
-  Louvor:        ["Ministro","Guitarra","Baixo","Bateria","Cajón","Teclado","Backing Vocal","Violão","Pandeiro"],
+  Louvor:        ["Ministro(a)","Guitarra","Baixo","Cajón","Teclado","Backing Vocal","Violão","Pandeiro"],
   "Mídias":      ["Transmissão","Projeção/Letras","Fotografia","Câmera"],
-  Cantina:       ["Abertura/Oferta","Escala de Limpeza","Recepção"],
+  Cantina:       ["Abertura","Oferta","Recepção"],
   Limpeza:       ["Escala de Limpeza"],
-  Infantil:      ["Professora","Monitor","Auxiliar"],
-  "Ação Social": ["Coordenação","Voluntário"],
+  Infantil:      ["Professor(a)","Monitor(a)","Auxiliar"],
+  "Ação Social": ["Coordenação","Voluntário(a)"],
   Jovens:        ["Líder","Auxiliar"],
-  Ensino:        ["Professor","Auxiliar"],
+  Ensino:        ["Preletor(a)"],
 };
 
 // ─── Equipes fixas do Louvor ────────────────────────────────────────────────
@@ -129,9 +129,15 @@ const FUNCAO_DB_MAP: Partial<Record<string, string>> = {
 };
 const FUNCAO_ALIAS_SET = new Set(["Cajón", "Pandeiro", "Violão"]);
 
-/** Retorna a função a exibir: prioriza observação quando é um alias de instrumento */
+/** Retorna a função a exibir: prioriza observação quando é um alias de instrumento; Bateria → Cajón */
 export function displayFuncao(it: { funcao: string; observacao?: string }): string {
-  return (it.observacao && FUNCAO_ALIAS_SET.has(it.observacao)) ? it.observacao : it.funcao;
+  if (it.observacao && FUNCAO_ALIAS_SET.has(it.observacao)) return it.observacao;
+  if (it.funcao === "Bateria") return "Cajón";
+  if (it.funcao === "Ministro") return "Ministro(a)";
+  if (it.funcao === "Professora" || it.funcao === "Professor") return "Professor(a)";
+  if (it.funcao === "Monitor") return "Monitor(a)";
+  if (it.funcao === "Abertura/Oferta") return "Abertura/Oferta";
+  return it.funcao;
 }
 /** Retorna a observação real (ocultando alias de instrumento que já aparece em displayFuncao) */
 export function displayObs(it: { observacao?: string }): string | undefined {

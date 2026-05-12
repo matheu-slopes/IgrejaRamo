@@ -13,13 +13,28 @@ import {
 import clsx from "clsx";
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
+// Nomes de exibição (o valor do DB permanece igual)
+const MIN_LABEL: Record<string, string> = {
+  Cantina: "Portaria",
+  Ensino:  "Pregação",
+};
+const minLabel = (m: string) => MIN_LABEL[m] ?? m;
 
-// Infantil → apenas domingos | Jovens → apenas sábados (quinzenais)
-const MINISTERIOS_CULTO: Ministerio[] = ["Louvor", "Mídias", "Limpeza", "Cantina", "Jovens", "Ensino", "Infantil"];
-const TODOS: Ministerio[] = ["Louvor", "Mídias", "Limpeza", "Cantina", "Infantil", "Jovens", "Ensino"];
+const showFuncao = (it: { funcao: string; observacao?: string }) => {
+  if (it.observacao && ["Cajón","Pandeiro","Violão"].includes(it.observacao)) return it.observacao;
+  if (it.funcao === "Bateria") return "Cajón";
+  if (it.funcao === "Ministro") return "Ministro(a)";
+  if (it.funcao === "Professora" || it.funcao === "Professor") return "Professor(a)";
+  if (it.funcao === "Monitor") return "Monitor(a)";
+  return it.funcao;
+};
+
+// Ordem pelo fluxo do culto: Limpeza → Portaria(Cantina) → Louvor → Mídias → Pregação(Ensino) → Infantil → Jovens
+const MINISTERIOS_CULTO: Ministerio[] = ["Limpeza", "Cantina", "Louvor", "Mídias", "Ensino", "Infantil", "Jovens"];
+const TODOS: Ministerio[] = ["Limpeza", "Cantina", "Louvor", "Mídias", "Ensino", "Infantil", "Jovens"];
 
 const EMOJI: Record<string, string> = {
-  Louvor: "🎸", "Mídias": "📹", Cantina: "🧹",
+  Louvor: "🎸", "Mídias": "📹", Cantina: "🚪",
   Infantil: "🧒", Jovens: "⚡", Ensino: "📖", Limpeza: "🧽",
 };
 
@@ -154,14 +169,16 @@ function MinisterioSection({
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-base leading-none">{EMOJI[ministerio] ?? "📋"}</span>
           <span className={clsx("text-[11px] font-bold px-2 py-0.5 rounded-full", COR_MIN_BADGE[ministerio])}>
-            {ministerio}
+            {minLabel(ministerio)}
           </span>
           {temMinha && (
             <span className="text-[10px] bg-vine-700 text-white font-bold px-1.5 py-0.5 rounded-full">você</span>
           )}
-          <span className="text-[11px] text-gray-400 font-medium">
-            {escala.itens.length} pessoa{escala.itens.length !== 1 ? "s" : ""}
-          </span>
+          {ministerio === "Louvor" && escala.observacoes?.match(/^(Equipe \d)/) && (
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-vine-100 text-vine-800 border border-vine-200">
+              {escala.observacoes.match(/^(Equipe \d)/)?.[1]}
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-1 shrink-0">
           {isLider && (
@@ -197,7 +214,7 @@ function MinisterioSection({
                   )}
                 >
                   <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide shrink-0 w-20 truncate">
-                    {it.funcao}
+                    {showFuncao(it)}
                   </span>
                   <span className="text-sm font-semibold text-gray-800 truncate flex-1">
                     {it.voluntarioNome}
@@ -252,24 +269,24 @@ function CultoCard({
       "rounded-2xl border overflow-hidden shadow-sm",
       isPast && "opacity-55",
       isHoje ? "ring-2 ring-vine-300 border-vine-200" : "border-gray-100",
-      isDomingo ? "border-t-4 border-t-gold-400" : isSabado ? "border-t-4 border-t-vine-500" : "border-t-4 border-t-grape-400",
+      isDomingo ? "border-t-4 border-t-gold-400" : isSabado ? "border-t-4 border-t-vine-500" : "border-t-4 border-t-bark-500",
     )}>
       {/* Header */}
       <div className={clsx(
         "px-5 py-4 flex items-center gap-4",
-        isDomingo ? "bg-gold-50" : isSabado ? "bg-vine-50" : "bg-grape-50",
+        isDomingo ? "bg-gold-50" : isSabado ? "bg-vine-50" : "bg-bark-50",
       )}>
         <div className={clsx(
           "flex flex-col items-center w-12 shrink-0 rounded-xl px-1 py-1.5 text-center",
-          isDomingo ? "bg-gold-100" : isSabado ? "bg-vine-100" : "bg-grape-100",
+          isDomingo ? "bg-gold-100" : isSabado ? "bg-vine-100" : "bg-bark-100",
         )}>
-          <span className={clsx("text-[10px] font-bold uppercase leading-none", isDomingo ? "text-gold-700" : isSabado ? "text-vine-700" : "text-grape-700")}>
+          <span className={clsx("text-[10px] font-bold uppercase leading-none", isDomingo ? "text-gold-700" : isSabado ? "text-vine-700" : "text-bark-700")}>
             {d.toLocaleDateString("pt-BR", { weekday: "short" }).replace(".", "")}
           </span>
-          <span className={clsx("text-2xl font-bold leading-tight", isDomingo ? "text-gold-900" : isSabado ? "text-vine-900" : "text-grape-900")}>
+          <span className={clsx("text-2xl font-bold leading-tight", isDomingo ? "text-gold-900" : isSabado ? "text-vine-900" : "text-bark-900")}>
             {d.getDate()}
           </span>
-          <span className={clsx("text-[10px] uppercase leading-none font-medium", isDomingo ? "text-gold-600" : isSabado ? "text-vine-600" : "text-grape-600")}>
+          <span className={clsx("text-[10px] uppercase leading-none font-medium", isDomingo ? "text-gold-600" : isSabado ? "text-vine-600" : "text-bark-600")}>
             {d.toLocaleDateString("pt-BR", { month: "short" }).replace(".", "")}
           </span>
         </div>
@@ -280,7 +297,7 @@ function CultoCard({
             {isHoje && <span className="text-[10px] bg-vine-700 text-white font-bold px-2 py-0.5 rounded-full">Hoje</span>}
             {temMinha && <span className="text-[10px] bg-vine-100 text-vine-700 font-bold px-2 py-0.5 rounded-full">Você serve</span>}
           </div>
-          {horario && <p className="text-sm text-gray-500 mt-0.5">{horario}</p>}
+          {horario && <p className="text-sm text-gray-500 mt-0.5">{horario.slice(0, 5)}</p>}
           <div className="flex flex-wrap gap-1 mt-1.5">
             {ministeriosNeste.map((m) => (
               <span key={m} className="text-[10px] font-medium text-gray-400">{EMOJI[m]}</span>
@@ -344,20 +361,20 @@ function MinhasEscalasList({
             onClick={() => onOpen(esc)}
             className={clsx(
               "flex items-center gap-4 bg-white rounded-2xl border px-5 py-4 text-left hover:shadow-md transition",
-              isDomingo ? "border-t-2 border-t-gold-400 border-gray-100" : "border-t-2 border-t-grape-400 border-gray-100"
+              isDomingo ? "border-t-2 border-t-gold-400 border-gray-100" : "border-t-2 border-t-bark-500 border-gray-100"
             )}
           >
             <div className={clsx(
               "flex flex-col items-center w-11 shrink-0 rounded-xl py-1.5 text-center",
-              isDomingo ? "bg-gold-50" : "bg-grape-50"
+              isDomingo ? "bg-gold-50" : "bg-bark-50"
             )}>
-              <span className={clsx("text-[10px] font-bold uppercase leading-none", isDomingo ? "text-gold-600" : "text-grape-600")}>
+              <span className={clsx("text-[10px] font-bold uppercase leading-none", isDomingo ? "text-gold-600" : "text-bark-600")}>
                 {d.toLocaleDateString("pt-BR", { weekday: "short" }).replace(".", "")}
               </span>
-              <span className={clsx("text-2xl font-bold leading-tight", isDomingo ? "text-gold-900" : "text-grape-900")}>
+              <span className={clsx("text-2xl font-bold leading-tight", isDomingo ? "text-gold-900" : "text-bark-900")}>
                 {d.getDate()}
               </span>
-              <span className={clsx("text-[10px] uppercase leading-none font-medium", isDomingo ? "text-gold-500" : "text-grape-500")}>
+              <span className={clsx("text-[10px] uppercase leading-none font-medium", isDomingo ? "text-gold-500" : "text-bark-500")}>
                 {d.toLocaleDateString("pt-BR", { month: "short" }).replace(".", "")}
               </span>
             </div>
@@ -368,13 +385,13 @@ function MinhasEscalasList({
                 <span className="text-xs font-semibold text-gray-400">{esc.ministerio}</span>
               </div>
               <p className="text-sm font-bold text-gray-800">{esc.culto}</p>
-              <p className="text-xs text-gray-400">{esc.horario}</p>
+              <p className="text-xs text-gray-400">{esc.horario.slice(0, 5)}</p>
             </div>
 
             <div className="flex flex-col items-end gap-1 shrink-0">
               {minhasFuncoes.map((it, i) => (
                 <span key={i} className="text-xs bg-vine-100 text-vine-800 font-bold px-2.5 py-0.5 rounded-full">
-                  {it.funcao}
+                  {showFuncao(it)}
                 </span>
               ))}
             </div>
