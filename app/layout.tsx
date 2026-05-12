@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter, Lora } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/contexts/AuthContext";
@@ -17,10 +17,33 @@ const lora = Lora({
   display: "swap",
 });
 
+export const viewport: Viewport = {
+  themeColor: "#1a2e1a",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: "cover",
+};
+
 export const metadata: Metadata = {
   title: "Igreja Ramo da Vida",
   description: "Comunidade Igreja Ramo da Vida — Campinas, SP",
   metadataBase: new URL("https://ramodavida.vercel.app"),
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Ramo da Vida",
+    startupImage: [
+      {
+        url: "/icons/icon-512x512.png",
+      },
+    ],
+  },
+  formatDetection: {
+    telephone: false,
+  },
   openGraph: {
     title: "Igreja Ramo da Vida",
     description: "Comunidade Igreja Ramo da Vida — Campinas, SP",
@@ -43,6 +66,15 @@ export const metadata: Metadata = {
     description: "Comunidade Igreja Ramo da Vida — Campinas, SP",
     images: ["/opengraph-image"],
   },
+  icons: {
+    icon: [
+      { url: "/icons/icon-192x192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icons/icon-512x512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: [
+      { url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
+    ],
+  },
 };
 
 export default function RootLayout({
@@ -52,6 +84,14 @@ export default function RootLayout({
 }) {
   return (
     <html lang="pt-BR" data-scroll-behavior="smooth" className={`${inter.variable} ${lora.variable}`}>
+      <head>
+        {/* iOS standalone — esconde barra de endereço e UI do browser */}
+        <meta name="mobile-web-app-capable" content="yes" />
+        {/* Garante área segura (notch/dynamic island) */}
+        <meta name="theme-color" content="#1a2e1a" />
+        <link rel="manifest" href="/manifest.json" />
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+      </head>
         <body className="bg-cream text-gray-900 antialiased font-sans" suppressHydrationWarning>
         <AuthProvider>{children}</AuthProvider>
       </body>
