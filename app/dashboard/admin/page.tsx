@@ -896,6 +896,23 @@ const TIPOS_PUSH = [
 function TestePushPanel() {
   const [loading, setLoading] = useState<string | null>(null);
   const [resultado, setResultado] = useState<{ ok: boolean; msg: string } | null>(null);
+  const [status, setStatus] = useState<Record<string, unknown> | null>(null);
+  const [loadingStatus, setLoadingStatus] = useState(false);
+
+  async function verStatus() {
+    setLoadingStatus(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch("/api/push/status", {
+        headers: { Authorization: `Bearer ${session?.access_token ?? ""}` },
+      });
+      setStatus(await res.json());
+    } catch {
+      setStatus({ erro: "Falha ao buscar status" });
+    } finally {
+      setLoadingStatus(false);
+    }
+  }
 
   async function testar(tipo: string) {
     setLoading(tipo);
@@ -963,6 +980,32 @@ function TestePushPanel() {
           {resultado.msg}
         </div>
       )}
+
+      {/* Diagnóstico */}
+      <div className="mt-4 border-t border-gray-100 pt-3">
+        <button
+          onClick={verStatus}
+          disabled={loadingStatus}
+          className="text-xs text-vine-700 underline underline-offset-2 hover:text-vine-900 disabled:opacity-50"
+        >
+          {loadingStatus ? "Verificando…" : "🔍 Ver diagnóstico do sistema"}
+        </button>
+
+        {status && (
+          <div className="mt-2 bg-gray-50 border border-gray-200 rounded-xl p-3 text-[11px] text-gray-700 font-mono space-y-0.5">
+            {Object.entries(status).map(([k, v]) => (
+              <div key={k} className="flex gap-2">
+                <span className="text-gray-400 shrink-0">{k}:</span>
+                <span className={clsx(
+                  v === true ? "text-green-600" : v === false ? "text-red-500" : v === 0 ? "text-amber-600" : "text-gray-700"
+                )}>
+                  {JSON.stringify(v)}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
