@@ -11,7 +11,6 @@ import {
   CalendarCheck,
   MessageSquare,
   CalendarDays,
-  UserPlus,
   LogOut,
   Music,
   Video,
@@ -32,7 +31,6 @@ const navMain = [
   { href: "/dashboard/escalas",  label: "Escalas",     icon: CalendarCheck   },
   { href: "/dashboard/chat",     label: "Conversas",  icon: MessageSquare   },
   { href: "/dashboard/eventos",  label: "Eventos",    icon: CalendarDays    },
-  { href: "/dashboard/membros",  label: "Membros",    icon: UserPlus        },
 ];
 
 const navAdmin = [
