@@ -886,6 +886,13 @@ function NovoUsuarioForm({
 
 // ─── TestePushPanel ───────────────────────────────────────────────────────────
 
+function urlBase64ToUint8Array(base64String: string): Uint8Array {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const rawData = atob(base64);
+  return Uint8Array.from([...rawData].map((c) => c.charCodeAt(0)));
+}
+
 const TIPOS_PUSH = [
   { tipo: "aviso",  label: "📢 Aviso",        desc: "Broadcast para todos os usuários" },
   { tipo: "evento", label: "📅 Evento",       desc: "Broadcast para todos os usuários" },
@@ -898,6 +905,87 @@ function TestePushPanel() {
   const [resultado, setResultado] = useState<{ ok: boolean; msg: string } | null>(null);
   const [status, setStatus] = useState<Record<string, unknown> | null>(null);
   const [loadingStatus, setLoadingStatus] = useState(false);
+  const [registrando, setRegistrando] = useState(false);
+  const [resultadoRegistro, setResultadoRegistro] = useState<{ ok: boolean; msg: string } | null>(null);
+
+  async function registrarEsteDispositivo() {
+    setRegistrando(true);
+    setResultadoRegistro(null);
+    try {
+      if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+        setResultadoRegistro({ ok: false, msg: "Este navegador não suporta Push. Use o PWA instalado no celular." });
+        return;
+      }
+      if (!("Notification" in window)) {
+        setResultadoRegistro({ ok: false, msg: "Notificações não disponíveis neste navegador." });
+        return;
+      }
+
+      let permission = Notification.permission;
+      if (permission === "denied") {
+        setResultadoRegistro({ ok: false, msg: "Permissão bloqueada. Vá em Configurações do navegador → Notificações e desbloqueie este site." });
+        return;
+      }
+      if (permission === "default") {
+        permission = await Notification.requestPermission();
+      }
+      if (permission !== "granted") {
+        setResultadoRegistro({ ok: false, msg: "Permissão negada pelo usuário." });
+        return;
+      }
+
+      const registration = await navigator.serviceWorker.ready;
+      let sub = await registration.pushManager.getSubscription();
+      if (!sub) {
+        const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+        if (!vapidKey) {
+          setResultadoRegistro({ ok: false, msg: "NEXT_PUBLIC_VAPID_PUBLIC_KEY não disponível no bundle. Verifique as variáveis do Vercel e faça um novo deploy." });
+          return;
+        }
+        sub = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(vapidKey).buffer as ArrayBuffer,
+        });
+      }
+
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        setResultadoRegistro({ ok: false, msg: "Sessão expirada. Faça login novamente." });
+        return;
+      }
+
+      const key = sub.getKey("p256dh");
+      const auth = sub.getKey("auth");
+      if (!key || !auth) {
+        setResultadoRegistro({ ok: false, msg: "Erro ao obter chaves da subscription." });
+        return;
+      }
+
+      const res = await fetch("/api/push/subscribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({
+          endpoint: sub.endpoint,
+          p256dh: btoa(String.fromCharCode(...new Uint8Array(key))),
+          auth: btoa(String.fromCharCode(...new Uint8Array(auth))),
+        }),
+      });
+
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        setResultadoRegistro({ ok: false, msg: `Erro ${res.status}: ${d.error ?? "desconhecido"}` });
+        return;
+      }
+
+      setResultadoRegistro({ ok: true, msg: "Dispositivo registrado com sucesso! Agora você pode testar." });
+      // Atualiza o diagnóstico automaticamente
+      verStatus();
+    } catch (e) {
+      setResultadoRegistro({ ok: false, msg: String(e).replace("Error: ", "") });
+    } finally {
+      setRegistrando(false);
+    }
+  }
 
   async function verStatus() {
     setLoadingStatus(true);
@@ -947,11 +1035,36 @@ function TestePushPanel() {
         <Bell className="w-4 h-4 text-vine-700" />
         <h2 className="font-semibold text-gray-900 text-sm">Testar Notificações Push</h2>
       </div>
-      <p className="text-xs text-gray-500 mb-4">
-        Dispara notificações de teste para verificar se o sistema está funcionando.
-        Certifique-se de ter ativado as notificações no PWA antes de testar.
-      </p>
 
+      {/* Passo 1: registrar */}
+      <div className="mb-4 p-3 bg-gray-50 border border-gray-200 rounded-xl">
+        <p className="text-xs font-semibold text-gray-700 mb-1">Passo 1 — Registrar este dispositivo</p>
+        <p className="text-[11px] text-gray-400 mb-2 leading-snug">
+          Clique abaixo para registrar o dispositivo atual (celular/PC). Repita em cada aparelho que quiser receber notificações.
+        </p>
+        <button
+          onClick={registrarEsteDispositivo}
+          disabled={registrando}
+          className="flex items-center gap-1.5 bg-vine-700 hover:bg-vine-800 text-white text-xs font-semibold px-3 py-2 rounded-lg transition disabled:opacity-50"
+        >
+          <Bell className="w-3.5 h-3.5" />
+          {registrando ? "Registrando…" : "Registrar este dispositivo"}
+        </button>
+        {resultadoRegistro && (
+          <div className={clsx(
+            "mt-2 text-[11px] px-2.5 py-1.5 rounded-lg flex items-start gap-1.5",
+            resultadoRegistro.ok
+              ? "bg-green-50 text-green-700 border border-green-200"
+              : "bg-red-50 text-red-700 border border-red-200"
+          )}>
+            {resultadoRegistro.ok ? <Check className="w-3 h-3 mt-0.5 shrink-0" /> : <AlertCircle className="w-3 h-3 mt-0.5 shrink-0" />}
+            {resultadoRegistro.msg}
+          </div>
+        )}
+      </div>
+
+      {/* Passo 2: testar */}
+      <p className="text-xs font-semibold text-gray-700 mb-2">Passo 2 — Disparar notificação de teste</p>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         {TIPOS_PUSH.map(({ tipo, label, desc }) => (
           <button
