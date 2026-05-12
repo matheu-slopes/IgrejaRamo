@@ -18,7 +18,7 @@ export default function ImmersiveNav() {
   const bgOpacity = useTransform(scrollYProgress, [0.05, 0.12], [0, 1]);
 
   return (
-    <header className="fixed top-0 inset-x-0 z-50">
+    <header className="fixed top-0 inset-x-0 z-50" style={{ paddingTop: "env(safe-area-inset-top)" }}>
       <div className="mx-auto mt-4 max-w-5xl px-4">
         <nav className="relative flex items-center justify-between rounded-2xl px-5 py-3">
           {/* Background layer — fades in on scroll */}
