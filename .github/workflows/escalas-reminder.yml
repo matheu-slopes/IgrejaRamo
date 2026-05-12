@@ -1,0 +1,20 @@
+name: Lembrete de Escalas
+
+on:
+  schedule:
+    # 12:00 horário de Brasília = 15:00 UTC
+    - cron: "0 15 * * *"
+    # 18:00 horário de Brasília = 21:00 UTC
+    - cron: "0 21 * * *"
+  # Permite disparar manualmente pelo GitHub para testar
+  workflow_dispatch:
+
+jobs:
+  send-reminders:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Enviar lembretes de escala
+        run: |
+          curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.APP_URL }}/api/push/escalas-reminder"

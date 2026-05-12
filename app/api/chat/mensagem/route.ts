@@ -1,5 +1,6 @@
 ﻿import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { sendPushToUsers } from "@/lib/sendPush";
 
 const admin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -63,5 +64,46 @@ export async function POST(req: NextRequest) {
 
   // Retorna o criado_em atribuído pelo servidor (NOW()) para o cliente usar no broadcast
   // Garante que a ordem das mensagens usa sempre o relógio do servidor, não do cliente
+
+  // ── Push notification para os outros participantes ───────────────────────
+  sendPushParticipantes(conversa_id, autor_id, autor_nome, conteudo, tipo).catch(
+    (e) => console.error("push chat error:", e)
+  );
+
   return NextResponse.json({ ok: true, criado_em: inserted.criado_em });
+}
+
+/** Envia push para todos os participantes de uma conversa exceto o autor */
+async function sendPushParticipantes(
+  conversa_id: string,
+  autor_id: string,
+  autor_nome: string,
+  conteudo: string,
+  tipo: string
+) {
+  const { data: participantes } = await admin
+    .from("chat_participantes")
+    .select("user_id")
+    .eq("conversa_id", conversa_id)
+    .neq("user_id", autor_id);
+
+  if (!participantes?.length) return;
+
+  const userIds = participantes.map((p: { user_id: string }) => p.user_id);
+  const nome = autor_nome?.split(" ")[0] ?? "Alguém";
+  const body =
+    tipo === "imagem"
+      ? `${nome} enviou uma foto`
+      : tipo === "audio"
+      ? `${nome} enviou um áudio`
+      : tipo === "arquivo"
+      ? `${nome} enviou um arquivo`
+      : `${nome}: ${conteudo?.slice(0, 80) ?? ""}`;
+
+  await sendPushToUsers(userIds, {
+    title: "💬 Nova mensagem",
+    body,
+    url: "/dashboard/chat",
+    tag: `chat-${conversa_id}`,
+  });
 }

@@ -16,6 +16,7 @@ import {
 import clsx from "clsx";
 import { User, Role, Ministerio, Permissao, CanalMinisterio, Local } from "@/types";
 import { supabase } from "@/lib/supabase";
+import { notificarBroadcast } from "@/lib/notificarBroadcast";
 
 const ROLES: Role[] = ["admin", "pastor", "lider", "voluntario", "membro"];
 const MINISTERIOS: Ministerio[] = ["Louvor","Mídias","Ensino","Infantil","Ação Social","Jovens","Cantina","Limpeza"];
@@ -1402,6 +1403,8 @@ function ConteudoTab({ initSecao }: { initSecao?: string }) {
         if (lista) setAvisos(lista as Aviso[]);
         setNovoAviso(novoAvisoInicial());
         setAdicionandoAviso(false);
+        // Push para todos os membros
+        notificarBroadcast({ tipo: "aviso", titulo: novoAviso.titulo.trim() });
       }
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);

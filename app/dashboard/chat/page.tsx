@@ -114,7 +114,7 @@ function AudioPlayer({ src, isMe }: { src: string; isMe: boolean }) {
     <div className={clsx(
       "flex items-center gap-2 px-3 py-2.5 rounded-2xl w-[240px]",
       isMe
-        ? "bg-black text-white rounded-br-sm"
+        ? "bg-slate-700 text-white rounded-br-sm"
         : "bg-white border border-gray-100 text-gray-800 shadow-sm rounded-bl-sm"
     )}>
       {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
@@ -137,7 +137,7 @@ function AudioPlayer({ src, isMe }: { src: string; isMe: boolean }) {
             onClick={toggle}
             className={clsx(
               "w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition-colors",
-              isMe ? "bg-white/20 hover:bg-white/30 text-white" : "bg-black hover:bg-gray-900 text-white"
+              isMe ? "bg-white/20 hover:bg-white/30 text-white" : "bg-slate-700 hover:bg-slate-800 text-white"
             )}
           >
             {playing
@@ -560,14 +560,14 @@ function ComposeBar({
         {hasContent ? (
           <button
             onClick={handleSend}
-            className="w-10 h-10 rounded-full bg-black text-white flex items-center justify-center shrink-0 hover:bg-gray-900 active:scale-95 transition"
+            className="w-10 h-10 rounded-full bg-slate-700 text-white flex items-center justify-center shrink-0 hover:bg-slate-800 active:scale-95 transition"
           >
             <Send className="w-4 h-4" />
           </button>
         ) : (
           <button
             onClick={startRecording}
-            className="w-10 h-10 rounded-full bg-black text-white flex items-center justify-center shrink-0 hover:bg-gray-900 active:scale-95 transition"
+            className="w-10 h-10 rounded-full bg-slate-700 text-white flex items-center justify-center shrink-0 hover:bg-slate-800 active:scale-95 transition"
             title="Gravar �udio"
           >
             <Mic className="w-4 h-4" />
@@ -618,7 +618,7 @@ function MessageBubble({
       onMouseLeave={() => setHover(false)}
     >
       {!isMe && (
-        <div className="w-7 h-7 rounded-full bg-black text-white flex items-center justify-center text-[10px] font-bold shrink-0 self-end mb-1">
+        <div className="w-7 h-7 rounded-full bg-slate-700 text-white flex items-center justify-center text-[10px] font-bold shrink-0 self-end mb-1">
           {iniciais(msg.autorNome)}
         </div>
       )}
@@ -663,7 +663,7 @@ function MessageBubble({
               <button onClick={cancelEdit} className="text-xs text-gray-400 hover:text-gray-600 transition px-2 py-0.5">
                 Cancelar
               </button>
-              <button onClick={saveEdit} className="text-xs bg-black text-white rounded-full px-3 py-0.5 hover:bg-gray-900 transition">
+              <button onClick={saveEdit} className="text-xs bg-slate-700 text-white rounded-full px-3 py-0.5 hover:bg-slate-800 transition">
                 Salvar
               </button>
             </div>
@@ -676,7 +676,7 @@ function MessageBubble({
             className={clsx(
               "rounded-2xl text-sm leading-relaxed max-w-full break-words overflow-hidden",
               msg.tipo === "imagem" || msg.tipo === "documento" ? "" : "px-3.5 py-2",
-              isMe ? "bg-black text-white rounded-br-sm" : "bg-white border border-gray-100 text-gray-800 rounded-bl-sm shadow-sm"
+              isMe ? "bg-slate-700 text-white rounded-br-sm" : "bg-white border border-gray-100 text-gray-800 rounded-bl-sm shadow-sm"
             )}
           >
             {msg.tipo === "imagem" && msg.mediaUrl ? (
@@ -698,7 +698,7 @@ function MessageBubble({
                 rel="noopener noreferrer"
                 className={clsx(
                   "flex items-center gap-2.5 px-3.5 py-2.5 rounded-2xl min-w-[160px] max-w-[240px] transition",
-                  isMe ? "hover:bg-gray-900" : "hover:bg-gray-50"
+                  isMe ? "hover:bg-slate-800" : "hover:bg-gray-50"
                 )}
               >
                 <FileText className={clsx("w-8 h-8 shrink-0", isMe ? "text-gray-200" : "text-blue-500")} />
@@ -918,11 +918,11 @@ function InfoPanel({
       {/* Profile */}
       <div className="flex flex-col items-center gap-2 py-5 px-4 border-b border-gray-100 shrink-0">
         {emoji ? (
-          <div className={clsx("w-14 h-14 rounded-full flex items-center justify-center text-3xl text-white", cor ?? "bg-black")}>
+          <div className={clsx("w-14 h-14 rounded-full flex items-center justify-center text-3xl text-white", cor ?? "bg-slate-700")}>
             {emoji}
           </div>
         ) : (
-          <div className="w-14 h-14 rounded-full bg-black text-white flex items-center justify-center text-xl font-bold">
+          <div className="w-14 h-14 rounded-full bg-slate-700 text-white flex items-center justify-center text-xl font-bold">
             {iniciais(name)}
           </div>
         )}
@@ -938,7 +938,7 @@ function InfoPanel({
             onClick={() => setTab(t)}
             className={clsx(
               "flex-1 py-2.5 text-xs font-semibold border-b-2 transition",
-              tab === t ? "border-gray-800 text-gray-900" : "border-transparent text-gray-400 hover:text-gray-800"
+              tab === t ? "border-slate-600 text-slate-800" : "border-transparent text-gray-400 hover:text-gray-800"
             )}
           >
             {t === "midia" ? "Midia" : "Favoritos"}
@@ -1008,7 +1008,7 @@ function NewDmModal({
     dms.flatMap((dm) => dm.participantes).filter((id) => id !== currentUserId)
   );
   return (
-    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={onClose}>
+    <div className="fixed inset-0 bg-slate-700/40 z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
           <h3 className="font-semibold text-gray-800">Nova Conversa</h3>
@@ -1025,7 +1025,7 @@ function NewDmModal({
             const hasChat = existingIds.has(mu.id);
             return (
               <button key={mu.id} onClick={() => onStart(mu.id, mu.nome)} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition text-left border-b border-gray-50 last:border-0">
-                <div className="w-9 h-9 rounded-full bg-black text-white flex items-center justify-center text-sm font-bold shrink-0">{iniciais(mu.nome)}</div>
+                <div className="w-9 h-9 rounded-full bg-slate-700 text-white flex items-center justify-center text-sm font-bold shrink-0">{iniciais(mu.nome)}</div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-gray-800 truncate">{mu.nome}</p>
                   <p className="text-xs text-gray-400 capitalize truncate">{mu.role}</p>
@@ -1065,7 +1065,7 @@ function NewGroupModal({
     setMembros((prev) => prev.includes(id) ? prev.filter((m) => m !== id) : [...prev, id]);
   }
   return (
-    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={onClose}>
+    <div className="fixed inset-0 bg-slate-700/40 z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
           <h3 className="font-semibold text-gray-800">Criar Grupo</h3>
@@ -1090,7 +1090,7 @@ function NewGroupModal({
             <div className="max-h-36 overflow-y-auto space-y-1">
               {filtered.map((mu) => (
                 <button key={mu.id} onClick={() => toggle(mu.id)} className="w-full flex items-center gap-3 px-2 py-2 rounded-xl hover:bg-gray-50 transition text-left">
-                  <div className="w-8 h-8 rounded-full bg-black text-white flex items-center justify-center text-xs font-bold shrink-0">{iniciais(mu.nome)}</div>
+                  <div className="w-8 h-8 rounded-full bg-slate-700 text-white flex items-center justify-center text-xs font-bold shrink-0">{iniciais(mu.nome)}</div>
                   <span className="flex-1 text-sm text-gray-700 truncate">{mu.nome}</span>
                   {membros.includes(mu.id) && <Check className="w-4 h-4 text-gray-800 shrink-0" />}
                 </button>
@@ -1099,7 +1099,7 @@ function NewGroupModal({
           </div>
         </div>
         <div className="px-5 pb-4">
-          <button onClick={() => nome.trim() && onCreate(nome.trim(), emoji, membros)} disabled={!nome.trim()} className="w-full bg-black text-white rounded-xl py-2.5 text-sm font-semibold hover:bg-gray-900 disabled:opacity-40 disabled:cursor-not-allowed transition">
+          <button onClick={() => nome.trim() && onCreate(nome.trim(), emoji, membros)} disabled={!nome.trim()} className="w-full bg-slate-700 text-white rounded-xl py-2.5 text-sm font-semibold hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition">
             Criar Grupo{membros.length > 0 ? ` (${membros.length + 1} membros)` : ""}
           </button>
         </div>
@@ -1357,7 +1357,7 @@ export default function ChatPage() {
       } else {
         newGrupos.push({
           id: c.id, nome: c.nome ?? "Grupo", tipo: "geral",
-          emoji: c.emoji ?? "??", cor: c.cor ?? "bg-black",
+          emoji: c.emoji ?? "??", cor: c.cor ?? "bg-slate-700",
           descricao: c.descricao ?? undefined, adminId: c.admin_id ?? undefined,
           somenteAdmin: c.somente_admin ?? false, institucional: c.institucional ?? false,
           membros: membrosIds, mensagens,
@@ -1688,7 +1688,7 @@ export default function ChatPage() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        tipo: "grupo", nome, emoji, cor: "bg-black",
+        tipo: "grupo", nome, emoji, cor: "bg-slate-700",
         descricao: `Grupo criado por ${u.nome}`, admin_id: u.id, somente_admin: false,
         participantes: allMembros,
       }),
@@ -1700,7 +1700,7 @@ export default function ChatPage() {
     }
     const cid: string = json.id;
     setGrupos((prev) => [...prev, {
-      id: cid, nome, tipo: "geral", emoji, cor: "bg-black",
+      id: cid, nome, tipo: "geral", emoji, cor: "bg-slate-700",
       descricao: `Grupo criado por ${u.nome}`, adminId: u.id,
       somenteAdmin: false, institucional: false, membros: allMembros, mensagens: [],
     }]);
@@ -2075,7 +2075,7 @@ export default function ChatPage() {
           <button
             onClick={() => { setChatSearchOpen((v) => !v); setChatSearchQuery(""); }}
             className={clsx("w-8 h-8 rounded-full flex items-center justify-center transition",
-              chatSearchOpen ? "bg-gray-100 text-gray-900" : "text-gray-400 hover:text-gray-800 hover:bg-gray-100")}
+              chatSearchOpen ? "bg-gray-100 text-slate-800" : "text-gray-400 hover:text-gray-800 hover:bg-gray-100")}
             title="Pesquisar na conversa"
           >
             <Search className="w-4 h-4" />
@@ -2083,7 +2083,7 @@ export default function ChatPage() {
           <button
             onClick={() => setInfoOpen((v) => !v)}
             className={clsx("w-8 h-8 rounded-full flex items-center justify-center transition",
-              infoOpen ? "bg-gray-100 text-gray-900" : "text-gray-400 hover:text-gray-800 hover:bg-gray-100")}
+              infoOpen ? "bg-gray-100 text-slate-800" : "text-gray-400 hover:text-gray-800 hover:bg-gray-100")}
             title="Informacoes"
           >
             <Info className="w-4 h-4" />
@@ -2106,7 +2106,7 @@ export default function ChatPage() {
       const other = otherParticipant(activeDm);
       const otherUser = usuarios.find((mu) => mu.id === other.id);
       const avatarEl = (
-        <div className="w-9 h-9 rounded-full bg-black text-white flex items-center justify-center text-sm font-bold shrink-0">
+        <div className="w-9 h-9 rounded-full bg-slate-700 text-white flex items-center justify-center text-sm font-bold shrink-0">
           {iniciais(other.nome)}
         </div>
       );
@@ -2166,7 +2166,7 @@ export default function ChatPage() {
             <div className="flex items-center gap-2 px-4 py-2 border-t border-gray-100 bg-gray-50 shrink-0">
               <div className="w-0.5 h-9 rounded-full bg-gray-800 shrink-0" />
               <div className="flex-1 min-w-0">
-                <p className="text-[10px] font-semibold text-gray-900">{replyTo.autorNome}</p>
+                <p className="text-[10px] font-semibold text-slate-800">{replyTo.autorNome}</p>
                 <p className="text-xs text-gray-500 truncate">{replyTo.conteudo}</p>
               </div>
               <button onClick={() => setReplyTo(null)} className="text-gray-400 hover:text-gray-600 transition">
@@ -2214,7 +2214,7 @@ export default function ChatPage() {
               onClick={() => { setTab(id); openChat(null); setSearch(""); }}
               className={clsx(
                 "flex-1 flex flex-col items-center gap-0.5 py-2.5 text-xs font-semibold border-b-2 transition",
-                tab === id ? "border-gray-800 text-gray-900" : "border-transparent text-gray-400 hover:text-gray-800"
+                tab === id ? "border-slate-600 text-slate-800" : "border-transparent text-gray-400 hover:text-gray-800"
               )}
             >
               <span className="relative">
@@ -2243,7 +2243,7 @@ export default function ChatPage() {
           </div>
           <button
             onClick={() => tab === "direto" ? setShowNewDmModal(true) : setShowNewGroupModal(true)}
-            className="w-9 h-9 rounded-full bg-black text-white flex items-center justify-center shrink-0 hover:bg-gray-900 active:scale-95 transition"
+            className="w-9 h-9 rounded-full bg-slate-700 text-white flex items-center justify-center shrink-0 hover:bg-slate-800 active:scale-95 transition"
             title={tab === "direto" ? "Nova conversa" : "Criar grupo"}
           >
             <Plus className="w-4 h-4" />
@@ -2274,14 +2274,14 @@ export default function ChatPage() {
                     onClick={() => openChat({ tipo: "direto", id: dm.id })}
                   >
                     <div className="relative shrink-0">
-                      <div className="w-10 h-10 rounded-full bg-black text-white flex items-center justify-center text-sm font-bold">
+                      <div className="w-10 h-10 rounded-full bg-slate-700 text-white flex items-center justify-center text-sm font-bold">
                         {iniciais(other.nome)}
                       </div>
                       {unread > 0 && <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center">{unread}</span>}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-2">
-                        <span className={clsx("text-sm truncate", unread > 0 ? "font-bold text-gray-900" : "font-semibold text-gray-700")}>
+                        <span className={clsx("text-sm truncate", unread > 0 ? "font-bold text-slate-800" : "font-semibold text-gray-700")}>
                           {other.nome.split(" ")[0]}{" "}<span className="font-normal text-gray-400">{other.nome.split(" ").slice(1).join(" ")}</span>
                         </span>
                         {last && <span className="text-[10px] text-gray-400 shrink-0">{formatDay(last.criadoEm)}</span>}
@@ -2348,7 +2348,7 @@ export default function ChatPage() {
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between gap-2">
-                            <span className={clsx("text-sm truncate", unread > 0 ? "font-bold text-gray-900" : "font-semibold text-gray-700")}>{g.nome}</span>
+                            <span className={clsx("text-sm truncate", unread > 0 ? "font-bold text-slate-800" : "font-semibold text-gray-700")}>{g.nome}</span>
                             <div className="flex items-center gap-1.5 shrink-0">
                               {g.somenteAdmin && <Lock className="w-2.5 h-2.5 text-amber-400" />}
                               {last && <span className="text-[10px] text-gray-400">{formatDay(last.criadoEm)}</span>}

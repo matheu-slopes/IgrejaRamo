@@ -7,6 +7,7 @@ import clsx from "clsx";
 import { Evento, Ministerio } from "@/types";
 import { supabase } from "@/lib/supabase";
 import { downloadICS, linkGoogleCalendar, formatarData, diaSemana } from "@/lib/calendarUtils";
+import { notificarBroadcast } from "@/lib/notificarBroadcast";
 
 export function EventosTab({
   ministerio,
@@ -74,6 +75,8 @@ export function EventosTab({
     })));
     setForm({ titulo: "", descricao: "", data: "", horario: "", local: "", publico: false, ministerio });
     setShowForm(false);
+    // Push para membros do ministério
+    notificarBroadcast({ tipo: "evento", titulo: form.titulo, conteudo: form.local, ministerio });
   }
 
   async function removerEvento(id: string) {
