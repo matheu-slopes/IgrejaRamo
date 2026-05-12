@@ -485,7 +485,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
                 }
               </div>
               <p className="text-xs text-gray-400">{esc.horario}</p>
-              {esc.itens.length > 0 && (
+              {esc.itens.length > 0 && !equipeLabel && (
                 <div className="flex flex-wrap gap-1">
                   {esc.itens.slice(0, 4).map((it, i) => (
                     <span
