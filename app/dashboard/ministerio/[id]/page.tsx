@@ -986,7 +986,6 @@ function MembrosTab({
       .select("id, nome, email, telefone, role, lider_ministerios, data_ingresso")
       .contains("ministerios", [ministerio])
       .eq("ativo", true)
-      .neq("role", "admin")
       .then(({ data }) => {
         if (data) setMembros(data.map((p: Record<string, unknown>) => {
           const liderMins = (p.lider_ministerios as string[]) ?? [];
