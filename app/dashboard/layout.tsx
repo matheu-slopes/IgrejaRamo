@@ -329,6 +329,8 @@ export default function DashboardLayout({
 
   const [senhaModal, setSenhaModal] = useState(false);
   const [novaSenhaPrimeiro, setNovaSenhaPrimeiro] = useState("");
+  const [nomeForm, setNomeForm] = useState("");
+  const [telefoneForm, setTelefoneForm] = useState("");
   const [showSenhaPrimeiro, setShowSenhaPrimeiro] = useState(false);
   const [salvandoPrimeiro, setSalvandoPrimeiro] = useState(false);
   const [erroPrimeiro, setErroPrimeiro] = useState("");
@@ -346,13 +348,19 @@ export default function DashboardLayout({
 
   useEffect(() => {
     if (!isLoading && user?.primeiroAcesso) {
+      setNomeForm(user.nome ?? "");
+      setTelefoneForm(user.telefone ?? "");
       setSenhaModal(true);
     }
   }, [isLoading, user?.primeiroAcesso]);
 
   async function salvarPrimeiraSenha() {
     if (!user) return;
-    if (novaSenhaPrimeiro.length < 6) { setErroPrimeiro("Mínimo 6 caracteres."); return; }
+    const nomeTrimmed = nomeForm.trim();
+    const telTrimmed = telefoneForm.trim();
+    if (!nomeTrimmed) { setErroPrimeiro("Digite seu nome completo."); return; }
+    if (!telTrimmed) { setErroPrimeiro("Digite seu telefone."); return; }
+    if (novaSenhaPrimeiro.length < 6) { setErroPrimeiro("A nova senha deve ter no mínimo 6 caracteres."); return; }
     setSalvandoPrimeiro(true); setErroPrimeiro("");
     const res = await fetch("/api/alterar-senha", {
       method: "POST",
@@ -361,7 +369,7 @@ export default function DashboardLayout({
     });
     const json = await res.json().catch(() => ({}));
     if (!res.ok) { setErroPrimeiro(json.error ?? "Erro ao alterar senha."); setSalvandoPrimeiro(false); return; }
-    await atualizarUsuario(user.id, { primeiroAcesso: false });
+    await atualizarUsuario(user.id, { primeiroAcesso: false, nome: nomeTrimmed, telefone: telTrimmed });
     setSenhaModal(false);
     setNovaSenhaPrimeiro("");
     setSalvandoPrimeiro(false);
@@ -422,30 +430,62 @@ export default function DashboardLayout({
               <div className="w-12 h-12 bg-vine-100 rounded-full flex items-center justify-center mx-auto mb-3">
                 <KeyRound className="w-6 h-6 text-vine-700" />
               </div>
-              <h2 className="text-lg font-bold text-gray-900">Crie sua senha pessoal</h2>
-              <p className="text-sm text-gray-500">Por segurança, troque a senha padrão antes de continuar.</p>
+              <h2 className="text-lg font-bold text-gray-900">Complete seu cadastro</h2>
+              <p className="text-sm text-gray-500">Confirme seus dados e crie uma senha pessoal para continuar.</p>
             </div>
-            <div className="relative">
-              <input
-                type={showSenhaPrimeiro ? "text" : "password"}
-                value={novaSenhaPrimeiro}
-                onChange={(e) => { setNovaSenhaPrimeiro(e.target.value); setErroPrimeiro(""); }}
-                onKeyDown={(e) => { if (e.key === "Enter") salvarPrimeiraSenha(); }}
-                placeholder="Nova senha (mín. 6 caracteres)"
-                autoFocus
-                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-vine-400 focus:ring-1 focus:ring-vine-100 pr-10"
-              />
-              <button type="button" onClick={() => setShowSenhaPrimeiro((v) => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
-                {showSenhaPrimeiro ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-              </button>
+
+            <div className="space-y-3">
+              {/* Nome */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Nome completo</label>
+                <input
+                  type="text"
+                  value={nomeForm}
+                  onChange={(e) => { setNomeForm(e.target.value); setErroPrimeiro(""); }}
+                  placeholder="Seu nome completo"
+                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-vine-400 focus:ring-1 focus:ring-vine-100"
+                  autoFocus
+                />
+              </div>
+
+              {/* Telefone */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Telefone / WhatsApp</label>
+                <input
+                  type="tel"
+                  value={telefoneForm}
+                  onChange={(e) => { setTelefoneForm(e.target.value); setErroPrimeiro(""); }}
+                  placeholder="(00) 00000-0000"
+                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-vine-400 focus:ring-1 focus:ring-vine-100"
+                />
+              </div>
+
+              {/* Nova senha */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Nova senha</label>
+                <div className="relative">
+                  <input
+                    type={showSenhaPrimeiro ? "text" : "password"}
+                    value={novaSenhaPrimeiro}
+                    onChange={(e) => { setNovaSenhaPrimeiro(e.target.value); setErroPrimeiro(""); }}
+                    onKeyDown={(e) => { if (e.key === "Enter") salvarPrimeiraSenha(); }}
+                    placeholder="Mínimo 6 caracteres"
+                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-vine-400 focus:ring-1 focus:ring-vine-100 pr-10"
+                  />
+                  <button type="button" onClick={() => setShowSenhaPrimeiro((v) => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                    {showSenhaPrimeiro ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
             </div>
+
             {erroPrimeiro && <p className="text-xs text-red-500 -mt-2">{erroPrimeiro}</p>}
             <button
               onClick={salvarPrimeiraSenha}
-              disabled={salvandoPrimeiro || !novaSenhaPrimeiro}
+              disabled={salvandoPrimeiro || !nomeForm || !telefoneForm || !novaSenhaPrimeiro}
               className="w-full py-3 bg-vine-700 text-white rounded-xl text-sm font-semibold hover:bg-vine-800 transition disabled:opacity-50"
             >
-              {salvandoPrimeiro ? "Salvando..." : "Salvar e continuar"}
+              {salvandoPrimeiro ? "Salvando..." : "Confirmar e entrar"}
             </button>
           </div>
         </div>
