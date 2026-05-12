@@ -1004,6 +1004,22 @@ function MembrosTab({
   const [novaFuncao, setNovaFuncao] = useState<FuncaoMinisterio>("Membro");
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ nome: "", email: "", telefone: "", funcao: "Membro" as FuncaoMinisterio });
+  const [sortBy, setSortBy] = useState<"nome" | "funcao">("nome");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+
+  function toggleSort(col: "nome" | "funcao") {
+    if (sortBy === col) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    else { setSortBy(col); setSortDir("asc"); }
+  }
+
+  const FUNCAO_ORDER: Record<FuncaoMinisterio, number> = { "L\u00edder": 0, "Sub-l\u00edder": 1, "Membro": 2, "Visitante": 3 };
+  const membrosOrdenados = [...membros].sort((a, b) => {
+    let cmp = 0;
+    if (sortBy === "nome") cmp = a.nome.localeCompare(b.nome, "pt-BR");
+    else cmp = (FUNCAO_ORDER[a.funcao] ?? 9) - (FUNCAO_ORDER[b.funcao] ?? 9);
+    return sortDir === "asc" ? cmp : -cmp;
+  });
+
   // Per-member canal permissions
   const [permissoesMembro, setPermissoesMembro] = useState<Record<string, string[]>>({});
   const [permExpandido, setPermExpandido] = useState<string | null>(null);
@@ -1114,14 +1130,36 @@ function MembrosTab({
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-gray-100 bg-gray-50 text-gray-500 text-xs uppercase tracking-wider">
-              <th className="text-left px-4 py-3">Nome</th>
+              <th className="text-left px-4 py-3">
+                <button
+                  onClick={() => toggleSort("nome")}
+                  className="flex items-center gap-1 hover:text-gray-800 transition"
+                >
+                  Nome
+                  <span className="flex flex-col leading-none">
+                    <ChevronUp   className={clsx("w-2.5 h-2.5", sortBy==="nome" && sortDir==="asc"  ? "text-vine-600" : "text-gray-300")} />
+                    <ChevronDown className={clsx("w-2.5 h-2.5", sortBy==="nome" && sortDir==="desc" ? "text-vine-600" : "text-gray-300")} />
+                  </span>
+                </button>
+              </th>
               <th className="text-left px-4 py-3">Contato</th>
-              <th className="text-left px-4 py-3">Função</th>
+              <th className="text-left px-4 py-3">
+                <button
+                  onClick={() => toggleSort("funcao")}
+                  className="flex items-center gap-1 hover:text-gray-800 transition"
+                >
+                  Função
+                  <span className="flex flex-col leading-none">
+                    <ChevronUp   className={clsx("w-2.5 h-2.5", sortBy==="funcao" && sortDir==="asc"  ? "text-vine-600" : "text-gray-300")} />
+                    <ChevronDown className={clsx("w-2.5 h-2.5", sortBy==="funcao" && sortDir==="desc" ? "text-vine-600" : "text-gray-300")} />
+                  </span>
+                </button>
+              </th>
               {(isLider || podeAtribuirPermissoes) && <th className="px-4 py-3" />}
             </tr>
           </thead>
           <tbody>
-            {membros.map((m) => (
+            {membrosOrdenados.map((m) => (
               <React.Fragment key={m.id}>
                 <tr className="border-b border-gray-50 hover:bg-gray-50 transition">
                   <td className="px-4 py-3">
