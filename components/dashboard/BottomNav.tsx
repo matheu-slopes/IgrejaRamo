@@ -164,7 +164,11 @@ export default function BottomNav() {
       {/* Bottom bar */}
       <nav
         className="fixed bottom-0 inset-x-0 z-40 md:hidden bg-white border-t border-gray-100 flex items-stretch"
-        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+        style={{
+          paddingBottom: "env(safe-area-inset-bottom)",
+          paddingLeft: "env(safe-area-inset-left)",
+          paddingRight: "env(safe-area-inset-right)",
+        }}
       >
         {navItems.map(({ href, label, icon: Icon }) => {
           const isChat = href === "/dashboard/chat";

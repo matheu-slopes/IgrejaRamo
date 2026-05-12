@@ -6,30 +6,37 @@
   html {
     scroll-behavior: smooth;
     -webkit-tap-highlight-color: transparent;
-    /* Área segura para notch / dynamic island / home indicator */
-    padding-top: env(safe-area-inset-top);
-    padding-bottom: env(safe-area-inset-bottom);
-    padding-left: env(safe-area-inset-left);
-    padding-right: env(safe-area-inset-right);
+    /* Evita que iOS ajuste tamanho de texto automaticamente */
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    /* height para cobrir a tela inteira no PWA */
+    height: 100%;
   }
   body {
     font-feature-settings: "kern" 1, "liga" 1, "calt" 1;
     background-color: #F7F2EA;
-    /* Sem zoom em inputs no iOS */
+    /* Sem zoom em interações */
     touch-action: manipulation;
     /* Sem bounce scroll no iOS standalone */
     overscroll-behavior: none;
     /* Sem seleção acidental de texto */
     -webkit-user-select: none;
     user-select: none;
+    /* Ocupa toda a altura no standalone */
+    min-height: 100%;
   }
   /* Permitir seleção somente em textos legíveis */
   p, h1, h2, h3, h4, h5, h6, span, a, li, td, th, label {
     -webkit-user-select: text;
     user-select: text;
   }
-  /* Inputs sempre selecionáveis */
-  input, textarea {
+  /*
+   * CRÍTICO para iOS PWA: inputs com font-size < 16px fazem o Safari
+   * dar zoom automático ao focar o campo. Forçar 16px previne isso.
+   * O zoom no login ao entrar no dashboard tem essa causa.
+   */
+  input, textarea, select {
+    font-size: 16px !important;
     -webkit-user-select: auto;
     user-select: auto;
   }
@@ -58,6 +65,18 @@
   }
 }
 
+
+/* ─── Scrollbar das tabs de ministério ──────────────────────────── */
+.tabs-scroll::-webkit-scrollbar {
+  height: 3px;
+}
+.tabs-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.tabs-scroll::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.4);
+  border-radius: 9999px;
+}
 
 /* ─── Marquee de versículos — loop infinito real ─────────────────── */
 @keyframes marquee-scroll {

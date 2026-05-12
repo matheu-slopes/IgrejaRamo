@@ -7,6 +7,7 @@ import { ChatUnreadProvider } from "@/contexts/ChatUnreadContext";
 import Sidebar from "@/components/Sidebar";
 import BottomNav from "@/components/dashboard/BottomNav";
 import NotificationBell from "@/components/dashboard/NotificationBell";
+import Image from "next/image";
 import { User, Permissao } from "@/types";
 import {
   LogOut, Pencil, Check, X, Camera, ChevronRight, User as UserIcon,
@@ -388,7 +389,7 @@ export default function DashboardLayout({
 
   return (
     <ChatUnreadProvider>
-    <div className="flex h-screen overflow-hidden bg-gray-50">
+    <div className="flex h-dvh overflow-hidden bg-gray-50">
       {/* Sidebar — apenas desktop */}
       <Sidebar />
 
@@ -400,7 +401,7 @@ export default function DashboardLayout({
           <div className="h-14 px-4 md:px-6 flex items-center justify-between">
             {/* Mobile: logo + nome da igreja */}
             <div className="flex items-center gap-2 md:hidden">
-              <span className="text-gold-500 text-lg">✦</span>
+              <Image src="/logo.png" alt="Logo Ramo da Vida" width={28} height={28} className="w-7 h-7 object-contain" />
               <span className="font-bold text-vine-950 text-base">Ramo da Vida</span>
             </div>
             {/* Desktop: espaço vazio (título fica no conteúdo) */}
@@ -417,7 +418,7 @@ export default function DashboardLayout({
         </header>
 
         {/* Conteúdo principal */}
-        <main className="flex-1 overflow-y-auto p-4 md:p-6 pb-[calc(4.5rem+env(safe-area-inset-bottom))] md:pb-6">
+        <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-6 pb-[calc(4.5rem+env(safe-area-inset-bottom))] md:pb-6">
           {children}
         </main>
       </div>

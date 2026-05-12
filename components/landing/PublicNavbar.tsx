@@ -67,14 +67,9 @@ export default function PublicNavbar() {
           ))}
           <Link
             href="/login"
-            className={clsx(
-              "text-[13px] font-semibold px-5 py-2 rounded-full border transition-all duration-200",
-              scrolled
-                ? "border-vine-700 text-vine-700 hover:bg-vine-700 hover:text-white"
-                : "border-white/30 text-white hover:bg-white/10 hover:border-white/50"
-            )}
+            className="text-[13px] font-semibold px-5 py-2 rounded-full border border-white/40 text-white hover:bg-white/10 hover:border-white/60 transition-all duration-200"
           >
-            Entrar
+            Área do Voluntário
           </Link>
         </nav>
 
@@ -99,7 +94,7 @@ export default function PublicNavbar() {
           <Link href="/login"
             className="mt-1 bg-vine-800 text-white text-sm font-semibold px-4 py-2.5 rounded-full text-center hover:bg-vine-700 transition"
             onClick={() => setOpen(false)}>
-            Entrar
+            Área do Voluntário
           </Link>
         </div>
       )}

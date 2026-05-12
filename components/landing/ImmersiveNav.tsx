@@ -51,10 +51,10 @@ export default function ImmersiveNav() {
 
           <Link
             href="/login"
-            className="relative z-10 text-[11px] font-semibold text-gold-400 border border-gold-500/30 rounded-full px-4 py-1.5
-                       hover:bg-gold-500/10 transition-all duration-200"
+            className="relative z-10 text-[11px] font-semibold text-white border border-white/40 rounded-full px-4 py-1.5
+                       hover:bg-white/10 transition-all duration-200"
           >
-            Entrar
+            Área do Voluntário
           </Link>
         </nav>
       </div>

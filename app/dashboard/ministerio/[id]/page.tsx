@@ -78,54 +78,62 @@ export default function CanalMinisterioPage() {
   return (
     <div className="space-y-0">
       {/* Header do canal */}
-      <div className={clsx("rounded-2xl px-6 py-5 mb-6 text-white", corBg)}>
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-xs uppercase tracking-widest opacity-60 mb-0.5">Canal</p>
-            <h1 className="text-2xl font-sans font-semibold">{slug}</h1>
-            <p className="text-sm opacity-70 mt-1">{canalBase.descricao}</p>
-          </div>
-          <div className="flex items-center gap-2">
-            {tab === "chat" && (
+      <div className={clsx("rounded-2xl px-4 py-4 md:px-6 md:py-5 mb-6 text-white overflow-hidden", corBg)}>
+        {/* Título e descrição */}
+        <p className="text-xs uppercase tracking-widest opacity-60 mb-0.5">Canal</p>
+        <h1 className="text-2xl font-sans font-semibold">{slug}</h1>
+        {canalBase.descricao && (
+          <p className="text-sm opacity-70 mt-1">{canalBase.descricao}</p>
+        )}
+
+        {/* Botão de bloqueio de chat — abaixo do título, só na tab chat */}
+        {tab === "chat" && (
+          <button
+            onClick={() => podeBloquearChat && setChatBloqueado(!chatBloqueado)}
+            disabled={!podeBloquearChat}
+            className={clsx(
+              "mt-3 flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full border transition",
+              !podeBloquearChat && "opacity-40 cursor-not-allowed",
+              chatBloqueado
+                ? "border-white/40 text-white bg-white/20 hover:bg-white/30"
+                : "border-white/30 text-white/80 hover:bg-white/10"
+            )}
+          >
+            {chatBloqueado ? (<><Lock className="w-3.5 h-3.5" /> Chat bloqueado</>) : (<><Unlock className="w-3.5 h-3.5" /> Chat livre</>)}
+          </button>
+        )}
+
+        {/* Tabs com scrollbar visível */}
+        <div className="mt-4 border-t border-white/20 pt-3">
+          <div
+            className="tabs-scroll flex items-center gap-1 overflow-x-auto pb-2"
+            style={{
+              scrollbarWidth: "thin",
+              scrollbarColor: "rgba(255,255,255,0.4) transparent",
+              WebkitOverflowScrolling: "touch",
+            } as React.CSSProperties}
+          >
+            {([
+              { id: "chat",    label: "Chat",    icon: MessageSquare },
+              { id: "escalas", label: "Escalas", icon: CalendarDays  },
+              { id: "eventos", label: "Eventos", icon: Calendar      },
+              { id: "membros", label: "Membros", icon: Users         },
+            ] as { id: Tab; label: string; icon: React.ElementType }[]).map(({ id, label, icon: Icon }) => (
               <button
-                onClick={() => podeBloquearChat && setChatBloqueado(!chatBloqueado)}
-                disabled={!podeBloquearChat}
+                key={id}
+                onClick={() => setTab(id)}
                 className={clsx(
-                  "flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-full border transition",
-                  !podeBloquearChat && "opacity-40 cursor-not-allowed",
-                  chatBloqueado
-                    ? "border-white/40 text-white bg-white/20 hover:bg-white/30"
-                    : "border-white/30 text-white/80 hover:bg-white/10"
+                  "flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-medium transition shrink-0",
+                  tab === id
+                    ? "bg-white text-gray-900"
+                    : "text-white/70 hover:text-white hover:bg-white/10"
                 )}
               >
-                {chatBloqueado ? (<><Lock className="w-4 h-4" /> Chat bloqueado</>) : (<><Unlock className="w-4 h-4" /> Chat livre</>)}
+                <Icon className="w-3.5 h-3.5" />
+                {label}
               </button>
-            )}
+            ))}
           </div>
-        </div>
-
-        {/* Tabs */}
-        <div className="flex items-center gap-1 mt-5 border-t border-white/20 pt-4">
-          {([
-            { id: "chat",    label: "Chat",    icon: MessageSquare },
-            { id: "escalas", label: "Escalas", icon: CalendarDays  },
-            { id: "eventos", label: "Eventos", icon: Calendar      },
-            { id: "membros", label: "Membros", icon: Users         },
-          ] as { id: Tab; label: string; icon: React.ElementType }[]).map(({ id, label, icon: Icon }) => (
-            <button
-              key={id}
-              onClick={() => setTab(id)}
-              className={clsx(
-                "flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-medium transition",
-                tab === id
-                  ? "bg-white text-gray-900"
-                  : "text-white/70 hover:text-white hover:bg-white/10"
-              )}
-            >
-              <Icon className="w-3.5 h-3.5" />
-              {label}
-            </button>
-          ))}
         </div>
       </div>
 
