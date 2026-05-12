@@ -15,12 +15,12 @@ import clsx from "clsx";
 // ─── Constantes ───────────────────────────────────────────────────────────────
 
 // Infantil → apenas domingos | Jovens → apenas sábados (quinzenais)
-const MINISTERIOS_CULTO: Ministerio[] = ["Louvor", "Mídias", "Cantina", "Jovens", "Ensino", "Infantil"];
-const TODOS: Ministerio[] = ["Louvor", "Mídias", "Cantina", "Infantil", "Jovens", "Ensino"];
+const MINISTERIOS_CULTO: Ministerio[] = ["Louvor", "Mídias", "Limpeza", "Cantina", "Jovens", "Ensino", "Infantil"];
+const TODOS: Ministerio[] = ["Louvor", "Mídias", "Limpeza", "Cantina", "Infantil", "Jovens", "Ensino"];
 
 const EMOJI: Record<string, string> = {
   Louvor: "🎸", "Mídias": "📹", Cantina: "🧹",
-  Infantil: "🧒", Jovens: "⚡", Ensino: "📖",
+  Infantil: "🧒", Jovens: "⚡", Ensino: "📖", Limpeza: "🧽",
 };
 
 const COR_MIN_BADGE: Record<string, string> = {
@@ -30,6 +30,7 @@ const COR_MIN_BADGE: Record<string, string> = {
   Infantil: "bg-yellow-100 text-yellow-700",
   Jovens:   "bg-vine-100 text-vine-700",
   Ensino:   "bg-teal-100 text-teal-700",
+  Limpeza:  "bg-cyan-100 text-cyan-700",
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

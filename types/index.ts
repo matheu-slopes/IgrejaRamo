@@ -28,7 +28,8 @@ export type Ministerio =
   | "Infantil"
   | "Mídias"
   | "Cantina"
-  | "Jovens";
+  | "Jovens"
+  | "Limpeza";
 
 export interface User {
   id: string;

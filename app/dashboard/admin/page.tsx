@@ -18,7 +18,7 @@ import { User, Role, Ministerio, Permissao, CanalMinisterio, Local } from "@/typ
 import { supabase } from "@/lib/supabase";
 
 const ROLES: Role[] = ["admin", "pastor", "lider", "voluntario", "membro"];
-const MINISTERIOS: Ministerio[] = ["Louvor","Mídias","Ensino","Infantil","Ação Social","Jovens","Cantina"];
+const MINISTERIOS: Ministerio[] = ["Louvor","Mídias","Ensino","Infantil","Ação Social","Jovens","Cantina","Limpeza"];
 
 const ROLE_COR: Record<Role, string> = {
   admin:      "bg-red-100 text-red-700 border-red-200",

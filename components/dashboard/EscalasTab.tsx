@@ -24,6 +24,7 @@ export const FUNCOES_POR_MIN: Record<string, string[]> = {
   Louvor:        ["Ministro","Guitarra","Baixo","Bateria","Cajón","Teclado","Backing Vocal","Violão","Pandeiro"],
   "Mídias":      ["Transmissão","Projeção/Letras","Fotografia","Câmera"],
   Cantina:       ["Abertura/Oferta","Escala de Limpeza","Recepção"],
+  Limpeza:       ["Escala de Limpeza"],
   Infantil:      ["Professora","Monitor","Auxiliar"],
   "Ação Social": ["Coordenação","Voluntário"],
   Jovens:        ["Líder","Auxiliar"],

@@ -23,6 +23,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Bell,
+  Sparkles,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -49,6 +50,7 @@ const ministerios = [
   { label: "Infantil",    icon: Baby,           href: "/dashboard/ministerio/Infantil"     },
   { label: "Ação Social", icon: HeartHandshake, href: "/dashboard/ministerio/A%C3%A7%C3%A3o%20Social" },
   { label: "Jovens",      icon: Users,          href: "/dashboard/ministerio/Jovens"       },
+  { label: "Limpeza",     icon: Sparkles,       href: "/dashboard/ministerio/Limpeza"      },
 ];
 
 export default function Sidebar() {
