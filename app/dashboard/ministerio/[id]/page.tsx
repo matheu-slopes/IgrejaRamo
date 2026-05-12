@@ -59,6 +59,7 @@ export default function CanalMinisterioPage() {
   }, [slug]);
 
   // ── permissão ─────────────────────────────────────────────────────
+  const isAdmin               = user?.role === "admin" || user?.role === "pastor";
   const podeBloquearChat     = temPermissaoNoMinisterio("bloquear_chat", slug);
   const podeGerenciarMembros = temPermissaoNoMinisterio("gerenciar_membros_ministerio", slug);
   const podeCriarEvento      = temPermissaoNoMinisterio("criar_evento", slug);
@@ -141,7 +142,7 @@ export default function CanalMinisterioPage() {
       {tab === "chat"    && <ChatTab ministerio={slug} chatBloqueado={chatBloqueado} podeEnviar={temPermissaoNoMinisterio("enviar_chat", slug)} podeFixar={temPermissaoNoMinisterio("fixar_mensagem", slug)} user={user} />}
       {tab === "membros" && <MembrosTab ministerio={slug} isLider={podeGerenciarMembros} podeAtribuirPermissoes={podeAtribuirPermissoes} />}
       {tab === "eventos" && <EventosTab ministerio={slug} isLider={podeCriarEvento} podeEditar={podeEditarEvento} />}
-      {tab === "escalas" && <EscalasTab ministerio={slug} isLider={temPermissaoNoMinisterio("criar_escala", slug)} />}
+      {tab === "escalas" && <EscalasTab ministerio={slug} isLider={isAdmin || temPermissaoNoMinisterio("criar_escala", slug)} />}
     </div>
   );
 }
