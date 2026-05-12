@@ -90,6 +90,9 @@ export type FuncaoEscala =
   | "Guitarra"
   | "Baixo"
   | "Bateria"
+  | "Cajón"
+  | "Pandeiro"
+  | "Violão"
   | "Teclado"
   | "Backing Vocal"
   // Mídia

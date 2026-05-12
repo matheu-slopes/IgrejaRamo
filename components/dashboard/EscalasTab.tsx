@@ -21,7 +21,7 @@ export const TONS = [
 ];
 
 export const FUNCOES_POR_MIN: Record<string, string[]> = {
-  Louvor:        ["Ministro","Guitarra","Baixo","Bateria","Teclado","Backing Vocal","Violão","Pandeiro"],
+  Louvor:        ["Ministro","Guitarra","Baixo","Bateria","Cajón","Teclado","Backing Vocal","Violão","Pandeiro"],
   "Mídias":      ["Transmissão","Projeção/Letras","Fotografia","Câmera"],
   Cantina:       ["Abertura/Oferta","Escala de Limpeza","Recepção"],
   Infantil:      ["Professora","Monitor","Auxiliar"],
@@ -29,6 +29,38 @@ export const FUNCOES_POR_MIN: Record<string, string[]> = {
   Jovens:        ["Líder","Auxiliar"],
   Ensino:        ["Professor","Auxiliar"],
 };
+
+// ─── Equipes fixas do Louvor ────────────────────────────────────────────────
+export const EQUIPES_LOUVOR = [
+  {
+    numero: 1, label: "Equipe 1", responsavel: "Pr Flávio",
+    membros: [
+      { id: "093a4e47-e3b6-4ffe-9ac0-efcdf0800bf9", nome: "Pastor Flavio",       funcao: "Ministro",      obs: "" },
+      { id: "2a5a89e6-0452-4643-af64-c17f7881e7e5", nome: "Isadora Fernandes",  funcao: "Backing Vocal", obs: "" },
+      { id: null,                                   nome: "Tudes",              funcao: "Backing Vocal", obs: "" },
+      { id: "af737764-2a81-4f89-8153-672571c5df16", nome: "Ricardo Bortot",     funcao: "Cajón",         obs: "" },
+    ],
+  },
+  {
+    numero: 2, label: "Equipe 2", responsavel: "Matheus Alves",
+    membros: [
+      { id: "4c646c5d-cf1a-401f-a8bf-5bc9af996cdf", nome: "Matheus Alves",      funcao: "Ministro",      obs: "" },
+      { id: "4d729cce-d0a0-42b1-9d09-62d3cd4b7b87", nome: "Lívia Martins",      funcao: "Backing Vocal", obs: "" },
+      { id: null,                                   nome: "Edeni",              funcao: "Backing Vocal", obs: "" },
+      { id: null,                                   nome: "Victor",             funcao: "Cajón",         obs: "" },
+      { id: "ad69a900-1be0-41fa-943b-20c30a5bfb3c", nome: "Thaíná Victoria",   funcao: "Backing Vocal", obs: "" },
+    ],
+  },
+  {
+    numero: 3, label: "Equipe 3", responsavel: "Matheus Lopes",
+    membros: [
+      { id: "253ebd74-151a-405b-ba2a-87e64107ab59", nome: "Matheus Lopes",      funcao: "Ministro",      obs: "" },
+      { id: "01c938ee-69b0-430b-9fe3-cd6632d70982", nome: "Luisa Lopes",        funcao: "Backing Vocal", obs: "" },
+      { id: "d153862e-bdc6-4769-8bbd-4814b10b3846", nome: "Melissa Vaz",        funcao: "Backing Vocal", obs: "" },
+      { id: "c9db7bdf-0d50-4698-8728-d45b91e09c63", nome: "Larissa Pedro",      funcao: "Cajón",         obs: "" },
+    ],
+  },
+];
 
 export const TEMPLATES_CULTO = [
   { id: "quinta",   label: "Culto de Quinta",  horario: "20:00", diaSemana: 4, cor: "bg-grape-100 text-grape-800 border-grape-200" },
@@ -65,15 +97,56 @@ interface EscalaForm {
   culto: string;
   data: string;
   horario: string;
-  observacoes: string;
+  observacoes: string;  // notas livres (sem o prefixo de equipe)
+  equipe: string;       // ex: "Equipe 1" | "Equipe 2" | "Equipe 3" | ""
   visivel: boolean;
   confirmacaoParticipantes: boolean;
   itens: ItemEscala[];
   musicas: EscalaMusica[];
 }
 
+/** Extrai equipe e notas livres do campo observacoes do banco */
+function parseEquipeObs(raw: string | undefined): { equipe: string; notas: string } {
+  if (!raw) return { equipe: "", notas: "" };
+  const m = raw.match(/^(Equipe \d)\n?([\s\S]*)/);
+  if (m) return { equipe: m[1], notas: m[2].trim() };
+  return { equipe: "", notas: raw };
+}
+
+/** Reconstrói o campo observacoes para salvar no banco */
+function buildObs(equipe: string, notas: string): string | null {
+  const parts = [equipe, notas].filter(Boolean).join("\n");
+  return parts || null;
+}
+
+// O DB usa ENUM funcao_escala que ainda não tem Cajón/Pandeiro/Violão.
+// Mapeamos para o valor válido mais próximo e preservamos o nome real em observacao.
+const FUNCAO_DB_MAP: Partial<Record<string, string>> = {
+  "Cajón":   "Bateria",
+  "Pandeiro": "Bateria",
+  "Violão":  "Guitarra",
+};
+const FUNCAO_ALIAS_SET = new Set(["Cajón", "Pandeiro", "Violão"]);
+
+/** Retorna a função a exibir: prioriza observação quando é um alias de instrumento */
+export function displayFuncao(it: { funcao: string; observacao?: string }): string {
+  return (it.observacao && FUNCAO_ALIAS_SET.has(it.observacao)) ? it.observacao : it.funcao;
+}
+/** Retorna a observação real (ocultando alias de instrumento que já aparece em displayFuncao) */
+export function displayObs(it: { observacao?: string }): string | undefined {
+  return (it.observacao && FUNCAO_ALIAS_SET.has(it.observacao)) ? undefined : it.observacao;
+}
+/** Normaliza funcao para salvar no DB (resolve aliases → enum válido + preserva em obs) */
+function normalizeFuncaoParaDB(funcao: string, obs?: string): { funcao: string; observacao: string | null } {
+  const mapped = FUNCAO_DB_MAP[funcao];
+  if (mapped) {
+    return { funcao: mapped, observacao: obs ? `${funcao} · ${obs}` : funcao };
+  }
+  return { funcao, observacao: obs || null };
+}
+
 const EMPTY_FORM: EscalaForm = {
-  culto: "", data: "", horario: "", observacoes: "",
+  culto: "", data: "", horario: "", observacoes: "", equipe: "",
   visivel: true, confirmacaoParticipantes: false,
   itens: [], musicas: [],
 };
@@ -164,11 +237,13 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
   }
 
   function abrirEdicao(esc: Escala) {
+    const { equipe, notas } = parseEquipeObs(esc.observacoes);
     setForm({
       culto: esc.culto,
       data: esc.data,
       horario: esc.horario,
-      observacoes: esc.observacoes ?? "",
+      observacoes: notas,
+      equipe,
       visivel: esc.visivel ?? true,
       confirmacaoParticipantes: esc.confirmacaoParticipantes ?? false,
       itens: [...esc.itens],
@@ -179,26 +254,40 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
     setModo("form");
   }
 
+  function carregarEquipe(label: string) {
+    const equipe = EQUIPES_LOUVOR.find((e) => e.label === label);
+    if (!equipe) { setForm((f) => ({ ...f, equipe: "" })); return; }
+    const itens: import("@/types").ItemEscala[] = equipe.membros.map((m) => {
+      const alias = FUNCAO_DB_MAP[m.funcao];
+      return {
+        funcao: (alias ?? m.funcao) as import("@/types").FuncaoEscala,
+        voluntarioId: m.id ?? "",
+        voluntarioNome: m.nome,
+        observacao: alias ? m.funcao : (m.obs || undefined),
+      };
+    });
+    setForm((f) => ({ ...f, equipe: label, itens }));
+  }
+
   async function salvar() {
     if (!form.culto || !form.data || !form.horario) return;
     setSaving(true);
+    const obsDB = buildObs(form.equipe, form.observacoes);
     try {
       if (editId) {
         await supabase.from("escalas").update({
           culto: form.culto, horario: form.horario, data: form.data,
-          observacoes: form.observacoes || null,
+          observacoes: obsDB,
           visivel: form.visivel,
           confirmacao_participantes: form.confirmacaoParticipantes,
         }).eq("id", editId);
         await supabase.from("escala_itens").delete().eq("escala_id", editId);
         if (form.itens.length > 0) {
           await supabase.from("escala_itens").insert(
-            form.itens.map((i) => ({
-              escala_id: editId, funcao: i.funcao,
-              voluntario_id: i.voluntarioId || null,
-              voluntario_nome: i.voluntarioNome,
-              observacao: i.observacao || null,
-            }))
+            form.itens.map((i) => {
+              const norm = normalizeFuncaoParaDB(i.funcao, i.observacao);
+              return { escala_id: editId, funcao: norm.funcao, voluntario_id: i.voluntarioId || null, voluntario_nome: i.voluntarioNome, observacao: norm.observacao };
+            })
           );
         }
         await supabase.from("escala_musicas").delete().eq("escala_id", editId);
@@ -210,12 +299,12 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
             }))
           );
         }
-        setEscalas((prev) => prev.map((e) => e.id === editId ? { ...e, ...form } : e));
+        setEscalas((prev) => prev.map((e) => e.id === editId ? { ...e, ...form, observacoes: obsDB ?? undefined } : e));
       } else {
         const { data: inserted } = await supabase.from("escalas").insert({
           ministerio, data: form.data, horario: form.horario,
           culto: form.culto,
-          observacoes: form.observacoes || null,
+          observacoes: obsDB,
           visivel: form.visivel,
           confirmacao_participantes: form.confirmacaoParticipantes,
           criado_por: user?.id ?? null,
@@ -223,12 +312,10 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
         if (inserted) {
           if (form.itens.length > 0) {
             await supabase.from("escala_itens").insert(
-              form.itens.map((i) => ({
-                escala_id: inserted.id, funcao: i.funcao,
-                voluntario_id: i.voluntarioId || null,
-                voluntario_nome: i.voluntarioNome,
-                observacao: i.observacao || null,
-              }))
+              form.itens.map((i) => {
+                const norm = normalizeFuncaoParaDB(i.funcao, i.observacao);
+                return { escala_id: inserted.id, funcao: norm.funcao, voluntario_id: i.voluntarioId || null, voluntario_nome: i.voluntarioNome, observacao: norm.observacao };
+              })
             );
           }
           if (form.musicas.length > 0) {
@@ -241,7 +328,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
           }
           const nova: Escala = {
             id: inserted.id, ministerio, criadoPor: user?.id ?? "",
-            ...form,
+            ...form, observacoes: obsDB ?? undefined,
           };
           setEscalas((prev) => [nova, ...prev]);
         }
@@ -357,6 +444,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
       const isSel = selectedId === esc.id;
       const d = esc.data ? new Date(esc.data + "T00:00:00") : null;
       const isPast = esc.data < hojeStr;
+      const equipeLabel = esc.observacoes?.match(/^(Equipe \d)/)?.[1];
       return (
         <button
           key={esc.id}
@@ -386,6 +474,11 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
                 <span className={clsx("text-[11px] font-bold px-2 py-0.5 rounded-full", corBadge(esc.culto))}>
                   {esc.culto}
                 </span>
+                {equipeLabel && (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-vine-100 text-vine-800 border border-vine-200">
+                    {equipeLabel}
+                  </span>
+                )}
                 {esc.visivel
                   ? <span className="text-[10px] bg-green-100 text-green-700 font-semibold px-1.5 py-0.5 rounded-full">✓</span>
                   : <span className="text-[10px] bg-gray-100 text-gray-400 font-semibold px-1.5 py-0.5 rounded-full">◦</span>
@@ -521,6 +614,11 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
                   <div className="space-y-0.5">
                     <div className="flex items-center gap-2 flex-wrap">
                       <h3 className="font-bold text-gray-900 text-base">{selectedEscala.culto}</h3>
+                      {selectedEscala.observacoes?.match(/^(Equipe \d)/)?.[1] && (
+                        <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-vine-100 text-vine-800 border border-vine-200">
+                          {selectedEscala.observacoes.match(/^(Equipe \d)/)?.[1]}
+                        </span>
+                      )}
                       {selectedEscala.visivel
                         ? <span className="text-[10px] bg-green-100 text-green-700 font-bold px-2 py-0.5 rounded-full">Publicada</span>
                         : <span className="text-[10px] bg-white/70 text-gray-500 font-bold px-2 py-0.5 rounded-full">Rascunho</span>
@@ -579,7 +677,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
                             <tr key={i} className={it.voluntarioId === user?.id ? "bg-vine-50" : ""}>
                               <td className="px-3 py-2.5">
                                 <span className="text-xs font-bold text-grape-800 bg-grape-50 px-2 py-0.5 rounded-full">
-                                  {it.funcao}
+                                  {displayFuncao(it)}
                                 </span>
                               </td>
                               <td className="px-3 py-2.5 font-medium text-gray-800 text-sm">
@@ -587,8 +685,8 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
                                 {it.voluntarioId === user?.id && (
                                   <span className="ml-1.5 text-[10px] bg-vine-700 text-white px-1.5 py-0.5 rounded-full font-bold">você</span>
                                 )}
-                                {it.observacao && (
-                                  <p className="text-xs text-gray-400 font-normal mt-0.5">{it.observacao}</p>
+                                {displayObs(it) && (
+                                  <p className="text-xs text-gray-400 font-normal mt-0.5">{displayObs(it)}</p>
                                 )}
                               </td>
                             </tr>
@@ -662,7 +760,14 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
               selectedEscala.culto.includes("Domingo") ? "bg-gold-50" : "bg-vine-50"
             )}>
               <div>
-                <p className="font-bold text-gray-900">{selectedEscala.culto}</p>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <p className="font-bold text-gray-900">{selectedEscala.culto}</p>
+                  {selectedEscala.observacoes?.match(/^(Equipe \d)/)?.[1] && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-vine-100 text-vine-800 border border-vine-200">
+                      {selectedEscala.observacoes.match(/^(Equipe \d)/)?.[1]}
+                    </span>
+                  )}
+                </div>
                 <p className="text-xs text-gray-500">{formatDateSimples(selectedEscala.data)} · {selectedEscala.horario}</p>
               </div>
               <div className="flex gap-1">
@@ -683,7 +788,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
                       "text-xs px-2 py-1 rounded-full border font-medium",
                       it.voluntarioId === user?.id ? "bg-vine-100 text-vine-800 border-vine-200" : "bg-grape-50 text-grape-800 border-grape-100"
                     )}>
-                      <strong>{it.funcao}</strong>: {it.voluntarioNome}
+                      <strong>{displayFuncao(it)}</strong>: {it.voluntarioNome}
                     </span>
                   ))}
                 </div>
@@ -753,6 +858,34 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
       {/* ── Detalhes ── */}
       {subTab === "detalhes" && (
         <div className="space-y-4">
+          {/* Equipe (somente Louvor) */}
+          {ministerio === "Louvor" && (
+            <div>
+              <p className="text-xs text-gray-400 mb-2 font-semibold uppercase tracking-widest">Equipe</p>
+              <div className="flex gap-2 flex-wrap">
+                {[{ label: "", responsavel: "" }, ...EQUIPES_LOUVOR].map((eq) => (
+                  <button
+                    key={eq.label}
+                    onClick={() => carregarEquipe(eq.label)}
+                    className={clsx(
+                      "text-xs font-semibold px-3 py-1.5 rounded-full border transition",
+                      form.equipe === eq.label
+                        ? "bg-vine-700 text-white border-vine-700"
+                        : "bg-white text-gray-600 border-gray-200 hover:border-vine-400"
+                    )}
+                  >
+                    {eq.label || "Sem equipe"}
+                  </button>
+                ))}
+              </div>
+              {form.equipe && (
+                <p className="text-xs text-gray-400 mt-1.5">
+                  Resp.: {EQUIPES_LOUVOR.find((e) => e.label === form.equipe)?.responsavel} · {form.itens.length} participantes carregados
+                </p>
+              )}
+            </div>
+          )}
+
           <div>
             <p className="text-xs text-gray-400 mb-2 font-semibold uppercase tracking-widest">Tipo de culto</p>
             <div className="flex gap-2 flex-wrap">
@@ -919,8 +1052,8 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
               <div key={i} className="flex items-center justify-between bg-white border border-gray-100 rounded-xl px-4 py-3 shadow-sm">
                 <div>
                   <p className="text-sm font-semibold text-gray-800">{it.voluntarioNome}</p>
-                  <p className="text-xs text-grape-700 font-medium">{it.funcao}</p>
-                  {it.observacao && <p className="text-xs text-gray-400 mt-0.5">{it.observacao}</p>}
+                  <p className="text-xs text-grape-700 font-medium">{displayFuncao(it)}</p>
+                  {displayObs(it) && <p className="text-xs text-gray-400 mt-0.5">{displayObs(it)}</p>}
                 </div>
                 <button
                   onClick={() => removeParticipante(i)}
