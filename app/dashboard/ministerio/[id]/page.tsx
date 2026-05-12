@@ -1017,10 +1017,10 @@ function MembrosTab({
   }
 
   const FUNCAO_ORDER: Record<FuncaoMinisterio, number> = { "L\u00edder": 0, "Sub-l\u00edder": 1, "Membro": 2, "Visitante": 3 };
-  const isLider = (m: MembroMinisterio) => m.funcao === "L\u00edder" || m.funcao === "Sub-l\u00edder";
+  const eLider = (m: MembroMinisterio) => m.funcao === "L\u00edder" || m.funcao === "Sub-l\u00edder";
   const membrosOrdenados = [
-    ...membros.filter(isLider).sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR")),
-    ...membros.filter((m) => !isLider(m)).sort((a, b) => {
+    ...membros.filter(eLider).sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR")),
+    ...membros.filter((m) => !eLider(m)).sort((a, b) => {
       let cmp = 0;
       if (sortBy === "nome") cmp = a.nome.localeCompare(b.nome, "pt-BR");
       else cmp = (FUNCAO_ORDER[a.funcao] ?? 9) - (FUNCAO_ORDER[b.funcao] ?? 9);
