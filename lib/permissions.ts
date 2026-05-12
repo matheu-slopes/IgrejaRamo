@@ -1,4 +1,4 @@
-/**
+﻿/**
  * lib/permissions.ts
  * ─────────────────────────────────────────────────────────────────
  * Central de permissões do sistema.

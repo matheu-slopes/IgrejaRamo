@@ -1,10 +1,10 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import Image from "next/image";
 import { MapPin, Clock } from "lucide-react";
 
 export default function LandingFooter() {
   return (
-    <footer className="bg-vine-950 text-vine-400 pt-14 pb-8 px-6">
+    <footer className="bg-black text-gray-400 pt-14 pb-8 px-6">
       <div className="max-w-5xl mx-auto">
 
         {/* Top row */}
@@ -19,9 +19,9 @@ export default function LandingFooter() {
               className="h-11 w-auto"
               style={{ filter: "invert(1)", mixBlendMode: "screen" }}
             />
-            <p className="font-sans italic text-vine-500 text-sm max-w-[220px] leading-relaxed">
+            <p className="font-sans italic text-gray-600 text-sm max-w-[220px] leading-relaxed">
               "Eu sou a videira; vós sois os ramos."
-              <span className="block not-italic text-vine-600 text-xs mt-1">— João 15:5</span>
+              <span className="block not-italic text-gray-800 text-xs mt-1">— João 15:5</span>
             </p>
           </div>
 
@@ -54,9 +54,9 @@ export default function LandingFooter() {
         </div>
 
         {/* Bottom row */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-6 text-xs text-vine-600">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-6 text-xs text-gray-800">
           <p>&copy; {new Date().getFullYear()} Igreja Ramo da Vida — Campinas, SP</p>
-          <Link href="/login" className="text-vine-500 hover:text-gold-400 transition font-medium">
+          <Link href="/login" className="text-gray-600 hover:text-gold-400 transition font-medium">
             Área do Voluntário →
           </Link>
         </div>

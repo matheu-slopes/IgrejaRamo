@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 import { Bell, CalendarDays } from "lucide-react";
@@ -44,7 +44,7 @@ export default function MuralPublico() {
           <p className="text-gold-600 font-semibold text-[11px] uppercase tracking-[0.3em] mb-3">
             Fique por dentro
           </p>
-          <h2 className="font-sans text-4xl md:text-5xl font-semibold text-vine-950">Mural de Avisos</h2>
+          <h2 className="font-sans text-4xl md:text-5xl font-semibold text-black">Mural de Avisos</h2>
           <div className="mx-auto mt-4 w-10 h-px bg-gold-400" />
           <p className="mt-4 text-gray-500 max-w-md mx-auto text-sm leading-relaxed">
             Comunicados e programações especiais para toda a comunidade.
@@ -57,14 +57,14 @@ export default function MuralPublico() {
           {avisos.map((aviso) => (
             <div
               key={aviso.id}
-              className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm hover:shadow-md hover:border-vine-200 transition-all"
+              className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm hover:shadow-md hover:border-gray-200 transition-all"
             >
               <div className="flex items-start gap-4">
                 <div className="w-10 h-10 bg-gold-50 border border-gold-100 rounded-xl flex items-center justify-center shrink-0">
                   <Bell className="w-5 h-5 text-gold-600" />
                 </div>
                 <div className="flex-1">
-                  <h3 className="font-bold text-vine-900 text-base leading-snug">
+                  <h3 className="font-bold text-black text-base leading-snug">
                     {aviso.titulo}
                   </h3>
                   <p className="text-gray-600 text-sm mt-1.5 leading-relaxed">

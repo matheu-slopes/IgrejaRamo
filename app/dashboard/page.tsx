@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -179,15 +179,15 @@ export default function DashboardPage() {
         <h2 className="text-sm font-bold uppercase tracking-widest text-gray-400 mb-3">
           Minha Próxima Escala
         </h2>
-        <div className="bg-gradient-to-r from-vine-800 to-vine-950 rounded-2xl p-6 text-white shadow-lg border border-vine-700">
+        <div className="bg-gradient-to-r from-gray-900 to-black rounded-2xl p-6 text-white shadow-lg border border-gray-900">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="space-y-2">
-              <div className="flex items-center gap-2 text-vine-300 text-sm">
+              <div className="flex items-center gap-2 text-gray-300 text-sm">
                 <CalendarCheck className="w-4 h-4" />
                 <span>{escala.data}</span>
               </div>
               <p className="text-2xl font-bold">{escala.funcao}</p>
-              <div className="flex flex-wrap gap-4 text-sm text-vine-300">
+              <div className="flex flex-wrap gap-4 text-sm text-gray-300">
                 <span className="flex items-center gap-1">
                   <Clock className="w-3.5 h-3.5" /> {escala.horario}
                 </span>
@@ -206,7 +206,7 @@ export default function DashboardPage() {
             </div>
             <Link
               href="/dashboard/escalas"
-              className="flex items-center gap-1 bg-gold-400 text-vine-950 font-semibold text-sm px-4 py-2 rounded-xl hover:bg-gold-300 transition shrink-0"
+              className="flex items-center gap-1 bg-gold-400 text-black font-semibold text-sm px-4 py-2 rounded-xl hover:bg-gold-300 transition shrink-0"
             >
               Ver todas as escalas
               <ChevronRight className="w-4 h-4" />
@@ -223,10 +223,10 @@ export default function DashboardPage() {
         <section className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
           <div className="flex items-center justify-between mb-5">
             <h2 className="font-bold text-gray-800 flex items-center gap-2">
-              <CalendarDays className="w-5 h-5 text-vine-600" />
+              <CalendarDays className="w-5 h-5 text-gray-800" />
               Próximos Eventos
             </h2>
-            <Link href="/eventos" className="text-xs text-vine-600 hover:underline font-medium">
+            <Link href="/eventos" className="text-xs text-gray-800 hover:underline font-medium">
               Ver todos
             </Link>
           </div>
@@ -236,11 +236,11 @@ export default function DashboardPage() {
                 key={e.id}
                 className="flex items-start gap-3 p-3 rounded-xl hover:bg-gray-50 transition"
               >
-                <div className="w-10 h-10 bg-vine-50 rounded-xl flex flex-col items-center justify-center shrink-0">
-                  <span className="text-vine-700 text-xs font-bold leading-tight">
+                <div className="w-10 h-10 bg-gray-50 rounded-xl flex flex-col items-center justify-center shrink-0">
+                  <span className="text-gray-900 text-xs font-bold leading-tight">
                     {new Date(e.data + "T00:00:00").toLocaleDateString("pt-BR", { day: "2-digit" })}
                   </span>
-                  <span className="text-vine-400 text-[10px] uppercase leading-tight">
+                  <span className="text-gray-400 text-[10px] uppercase leading-tight">
                     {new Date(e.data + "T00:00:00").toLocaleDateString("pt-BR", { month: "short" })}
                   </span>
                 </div>
@@ -251,7 +251,7 @@ export default function DashboardPage() {
                   </p>
                 </div>
                 {e.ministerio && (
-                  <span className="text-xs bg-vine-50 text-vine-700 font-medium px-2 py-0.5 rounded-full shrink-0">
+                  <span className="text-xs bg-gray-50 text-gray-900 font-medium px-2 py-0.5 rounded-full shrink-0">
                     {e.ministerio}
                   </span>
                 )}

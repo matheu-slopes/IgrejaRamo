@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -59,7 +59,7 @@ export default function EventosPage() {
                 onClick={() => setFiltro(f)}
                 className={`px-3 py-1 rounded-lg text-sm font-medium transition ${
                   filtro === f
-                    ? "bg-vine-700 text-white"
+                    ? "bg-black text-white"
                     : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                 }`}
               >
@@ -116,7 +116,7 @@ function EventoCard({ evento }: { evento: Evento }) {
       </div>
 
       {evento.ministerio && (
-        <span className="self-start bg-vine-50 text-vine-700 text-xs px-2 py-0.5 rounded-full">
+        <span className="self-start bg-gray-50 text-gray-900 text-xs px-2 py-0.5 rounded-full">
           {evento.ministerio}
         </span>
       )}

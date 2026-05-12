@@ -1,4 +1,4 @@
-import dynamic from "next/dynamic";
+﻿import dynamic from "next/dynamic";
 import ImmersiveNav from "@/components/landing/ImmersiveNav";
 import FloatingCTA from "@/components/FloatingCTA";
 import ParticleHero from "@/components/landing/ParticleHero";

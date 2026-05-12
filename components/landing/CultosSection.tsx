@@ -1,4 +1,4 @@
-import { Clock } from "lucide-react";
+﻿import { Clock } from "lucide-react";
 import ScrollReveal from "./ScrollReveal";
 
 // Programação semanal completa
@@ -45,10 +45,10 @@ type Cor = "default" | "ouro" | "uva" | "jovens";
 
 function cardClasses(cor: Cor) {
   switch (cor) {
-    case "ouro":    return { bg: "bg-gold-500 text-vine-950",  time: "text-vine-800" };
+    case "ouro":    return { bg: "bg-gold-500 text-black",  time: "text-gray-900" };
     case "uva":     return { bg: "bg-grape-800 text-white",    time: "text-grape-200" };
-    case "jovens":  return { bg: "bg-vine-700 text-white",     time: "text-vine-200" };
-    default:        return { bg: "bg-vine-50 text-vine-900",   time: "text-vine-600" };
+    case "jovens":  return { bg: "bg-black text-white",     time: "text-gray-200" };
+    default:        return { bg: "bg-gray-50 text-black",   time: "text-gray-800" };
   }
 }
 
@@ -62,7 +62,7 @@ export default function CultosSection() {
           <p className="text-gold-600 font-semibold text-[11px] uppercase tracking-[0.3em] mb-3">
             Venha nos visitar
           </p>
-          <h2 className="font-sans text-4xl md:text-5xl font-semibold text-vine-950">Programação Semanal</h2>
+          <h2 className="font-sans text-4xl md:text-5xl font-semibold text-black">Programação Semanal</h2>
           <div className="mx-auto mt-4 w-10 h-px bg-gold-400" />
           <p className="mt-4 text-gray-500 max-w-md mx-auto text-sm leading-relaxed">
             Momentos de louvor, oração e Palavra — toda semana.
@@ -76,11 +76,11 @@ export default function CultosSection() {
           {programacao.map((item) => (
             <div
               key={item.dia}
-              className="bg-white rounded-2xl shadow-sm border border-vine-100 overflow-hidden flex flex-col"
+              className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden flex flex-col"
             >
               {/* Day header */}
               <div className="bg-vine-900 text-white text-center py-3.5">
-                <p className="text-[9px] font-bold tracking-[0.3em] text-vine-400 uppercase">{item.abrev}</p>
+                <p className="text-[9px] font-bold tracking-[0.3em] text-gray-400 uppercase">{item.abrev}</p>
                 <p className="text-sm font-semibold mt-0.5">{item.dia.split("-")[0]}</p>
               </div>
 
@@ -109,7 +109,7 @@ export default function CultosSection() {
         {/* Address teaser */}
         <p className="text-center text-gray-400 text-sm mt-8">
           📍 R. Fernão Pompeu de Camargo, 1293 — Jardim do Trevo, Campinas – SP &nbsp;·&nbsp;{" "}
-          <a href="#localizacao" className="text-vine-600 hover:underline font-medium">
+          <a href="#localizacao" className="text-gray-800 hover:underline font-medium">
             Ver localização
           </a>
         </p>

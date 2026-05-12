@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -21,7 +21,7 @@ export default function SobrePage() {
       <Navbar />
       <main className="max-w-3xl mx-auto px-4 py-12">
         <div className="flex flex-col items-center text-center mb-10">
-          <Church className="w-14 h-14 text-vine-700 mb-4" />
+          <Church className="w-14 h-14 text-gray-900 mb-4" />
           <h1 className="text-3xl font-bold text-gray-800">Igreja Ramo</h1>
           <p className="text-gray-500 mt-2 max-w-md">
             Uma comunidade cristã comprometida com a Palavra, o amor e o serviço.
@@ -30,7 +30,7 @@ export default function SobrePage() {
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
           <InfoCard
-            icon={<Church className="w-6 h-6 text-vine-600" />}
+            icon={<Church className="w-6 h-6 text-gray-800" />}
             title="Nossa Missão"
             text="Proclamar o evangelho, discipular membros e servir a comunidade local com integridade e amor."
           />

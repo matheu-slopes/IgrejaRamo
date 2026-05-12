@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -24,7 +24,7 @@ const ROLE_COR: Record<string, string> = {
   admin: "bg-red-100 text-red-700",
   pastor: "bg-purple-100 text-purple-700",
   lider: "bg-gold-100 text-gold-800",
-  voluntario: "bg-vine-100 text-vine-700",
+  voluntario: "bg-gray-100 text-gray-700",
   membro: "bg-gray-100 text-gray-600",
 };
 
@@ -70,10 +70,10 @@ function ProfileDropdown({
   const Avatar = ({ size = "sm" }: { size?: "sm" | "lg" }) => {
     const cls = size === "lg"
       ? "w-16 h-16 text-2xl ring-4 ring-white/20"
-      : "w-8 h-8 text-sm ring-2 ring-vine-500 ring-offset-1";
+      : "w-8 h-8 text-sm ring-2 ring-[#0a0a0a] ring-offset-1";
     return user.foto
       ? <img src={user.foto} alt={user.nome} className={clsx("rounded-full object-cover", cls)} />
-      : <div className={clsx("rounded-full bg-vine-700 flex items-center justify-center text-white font-bold", cls)}>{initials}</div>;
+      : <div className={clsx("rounded-full bg-[#0a0a0a] flex items-center justify-center text-white font-bold", cls)}>{initials}</div>;
   };
 
   return (
@@ -96,7 +96,7 @@ function ProfileDropdown({
                     <Avatar size="sm" />
                     <button
                       onClick={() => photoRef.current?.click()}
-                      className="absolute -bottom-0.5 -right-0.5 w-5 h-5 bg-vine-600 rounded-full flex items-center justify-center shadow hover:bg-vine-500 transition"
+                      className="absolute -bottom-0.5 -right-0.5 w-5 h-5 bg-[#1a1a1a] rounded-full flex items-center justify-center shadow hover:bg-gray-600 transition"
                       title="Trocar foto"
                     >
                       <Camera className="w-2.5 h-2.5 text-white" />
@@ -179,7 +179,7 @@ function ProfileDropdown({
                       value={novaSenha}
                       onChange={(e) => { setNovaSenha(e.target.value); setErroSenha(""); setOkSenha(false); }}
                       placeholder="Nova senha (mín. 6 caracteres)"
-                      className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-vine-400 focus:ring-1 focus:ring-vine-100 pr-10"
+                      className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-gray-400 focus:ring-1 focus:ring-gray-100 pr-10"
                     />
                     <button type="button" onClick={() => setShowSenha((v) => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
                       {showSenha ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -201,7 +201,7 @@ function ProfileDropdown({
                       if (res.ok) { setOkSenha(true); setNovaSenha(""); }
                       else setErroSenha(json.error ?? "Erro ao alterar senha.");
                     }}
-                    className={okSenha ? "w-full py-2.5 rounded-xl text-sm font-semibold border bg-green-50 text-green-700 border-green-200" : "w-full py-2.5 rounded-xl text-sm font-semibold border bg-vine-700 text-white border-vine-700 hover:bg-vine-800 disabled:opacity-50"}
+                    className={okSenha ? "w-full py-2.5 rounded-xl text-sm font-semibold border bg-green-50 text-green-700 border-green-200" : "w-full py-2.5 rounded-xl text-sm font-semibold border bg-[#0a0a0a] text-white border-gray-800 hover:bg-[#111] disabled:opacity-50"}
                   >
                     {salvandoSenha ? "Salvando..." : okSenha ? "Senha alterada!" : "Salvar nova senha"}
                   </button>
@@ -226,14 +226,14 @@ function ProfileDropdown({
                     <Avatar size="lg" />
                     <button
                       onClick={() => photoRef.current?.click()}
-                      className="absolute -bottom-1 -right-1 w-7 h-7 bg-vine-700 rounded-full flex items-center justify-center shadow-lg hover:bg-vine-600 transition"
+                      className="absolute -bottom-1 -right-1 w-7 h-7 bg-[#0a0a0a] rounded-full flex items-center justify-center shadow-lg hover:bg-[#1a1a1a] transition"
                     >
                       <Camera className="w-3.5 h-3.5 text-white" />
                     </button>
                   </div>
                   <button
                     onClick={() => photoRef.current?.click()}
-                    className="text-xs text-vine-600 font-medium hover:underline"
+                    className="text-xs text-gray-700 font-medium hover:underline"
                   >
                     Trocar foto
                   </button>
@@ -251,17 +251,17 @@ function ProfileDropdown({
                           value={newName}
                           onChange={(e) => setNewName(e.target.value)}
                           onKeyDown={(e) => { if (e.key === "Enter") saveName(); if (e.key === "Escape") { setEditingName(false); setNewName(user.nome); } }}
-                          className="flex-1 border border-vine-400 rounded-lg px-2.5 py-1.5 text-sm outline-none focus:ring-1 focus:ring-vine-300"
+                          className="flex-1 border border-gray-400 rounded-lg px-2.5 py-1.5 text-sm outline-none focus:ring-1 focus:ring-gray-300"
                           autoFocus
                         />
-                        <button onClick={saveName} className="w-7 h-7 bg-vine-700 rounded-lg flex items-center justify-center text-white hover:bg-vine-600 transition"><Check className="w-3.5 h-3.5" /></button>
+                        <button onClick={saveName} className="w-7 h-7 bg-[#0a0a0a] rounded-lg flex items-center justify-center text-white hover:bg-[#1a1a1a] transition"><Check className="w-3.5 h-3.5" /></button>
                         <button onClick={() => { setEditingName(false); setNewName(user.nome); }} className="w-7 h-7 bg-gray-100 rounded-lg flex items-center justify-center text-gray-500 hover:bg-gray-200 transition"><X className="w-3.5 h-3.5" /></button>
                       </div>
                     ) : (
                       <div className="flex items-center justify-between group">
                         <p className="text-sm text-gray-800 font-medium">{user.nome}</p>
                         <button onClick={() => { setEditingName(true); setTimeout(() => nameInputRef.current?.focus(), 0); }}
-                          className="opacity-0 group-hover:opacity-100 transition text-gray-400 hover:text-vine-600"
+                          className="opacity-0 group-hover:opacity-100 transition text-gray-400 hover:text-gray-700"
                         >
                           <Pencil className="w-3.5 h-3.5" />
                         </button>
@@ -305,9 +305,9 @@ function ProfileDropdown({
                   ) : user.ministerios.map((m) => {
                     const MIN_LABEL: Record<string, string> = { Cantina: "Recepcionamento", Ensino: "Pregação" };
                     return (
-                      <div key={m} className="flex items-center gap-2.5 bg-vine-50 border border-vine-100 rounded-xl px-3 py-2">
-                        <Layers className="w-4 h-4 text-vine-500 shrink-0" />
-                        <p className="text-sm font-medium text-vine-800">{MIN_LABEL[m] ?? m}</p>
+                      <div key={m} className="flex items-center gap-2.5 bg-gray-50 border border-gray-100 rounded-xl px-3 py-2">
+                        <Layers className="w-4 h-4 text-gray-600 shrink-0" />
+                        <p className="text-sm font-medium text-gray-900">{MIN_LABEL[m] ?? m}</p>
                       </div>
                     );
                   })}
@@ -381,8 +381,8 @@ export default function DashboardLayout({
 
   if (isLoading || !user) {
     return (
-      <div className="flex items-center justify-center h-screen bg-vine-950">
-        <div className="w-8 h-8 border-4 border-vine-400 border-t-transparent rounded-full animate-spin" />
+      <div className="flex items-center justify-center h-screen bg-black">
+        <div className="w-8 h-8 border-4 border-gray-400 border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
@@ -402,7 +402,7 @@ export default function DashboardLayout({
             {/* Mobile: logo + nome da igreja */}
             <div className="flex items-center gap-2 md:hidden">
               <Image src="/logo.png" alt="Logo Ramo da Vida" width={28} height={28} className="w-7 h-7 object-contain" />
-              <span className="font-bold text-vine-950 text-base">Ramo da Vida</span>
+              <span className="font-bold text-black text-base">Ramo da Vida</span>
             </div>
             {/* Desktop: espaço vazio (título fica no conteúdo) */}
             <div className="hidden md:block" />
@@ -431,8 +431,8 @@ export default function DashboardLayout({
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-7 space-y-5">
             <div className="text-center space-y-1">
-              <div className="w-12 h-12 bg-vine-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                <KeyRound className="w-6 h-6 text-vine-700" />
+              <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                <KeyRound className="w-6 h-6 text-gray-700" />
               </div>
               <h2 className="text-lg font-bold text-gray-900">Complete seu cadastro</h2>
               <p className="text-sm text-gray-500">Confirme seus dados e crie uma senha pessoal para continuar.</p>
@@ -447,7 +447,7 @@ export default function DashboardLayout({
                   value={nomeForm}
                   onChange={(e) => { setNomeForm(e.target.value); setErroPrimeiro(""); }}
                   placeholder="Seu nome completo"
-                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-vine-400 focus:ring-1 focus:ring-vine-100"
+                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-gray-400 focus:ring-1 focus:ring-gray-100"
                   autoFocus
                 />
               </div>
@@ -460,7 +460,7 @@ export default function DashboardLayout({
                   value={telefoneForm}
                   onChange={(e) => { setTelefoneForm(e.target.value); setErroPrimeiro(""); }}
                   placeholder="(00) 00000-0000"
-                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-vine-400 focus:ring-1 focus:ring-vine-100"
+                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-gray-400 focus:ring-1 focus:ring-gray-100"
                 />
               </div>
 
@@ -474,7 +474,7 @@ export default function DashboardLayout({
                     onChange={(e) => { setNovaSenhaPrimeiro(e.target.value); setErroPrimeiro(""); }}
                     onKeyDown={(e) => { if (e.key === "Enter") salvarPrimeiraSenha(); }}
                     placeholder="Mínimo 6 caracteres"
-                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-vine-400 focus:ring-1 focus:ring-vine-100 pr-10"
+                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-gray-400 focus:ring-1 focus:ring-gray-100 pr-10"
                   />
                   <button type="button" onClick={() => setShowSenhaPrimeiro((v) => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
                     {showSenhaPrimeiro ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -487,7 +487,7 @@ export default function DashboardLayout({
             <button
               onClick={salvarPrimeiraSenha}
               disabled={salvandoPrimeiro || !nomeForm || !telefoneForm || !novaSenhaPrimeiro}
-              className="w-full py-3 bg-vine-700 text-white rounded-xl text-sm font-semibold hover:bg-vine-800 transition disabled:opacity-50"
+              className="w-full py-3 bg-[#0a0a0a] text-white rounded-xl text-sm font-semibold hover:bg-[#111] transition disabled:opacity-50"
             >
               {salvandoPrimeiro ? "Salvando..." : "Confirmar e entrar"}
             </button>

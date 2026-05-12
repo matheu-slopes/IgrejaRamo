@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect, useMemo } from "react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -43,7 +43,7 @@ const COR_MIN_BADGE: Record<string, string> = {
   "Mídias": "bg-blue-100 text-blue-700",
   Cantina:  "bg-orange-100 text-orange-700",
   Infantil: "bg-yellow-100 text-yellow-700",
-  Jovens:   "bg-vine-100 text-vine-700",
+  Jovens:   "bg-gray-100 text-gray-900",
   Ensino:   "bg-teal-100 text-teal-700",
   Limpeza:  "bg-cyan-100 text-cyan-700",
 };
@@ -165,7 +165,7 @@ function MinisterioSection({
   const temMinha = escala.itens.some((it) => it.voluntarioId === userId);
 
   return (
-    <div className={clsx("px-4 py-3", temMinha && "bg-vine-50/40")}>
+    <div className={clsx("px-4 py-3", temMinha && "bg-gray-50/40")}>
       <div
         role="button"
         tabIndex={0}
@@ -179,10 +179,10 @@ function MinisterioSection({
             {minLabel(ministerio)}
           </span>
           {temMinha && (
-            <span className="text-[10px] bg-vine-700 text-white font-bold px-1.5 py-0.5 rounded-full">você</span>
+            <span className="text-[10px] bg-black text-white font-bold px-1.5 py-0.5 rounded-full">você</span>
           )}
           {ministerio === "Louvor" && escala.observacoes?.match(/^(Equipe \d)/) && (
-            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-vine-100 text-vine-800 border border-vine-200">
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-900 border border-gray-200">
               {escala.observacoes.match(/^(Equipe \d)/)?.[1]}
             </span>
           )}
@@ -199,7 +199,7 @@ function MinisterioSection({
           {isLider && (
             <button
               onClick={(e) => { e.stopPropagation(); onGerenciar(); }}
-              className="p-1 text-gray-300 hover:text-vine-600 rounded-lg transition"
+              className="p-1 text-gray-300 hover:text-gray-800 rounded-lg transition"
               title="Gerenciar escala"
             >
               <Settings2 className="w-3.5 h-3.5" />
@@ -224,7 +224,7 @@ function MinisterioSection({
                   className={clsx(
                     "flex items-center gap-2 px-2.5 py-1.5 rounded-lg",
                     it.voluntarioId === userId
-                      ? "bg-vine-100 border border-vine-200"
+                      ? "bg-gray-100 border border-gray-200"
                       : "bg-gray-50 border border-gray-100"
                   )}
                 >
@@ -240,7 +240,7 @@ function MinisterioSection({
                     )}
                   </div>
                   {it.voluntarioId === userId && (
-                    <span className="w-1.5 h-1.5 rounded-full bg-vine-500 shrink-0" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-gray-500 shrink-0" />
                   )}
                 </div>
               ))}
@@ -266,7 +266,7 @@ function InfantilSection({
   const temMinha = escalas.some((e) => e.itens.some((it) => it.voluntarioId === userId));
 
   return (
-    <div className={clsx("px-4 py-3", temMinha && "bg-vine-50/40")}>
+    <div className={clsx("px-4 py-3", temMinha && "bg-gray-50/40")}>
       <div
         role="button"
         tabIndex={0}
@@ -280,14 +280,14 @@ function InfantilSection({
             Infantil
           </span>
           {temMinha && (
-            <span className="text-[10px] bg-vine-700 text-white font-bold px-1.5 py-0.5 rounded-full">você</span>
+            <span className="text-[10px] bg-black text-white font-bold px-1.5 py-0.5 rounded-full">você</span>
           )}
         </div>
         <div className="flex items-center gap-1 shrink-0">
           {isLider && (
             <button
               onClick={(e) => { e.stopPropagation(); onGerenciar(); }}
-              className="p-1 text-gray-300 hover:text-vine-600 rounded-lg transition"
+              className="p-1 text-gray-300 hover:text-gray-800 rounded-lg transition"
               title="Gerenciar escala"
             >
               <Settings2 className="w-3.5 h-3.5" />
@@ -308,9 +308,9 @@ function InfantilSection({
             return (
               <div
                 key={esc.id}
-                className={clsx("rounded-xl border overflow-hidden", temMinhaEsc ? "border-vine-200" : "border-gray-100")}
+                className={clsx("rounded-xl border overflow-hidden", temMinhaEsc ? "border-gray-200" : "border-gray-100")}
               >
-                <div className={clsx("px-3 py-2 flex items-center gap-2 flex-wrap", temMinhaEsc ? "bg-vine-50" : "bg-yellow-50/40")}>
+                <div className={clsx("px-3 py-2 flex items-center gap-2 flex-wrap", temMinhaEsc ? "bg-gray-50" : "bg-yellow-50/40")}>
                   {ageGroup && (
                     <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-800 border border-yellow-200">
                       {ageGroup}
@@ -330,7 +330,7 @@ function InfantilSection({
                         className={clsx(
                           "flex items-start gap-2 px-2.5 py-1.5 rounded-lg",
                           it.voluntarioId === userId
-                            ? "bg-vine-100 border border-vine-200"
+                            ? "bg-gray-100 border border-gray-200"
                             : "bg-gray-50 border border-gray-100"
                         )}
                       >
@@ -344,7 +344,7 @@ function InfantilSection({
                           )}
                         </div>
                         {it.voluntarioId === userId && (
-                          <span className="w-1.5 h-1.5 rounded-full bg-vine-500 shrink-0 mt-1.5" />
+                          <span className="w-1.5 h-1.5 rounded-full bg-gray-500 shrink-0 mt-1.5" />
                         )}
                       </div>
                     ))}
@@ -395,25 +395,25 @@ function CultoCard({
     <div className={clsx(
       "rounded-2xl border overflow-hidden shadow-sm",
       isPast && "opacity-55",
-      isHoje ? "ring-2 ring-vine-300 border-vine-200" : "border-gray-100",
-      isDomingo ? "border-t-4 border-t-gold-400" : isSabado ? "border-t-4 border-t-vine-500" : "border-t-4 border-t-bark-500",
+      isHoje ? "ring-2 ring-gray-300 border-gray-200" : "border-gray-100",
+      isDomingo ? "border-t-4 border-t-gold-400" : isSabado ? "border-t-4 border-t-gray-600" : "border-t-4 border-t-bark-500",
     )}>
       {/* Header */}
       <div className={clsx(
         "px-5 py-4 flex items-center gap-4",
-        isDomingo ? "bg-gold-50" : isSabado ? "bg-vine-50" : "bg-bark-50",
+        isDomingo ? "bg-gold-50" : isSabado ? "bg-gray-50" : "bg-bark-50",
       )}>
         <div className={clsx(
           "flex flex-col items-center w-12 shrink-0 rounded-xl px-1 py-1.5 text-center",
-          isDomingo ? "bg-gold-100" : isSabado ? "bg-vine-100" : "bg-bark-100",
+          isDomingo ? "bg-gold-100" : isSabado ? "bg-gray-100" : "bg-bark-100",
         )}>
-          <span className={clsx("text-[10px] font-bold uppercase leading-none", isDomingo ? "text-gold-700" : isSabado ? "text-vine-700" : "text-bark-700")}>
+          <span className={clsx("text-[10px] font-bold uppercase leading-none", isDomingo ? "text-gold-700" : isSabado ? "text-gray-900" : "text-bark-700")}>
             {d.toLocaleDateString("pt-BR", { weekday: "short" }).replace(".", "")}
           </span>
-          <span className={clsx("text-2xl font-bold leading-tight", isDomingo ? "text-gold-900" : isSabado ? "text-vine-900" : "text-bark-900")}>
+          <span className={clsx("text-2xl font-bold leading-tight", isDomingo ? "text-gold-900" : isSabado ? "text-black" : "text-bark-900")}>
             {d.getDate()}
           </span>
-          <span className={clsx("text-[10px] uppercase leading-none font-medium", isDomingo ? "text-gold-600" : isSabado ? "text-vine-600" : "text-bark-600")}>
+          <span className={clsx("text-[10px] uppercase leading-none font-medium", isDomingo ? "text-gold-600" : isSabado ? "text-gray-800" : "text-bark-600")}>
             {d.toLocaleDateString("pt-BR", { month: "short" }).replace(".", "")}
           </span>
         </div>
@@ -421,8 +421,8 @@ function CultoCard({
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <h3 className="font-bold text-gray-900 text-base leading-tight">{cultoLabel}</h3>
-            {isHoje && <span className="text-[10px] bg-vine-700 text-white font-bold px-2 py-0.5 rounded-full">Hoje</span>}
-            {temMinha && <span className="text-[10px] bg-vine-100 text-vine-700 font-bold px-2 py-0.5 rounded-full">Você serve</span>}
+            {isHoje && <span className="text-[10px] bg-black text-white font-bold px-2 py-0.5 rounded-full">Hoje</span>}
+            {temMinha && <span className="text-[10px] bg-gray-100 text-gray-900 font-bold px-2 py-0.5 rounded-full">Você serve</span>}
           </div>
           {horario && <p className="text-sm text-gray-500 mt-0.5">{horario.slice(0, 5)}</p>}
           <div className="flex flex-wrap gap-1 mt-1.5">
@@ -530,7 +530,7 @@ function MinhasEscalasList({
 
             <div className="flex flex-col items-end gap-1 shrink-0">
               {minhasFuncoes.map((it, i) => (
-                <span key={i} className="text-xs bg-vine-100 text-vine-800 font-bold px-2.5 py-0.5 rounded-full">
+                <span key={i} className="text-xs bg-gray-100 text-gray-900 font-bold px-2.5 py-0.5 rounded-full">
                   {showFuncao(it)}
                 </span>
               ))}
@@ -622,7 +622,7 @@ export default function EscalasDashboardPage() {
             ← Voltar
           </button>
           <span className="text-gray-300">/</span>
-          <h1 className="text-base font-bold text-vine-950">
+          <h1 className="text-base font-bold text-black">
             {EMOJI[editing] ?? "📋"} {editing}
           </h1>
         </div>
@@ -640,7 +640,7 @@ export default function EscalasDashboardPage() {
       {/* Cabeçalho */}
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
         <div>
-          <h1 className="text-xl md:text-2xl font-sans font-semibold text-vine-950">Escalas</h1>
+          <h1 className="text-xl md:text-2xl font-sans font-semibold text-black">Escalas</h1>
           <p className="text-sm text-gray-400 mt-0.5 hidden sm:block">
             {aba === "minhas"
               ? "Todos os cultos em que você vai servir."
@@ -653,14 +653,14 @@ export default function EscalasDashboardPage() {
             onClick={() => setAba("minhas")}
             className={clsx(
               "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold transition",
-              aba === "minhas" ? "bg-white shadow-sm text-vine-700" : "text-gray-500 hover:text-gray-700"
+              aba === "minhas" ? "bg-white shadow-sm text-gray-900" : "text-gray-500 hover:text-gray-700"
             )}
           >
             <Star className="w-3.5 h-3.5" /> Meus Serviços
             {minhasEscalas.length > 0 && (
               <span className={clsx(
                 "text-xs font-bold px-1.5 py-0.5 rounded-full",
-                aba === "minhas" ? "bg-vine-100 text-vine-700" : "bg-gray-200 text-gray-500"
+                aba === "minhas" ? "bg-gray-100 text-gray-900" : "bg-gray-200 text-gray-500"
               )}>
                 {minhasEscalas.length}
               </span>
@@ -670,7 +670,7 @@ export default function EscalasDashboardPage() {
             onClick={() => setAba("culto")}
             className={clsx(
               "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold transition",
-              aba === "culto" ? "bg-white shadow-sm text-vine-700" : "text-gray-500 hover:text-gray-700"
+              aba === "culto" ? "bg-white shadow-sm text-gray-900" : "text-gray-500 hover:text-gray-700"
             )}
           >
             <Calendar className="w-3.5 h-3.5" /> Por Culto
@@ -730,7 +730,7 @@ export default function EscalasDashboardPage() {
                   {isoDate(semanaBase) !== isoDate(semanaInicio(new Date())) && (
                     <button
                       onClick={() => setSemanaBase(semanaInicio(new Date()))}
-                      className="text-[11px] text-vine-600 font-semibold hover:underline"
+                      className="text-[11px] text-gray-800 font-semibold hover:underline"
                     >
                       Ir para semana atual
                     </button>
@@ -761,7 +761,7 @@ export default function EscalasDashboardPage() {
               {isLider && (
                 <button
                   onClick={() => setEditing(lista[0] ?? "Louvor")}
-                  className="text-sm text-vine-600 font-semibold hover:underline"
+                  className="text-sm text-gray-800 font-semibold hover:underline"
                 >
                   + Criar escala
                 </button>
@@ -799,7 +799,7 @@ export default function EscalasDashboardPage() {
           {isLider && (
             <button
               onClick={() => setEditing("Jovens")}
-              className="flex items-center justify-between gap-3 bg-white rounded-2xl border border-gray-100 px-5 py-4 text-left hover:shadow-md hover:border-vine-200 transition shadow-sm mt-1"
+              className="flex items-center justify-between gap-3 bg-white rounded-2xl border border-gray-100 px-5 py-4 text-left hover:shadow-md hover:border-gray-200 transition shadow-sm mt-1"
             >
               <div className="flex items-center gap-3">
                 <span className="text-xl">⚡</span>

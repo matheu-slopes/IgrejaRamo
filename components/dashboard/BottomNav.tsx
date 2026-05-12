@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -100,7 +100,7 @@ export default function BottomNav() {
                       onClick={() => setDrawerOpen(false)}
                       className={clsx(
                         "flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-semibold transition",
-                        active ? "bg-vine-50 text-vine-700" : "bg-gray-50 text-gray-700 hover:bg-gray-100"
+                        active ? "bg-gray-50 text-gray-900" : "bg-gray-50 text-gray-700 hover:bg-gray-100"
                       )}
                     >
                       <Icon className="w-4 h-4 shrink-0" />
@@ -128,7 +128,7 @@ export default function BottomNav() {
                       onClick={() => setDrawerOpen(false)}
                       className={clsx(
                         "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition",
-                        active ? "bg-vine-50 text-vine-700" : "text-gray-700 hover:bg-gray-50"
+                        active ? "bg-gray-50 text-gray-900" : "text-gray-700 hover:bg-gray-50"
                       )}
                     >
                       <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center shrink-0">
@@ -164,7 +164,7 @@ export default function BottomNav() {
               href={href}
               className={clsx(
                 "flex-1 flex flex-col items-center justify-center gap-0.5 py-2 transition-colors relative",
-                active ? "text-vine-700" : "text-gray-400"
+                active ? "text-gray-900" : "text-gray-400"
               )}
             >
               <div className="relative">
@@ -175,11 +175,11 @@ export default function BottomNav() {
                   </span>
                 )}
               </div>
-              <span className={clsx("text-[10px] font-semibold leading-none", active ? "text-vine-700" : "text-gray-400")}>
+              <span className={clsx("text-[10px] font-semibold leading-none", active ? "text-gray-900" : "text-gray-400")}>
                 {label}
               </span>
               {active && (
-                <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-vine-600 rounded-full" />
+                <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-gray-800 rounded-full" />
               )}
             </Link>
           );
@@ -197,15 +197,15 @@ export default function BottomNav() {
                 href={m?.href ?? "/dashboard"}
                 className={clsx(
                   "flex-1 flex flex-col items-center justify-center gap-0.5 py-2 transition-colors relative",
-                  active ? "text-vine-700" : "text-gray-400"
+                  active ? "text-gray-900" : "text-gray-400"
                 )}
               >
                 <Layers className={clsx("w-5 h-5 transition-transform", active && "scale-110")} />
-                <span className={clsx("text-[10px] font-semibold leading-none", active ? "text-vine-700" : "text-gray-400")}>
+                <span className={clsx("text-[10px] font-semibold leading-none", active ? "text-gray-900" : "text-gray-400")}>
                   {nome}
                 </span>
                 {active && (
-                  <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-vine-600 rounded-full" />
+                  <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-gray-800 rounded-full" />
                 )}
               </Link>
             );
@@ -216,17 +216,17 @@ export default function BottomNav() {
             onClick={() => setDrawerOpen(true)}
             className={clsx(
               "flex-1 flex flex-col items-center justify-center gap-0.5 py-2 transition-colors relative",
-              drawerOpen ? "text-vine-700" : "text-gray-400"
+              drawerOpen ? "text-gray-900" : "text-gray-400"
             )}
           >
             <div className="relative">
               <Layers className={clsx("w-5 h-5 transition-transform", drawerOpen && "scale-110")} />
             </div>
-            <span className={clsx("text-[10px] font-semibold leading-none", drawerOpen ? "text-vine-700" : "text-gray-400")}>
+            <span className={clsx("text-[10px] font-semibold leading-none", drawerOpen ? "text-gray-900" : "text-gray-400")}>
               Ministérios
             </span>
             {drawerOpen && (
-              <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-vine-600 rounded-full" />
+              <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-gray-800 rounded-full" />
             )}
           </button>
         ) : (
@@ -235,20 +235,20 @@ export default function BottomNav() {
             onClick={() => setDrawerOpen(true)}
             className={clsx(
               "flex-1 flex flex-col items-center justify-center gap-0.5 py-2 transition-colors relative",
-              drawerOpen ? "text-vine-700" : "text-gray-400"
+              drawerOpen ? "text-gray-900" : "text-gray-400"
             )}
           >
             <div className="relative">
               <MoreHorizontal className={clsx("w-5 h-5 transition-transform", drawerOpen && "scale-110")} />
               {hasExtras && (
-                <span className="absolute -top-1 -right-1.5 w-2 h-2 rounded-full bg-vine-500" />
+                <span className="absolute -top-1 -right-1.5 w-2 h-2 rounded-full bg-gray-500" />
               )}
             </div>
-            <span className={clsx("text-[10px] font-semibold leading-none", drawerOpen ? "text-vine-700" : "text-gray-400")}>
+            <span className={clsx("text-[10px] font-semibold leading-none", drawerOpen ? "text-gray-900" : "text-gray-400")}>
               Mais
             </span>
             {drawerOpen && (
-              <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-vine-600 rounded-full" />
+              <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-gray-800 rounded-full" />
             )}
           </button>
         )}

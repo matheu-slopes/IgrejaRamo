@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import Image from "next/image";
@@ -58,7 +58,7 @@ export default function PublicNavbar() {
                 "after:absolute after:-bottom-0.5 after:left-0 after:w-0 after:h-[1.5px]",
                 "after:bg-gold-500 after:transition-all after:duration-300 hover:after:w-full",
                 scrolled
-                  ? "text-gray-600 hover:text-vine-800"
+                  ? "text-gray-600 hover:text-gray-900"
                   : "text-white/75 hover:text-white"
               )}
             >
@@ -74,7 +74,7 @@ export default function PublicNavbar() {
         </nav>
 
         <button
-          className={clsx("md:hidden transition-colors duration-200", scrolled ? "text-vine-900" : "text-white")}
+          className={clsx("md:hidden transition-colors duration-200", scrolled ? "text-black" : "text-white")}
           onClick={() => setOpen(!open)}
           aria-label="Menu"
         >
@@ -86,13 +86,13 @@ export default function PublicNavbar() {
         <div className="md:hidden bg-white border-t border-gray-100 px-5 pb-5 pt-3 flex flex-col gap-3.5">
           {links.map((l) => (
             <a key={l.href} href={l.href}
-              className="text-[14px] text-gray-700 font-medium hover:text-vine-700 transition py-0.5"
+              className="text-[14px] text-gray-700 font-medium hover:text-gray-900 transition py-0.5"
               onClick={() => setOpen(false)}>
               {l.label}
             </a>
           ))}
           <Link href="/login"
-            className="mt-1 bg-vine-800 text-white text-sm font-semibold px-4 py-2.5 rounded-full text-center hover:bg-vine-700 transition"
+            className="mt-1 bg-gray-900 text-white text-sm font-semibold px-4 py-2.5 rounded-full text-center hover:bg-black transition"
             onClick={() => setOpen(false)}>
             Área do Voluntário
           </Link>

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * mockData.ts
  * ─────────────────────────────────────────────────────────────────
  * Todos os dados abaixo são FICTÍCIOS para desenvolvimento da UI.
@@ -677,7 +677,7 @@ export const mockGrupos: Grupo[] = [
     nome: "Geral da Igreja",
     tipo: "geral",
     emoji: "🌿",
-    cor: "bg-vine-700",
+    cor: "bg-black",
     descricao: "Informações e comunicados para toda a igreja",
     somenteAdmin: false,
     adminId: "2",
@@ -792,7 +792,7 @@ export const mockGrupos: Grupo[] = [
     nome: "Mídias",
     tipo: "ministerio",
     emoji: "📹",
-    cor: "bg-vine-700",
+    cor: "bg-black",
     ministerio: "Mídias",
     descricao: "Comunicação e transmissão",
     adminId: "2",

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -42,8 +42,8 @@ export default function MembroPortalPage() {
 
   if (isLoading || !user) {
     return (
-      <div className="flex items-center justify-center h-screen bg-vine-950">
-        <div className="w-8 h-8 border-4 border-vine-400 border-t-transparent rounded-full animate-spin" />
+      <div className="flex items-center justify-center h-screen bg-black">
+        <div className="w-8 h-8 border-4 border-gray-400 border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
@@ -81,14 +81,14 @@ export default function MembroPortalPage() {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       {/* Header */}
-      <header className="bg-vine-950 text-white px-6 py-4 flex items-center justify-between shadow-md">
+      <header className="bg-black text-white px-6 py-4 flex items-center justify-between shadow-md">
         <div className="flex items-center gap-3">
           <Church className="w-6 h-6 text-gold-400" />
           <span className="font-bold text-lg">Ramo da Vida</span>
         </div>
         <button
           onClick={handleLogout}
-          className="flex items-center gap-2 text-sm text-vine-300 hover:text-white transition"
+          className="flex items-center gap-2 text-sm text-gray-300 hover:text-white transition"
         >
           <LogOut className="w-4 h-4" />
           Sair
@@ -99,7 +99,7 @@ export default function MembroPortalPage() {
 
         {/* Avatar + boas-vindas */}
         <div className="flex flex-col items-center text-center gap-3">
-          <div className="w-20 h-20 bg-vine-700 rounded-full flex items-center justify-center text-white text-3xl font-bold shadow-lg">
+          <div className="w-20 h-20 bg-black rounded-full flex items-center justify-center text-white text-3xl font-bold shadow-lg">
             {iniciais}
           </div>
           <div className="flex flex-col items-center gap-1">
@@ -110,15 +110,15 @@ export default function MembroPortalPage() {
                   value={novoNome}
                   onChange={(e) => setNovoNome(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter") salvarNome(); if (e.key === "Escape") setEditandoNome(false); }}
-                  className="border border-vine-400 rounded-xl px-3 py-1.5 text-base font-bold text-gray-900 outline-none focus:ring-1 focus:ring-vine-300"
+                  className="border border-gray-400 rounded-xl px-3 py-1.5 text-base font-bold text-gray-900 outline-none focus:ring-1 focus:ring-gray-300"
                 />
-                <button onClick={salvarNome} disabled={salvandoNome} className="w-7 h-7 bg-vine-700 rounded-full flex items-center justify-center text-white hover:bg-vine-800 transition"><Check className="w-3.5 h-3.5" /></button>
+                <button onClick={salvarNome} disabled={salvandoNome} className="w-7 h-7 bg-black rounded-full flex items-center justify-center text-white hover:bg-gray-900 transition"><Check className="w-3.5 h-3.5" /></button>
                 <button onClick={() => setEditandoNome(false)} className="w-7 h-7 bg-gray-100 rounded-full flex items-center justify-center text-gray-500 hover:bg-gray-200 transition"><X className="w-3.5 h-3.5" /></button>
               </div>
             ) : (
               <div className="flex items-center gap-2">
                 <h1 className="text-2xl font-bold text-gray-900">{user.nome}</h1>
-                <button onClick={() => { setNovoNome(user.nome); setEditandoNome(true); }} className="text-gray-400 hover:text-vine-600 transition" title="Editar nome">
+                <button onClick={() => { setNovoNome(user.nome); setEditandoNome(true); }} className="text-gray-400 hover:text-gray-800 transition" title="Editar nome">
                   <Pencil className="w-4 h-4" />
                 </button>
               </div>
@@ -133,12 +133,12 @@ export default function MembroPortalPage() {
             <p className="text-xs font-bold uppercase tracking-widest text-gray-400">Seus dados</p>
           </div>
           <div className="divide-y divide-gray-50">
-            <InfoRow icon={<Mail className="w-4 h-4 text-vine-600" />} label="E-mail" value={user.email} />
+            <InfoRow icon={<Mail className="w-4 h-4 text-gray-800" />} label="E-mail" value={user.email} />
             {user.telefone && (
-              <InfoRow icon={<Phone className="w-4 h-4 text-vine-600" />} label="Telefone" value={user.telefone} />
+              <InfoRow icon={<Phone className="w-4 h-4 text-gray-800" />} label="Telefone" value={user.telefone} />
             )}
             <InfoRow
-              icon={<Calendar className="w-4 h-4 text-vine-600" />}
+              icon={<Calendar className="w-4 h-4 text-gray-800" />}
               label="Membro desde"
               value={new Date(user.dataIngresso + "T00:00:00").toLocaleDateString("pt-BR", {
                 day: "2-digit", month: "long", year: "numeric",
@@ -160,7 +160,7 @@ export default function MembroPortalPage() {
                 value={novaSenha}
                 onChange={(e) => { setNovaSenha(e.target.value); setErroSenha(""); setOkSenha(false); }}
                 placeholder="Nova senha (mín. 6 caracteres)"
-                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-vine-400 focus:ring-1 focus:ring-vine-100 pr-10"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-gray-400 focus:ring-1 focus:ring-gray-300 pr-10"
               />
               <button
                 type="button"
@@ -178,7 +178,7 @@ export default function MembroPortalPage() {
                 "w-full py-2.5 rounded-xl text-sm font-semibold border transition",
                 okSenha
                   ? "bg-green-50 text-green-700 border-green-200"
-                  : "bg-vine-700 text-white border-vine-700 hover:bg-vine-800 disabled:opacity-50"
+                  : "bg-black text-white border-gray-900 hover:bg-gray-900 disabled:opacity-50"
               )}
             >
               {salvandoSenha ? "Salvando..." : okSenha ? "Senha alterada!" : "Salvar nova senha"}

@@ -13,9 +13,9 @@ import {
 } from "lucide-react";
 import clsx from "clsx";
 
-// ─── Helper: retorna sempre um access_token fresco ────────────────
-// getSession() usa cache local sem validar expiração. Se o token
-// estiver a menos de 60 s do vencimento (ou já vencido), força refresh.
+// --- Helper: retorna sempre um access_token fresco ----------------
+// getSession() usa cache local sem validar expira��o. Se o token
+// estiver a menos de 60 s do vencimento (ou j� vencido), for�a refresh.
 async function getFreshToken(): Promise<string> {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) return "";
@@ -27,9 +27,9 @@ async function getFreshToken(): Promise<string> {
   return session.access_token;
 }
 
-// ─── AudioPlayer ─────────────────────────────────────────────────
-// O MediaRecorder não escreve duração nos metadados do WebM.
-// O hack: seek para 1e101 força o browser a varrer o arquivo e calcular a duração real.
+// --- AudioPlayer -------------------------------------------------
+// O MediaRecorder n�o escreve dura��o nos metadados do WebM.
+// O hack: seek para 1e101 for�a o browser a varrer o arquivo e calcular a dura��o real.
 function AudioPlayer({ src, isMe }: { src: string; isMe: boolean }) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [playing, setPlaying]   = useState(false);
@@ -48,7 +48,7 @@ function AudioPlayer({ src, isMe }: { src: string; isMe: boolean }) {
       if (!el) return;
       if (!isFinite(el.duration) || el.duration === 0) {
         seekingDuration.current = true;
-        el.currentTime = 1e101; // força o browser a determinar o final do arquivo
+        el.currentTime = 1e101; // for�a o browser a determinar o final do arquivo
       } else {
         setDuration(el.duration);
       }
@@ -114,7 +114,7 @@ function AudioPlayer({ src, isMe }: { src: string; isMe: boolean }) {
     <div className={clsx(
       "flex items-center gap-2 px-3 py-2.5 rounded-2xl w-[240px]",
       isMe
-        ? "bg-vine-700 text-white rounded-br-sm"
+        ? "bg-black text-white rounded-br-sm"
         : "bg-white border border-gray-100 text-gray-800 shadow-sm rounded-bl-sm"
     )}>
       {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
@@ -128,7 +128,7 @@ function AudioPlayer({ src, isMe }: { src: string; isMe: boolean }) {
             <MicOff className="w-3.5 h-3.5" />
           </div>
           <span className={clsx("text-xs flex-1", isMe ? "text-white/60" : "text-gray-400")}>
-            Áudio indisponível
+            �udio indispon�vel
           </span>
         </>
       ) : (
@@ -137,7 +137,7 @@ function AudioPlayer({ src, isMe }: { src: string; isMe: boolean }) {
             onClick={toggle}
             className={clsx(
               "w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition-colors",
-              isMe ? "bg-white/20 hover:bg-white/30 text-white" : "bg-vine-700 hover:bg-vine-800 text-white"
+              isMe ? "bg-white/20 hover:bg-white/30 text-white" : "bg-black hover:bg-gray-900 text-white"
             )}
           >
             {playing
@@ -150,7 +150,7 @@ function AudioPlayer({ src, isMe }: { src: string; isMe: boolean }) {
             className="flex-1 h-1 rounded-full cursor-pointer min-w-0"
             style={{ accentColor: isMe ? "white" : "#4a6741" }}
           />
-          <span className={clsx("text-[10px] font-medium shrink-0 tabular-nums", isMe ? "text-vine-200" : "text-gray-400")}>
+          <span className={clsx("text-[10px] font-medium shrink-0 tabular-nums", isMe ? "text-gray-200" : "text-gray-400")}>
             {fmt(current)}&nbsp;/&nbsp;{fmt(duration)}
           </span>
         </>
@@ -159,16 +159,16 @@ function AudioPlayer({ src, isMe }: { src: string; isMe: boolean }) {
   );
 }
 
-// ─── Constants ────────────────────────────────────────────────────
+// --- Constants ----------------------------------------------------
 
 const EMOJIS = [
-  "😀","😂","❤️","🙏","👍","🎉","🔥","😭",
-  "😍","🤔","😊","✅","🙌","💪","🎸","📖",
-  "⛪","🕊️","✝️","🌿","😅","🤣","💕","🥰",
-  "👏","🎵","🙋","💬","📋","🤝","🍞","🧒",
+  "??","??","??","??","??","??","??","??",
+  "??","??","??","?","??","??","??","??",
+  "?","???","??","??","??","??","??","??",
+  "??","??","??","??","??","??","??","??",
 ];
 
-const QUICK_REACTIONS = ["❤️", "😂", "😮", "😢", "👏", "🙏"];
+const QUICK_REACTIONS = ["??", "??", "??", "??", "??", "??"];
 
 const MOCK_MEDIA = [
   "https://images.unsplash.com/photo-1510915361894-db8b60106cb1?w=200&q=60",
@@ -179,7 +179,7 @@ const MOCK_MEDIA = [
   "https://images.unsplash.com/photo-1484820540004-14229fe36ca4?w=200&q=60",
 ];
 
-// ─── Helpers ──────────────────────────────────────────────────────
+// --- Helpers ------------------------------------------------------
 
 function iniciais(nome: string) {
   return nome.split(" ").slice(0, 2).map((n) => n[0]).join("").toUpperCase();
@@ -209,7 +209,7 @@ function formatDateHeader(iso: string) {
 type ChatTab = "direto" | "grupos";
 type ActiveChat = { tipo: "direto"; id: string } | { tipo: "grupo"; id: string } | null;
 
-// ─── Toast ────────────────────────────────────────────────────────
+// --- Toast --------------------------------------------------------
 
 function Toast({ msg }: { msg: string }) {
   return (
@@ -219,7 +219,7 @@ function Toast({ msg }: { msg: string }) {
   );
 }
 
-// ─── EmojiPicker ─────────────────────────────────────────────────
+// --- EmojiPicker -------------------------------------------------
 
 function EmojiPicker({ onSelect, onClose }: { onSelect: (e: string) => void; onClose: () => void }) {
   return (
@@ -239,7 +239,7 @@ function EmojiPicker({ onSelect, onClose }: { onSelect: (e: string) => void; onC
   );
 }
 
-// ─── AttachMenu ───────────────────────────────────────────────────
+// --- AttachMenu ---------------------------------------------------
 
 function AttachMenu({ onAction, onClose }: { onAction: (label: string) => void; onClose: () => void }) {
   const options = [
@@ -263,7 +263,7 @@ function AttachMenu({ onAction, onClose }: { onAction: (label: string) => void; 
   );
 }
 
-// ─── ComposeBar ───────────────────────────────────────────────────
+// --- ComposeBar ---------------------------------------------------
 
 function ComposeBar({
   onSend, onSendImage, onSendAudio, onSendDoc, disabled, onToast,
@@ -280,7 +280,7 @@ function ComposeBar({
   const [showAttach, setShowAttach] = useState(false);
   const [imgPreview, setImgPreview] = useState<{ file: File; url: string } | null>(null);
   const [docPreview, setDocPreview] = useState<File | null>(null);
-  // ── Gravação de áudio ──
+  // -- Grava��o de �udio --
   const [recording, setRecording] = useState(false);
   const [recSeconds, setRecSeconds] = useState(0);
   const [audioPreview, setAudioPreview] = useState<{ blob: Blob; url: string; name: string } | null>(null);
@@ -344,7 +344,7 @@ function ComposeBar({
     const raw = e.target.files?.[0];
     e.target.value = "";
     if (!raw) return;
-    if (!raw.type.startsWith("image/")) { onToast("Apenas imagens são suportadas"); return; }
+    if (!raw.type.startsWith("image/")) { onToast("Apenas imagens s�o suportadas"); return; }
     const compressed = await compressImage(raw);
     setImgPreview({ file: compressed, url: URL.createObjectURL(compressed) });
     setShowAttach(false);
@@ -354,12 +354,12 @@ function ComposeBar({
     const raw = e.target.files?.[0];
     e.target.value = "";
     if (!raw) return;
-    if (raw.size > 20 * 1024 * 1024) { onToast("Documento muito grande (máx 20 MB)"); return; }
+    if (raw.size > 20 * 1024 * 1024) { onToast("Documento muito grande (m�x 20 MB)"); return; }
     setDocPreview(raw);
     setShowAttach(false);
   }
 
-  // ── Gravação ──
+  // -- Grava��o --
   async function startRecording() {
     if (recording) return;
     try {
@@ -388,7 +388,7 @@ function ComposeBar({
       setRecSeconds(0);
       timerRef.current = setInterval(() => setRecSeconds((s) => s + 1), 1000);
     } catch {
-      onToast("Microfone não disponível ou permissão negada");
+      onToast("Microfone n�o dispon�vel ou permiss�o negada");
     }
   }
 
@@ -422,7 +422,7 @@ function ComposeBar({
     );
   }
 
-  // ── UI de gravação ativo ──
+  // -- UI de grava��o ativo --
   if (recording) {
     return (
       <div className="border-t border-gray-100 bg-white px-3 py-3 shrink-0">
@@ -439,7 +439,7 @@ function ComposeBar({
           <button
             onClick={stopRecording}
             className="w-9 h-9 rounded-full bg-red-500 text-white flex items-center justify-center hover:bg-red-600 transition"
-            title="Parar gravação"
+            title="Parar grava��o"
           >
             <Square className="w-4 h-4 fill-white" />
           </button>
@@ -476,10 +476,10 @@ function ComposeBar({
           </button>
         </div>
       )}
-      {/* Preview do áudio */}
+      {/* Preview do �udio */}
       {audioPreview && (
-        <div className="flex items-center gap-2 mb-2 bg-vine-50 border border-vine-200 rounded-xl px-3 py-2">
-          <Mic className="w-4 h-4 text-vine-600 shrink-0" />
+        <div className="flex items-center gap-2 mb-2 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2">
+          <Mic className="w-4 h-4 text-gray-800 shrink-0" />
           {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
           <audio src={audioPreview.url} controls preload="metadata" className="h-8 flex-1 min-w-0" />
           <button
@@ -531,7 +531,7 @@ function ComposeBar({
         {/* Attach */}
         <button
           onClick={() => { setShowAttach((v) => !v); setShowEmoji(false); }}
-          className="w-9 h-9 rounded-full flex items-center justify-center text-gray-400 hover:text-vine-600 hover:bg-gray-100 transition shrink-0"
+          className="w-9 h-9 rounded-full flex items-center justify-center text-gray-400 hover:text-gray-800 hover:bg-gray-100 transition shrink-0"
         >
           <Paperclip className="w-5 h-5" />
         </button>
@@ -546,7 +546,7 @@ function ComposeBar({
             }}
             placeholder={imgPreview || docPreview || audioPreview ? "Legenda (opcional)..." : "Digite uma mensagem..."}
             rows={1}
-            className="w-full resize-none rounded-2xl border border-gray-200 bg-gray-50 px-4 py-2.5 pr-10 text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-vine-300 focus:border-vine-400 leading-relaxed max-h-32 overflow-y-auto"
+            className="w-full resize-none rounded-2xl border border-gray-200 bg-gray-50 px-4 py-2.5 pr-10 text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-300 focus:border-gray-400 leading-relaxed max-h-32 overflow-y-auto"
           />
           <button
             onClick={() => { setShowEmoji((v) => !v); setShowAttach(false); }}
@@ -560,15 +560,15 @@ function ComposeBar({
         {hasContent ? (
           <button
             onClick={handleSend}
-            className="w-10 h-10 rounded-full bg-vine-700 text-white flex items-center justify-center shrink-0 hover:bg-vine-800 active:scale-95 transition"
+            className="w-10 h-10 rounded-full bg-black text-white flex items-center justify-center shrink-0 hover:bg-gray-900 active:scale-95 transition"
           >
             <Send className="w-4 h-4" />
           </button>
         ) : (
           <button
             onClick={startRecording}
-            className="w-10 h-10 rounded-full bg-vine-700 text-white flex items-center justify-center shrink-0 hover:bg-vine-800 active:scale-95 transition"
-            title="Gravar áudio"
+            className="w-10 h-10 rounded-full bg-black text-white flex items-center justify-center shrink-0 hover:bg-gray-900 active:scale-95 transition"
+            title="Gravar �udio"
           >
             <Mic className="w-4 h-4" />
           </button>
@@ -578,7 +578,7 @@ function ComposeBar({
   );
 }
 
-// ─── MessageBubble ────────────────────────────────────────────────
+// --- MessageBubble ------------------------------------------------
 
 function MessageBubble({
   msg, isMe, showAuthor, onStar, isStarred, onEdit, onReply, onReact, myReacted,
@@ -618,14 +618,14 @@ function MessageBubble({
       onMouseLeave={() => setHover(false)}
     >
       {!isMe && (
-        <div className="w-7 h-7 rounded-full bg-vine-700 text-white flex items-center justify-center text-[10px] font-bold shrink-0 self-end mb-1">
+        <div className="w-7 h-7 rounded-full bg-black text-white flex items-center justify-center text-[10px] font-bold shrink-0 self-end mb-1">
           {iniciais(msg.autorNome)}
         </div>
       )}
-      {/* Coluna de conteúdo — relative para posicionar botões de ação sem afetar o layout */}
+      {/* Coluna de conte�do � relative para posicionar bot�es de a��o sem afetar o layout */}
       <div className={clsx("relative flex flex-col", isMe ? "items-end" : "items-start")}>
         {showAuthor && !isMe && (
-          <span className="text-[10px] font-semibold text-vine-600 mb-0.5 px-1">
+          <span className="text-[10px] font-semibold text-gray-800 mb-0.5 px-1">
             {msg.autorNome.split(" ")[0]}
           </span>
         )}
@@ -635,10 +635,10 @@ function MessageBubble({
           <div
             className={clsx(
               "mb-1 rounded-xl px-3 py-1.5 text-xs max-w-full border-l-2",
-              isMe ? "bg-vine-600 border-white/50 text-white/90" : "bg-gray-100 border-vine-400 text-gray-600"
+              isMe ? "bg-gray-800 border-white/50 text-white/90" : "bg-gray-100 border-gray-400 text-gray-600"
             )}
           >
-            <p className={clsx("font-semibold text-[10px] truncate mb-0.5", isMe ? "text-white/70" : "text-vine-600")}>
+            <p className={clsx("font-semibold text-[10px] truncate mb-0.5", isMe ? "text-white/70" : "text-gray-800")}>
               {msg.respostaA.autorNome}
             </p>
             <p className="truncate leading-snug">{msg.respostaA.conteudo}</p>
@@ -657,26 +657,26 @@ function MessageBubble({
                 if (e.key === "Escape") cancelEdit();
               }}
               rows={2}
-              className="w-full resize-none rounded-2xl border-2 border-vine-400 bg-white px-3.5 py-2 text-sm text-gray-800 focus:outline-none leading-relaxed max-h-32 overflow-y-auto"
+              className="w-full resize-none rounded-2xl border-2 border-gray-400 bg-white px-3.5 py-2 text-sm text-gray-800 focus:outline-none leading-relaxed max-h-32 overflow-y-auto"
             />
             <div className="flex justify-end gap-2 mt-1 px-1">
               <button onClick={cancelEdit} className="text-xs text-gray-400 hover:text-gray-600 transition px-2 py-0.5">
                 Cancelar
               </button>
-              <button onClick={saveEdit} className="text-xs bg-vine-700 text-white rounded-full px-3 py-0.5 hover:bg-vine-800 transition">
+              <button onClick={saveEdit} className="text-xs bg-black text-white rounded-full px-3 py-0.5 hover:bg-gray-900 transition">
                 Salvar
               </button>
             </div>
           </div>
         ) : msg.tipo === "audio" && msg.mediaUrl ? (
-          /* Áudio fica fora da bolha para evitar duplo fundo */
+          /* �udio fica fora da bolha para evitar duplo fundo */
           <AudioPlayer src={msg.mediaUrl} isMe={isMe} />
         ) : (
           <div
             className={clsx(
               "rounded-2xl text-sm leading-relaxed max-w-full break-words overflow-hidden",
               msg.tipo === "imagem" || msg.tipo === "documento" ? "" : "px-3.5 py-2",
-              isMe ? "bg-vine-700 text-white rounded-br-sm" : "bg-white border border-gray-100 text-gray-800 rounded-bl-sm shadow-sm"
+              isMe ? "bg-black text-white rounded-br-sm" : "bg-white border border-gray-100 text-gray-800 rounded-bl-sm shadow-sm"
             )}
           >
             {msg.tipo === "imagem" && msg.mediaUrl ? (
@@ -698,17 +698,17 @@ function MessageBubble({
                 rel="noopener noreferrer"
                 className={clsx(
                   "flex items-center gap-2.5 px-3.5 py-2.5 rounded-2xl min-w-[160px] max-w-[240px] transition",
-                  isMe ? "hover:bg-vine-800" : "hover:bg-gray-50"
+                  isMe ? "hover:bg-gray-900" : "hover:bg-gray-50"
                 )}
               >
-                <FileText className={clsx("w-8 h-8 shrink-0", isMe ? "text-vine-200" : "text-blue-500")} />
+                <FileText className={clsx("w-8 h-8 shrink-0", isMe ? "text-gray-200" : "text-blue-500")} />
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-medium leading-tight truncate">{msg.conteudo || "Documento"}</p>
-                  <p className={clsx("text-[10px] mt-0.5", isMe ? "text-vine-300" : "text-gray-400")}>
+                  <p className={clsx("text-[10px] mt-0.5", isMe ? "text-gray-300" : "text-gray-400")}>
                     Toque para abrir
                   </p>
                 </div>
-                <Download className={clsx("w-3.5 h-3.5 shrink-0", isMe ? "text-vine-300" : "text-gray-400")} />
+                <Download className={clsx("w-3.5 h-3.5 shrink-0", isMe ? "text-gray-300" : "text-gray-400")} />
               </a>
             ) : (
               msg.conteudo
@@ -724,8 +724,8 @@ function MessageBubble({
                 key={r.emoji}
                 onClick={() => onReact(r.emoji)}
                 className={clsx(
-                  "flex items-center gap-1 text-sm bg-white border rounded-full px-2 py-0.5 transition hover:border-vine-300",
-                  myReacted.includes(r.emoji) ? "border-vine-400 bg-vine-50" : "border-gray-200"
+                  "flex items-center gap-1 text-sm bg-white border rounded-full px-2 py-0.5 transition hover:border-gray-300",
+                  myReacted.includes(r.emoji) ? "border-gray-400 bg-gray-50" : "border-gray-200"
                 )}
               >
                 {r.emoji}
@@ -741,7 +741,7 @@ function MessageBubble({
           <span className="text-[10px] text-gray-400">{formatTime(msg.criadoEm)}</span>
         </div>
 
-        {/* Botões de ação — absolutamente posicionados (sem impacto no layout) */}
+        {/* Bot�es de a��o � absolutamente posicionados (sem impacto no layout) */}
         {(hover || emojiOpen) && !editing && (
           <div className={clsx(
             "absolute top-1/2 -translate-y-1/2 flex flex-col items-center gap-1 z-10",
@@ -760,7 +760,7 @@ function MessageBubble({
                       onClick={() => { onReact(emoji); setEmojiOpen(false); }}
                       className={clsx(
                         "text-lg w-8 h-8 rounded-full flex items-center justify-center hover:bg-gray-100 transition",
-                        myReacted.includes(emoji) && "bg-vine-50 ring-1 ring-vine-300"
+                        myReacted.includes(emoji) && "bg-gray-50 ring-1 ring-gray-300"
                       )}
                     >
                       {emoji}
@@ -770,15 +770,15 @@ function MessageBubble({
               )}
               <button
                 onClick={() => setEmojiOpen(!emojiOpen)}
-                className="w-6 h-6 rounded-full bg-white border border-gray-200 shadow-sm flex items-center justify-center text-[14px] hover:border-vine-300 transition"
+                className="w-6 h-6 rounded-full bg-white border border-gray-200 shadow-sm flex items-center justify-center text-[14px] hover:border-gray-300 transition"
                 title="Reagir"
               >
-                😊
+                ??
               </button>
             </div>
             <button
               onClick={() => onReply(msg)}
-              className="w-6 h-6 rounded-full bg-white border border-gray-200 shadow-sm flex items-center justify-center text-gray-400 hover:text-vine-600 hover:border-vine-300 transition"
+              className="w-6 h-6 rounded-full bg-white border border-gray-200 shadow-sm flex items-center justify-center text-gray-400 hover:text-gray-800 hover:border-gray-300 transition"
               title="Responder"
             >
               <Reply className="w-3 h-3" />
@@ -786,7 +786,7 @@ function MessageBubble({
             {isMe && (
               <button
                 onClick={startEdit}
-                className="w-6 h-6 rounded-full bg-white border border-gray-200 shadow-sm flex items-center justify-center text-gray-400 hover:text-vine-600 hover:border-vine-300 transition"
+                className="w-6 h-6 rounded-full bg-white border border-gray-200 shadow-sm flex items-center justify-center text-gray-400 hover:text-gray-800 hover:border-gray-300 transition"
                 title="Editar"
               >
                 <Pencil className="w-3 h-3" />
@@ -795,7 +795,7 @@ function MessageBubble({
             <button
               onClick={() => onStar(msg.id)}
               className={clsx(
-                "w-6 h-6 rounded-full bg-white border shadow-sm flex items-center justify-center transition hover:border-vine-300",
+                "w-6 h-6 rounded-full bg-white border shadow-sm flex items-center justify-center transition hover:border-gray-300",
                 isStarred ? "border-gold-300 text-gold-500" : "border-gray-200 text-gray-400"
               )}
               title="Favoritar"
@@ -809,7 +809,7 @@ function MessageBubble({
   );
 }
 
-// ─── ConversationMessages ─────────────────────────────────────────
+// --- ConversationMessages -----------------------------------------
 
 function ConversationMessages({
   messages, myId, isGroup, searchQuery, onStar, starredIds, onEdit, onReply, onReact, myReacoes,
@@ -889,7 +889,7 @@ function ConversationMessages({
   );
 }
 
-// ─── InfoPanel ────────────────────────────────────────────────────
+// --- InfoPanel ----------------------------------------------------
 
 function InfoPanel({
   name, description, emoji, cor, messages, starredIds, onClose,
@@ -918,11 +918,11 @@ function InfoPanel({
       {/* Profile */}
       <div className="flex flex-col items-center gap-2 py-5 px-4 border-b border-gray-100 shrink-0">
         {emoji ? (
-          <div className={clsx("w-14 h-14 rounded-full flex items-center justify-center text-3xl text-white", cor ?? "bg-vine-700")}>
+          <div className={clsx("w-14 h-14 rounded-full flex items-center justify-center text-3xl text-white", cor ?? "bg-black")}>
             {emoji}
           </div>
         ) : (
-          <div className="w-14 h-14 rounded-full bg-vine-700 text-white flex items-center justify-center text-xl font-bold">
+          <div className="w-14 h-14 rounded-full bg-black text-white flex items-center justify-center text-xl font-bold">
             {iniciais(name)}
           </div>
         )}
@@ -938,7 +938,7 @@ function InfoPanel({
             onClick={() => setTab(t)}
             className={clsx(
               "flex-1 py-2.5 text-xs font-semibold border-b-2 transition",
-              tab === t ? "border-vine-600 text-vine-700" : "border-transparent text-gray-400 hover:text-vine-600"
+              tab === t ? "border-gray-800 text-gray-900" : "border-transparent text-gray-400 hover:text-gray-800"
             )}
           >
             {t === "midia" ? "Midia" : "Favoritos"}
@@ -977,7 +977,7 @@ function InfoPanel({
             ) : (
               starred.map((m) => (
                 <div key={m.id} className="bg-gray-50 rounded-xl px-3 py-2.5 border border-gray-100">
-                  <p className="text-[10px] font-semibold text-vine-600 mb-0.5">{m.autorNome.split(" ")[0]}</p>
+                  <p className="text-[10px] font-semibold text-gray-800 mb-0.5">{m.autorNome.split(" ")[0]}</p>
                   <p className="text-xs text-gray-700 leading-relaxed">{m.conteudo}</p>
                   <p className="text-[10px] text-gray-400 mt-1">{formatTime(m.criadoEm)}</p>
                 </div>
@@ -990,7 +990,7 @@ function InfoPanel({
   );
 }
 
-// ─── NewDmModal ──────────────────────────────────────────────────
+// --- NewDmModal --------------------------------------------------
 
 function NewDmModal({
   currentUserId, dms, usuarios, onStart, onClose,
@@ -1025,13 +1025,13 @@ function NewDmModal({
             const hasChat = existingIds.has(mu.id);
             return (
               <button key={mu.id} onClick={() => onStart(mu.id, mu.nome)} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition text-left border-b border-gray-50 last:border-0">
-                <div className="w-9 h-9 rounded-full bg-vine-700 text-white flex items-center justify-center text-sm font-bold shrink-0">{iniciais(mu.nome)}</div>
+                <div className="w-9 h-9 rounded-full bg-black text-white flex items-center justify-center text-sm font-bold shrink-0">{iniciais(mu.nome)}</div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-gray-800 truncate">{mu.nome}</p>
                   <p className="text-xs text-gray-400 capitalize truncate">{mu.role}</p>
                 </div>
                 {hasChat && (
-                  <span className="text-[10px] text-vine-600 font-semibold bg-vine-50 px-2 py-0.5 rounded-full shrink-0">Abrir</span>
+                  <span className="text-[10px] text-gray-800 font-semibold bg-gray-50 px-2 py-0.5 rounded-full shrink-0">Abrir</span>
                 )}
               </button>
             );
@@ -1043,9 +1043,9 @@ function NewDmModal({
   );
 }
 
-// ─── NewGroupModal ────────────────────────────────────────────────
+// --- NewGroupModal ------------------------------------------------
 
-const GROUP_EMOJIS = ["💬","⛪","🎸","📖","✝️","🌿","🤝","📋","🎉","🙏","👑","⚡","🕊️","🎵"];
+const GROUP_EMOJIS = ["??","?","??","??","??","??","??","??","??","??","??","?","???","??"];
 
 function NewGroupModal({
   currentUserId, usuarios, onClose, onCreate,
@@ -1056,7 +1056,7 @@ function NewGroupModal({
   onCreate: (nome: string, emoji: string, membros: string[]) => void;
 }) {
   const [nome, setNome] = useState("");
-  const [emoji, setEmoji] = useState("💬");
+  const [emoji, setEmoji] = useState("??");
   const [membros, setMembros] = useState<string[]>([]);
   const [search, setSearch] = useState("");
   const others = usuarios.filter((mu) => mu.id !== currentUserId);
@@ -1073,12 +1073,12 @@ function NewGroupModal({
         </div>
         <div className="px-5 py-4 space-y-4">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-full bg-vine-100 border-2 border-vine-200 flex items-center justify-center text-2xl">{emoji}</div>
-            <input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Nome do grupo" className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-vine-300" />
+            <div className="w-12 h-12 rounded-full bg-gray-100 border-2 border-gray-200 flex items-center justify-center text-2xl">{emoji}</div>
+            <input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Nome do grupo" className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-300" />
           </div>
           <div className="flex flex-wrap gap-1.5">
             {GROUP_EMOJIS.map((e) => (
-              <button key={e} onClick={() => setEmoji(e)} className={clsx("text-xl w-9 h-9 rounded-xl flex items-center justify-center transition", emoji === e ? "bg-vine-100 ring-2 ring-vine-400" : "hover:bg-gray-100")}>{e}</button>
+              <button key={e} onClick={() => setEmoji(e)} className={clsx("text-xl w-9 h-9 rounded-xl flex items-center justify-center transition", emoji === e ? "bg-gray-100 ring-2 ring-gray-400" : "hover:bg-gray-100")}>{e}</button>
             ))}
           </div>
           <div>
@@ -1090,16 +1090,16 @@ function NewGroupModal({
             <div className="max-h-36 overflow-y-auto space-y-1">
               {filtered.map((mu) => (
                 <button key={mu.id} onClick={() => toggle(mu.id)} className="w-full flex items-center gap-3 px-2 py-2 rounded-xl hover:bg-gray-50 transition text-left">
-                  <div className="w-8 h-8 rounded-full bg-vine-700 text-white flex items-center justify-center text-xs font-bold shrink-0">{iniciais(mu.nome)}</div>
+                  <div className="w-8 h-8 rounded-full bg-black text-white flex items-center justify-center text-xs font-bold shrink-0">{iniciais(mu.nome)}</div>
                   <span className="flex-1 text-sm text-gray-700 truncate">{mu.nome}</span>
-                  {membros.includes(mu.id) && <Check className="w-4 h-4 text-vine-600 shrink-0" />}
+                  {membros.includes(mu.id) && <Check className="w-4 h-4 text-gray-800 shrink-0" />}
                 </button>
               ))}
             </div>
           </div>
         </div>
         <div className="px-5 pb-4">
-          <button onClick={() => nome.trim() && onCreate(nome.trim(), emoji, membros)} disabled={!nome.trim()} className="w-full bg-vine-700 text-white rounded-xl py-2.5 text-sm font-semibold hover:bg-vine-800 disabled:opacity-40 disabled:cursor-not-allowed transition">
+          <button onClick={() => nome.trim() && onCreate(nome.trim(), emoji, membros)} disabled={!nome.trim()} className="w-full bg-black text-white rounded-xl py-2.5 text-sm font-semibold hover:bg-gray-900 disabled:opacity-40 disabled:cursor-not-allowed transition">
             Criar Grupo{membros.length > 0 ? ` (${membros.length + 1} membros)` : ""}
           </button>
         </div>
@@ -1108,7 +1108,7 @@ function NewGroupModal({
   );
 }
 
-// ─── GrupoAvatar ─────────────────────────────────────────────────
+// --- GrupoAvatar -------------------------------------------------
 
 function GrupoAvatar({ grupo, size = "md" }: { grupo: Grupo; size?: "sm" | "md" }) {
   const sz = size === "sm" ? "w-9 h-9 text-base" : "w-10 h-10 text-xl";
@@ -1119,7 +1119,7 @@ function GrupoAvatar({ grupo, size = "md" }: { grupo: Grupo; size?: "sm" | "md" 
   );
 }
 
-// ─── Page ─────────────────────────────────────────────────────────
+// --- Page ---------------------------------------------------------
 
 export default function ChatPage() {
   const { user, usuarios } = useAuth();
@@ -1140,7 +1140,7 @@ export default function ChatPage() {
   const [replyTo, setReplyTo] = useState<MensagemConversa | null>(null);
   const [myReacoes, setMyReacoes] = useState<Set<string>>(new Set());
 
-  // Carrega reações persistidas do localStorage ao montar
+  // Carrega rea��es persistidas do localStorage ao montar
   useEffect(() => {
     if (!user?.id) return;
     try {
@@ -1157,11 +1157,11 @@ export default function ChatPage() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const updatesChannelRef = useRef<any>(null);
   const activeChatRef = useRef<ActiveChat>(null);
-  // Refs para leitura síncrona no beforeunload e closures
+  // Refs para leitura s�ncrona no beforeunload e closures
   const dmsRef = useRef<ConversaDireta[]>([]);
   const gruposRef = useRef<Grupo[]>([]);
   const conversaIdsRef = useRef<string[]>([]);
-  // Inbox de mensagens recebidas enquanto estava em outra página
+  // Inbox de mensagens recebidas enquanto estava em outra p�gina
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const inboxRef = useRef<Record<string, any[]>>({});
 
@@ -1172,19 +1172,19 @@ export default function ChatPage() {
     return () => document.removeEventListener("click", handleClick);
   }, [ctxMenu]);
 
-  // ── cache localStorage ────────────────────────────────────────────
+  // -- cache localStorage --------------------------------------------
   function cacheKey(uid: string) { return `chat_v1_${uid}`; }
 
   function salvarCache(uid: string, newDms: ConversaDireta[], newGrupos: Grupo[]) {
     try {
       // Mensagens com blob: URL = upload ainda em andamento.
-      // Salva com mediaUrl removida e tipo="texto" temporariamente, para não perder
-      // o texto e o horário. Quando o upload terminar, o cache será atualizado com a URL real.
+      // Salva com mediaUrl removida e tipo="texto" temporariamente, para n�o perder
+      // o texto e o hor�rio. Quando o upload terminar, o cache ser� atualizado com a URL real.
       const clean = (msgs: MensagemConversa[]) =>
         msgs
           .slice(-200)
           .map(m => m.mediaUrl?.startsWith("blob:")
-            ? { ...m, mediaUrl: undefined, conteudo: m.conteudo || "⏳ enviando mídia…" }
+            ? { ...m, mediaUrl: undefined, conteudo: m.conteudo || "? enviando m�dia�" }
             : m
           );
       const dmsSave    = newDms.map(d => ({ ...d, mensagens: clean(d.mensagens) }));
@@ -1198,10 +1198,10 @@ export default function ChatPage() {
       const raw = localStorage.getItem(cacheKey(uid));
       if (!raw) return null;
       const parsed = JSON.parse(raw);
-      // Remove mensagens que ficaram presas como "⏳ enviando mídia…"
-      // (upload não concluído antes de recarregar a página)
+      // Remove mensagens que ficaram presas como "? enviando m�dia�"
+      // (upload n�o conclu�do antes de recarregar a p�gina)
       const limpar = (msgs: MensagemConversa[]) =>
-        msgs.filter((m) => m.conteudo !== "⏳ enviando mídia…");
+        msgs.filter((m) => m.conteudo !== "? enviando m�dia�");
       return {
         dms:    parsed.dms?.map((d: ConversaDireta) => ({ ...d, mensagens: limpar(d.mensagens) })) ?? [],
         grupos: parsed.grupos?.map((g: Grupo) => ({ ...g, mensagens: limpar(g.mensagens) })) ?? [],
@@ -1209,7 +1209,7 @@ export default function ChatPage() {
     } catch { return null; }
   }
 
-  // ── helpers Supabase ─────────────────────────────────────────────
+  // -- helpers Supabase ---------------------------------------------
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   function rowToMensagem(row: any): MensagemConversa {
     return {
@@ -1230,17 +1230,17 @@ export default function ChatPage() {
     };
   }
 
-  // ── carregar conversas ────────────────────────────────────────────
+  // -- carregar conversas --------------------------------------------
   useEffect(() => {
     if (!user?.id) return;
     const uid = user.id;
 
-    // 1) Carrega cache + inbox de forma SÍNCRONA (zero latência, sem race conditions)
+    // 1) Carrega cache + inbox de forma S�NCRONA (zero lat�ncia, sem race conditions)
     if (!cacheLoadedRef.current) {
       cacheLoadedRef.current = true;
 
-      // ── Lê e limpa inbox ANTES de qualquer operação assíncrona ──────
-      // Motivo: se lido depois de fetch assíncrono, o inbox pode ser
+      // -- L� e limpa inbox ANTES de qualquer opera��o ass�ncrona ------
+      // Motivo: se lido depois de fetch ass�ncrono, o inbox pode ser
       // sobrescrito ou sobreposto por outros setDms concorrentes.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const inbox: Record<string, any[]> = {};
@@ -1254,10 +1254,10 @@ export default function ChatPage() {
             inbox[cid] = Array.isArray(entry) ? entry : (entry ? [entry] : []);
           }
         }
-      } catch { /* localStorage indisponível */ }
-      inboxRef.current = inbox; // mantém para uso em carregarMensagens também
+      } catch { /* localStorage indispon�vel */ }
+      inboxRef.current = inbox; // mant�m para uso em carregarMensagens tamb�m
 
-      // ── Mescla inbox no cache antes de setar estado ─────────────────
+      // -- Mescla inbox no cache antes de setar estado -----------------
       const cached = lerCache(uid);
       const baseDms: ConversaDireta[]   = cached?.dms    ?? [];
       const baseGrupos: Grupo[]         = cached?.grupos ?? [];
@@ -1347,7 +1347,7 @@ export default function ChatPage() {
 
       if (c.tipo === "direto") {
         const otherId = membrosIds.find((id: string) => id !== user.id) ?? "";
-        const otherNome = nomePorId[otherId] ?? usuarios.find(mu => mu.id === otherId)?.nome ?? "Usuário";
+        const otherNome = nomePorId[otherId] ?? usuarios.find(mu => mu.id === otherId)?.nome ?? "Usu�rio";
         newDms.push({
           id: c.id,
           participantes: [user.id, otherId] as [string, string],
@@ -1357,7 +1357,7 @@ export default function ChatPage() {
       } else {
         newGrupos.push({
           id: c.id, nome: c.nome ?? "Grupo", tipo: "geral",
-          emoji: c.emoji ?? "💬", cor: c.cor ?? "bg-vine-700",
+          emoji: c.emoji ?? "??", cor: c.cor ?? "bg-black",
           descricao: c.descricao ?? undefined, adminId: c.admin_id ?? undefined,
           somenteAdmin: c.somente_admin ?? false, institucional: c.institucional ?? false,
           membros: membrosIds, mensagens,
@@ -1365,11 +1365,11 @@ export default function ChatPage() {
       }
     }
 
-    // ── MERGE: nunca substituir mensagens existentes ─────────────────
-    // Mantém todas as mensagens já no estado (cache + broadcasts recebidos).
-    // Adiciona apenas as que vieram do banco e ainda não existem no estado.
+    // -- MERGE: nunca substituir mensagens existentes -----------------
+    // Mant�m todas as mensagens j� no estado (cache + broadcasts recebidos).
+    // Adiciona apenas as que vieram do banco e ainda n�o existem no estado.
     // Isso evita apagar mensagens de broadcast recebidas entre o carregamento
-    // do cache e a conclusão desta query assíncrona.
+    // do cache e a conclus�o desta query ass�ncrona.
     setDms(prev => {
       const prevMap = new Map(prev.map(d => [d.id, d]));
       return newDms.map(newDm => {
@@ -1413,7 +1413,7 @@ export default function ChatPage() {
     const dbMsgs = (data as any[]).map(row => ({ ...rowToMensagem(row), lida: true }));
     const dbIds = new Set(dbMsgs.map((m: MensagemConversa) => m.id));
 
-    // Mensagens do inbox para esta conversa que ainda não estão no banco
+    // Mensagens do inbox para esta conversa que ainda n�o est�o no banco
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const inboxExtra: MensagemConversa[] = (inboxRef.current[conversaId] ?? [])
       .filter((im: { id: string }) => !dbIds.has(im.id))
@@ -1435,7 +1435,7 @@ export default function ChatPage() {
       const cacheById = new Map(dm.mensagens.map(m => [m.id, m]));
       const mergedDb = dbMsgs.map(dbMsg => {
         const cached = cacheById.get(dbMsg.id);
-        // Preserva mediaUrl do cache se o banco não tem
+        // Preserva mediaUrl do cache se o banco n�o tem
         const mediaUrl = (!dbMsg.mediaUrl && cached?.mediaUrl) ? cached.mediaUrl : dbMsg.mediaUrl;
         // MIN(cacheTime, dbTime) para corrigir delay de insert no banco
         const criadoEm = cached && new Date(cached.criadoEm).getTime() < new Date(dbMsg.criadoEm).getTime()
@@ -1466,7 +1466,7 @@ export default function ChatPage() {
     // cache salvo automaticamente pelo useEffect [dms, grupos]
   }
 
-  // ── broadcast: subscribe a cada conversa (WebSocket puro, sem banco) ──
+  // -- broadcast: subscribe a cada conversa (WebSocket puro, sem banco) --
   useEffect(() => {
     if (!user?.id || conversaIds.length === 0) return;
     const map = broadcastChannelsRef.current;
@@ -1501,16 +1501,16 @@ export default function ChatPage() {
     };
   }, []);
 
-  // ── postgres_changes: só para UPDATE (edições) e novas participações ──
+  // -- postgres_changes: s� para UPDATE (edi��es) e novas participa��es --
   useEffect(() => {
     if (!user?.id) return;
     if (updatesChannelRef.current) supabase.removeChannel(updatesChannelRef.current);
     const ch = supabase.channel(`chat_updates_${user.id}`)
-      // ── INSERT: fallback + correção de clock skew ──────────────────
-      // Usa MIN(broadcastTime, serverTime) para ordenação:
-      //  - Se relógio do remetente estava ADIANTADO: broadcast > server → usa serverTime (correto)
-      //  - Se INSERT chegou ao banco com DELAY de rede: server > broadcast → usa broadcastTime (correto)
-      // Também serve de fallback caso o broadcast WebSocket tenha sido perdido.
+      // -- INSERT: fallback + corre��o de clock skew ------------------
+      // Usa MIN(broadcastTime, serverTime) para ordena��o:
+      //  - Se rel�gio do remetente estava ADIANTADO: broadcast > server ? usa serverTime (correto)
+      //  - Se INSERT chegou ao banco com DELAY de rede: server > broadcast ? usa broadcastTime (correto)
+      // Tamb�m serve de fallback caso o broadcast WebSocket tenha sido perdido.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .on("postgres_changes" as any, {
         event: "INSERT", schema: "public", table: "chat_mensagens",
@@ -1524,12 +1524,12 @@ export default function ChatPage() {
           ...rowToMensagem(row),
           lida: row.autor_id === user.id || activeChatRef.current?.id === cid,
         };
-        // MIN(broadcastTime, serverTime): mantém o timestamp mais antigo entre os dois
+        // MIN(broadcastTime, serverTime): mant�m o timestamp mais antigo entre os dois
         const upsertSorted = (msgs: MensagemConversa[]) => {
           const existing = msgs.find(m => m.id === msg.id);
           let bestTime = serverTime;
           if (existing) {
-            // Mantém o menor timestamp: broadcast pode refletir envio real antes do DB INSERT
+            // Mant�m o menor timestamp: broadcast pode refletir envio real antes do DB INSERT
             bestTime = new Date(existing.criadoEm).getTime() < new Date(serverTime).getTime()
               ? existing.criadoEm
               : serverTime;
@@ -1542,7 +1542,7 @@ export default function ChatPage() {
         setDms(prev => prev.map(dm => dm.id === cid ? { ...dm, mensagens: upsertSorted(dm.mensagens) } : dm));
         setGrupos(prev => prev.map(g => g.id === cid ? { ...g, mensagens: upsertSorted(g.mensagens) } : g));
       })
-      // ── UPDATE: edições de mensagens ────────────────────────────────
+      // -- UPDATE: edi��es de mensagens --------------------------------
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .on("postgres_changes" as any, {
         event: "UPDATE", schema: "public", table: "chat_mensagens",
@@ -1563,14 +1563,14 @@ export default function ChatPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 
-  // ── carrega histórico ao abrir conversa ────────────────────────────
+  // -- carrega hist�rico ao abrir conversa ----------------------------
   useEffect(() => {
     if (!activeChat) return;
     carregarMensagens(activeChat.id);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeChat?.id]);
 
-  // ── atualiza totalUnread no contexto ─────────────────────────────
+  // -- atualiza totalUnread no contexto -----------------------------
   useEffect(() => {
     if (!user?.id) return;
     const uid = user.id;
@@ -1581,22 +1581,22 @@ export default function ChatPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dms, grupos]);
 
-  // ── auto-salva cache sempre que dms/grupos mudam ─────────────────
+  // -- auto-salva cache sempre que dms/grupos mudam -----------------
   // Cobre mensagens chegadas por broadcast que antes eram perdidas no reload
   useEffect(() => {
     if (!user?.id) return;
-    // Mantém refs atualizadas para uso síncrono (beforeunload, closures)
+    // Mant�m refs atualizadas para uso s�ncrono (beforeunload, closures)
     dmsRef.current = dms;
     gruposRef.current = grupos;
     salvarCache(user.id, dms, grupos);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dms, grupos]);
 
-  // ── mantém conversaIdsRef sempre atualizado ───────────────────────
+  // -- mant�m conversaIdsRef sempre atualizado -----------------------
   useEffect(() => { conversaIdsRef.current = conversaIds; }, [conversaIds]);
 
-  // ── salva cache de forma síncrona ao fechar a aba ─────────────────
-  // O useEffect[dms,grupos] pode não ter rodado antes do unload.
+  // -- salva cache de forma s�ncrona ao fechar a aba -----------------
+  // O useEffect[dms,grupos] pode n�o ter rodado antes do unload.
   // O beforeunload garante que o cache tenha os dados mais recentes.
   useEffect(() => {
     if (!user?.id) return;
@@ -1607,7 +1607,7 @@ export default function ChatPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 
-  // ── sincroniza activeChatId no contexto global ───────────────────
+  // -- sincroniza activeChatId no contexto global -------------------
   useEffect(() => {
     setActiveChatId(activeChat?.id ?? null);
     return () => { setActiveChatId(null); };
@@ -1632,7 +1632,7 @@ export default function ChatPage() {
   }
 
   async function deleteDm(id: string) {
-    // deleta conversa — ON DELETE CASCADE remove participantes e mensagens
+    // deleta conversa � ON DELETE CASCADE remove participantes e mensagens
     await supabase.from("chat_conversas").delete().eq("id", id);
     setDms((prev) => prev.filter((dm) => dm.id !== id));
     if (activeChat?.tipo === "direto" && activeChat.id === id) openChat(null);
@@ -1688,7 +1688,7 @@ export default function ChatPage() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        tipo: "grupo", nome, emoji, cor: "bg-vine-700",
+        tipo: "grupo", nome, emoji, cor: "bg-black",
         descricao: `Grupo criado por ${u.nome}`, admin_id: u.id, somente_admin: false,
         participantes: allMembros,
       }),
@@ -1700,7 +1700,7 @@ export default function ChatPage() {
     }
     const cid: string = json.id;
     setGrupos((prev) => [...prev, {
-      id: cid, nome, tipo: "geral", emoji, cor: "bg-vine-700",
+      id: cid, nome, tipo: "geral", emoji, cor: "bg-black",
       descricao: `Grupo criado por ${u.nome}`, adminId: u.id,
       somenteAdmin: false, institucional: false, membros: allMembros, mensagens: [],
     }]);
@@ -1729,16 +1729,16 @@ export default function ChatPage() {
       conteudo: text, criadoEm: clientTime, lida: true,
       respostaA: replySnapshot ? { id: replySnapshot.id, autorNome: replySnapshot.autorNome, conteudo: replySnapshot.conteudo } : undefined,
     };
-    // 1) Optimistic: você vê sua mensagem imediatamente
+    // 1) Optimistic: voc� v� sua mensagem imediatamente
     setDms((prev) => prev.map((dm) => dm.id === dmId ? {
       ...dm,
       mensagens: [...dm.mensagens, msg].sort((a, b) => new Date(a.criadoEm).getTime() - new Date(b.criadoEm).getTime()),
     } : dm));
     setReplyTo(null);
 
-    // 2) Persiste no DB primeiro — o servidor retorna o criado_em autoritativo (NOW())
-    // O broadcast SÓ acontece depois, carregando o timestamp do servidor.
-    // Isso garante que todos os clientes ordenam mensagens pelo relógio do servidor.
+    // 2) Persiste no DB primeiro � o servidor retorna o criado_em autoritativo (NOW())
+    // O broadcast S� acontece depois, carregando o timestamp do servidor.
+    // Isso garante que todos os clientes ordenam mensagens pelo rel�gio do servidor.
     try {
       const token = await getFreshToken();
       const r = await fetch("/api/chat/mensagem", {
@@ -1768,12 +1768,12 @@ export default function ChatPage() {
           .map((m) => m.id === msgId ? finalMsg : m)
           .sort((a, b) => new Date(a.criadoEm).getTime() - new Date(b.criadoEm).getTime()),
       } : dm));
-      // 4) Broadcast com timestamp do servidor — amigo recebe na ordem correta
+      // 4) Broadcast com timestamp do servidor � amigo recebe na ordem correta
       broadcastChannelsRef.current.get(dmId)?.send({ type: "broadcast", event: "msg", payload: finalMsg });
     } catch (err) {
       console.error("sendDm network error:", err);
       setDms((prev) => prev.map((dm) => dm.id === dmId ? { ...dm, mensagens: dm.mensagens.filter((m) => m.id !== msgId) } : dm));
-      showToast("Sem conexão — mensagem não enviada");
+      showToast("Sem conex�o � mensagem n�o enviada");
     }
   }
 
@@ -1793,7 +1793,7 @@ export default function ChatPage() {
     } : g));
     setReplyTo(null);
 
-    // 2) DB primeiro → timestamp do servidor
+    // 2) DB primeiro ? timestamp do servidor
     try {
       const token = await getFreshToken();
       const r = await fetch("/api/chat/mensagem", {
@@ -1828,7 +1828,7 @@ export default function ChatPage() {
     } catch (err) {
       console.error("sendGrupo network error:", err);
       setGrupos((prev) => prev.map((g) => g.id === grupoId ? { ...g, mensagens: g.mensagens.filter((m) => m.id !== msgId) } : g));
-      showToast("Sem conexão — mensagem não enviada");
+      showToast("Sem conex�o � mensagem n�o enviada");
     }
   }
 
@@ -1840,10 +1840,10 @@ export default function ChatPage() {
       conteudo: "", tipo: "imagem", mediaUrl: localUrl,
       criadoEm: new Date().toISOString(), lida: true,
     };
-    // Optimistic: mostra imagem local imediatamente (só para o remetente)
+    // Optimistic: mostra imagem local imediatamente (s� para o remetente)
     if (tipo === "direto") setDms(prev => prev.map(dm => dm.id === conversaId ? { ...dm, mensagens: [...dm.mensagens, msg] } : dm));
     else setGrupos(prev => prev.map(g => g.id === conversaId ? { ...g, mensagens: [...g.mensagens, msg] } : g));
-    // Não faz broadcast ainda — blob: URL só funciona localmente
+    // N�o faz broadcast ainda � blob: URL s� funciona localmente
 
     try {
       const token = await getFreshToken();
@@ -1864,7 +1864,7 @@ export default function ChatPage() {
       else setGrupos(prev => prev.map(g => g.id === conversaId ? { ...g, mensagens: g.mensagens.map(updater) } : g));
       URL.revokeObjectURL(localUrl);
 
-      // Broadcast só agora, com URL definitiva (outros usuários podem exibir)
+      // Broadcast s� agora, com URL definitiva (outros usu�rios podem exibir)
       const finalMsg = { ...msg, mediaUrl: finalUrl };
       broadcastChannelsRef.current.get(conversaId)?.send({ type: "broadcast", event: "msg", payload: finalMsg });
 
@@ -1894,7 +1894,7 @@ export default function ChatPage() {
     };
     if (tipo === "direto") setDms(prev => prev.map(dm => dm.id === conversaId ? { ...dm, mensagens: [...dm.mensagens, msg] } : dm));
     else setGrupos(prev => prev.map(g => g.id === conversaId ? { ...g, mensagens: [...g.mensagens, msg] } : g));
-    // Não faz broadcast ainda — blob: URL só funciona localmente
+    // N�o faz broadcast ainda � blob: URL s� funciona localmente
 
     try {
       const token = await getFreshToken();
@@ -1916,11 +1916,11 @@ export default function ChatPage() {
       else setGrupos(prev => prev.map(g => g.id === conversaId ? { ...g, mensagens: g.mensagens.map(updater) } : g));
       URL.revokeObjectURL(localUrl);
 
-      // Broadcast só agora, com URL definitiva
+      // Broadcast s� agora, com URL definitiva
       const finalMsg = { ...msg, mediaUrl: finalUrl };
       broadcastChannelsRef.current.get(conversaId)?.send({ type: "broadcast", event: "msg", payload: finalMsg });
 
-      // Persiste no banco — tratamento de erro igual ao sendDm
+      // Persiste no banco � tratamento de erro igual ao sendDm
       fetch("/api/chat/mensagem", {
         method: "POST", keepalive: true,
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
@@ -1970,7 +1970,7 @@ export default function ChatPage() {
       return next;
     });
 
-    // 2) Calcula novo array de reações para o banco e para outros usuários
+    // 2) Calcula novo array de rea��es para o banco e para outros usu�rios
     const getMsg = () => {
       const msgs = activeChat.tipo === "direto"
         ? dms.find(d => d.id === activeChat.id)?.mensagens
@@ -1992,8 +1992,8 @@ export default function ChatPage() {
       setGrupos(prev => prev.map(g => g.id === activeChat.id ? { ...g, mensagens: updater(g.mensagens) } : g));
     }
 
-    // 4) Persiste no banco — dispara UPDATE que o postgres_changes já escuta
-    // O outro usuário receberá a atualização automaticamente via postgres_changes UPDATE
+    // 4) Persiste no banco � dispara UPDATE que o postgres_changes j� escuta
+    // O outro usu�rio receber� a atualiza��o automaticamente via postgres_changes UPDATE
     supabase.from("chat_mensagens")
       .update({ reacoes: newReacoes })
       .eq("id", msgId)
@@ -2046,19 +2046,19 @@ export default function ChatPage() {
     }
   }
 
-  // ── Chat header ───────────────────────────────────────────────────
+  // -- Chat header ---------------------------------------------------
 
   function renderChatHeader(name: string, subtitle: string, avatarEl: ReactNode) {
     return (
       <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-100 bg-white shrink-0">
         <button
           onClick={() => openChat(null)}
-          className="lg:hidden text-gray-400 hover:text-vine-600 transition"
+          className="lg:hidden text-gray-400 hover:text-gray-800 transition"
         >
           <ArrowLeft className="w-5 h-5" />
         </button>
 
-        {/* Clickable name/avatar → info panel */}
+        {/* Clickable name/avatar ? info panel */}
         <button
           onClick={() => setInfoOpen((v) => !v)}
           className="flex items-center gap-3 flex-1 min-w-0 text-left hover:opacity-80 transition"
@@ -2075,7 +2075,7 @@ export default function ChatPage() {
           <button
             onClick={() => { setChatSearchOpen((v) => !v); setChatSearchQuery(""); }}
             className={clsx("w-8 h-8 rounded-full flex items-center justify-center transition",
-              chatSearchOpen ? "bg-vine-100 text-vine-700" : "text-gray-400 hover:text-vine-600 hover:bg-gray-100")}
+              chatSearchOpen ? "bg-gray-100 text-gray-900" : "text-gray-400 hover:text-gray-800 hover:bg-gray-100")}
             title="Pesquisar na conversa"
           >
             <Search className="w-4 h-4" />
@@ -2083,7 +2083,7 @@ export default function ChatPage() {
           <button
             onClick={() => setInfoOpen((v) => !v)}
             className={clsx("w-8 h-8 rounded-full flex items-center justify-center transition",
-              infoOpen ? "bg-vine-100 text-vine-700" : "text-gray-400 hover:text-vine-600 hover:bg-gray-100")}
+              infoOpen ? "bg-gray-100 text-gray-900" : "text-gray-400 hover:text-gray-800 hover:bg-gray-100")}
             title="Informacoes"
           >
             <Info className="w-4 h-4" />
@@ -2093,7 +2093,7 @@ export default function ChatPage() {
     );
   }
 
-  // ── Chat panel ────────────────────────────────────────────────────
+  // -- Chat panel ----------------------------------------------------
 
   function renderChatPanel() {
     if (!activeChat) return null;
@@ -2106,7 +2106,7 @@ export default function ChatPage() {
       const other = otherParticipant(activeDm);
       const otherUser = usuarios.find((mu) => mu.id === other.id);
       const avatarEl = (
-        <div className="w-9 h-9 rounded-full bg-vine-700 text-white flex items-center justify-center text-sm font-bold shrink-0">
+        <div className="w-9 h-9 rounded-full bg-black text-white flex items-center justify-center text-sm font-bold shrink-0">
           {iniciais(other.nome)}
         </div>
       );
@@ -2163,10 +2163,10 @@ export default function ChatPage() {
 
           {/* Reply preview bar */}
           {replyTo && (
-            <div className="flex items-center gap-2 px-4 py-2 border-t border-gray-100 bg-vine-50 shrink-0">
-              <div className="w-0.5 h-9 rounded-full bg-vine-600 shrink-0" />
+            <div className="flex items-center gap-2 px-4 py-2 border-t border-gray-100 bg-gray-50 shrink-0">
+              <div className="w-0.5 h-9 rounded-full bg-gray-800 shrink-0" />
               <div className="flex-1 min-w-0">
-                <p className="text-[10px] font-semibold text-vine-700">{replyTo.autorNome}</p>
+                <p className="text-[10px] font-semibold text-gray-900">{replyTo.autorNome}</p>
                 <p className="text-xs text-gray-500 truncate">{replyTo.conteudo}</p>
               </div>
               <button onClick={() => setReplyTo(null)} className="text-gray-400 hover:text-gray-600 transition">
@@ -2198,7 +2198,7 @@ export default function ChatPage() {
     );
   }
 
-  // ── Left list ─────────────────────────────────────────────────────
+  // -- Left list -----------------------------------------------------
 
   function renderList() {
     return (
@@ -2214,7 +2214,7 @@ export default function ChatPage() {
               onClick={() => { setTab(id); openChat(null); setSearch(""); }}
               className={clsx(
                 "flex-1 flex flex-col items-center gap-0.5 py-2.5 text-xs font-semibold border-b-2 transition",
-                tab === id ? "border-vine-600 text-vine-700" : "border-transparent text-gray-400 hover:text-vine-600"
+                tab === id ? "border-gray-800 text-gray-900" : "border-transparent text-gray-400 hover:text-gray-800"
               )}
             >
               <span className="relative">
@@ -2243,7 +2243,7 @@ export default function ChatPage() {
           </div>
           <button
             onClick={() => tab === "direto" ? setShowNewDmModal(true) : setShowNewGroupModal(true)}
-            className="w-9 h-9 rounded-full bg-vine-700 text-white flex items-center justify-center shrink-0 hover:bg-vine-800 active:scale-95 transition"
+            className="w-9 h-9 rounded-full bg-black text-white flex items-center justify-center shrink-0 hover:bg-gray-900 active:scale-95 transition"
             title={tab === "direto" ? "Nova conversa" : "Criar grupo"}
           >
             <Plus className="w-4 h-4" />
@@ -2258,7 +2258,7 @@ export default function ChatPage() {
                 <div className="flex flex-col items-center gap-2 py-12 text-gray-300">
                   <MessageSquare className="w-8 h-8 opacity-40" />
                   <p className="text-sm text-gray-400">Nenhuma conversa ainda.</p>
-                  <button onClick={() => setShowNewDmModal(true)} className="text-xs text-vine-600 font-semibold mt-1 hover:underline">Iniciar conversa</button>
+                  <button onClick={() => setShowNewDmModal(true)} className="text-xs text-gray-800 font-semibold mt-1 hover:underline">Iniciar conversa</button>
                 </div>
               )}
               {filteredDms.map((dm) => {
@@ -2270,11 +2270,11 @@ export default function ChatPage() {
                 return (
                   <div
                     key={dm.id}
-                    className={clsx("relative group w-full flex items-center gap-3 px-4 py-3.5 border-b border-gray-50 transition cursor-pointer select-none", isActive ? "bg-vine-50" : "hover:bg-gray-50")}
+                    className={clsx("relative group w-full flex items-center gap-3 px-4 py-3.5 border-b border-gray-50 transition cursor-pointer select-none", isActive ? "bg-gray-50" : "hover:bg-gray-50")}
                     onClick={() => openChat({ tipo: "direto", id: dm.id })}
                   >
                     <div className="relative shrink-0">
-                      <div className="w-10 h-10 rounded-full bg-vine-700 text-white flex items-center justify-center text-sm font-bold">
+                      <div className="w-10 h-10 rounded-full bg-black text-white flex items-center justify-center text-sm font-bold">
                         {iniciais(other.nome)}
                       </div>
                       {unread > 0 && <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center">{unread}</span>}
@@ -2288,7 +2288,7 @@ export default function ChatPage() {
                       </div>
                       {last && (
                         <p className={clsx("text-xs truncate mt-0.5", unread > 0 ? "text-gray-700 font-medium" : "text-gray-400")}>
-                          {last.autorId === u.id ? "Voce: " : ""}{last.tipo === "imagem" ? "📷 Foto" : last.tipo === "audio" ? "🎤 Áudio" : last.tipo === "documento" ? "📎 " + (last.conteudo || "Documento") : last.conteudo}
+                          {last.autorId === u.id ? "Voce: " : ""}{last.tipo === "imagem" ? "?? Foto" : last.tipo === "audio" ? "?? �udio" : last.tipo === "documento" ? "?? " + (last.conteudo || "Documento") : last.conteudo}
                         </p>
                       )}
                     </div>
@@ -2324,7 +2324,7 @@ export default function ChatPage() {
                 <div className="flex flex-col items-center gap-2 py-12 text-gray-300">
                   <Users className="w-8 h-8 opacity-40" />
                   <p className="text-sm text-gray-400">Voce nao participa de nenhum grupo.</p>
-                  <button onClick={() => setShowNewGroupModal(true)} className="text-xs text-vine-600 font-semibold mt-1 hover:underline">Criar grupo</button>
+                  <button onClick={() => setShowNewGroupModal(true)} className="text-xs text-gray-800 font-semibold mt-1 hover:underline">Criar grupo</button>
                 </div>
               )}
               {gruposBySection.map((section) => (
@@ -2339,7 +2339,7 @@ export default function ChatPage() {
                     return (
                       <div
                         key={g.id}
-                        className={clsx("relative group w-full flex items-center gap-3 px-4 py-3 border-b border-gray-50 transition cursor-pointer select-none", isActive ? "bg-vine-50" : "hover:bg-gray-50")}
+                        className={clsx("relative group w-full flex items-center gap-3 px-4 py-3 border-b border-gray-50 transition cursor-pointer select-none", isActive ? "bg-gray-50" : "hover:bg-gray-50")}
                         onClick={() => openChat({ tipo: "grupo", id: g.id })}
                       >
                         <div className="relative shrink-0">
@@ -2356,13 +2356,13 @@ export default function ChatPage() {
                           </div>
                           {last ? (
                             <p className={clsx("text-xs truncate mt-0.5", unread > 0 ? "text-gray-700 font-medium" : "text-gray-400")}>
-                              {last.autorId === u.id ? "Voce: " : last.autorNome.split(" ")[0] + ": "}{last.tipo === "imagem" ? "📷 Foto" : last.tipo === "audio" ? "🎤 Áudio" : last.tipo === "documento" ? "📎 " + (last.conteudo || "Documento") : last.conteudo}
+                              {last.autorId === u.id ? "Voce: " : last.autorNome.split(" ")[0] + ": "}{last.tipo === "imagem" ? "?? Foto" : last.tipo === "audio" ? "?? �udio" : last.tipo === "documento" ? "?? " + (last.conteudo || "Documento") : last.conteudo}
                             </p>
                           ) : (
                             <p className="text-xs text-gray-300 mt-0.5 italic">{g.descricao}</p>
                           )}
                         </div>
-                        {/* Context menu — apenas grupos nao institucionais */}
+                        {/* Context menu � apenas grupos nao institucionais */}
                         {!g.institucional && (
                           <div className="relative shrink-0" onClick={(e) => e.stopPropagation()}>
                             <button
@@ -2406,7 +2406,7 @@ export default function ChatPage() {
     );
   }
 
-  // ─── Layout ───────────────────────────────────────────────────────
+  // --- Layout -------------------------------------------------------
 
   return (
     <div>
@@ -2414,9 +2414,9 @@ export default function ChatPage() {
       {showNewDmModal && <NewDmModal currentUserId={u.id} dms={dms} usuarios={usuarios} onStart={startDm} onClose={() => setShowNewDmModal(false)} />}
       {showNewGroupModal && <NewGroupModal currentUserId={u.id} usuarios={usuarios} onClose={() => setShowNewGroupModal(false)} onCreate={createGroup} />}
       <div className="mb-3">
-        <h1 className="text-xl md:text-2xl font-sans font-semibold text-vine-950">Mensagens</h1>
+        <h1 className="text-xl md:text-2xl font-sans font-semibold text-black">Mensagens</h1>
         <p className="text-sm text-gray-500 mt-0.5 hidden sm:block">
-          Conversas diretas, chat do culto e canais de ministério.
+          Conversas diretas, chat do culto e canais de minist�rio.
         </p>
       </div>
 

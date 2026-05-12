@@ -1,4 +1,4 @@
-/**
+﻿/**
  * LogoMark – SVG da marca "Igreja Ramo da Vida"
  * Cruz stylizada com ramos/folhas crescendo do caule inferior.
  *

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 import { Clock } from "lucide-react";
@@ -75,9 +75,9 @@ export default function CountdownBadge() {
   if (!label) return null;
 
   return (
-    <div className="inline-flex items-center gap-2.5 bg-vine-900/70 border border-vine-800/60 backdrop-blur-sm rounded-full px-5 py-2">
+    <div className="inline-flex items-center gap-2.5 bg-vine-900/70 border border-gray-900/60 backdrop-blur-sm rounded-full px-5 py-2">
       <Clock className="w-3.5 h-3.5 text-gold-400 shrink-0 animate-pulse" />
-      <span className="text-vine-400 text-xs">{label} em:</span>
+      <span className="text-gray-400 text-xs">{label} em:</span>
       <span className="font-mono font-bold text-gold-300 text-xs tabular-nums tracking-wider">
         {countdown}
       </span>

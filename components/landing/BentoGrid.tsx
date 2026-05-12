@@ -84,7 +84,7 @@ function LatestCultoCard() {
       depth={1}
       className="rounded-[20px] overflow-hidden relative group h-full min-h-[240px] transition-shadow duration-300 hover:shadow-[0_12px_40px_rgba(0,0,0,0.08)]"
     >
-      {/* Vídeo com loop nativo */}
+      {/* V�deo com loop nativo */}
       <video
         src="/final.mp4"
         autoPlay
@@ -114,7 +114,7 @@ function LatestCultoCard() {
         <div className="bg-white/5 backdrop-blur-sm rounded-2xl px-6 py-5 flex flex-col items-start gap-2">
           <p className="font-sans text-white/80 text-[11px] tracking-[0.3em] uppercase font-medium">Ao vivo</p>
           <h3 className="font-sans text-2xl md:text-3xl text-white font-semibold tracking-wide leading-tight">
-            Assista nosso último culto
+            Assista nosso �ltimo culto
           </h3>
         </div>
         <a
@@ -122,9 +122,9 @@ function LatestCultoCard() {
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex items-center gap-2.5 px-6 py-3 rounded-full
-                     bg-vine-900 border border-vine-800
+                     bg-vine-900 border border-gray-900
                      text-white text-sm font-sans font-medium
-                     hover:bg-vine-800 transition-all duration-300
+                     hover:bg-gray-900 transition-all duration-300
                      group/btn"
         >
           <Play className="w-4 h-4 fill-current group-hover/btn:scale-110 transition-transform" />
@@ -142,7 +142,7 @@ function DevocionalCard() {
       depth={1}
       className="rounded-[20px] overflow-hidden relative group h-full min-h-[240px] transition-shadow duration-300 hover:shadow-[0_12px_40px_rgba(0,0,0,0.08)]"
     >
-      {/* Vídeo com loop nativo */}
+      {/* V�deo com loop nativo */}
       <video
         src="/hero-bg.mp4"
         muted
@@ -160,17 +160,17 @@ function DevocionalCard() {
       {/* Content */}
       <div className="relative z-10 flex flex-col items-start justify-end h-full text-left p-8 gap-4">
         <div className="bg-white/5 backdrop-blur-sm rounded-2xl px-6 py-5 flex flex-col items-start gap-2">
-          <p className="font-sans text-white/80 text-[11px] tracking-[0.3em] uppercase font-medium">Diário</p>
+          <p className="font-sans text-white/80 text-[11px] tracking-[0.3em] uppercase font-medium">Di�rio</p>
           <h3 className="font-sans text-2xl md:text-3xl text-white font-semibold tracking-wide leading-tight">
-            Faça seu devocional diário
+            Fa�a seu devocional di�rio
           </h3>
         </div>
         <a
           href="/devocional"
           className="inline-flex items-center gap-2.5 px-6 py-3 rounded-full
-                     bg-vine-900 border border-vine-800
+                     bg-vine-900 border border-gray-900
                      text-white text-sm font-sans font-medium
-                     hover:bg-vine-800 transition-all duration-300
+                     hover:bg-gray-900 transition-all duration-300
                      group/btn"
         >
           <BookOpen className="w-4 h-4 group-hover/btn:scale-110 transition-transform" />
@@ -242,7 +242,7 @@ export default function BentoGrid() {
         }}
       />
 
-      {/* ── Ramo botânico — canto inferior esquerdo ── */}
+      {/* -- Ramo bot�nico � canto inferior esquerdo -- */}
       <motion.svg
         aria-hidden="true"
         style={{ y: branchParallax, filter: "blur(3px)" }}
@@ -276,7 +276,7 @@ export default function BentoGrid() {
         <ellipse cx="35" cy="140" rx="3" ry="7" transform="rotate(-20 35 140)" fill="#276f2a" opacity="0.4"/>
       </motion.svg>
 
-      {/* ── Ramo botânico — canto superior direito ── */}
+      {/* -- Ramo bot�nico � canto superior direito -- */}
       <motion.svg
         aria-hidden="true"
         style={{ y: branchParallax, filter: "blur(3px)", scaleY: -1, scaleX: -1 }}
@@ -320,7 +320,7 @@ export default function BentoGrid() {
           className="text-center mb-16"
         >
           <p className="text-[#1A1A1A] text-sm md:text-base font-medium tracking-[0.2em] uppercase">
-            Se liga nas últimas atualizações
+            Se liga nas �ltimas atualiza��es
           </p>
         </motion.div>
 
@@ -356,10 +356,10 @@ export default function BentoGrid() {
           >
             <div className="mb-6 flex items-end justify-between border-b border-black/[0.06] pb-5">
               <div>
-                <p className="mb-1.5 text-[11px] uppercase tracking-[0.45em] text-vine-600">Fique por dentro</p>
-                <h2 className="font-sans text-2xl font-semibold leading-none text-vine-900">Mural de Avisos</h2>
+                <p className="mb-1.5 text-[11px] uppercase tracking-[0.45em] text-gray-800">Fique por dentro</p>
+                <h2 className="font-sans text-2xl font-semibold leading-none text-black">Mural de Avisos</h2>
               </div>
-              <Bell className="h-5 w-5 text-vine-500" />
+              <Bell className="h-5 w-5 text-gray-600" />
             </div>
 
             <ol className="space-y-3 flex-1 overflow-auto">
@@ -370,11 +370,11 @@ export default function BentoGrid() {
                   whileInView={{ opacity: 1, x: 0 }}
                   viewport={{ once: true }}
                   transition={{ duration: 0.45, delay: i * 0.08 }}
-                  className="group flex items-start gap-4 rounded-xl border border-black/[0.05] border-l-2 border-l-vine-500 bg-transparent px-5 pl-6 py-4 transition-all duration-300 hover:bg-black/[0.03] cursor-pointer"
+                  className="group flex items-start gap-4 rounded-xl border border-black/[0.05] border-l-2 border-l-gray-900 bg-transparent px-5 pl-6 py-4 transition-all duration-300 hover:bg-black/[0.03] cursor-pointer"
                 >
                   <div className="flex flex-1 flex-col gap-1.5 min-w-0">
-                    <span className="text-sm font-semibold leading-snug text-vine-900">{aviso.titulo}</span>
-                    <span className="text-xs leading-5 text-vine-600">{aviso.conteudo}</span>
+                    <span className="text-sm font-semibold leading-snug text-black">{aviso.titulo}</span>
+                    <span className="text-xs leading-5 text-gray-800">{aviso.conteudo}</span>
                     <span className="mt-1 inline-flex w-fit items-center gap-1 font-serif italic text-[11px] text-gray-500">
                       <CalendarDays className="h-2.5 w-2.5" />
                       {formatDate(aviso.criadoEm)}
@@ -383,14 +383,14 @@ export default function BentoGrid() {
                 </motion.li>
               ))}
               {avisos.length === 0 && (
-                <li className="py-6 text-center text-[12px] text-vine-400">Nenhum aviso no momento.</li>
+                <li className="py-6 text-center text-[12px] text-gray-400">Nenhum aviso no momento.</li>
               )}
             </ol>
           </motion.div>
         </motion.div>
       </div>
 
-      {/* Fade de saída */}
+      {/* Fade de sa�da */}
       <div className="absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-b from-transparent to-[#FDFDFB]/60 pointer-events-none z-10" />
     </section>
   );

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -700,13 +700,13 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
       if (culto.includes("Quinta")) return "border-l-grape-500";
       if (culto.includes("Domingo")) return "border-l-gold-500";
       if (culto.includes("Especial")) return "border-l-blue-500";
-      return "border-l-vine-500";
+      return "border-l-gray-900";
     };
     const corBadge = (culto: string) => {
       if (culto.includes("Quinta")) return "bg-grape-100 text-grape-900";
       if (culto.includes("Domingo")) return "bg-gold-100 text-gold-900";
       if (culto.includes("Especial")) return "bg-blue-100 text-blue-800";
-      return "bg-vine-100 text-vine-900";
+      return "bg-gray-100 text-black";
     };
 
     const renderCard = (esc: Escala) => {
@@ -721,7 +721,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
           className={clsx(
             "w-full text-left border-l-4 rounded-xl px-3 py-3 border border-gray-100 transition hover:shadow-sm",
             corBorda(esc.culto),
-            isSel ? "bg-vine-50 shadow-sm ring-1 ring-vine-200" : "bg-white hover:bg-gray-50",
+            isSel ? "bg-gray-50 shadow-sm ring-1 ring-gray-200" : "bg-white hover:bg-gray-50",
             isPast && "opacity-60"
           )}
         >
@@ -744,7 +744,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
                   {esc.culto}
                 </span>
                 {equipeLabel && (
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-vine-100 text-vine-800 border border-vine-200">
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-900 border border-gray-200">
                     {equipeLabel}
                   </span>
                 )}
@@ -779,7 +779,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
                       className={clsx(
                         "text-[10px] px-1.5 py-0.5 rounded font-medium",
                         it.voluntarioId === user?.id
-                          ? "bg-vine-200 text-vine-900"
+                          ? "bg-gray-200 text-black"
                           : "bg-gray-100 text-gray-600"
                       )}
                     >
@@ -829,7 +829,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
           {isLider && viewMode === "culto" && (
             <button
               onClick={abrirNova}
-              className="flex items-center gap-1.5 bg-vine-700 text-white text-sm font-semibold px-4 py-2 rounded-xl hover:bg-vine-800 transition shrink-0"
+              className="flex items-center gap-1.5 bg-black text-white text-sm font-semibold px-4 py-2 rounded-xl hover:bg-gray-900 transition shrink-0"
             >
               <Plus className="w-4 h-4" /> Nova escala
             </button>
@@ -843,7 +843,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
             value={busca}
             onChange={(e) => setBusca(e.target.value)}
             placeholder="Buscar por culto ou membro..."
-            className="w-full border border-gray-200 rounded-xl pl-9 pr-4 py-2.5 text-sm outline-none focus:border-vine-400 bg-white"
+            className="w-full border border-gray-200 rounded-xl pl-9 pr-4 py-2.5 text-sm outline-none focus:border-gray-400 bg-white"
           />
         </div>
 
@@ -859,7 +859,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
                   {viewMode === "minhas" ? "Você não está escalado em nenhum culto." : "Nenhuma escala criada."}
                 </p>
                 {isLider && viewMode === "culto" && (
-                  <button onClick={abrirNova} className="text-sm text-vine-700 font-semibold hover:underline">
+                  <button onClick={abrirNova} className="text-sm text-gray-900 font-semibold hover:underline">
                     + Criar a primeira escala
                   </button>
                 )}
@@ -894,14 +894,14 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
                 "px-5 py-4 border-b border-gray-100",
                 selectedEscala.culto.includes("Quinta") ? "bg-grape-50" :
                 selectedEscala.culto.includes("Domingo") ? "bg-gold-50" :
-                selectedEscala.culto.includes("Especial") ? "bg-blue-50" : "bg-vine-50"
+                selectedEscala.culto.includes("Especial") ? "bg-blue-50" : "bg-gray-50"
               )}>
                 <div className="flex items-start justify-between gap-3">
                   <div className="space-y-0.5">
                     <div className="flex items-center gap-2 flex-wrap">
                       <h3 className="font-bold text-gray-900 text-base">{selectedEscala.culto}</h3>
                       {selectedEscala.observacoes?.match(/^(Equipe \d)/)?.[1] && (
-                        <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-vine-100 text-vine-800 border border-vine-200">
+                        <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-900 border border-gray-200">
                           {selectedEscala.observacoes.match(/^(Equipe \d)/)?.[1]}
                         </span>
                       )}
@@ -936,7 +936,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
                       <>
                         <button
                           onClick={() => abrirEdicao(selectedEscala)}
-                          className="p-2 text-gray-500 hover:text-vine-700 hover:bg-white/70 rounded-xl transition"
+                          className="p-2 text-gray-500 hover:text-gray-900 hover:bg-white/70 rounded-xl transition"
                           title="Editar"
                         >
                           <Pencil className="w-4 h-4" />
@@ -977,7 +977,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
                         </thead>
                         <tbody className="divide-y divide-gray-50">
                           {selectedEscala.itens.map((it, i) => (
-                            <tr key={i} className={it.voluntarioId === user?.id ? "bg-vine-50" : ""}>
+                            <tr key={i} className={it.voluntarioId === user?.id ? "bg-gray-50" : ""}>
                               <td className="px-3 py-2.5">
                                 <span className="text-xs font-bold text-grape-800 bg-grape-50 px-2 py-0.5 rounded-full">
                                   {displayFuncao(it)}
@@ -986,7 +986,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
                               <td className="px-3 py-2.5 font-medium text-gray-800 text-sm">
                                 {it.voluntarioNome}
                                 {it.voluntarioId === user?.id && (
-                                  <span className="ml-1.5 text-[10px] bg-vine-700 text-white px-1.5 py-0.5 rounded-full font-bold">você</span>
+                                  <span className="ml-1.5 text-[10px] bg-black text-white px-1.5 py-0.5 rounded-full font-bold">você</span>
                                 )}
                                 {displayObs(it) && (
                                   <p className="text-xs text-gray-400 font-normal mt-0.5">{displayObs(it)}</p>
@@ -1109,13 +1109,13 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
               <div className={clsx(
                 "px-4 py-3 border-b border-gray-100 flex items-center justify-between gap-2 shrink-0",
                 selectedEscala.culto.includes("Quinta") ? "bg-grape-50" :
-                selectedEscala.culto.includes("Domingo") ? "bg-gold-50" : "bg-vine-50"
+                selectedEscala.culto.includes("Domingo") ? "bg-gold-50" : "bg-gray-50"
               )}>
                 <div>
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <p className="font-bold text-gray-900">{selectedEscala.culto}</p>
                     {selectedEscala.observacoes?.match(/^(Equipe \d)/)?.[1] && (
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-vine-100 text-vine-800 border border-vine-200">
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-900 border border-gray-200">
                         {selectedEscala.observacoes.match(/^(Equipe \d)/)?.[1]}
                       </span>
                     )}
@@ -1129,7 +1129,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
                 <div className="flex gap-1 shrink-0">
                   {isLider && (
                     <>
-                      <button onClick={() => { setSelectedId(null); abrirEdicao(selectedEscala); }} className="p-2 text-gray-500 hover:text-vine-700 rounded-xl transition"><Pencil className="w-4 h-4" /></button>
+                      <button onClick={() => { setSelectedId(null); abrirEdicao(selectedEscala); }} className="p-2 text-gray-500 hover:text-gray-900 rounded-xl transition"><Pencil className="w-4 h-4" /></button>
                       <button onClick={() => { excluir(selectedEscala.id); setSelectedId(null); }} className="p-2 text-gray-500 hover:text-red-600 rounded-xl transition"><Trash2 className="w-4 h-4" /></button>
                     </>
                   )}
@@ -1155,7 +1155,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
                         </thead>
                         <tbody className="divide-y divide-gray-50">
                           {selectedEscala.itens.map((it, i) => (
-                            <tr key={i} className={it.voluntarioId === user?.id ? "bg-vine-50" : ""}>
+                            <tr key={i} className={it.voluntarioId === user?.id ? "bg-gray-50" : ""}>
                               <td className="px-3 py-2.5">
                                 <span className="text-xs font-bold text-grape-800 bg-grape-50 px-2 py-0.5 rounded-full">
                                   {displayFuncao(it)}
@@ -1164,7 +1164,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
                               <td className="px-3 py-2.5 font-medium text-gray-800 text-sm">
                                 {it.voluntarioNome}
                                 {it.voluntarioId === user?.id && (
-                                  <span className="ml-1.5 text-[10px] bg-vine-700 text-white px-1.5 py-0.5 rounded-full font-bold">você</span>
+                                  <span className="ml-1.5 text-[10px] bg-black text-white px-1.5 py-0.5 rounded-full font-bold">você</span>
                                 )}
                                 {displayObs(it) && (
                                   <p className="text-xs text-gray-400 font-normal mt-0.5">{displayObs(it)}</p>
@@ -1277,7 +1277,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
             {t.count !== undefined && t.count > 0 && (
               <span className={clsx(
                 "text-[10px] font-bold rounded-full px-1.5",
-                subTab === t.id ? "bg-vine-700 text-white" : "bg-gray-300 text-gray-600"
+                subTab === t.id ? "bg-black text-white" : "bg-gray-300 text-gray-600"
               )}>{t.count}</span>
             )}
           </button>
@@ -1299,8 +1299,8 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
                     className={clsx(
                       "text-xs font-semibold px-3 py-1.5 rounded-full border transition",
                       form.equipe === eq.label
-                        ? "bg-vine-700 text-white border-vine-700"
-                        : "bg-white text-gray-600 border-gray-200 hover:border-vine-400"
+                        ? "bg-black text-white border-gray-900"
+                        : "bg-white text-gray-600 border-gray-200 hover:border-gray-400"
                     )}
                   >
                     {eq.label || "Sem equipe"}
@@ -1337,7 +1337,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
                   }}
                   className={clsx(
                     "text-xs font-semibold px-3 py-1.5 rounded-full border transition hover:opacity-80",
-                    isActive ? t.cor + " ring-2 ring-offset-1 ring-vine-400" : t.cor
+                    isActive ? t.cor + " ring-2 ring-offset-1 ring-gray-400" : t.cor
                   )}
                 >{t.label}</button>
                 );
@@ -1356,8 +1356,8 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
                     className={clsx(
                       "text-xs font-semibold px-3 py-1.5 rounded-xl border transition",
                       form.data === iso
-                        ? "bg-vine-700 text-white border-vine-700"
-                        : "bg-white text-gray-700 border-gray-200 hover:border-vine-400"
+                        ? "bg-black text-white border-gray-900"
+                        : "bg-white text-gray-700 border-gray-200 hover:border-gray-400"
                     )}
                   >{formatDateSimples(iso)}</button>
                 ))}
@@ -1370,7 +1370,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
               value={form.culto}
               onChange={(e) => setForm({ ...form, culto: e.target.value })}
               placeholder="Título *  ex: Culto Domingo 18h30"
-              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-vine-400"
+              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-gray-400"
             />
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -1379,7 +1379,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
                   type="date"
                   value={form.data}
                   onChange={(e) => setForm({ ...form, data: e.target.value })}
-                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-vine-400 bg-white"
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-gray-400 bg-white"
                 />
               </div>
               <div>
@@ -1388,7 +1388,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
                   type="time"
                   value={form.horario}
                   onChange={(e) => setForm({ ...form, horario: e.target.value })}
-                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-vine-400 bg-white"
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-gray-400 bg-white"
                 />
               </div>
             </div>
@@ -1422,7 +1422,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
                   value={form.temaInfantil}
                   onChange={(e) => setForm({ ...form, temaInfantil: e.target.value })}
                   placeholder="ex: Honra"
-                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-vine-400"
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-gray-400"
                 />
               </div>
             </div>
@@ -1435,7 +1435,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
                 onChange={(e) => setForm({ ...form, observacoes: e.target.value.slice(0, 500) })}
                 placeholder="Observações"
                 rows={3}
-                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-vine-400 resize-none"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-gray-400 resize-none"
               />
               <p className="text-right text-[10px] text-gray-400">{form.observacoes.length}/500</p>
             </div>
@@ -1453,7 +1453,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
             </div>
             <button
               onClick={() => setForm({ ...form, visivel: !form.visivel })}
-              className={clsx("w-11 h-6 rounded-full transition relative", form.visivel ? "bg-vine-700" : "bg-gray-300")}
+              className={clsx("w-11 h-6 rounded-full transition relative", form.visivel ? "bg-black" : "bg-gray-300")}
             >
               <span className={clsx(
                 "absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform",
@@ -1469,7 +1469,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
             </div>
             <button
               onClick={() => setForm({ ...form, confirmacaoParticipantes: !form.confirmacaoParticipantes })}
-              className={clsx("w-11 h-6 rounded-full transition relative", form.confirmacaoParticipantes ? "bg-vine-700" : "bg-gray-300")}
+              className={clsx("w-11 h-6 rounded-full transition relative", form.confirmacaoParticipantes ? "bg-black" : "bg-gray-300")}
             >
               <span className={clsx(
                 "absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform",
@@ -1483,7 +1483,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
       {/* ── Participantes ── */}
       {subTab === "participantes" && (
         <div className="space-y-4">
-          <div className={clsx("border rounded-xl p-3 space-y-2", editandoIdx !== null ? "bg-vine-50 border-vine-300" : "bg-gray-50 border-gray-200")}>
+          <div className={clsx("border rounded-xl p-3 space-y-2", editandoIdx !== null ? "bg-gray-50 border-gray-300" : "bg-gray-50 border-gray-200")}>
             <p className="text-xs font-semibold text-gray-600">
               {editandoIdx !== null ? `Editando participante #${editandoIdx + 1}` : "Adicionar participante"}
             </p>
@@ -1491,7 +1491,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
               <select
                 value={novoMembroId}
                 onChange={(e) => setNovoMembroId(e.target.value)}
-                className="border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-vine-400 bg-white col-span-1"
+                className="border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-gray-400 bg-white col-span-1"
               >
                 <option value="">Selecionar membro</option>
                 {membros.map((m) => <option key={m.id} value={m.id}>{m.nome}</option>)}
@@ -1499,7 +1499,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
               <select
                 value={novaFuncao}
                 onChange={(e) => setNovaFuncao(e.target.value)}
-                className="border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-vine-400 bg-white"
+                className="border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-gray-400 bg-white"
               >
                 {funcoesMinisterio.map((f) => <option key={f}>{f}</option>)}
               </select>
@@ -1507,7 +1507,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
                 value={novaObs}
                 onChange={(e) => setNovaObs(e.target.value)}
                 placeholder={ministerio === "Infantil" && novaFuncao === "Professor(a)" ? "Tópico (ex: Honrando meu corpo)" : "Observação (opcional)"}
-                className="border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-vine-400"
+                className="border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-gray-400"
               />
             </div>
             <div className="flex items-center gap-2">
@@ -1515,7 +1515,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
                 onClick={addParticipante}
                 className={clsx(
                   "flex items-center gap-1.5 text-white text-xs font-semibold px-4 py-2 rounded-xl transition",
-                  editandoIdx !== null ? "bg-vine-700 hover:bg-vine-800" : "bg-vine-700 hover:bg-vine-800"
+                  editandoIdx !== null ? "bg-black hover:bg-gray-900" : "bg-black hover:bg-gray-900"
                 )}
               >
                 {editandoIdx !== null ? <><Save className="w-3.5 h-3.5" /> Atualizar</> : <><Plus className="w-3.5 h-3.5" /> Adicionar</>}
@@ -1537,7 +1537,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
             {form.itens.map((it, i) => (
               <div key={i} className={clsx(
                 "flex items-center justify-between bg-white border rounded-xl px-4 py-3 shadow-sm",
-                editandoIdx === i ? "border-vine-400 ring-1 ring-vine-200" : "border-gray-100"
+                editandoIdx === i ? "border-gray-400 ring-1 ring-gray-200" : "border-gray-100"
               )}>
                 <div>
                   <p className="text-sm font-semibold text-gray-800">{it.voluntarioNome}</p>
@@ -1547,7 +1547,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
                 <div className="flex items-center gap-1">
                   <button
                     onClick={() => editarParticipante(i)}
-                    className="p-2 text-gray-400 hover:text-vine-600 hover:bg-vine-50 rounded-xl transition"
+                    className="p-2 text-gray-400 hover:text-gray-800 hover:bg-gray-50 rounded-xl transition"
                     title="Editar"
                   >
                     <Pencil className="w-3.5 h-3.5" />
@@ -1594,7 +1594,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
                 value={buscaMusica}
                 onChange={(e) => setBuscaMusica(e.target.value)}
                 placeholder="Buscar no repertório..."
-                className="flex-1 border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-vine-400"
+                className="flex-1 border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-gray-400"
               />
               <button
                 onClick={() => setModalCifra(true)}
@@ -1642,7 +1642,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
                         disabled={jaAdicionada}
                         className={clsx(
                           "text-xs font-bold px-3 py-1.5 rounded-lg transition",
-                          jaAdicionada ? "bg-gray-100 text-gray-400 cursor-not-allowed" : "bg-vine-700 text-white hover:bg-vine-800"
+                          jaAdicionada ? "bg-gray-100 text-gray-400 cursor-not-allowed" : "bg-black text-white hover:bg-gray-900"
                         )}
                       >
                         {jaAdicionada ? "✓" : "+ Add"}
@@ -1659,19 +1659,19 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
             <button
               type="button"
               onClick={() => setAddingNova((v) => !v)}
-              className="w-full flex items-center justify-between px-3 py-2.5 text-sm font-semibold text-vine-700 hover:bg-vine-50 transition"
+              className="w-full flex items-center justify-between px-3 py-2.5 text-sm font-semibold text-gray-900 hover:bg-gray-50 transition"
             >
               <span className="flex items-center gap-2"><Plus className="w-4 h-4" /> Adicionar música nova ao repertório</span>
               {addingNova ? <X className="w-4 h-4 text-gray-400" /> : null}
             </button>
             {addingNova && (
-              <div className="px-3 pb-3 pt-1 space-y-2 bg-vine-50/40">
+              <div className="px-3 pb-3 pt-1 space-y-2 bg-gray-50/40">
                 <div className="flex gap-2">
                   <input
                     value={novaMusica.titulo}
                     onChange={(e) => setNovaMusica((n) => ({ ...n, titulo: e.target.value }))}
                     placeholder="Título da música"
-                    className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-vine-400 bg-white"
+                    className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-gray-400 bg-white"
                   />
                   <select
                     value={novaMusica.tom}
@@ -1687,12 +1687,12 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
                     value={novaMusica.artista}
                     onChange={(e) => setNovaMusica((n) => ({ ...n, artista: e.target.value }))}
                     placeholder="Artista / Banda"
-                    className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-vine-400 bg-white"
+                    className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-gray-400 bg-white"
                   />
                   <button
                     onClick={salvarNovaMusica}
                     disabled={savingNova || !novaMusica.titulo.trim() || !novaMusica.artista.trim()}
-                    className="px-4 py-2 text-sm font-bold text-white bg-vine-700 rounded-lg hover:bg-vine-800 transition disabled:opacity-40"
+                    className="px-4 py-2 text-sm font-bold text-white bg-black rounded-lg hover:bg-gray-900 transition disabled:opacity-40"
                   >
                     {savingNova ? "..." : "+ Add"}
                   </button>
@@ -1823,7 +1823,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
         <button
           onClick={salvar}
           disabled={!form.culto || !form.data || !form.horario || saving}
-          className="flex items-center gap-1.5 bg-vine-700 text-white text-sm font-semibold px-5 py-2 rounded-xl hover:bg-vine-800 disabled:opacity-40 disabled:cursor-not-allowed transition"
+          className="flex items-center gap-1.5 bg-black text-white text-sm font-semibold px-5 py-2 rounded-xl hover:bg-gray-900 disabled:opacity-40 disabled:cursor-not-allowed transition"
         >
           <Save className="w-4 h-4" /> {saving ? "Salvando..." : "Salvar"}
         </button>

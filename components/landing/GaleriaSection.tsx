@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
@@ -26,7 +26,7 @@ export default function GaleriaSection() {
   if (fotos.length === 0) return null;
 
   return (
-    <section id="galeria" className="py-24 px-6 bg-vine-950">
+    <section id="galeria" className="py-24 px-6 bg-black">
       <div className="max-w-6xl mx-auto">
         <ScrollReveal>
         <div className="text-center mb-12">
@@ -35,7 +35,7 @@ export default function GaleriaSection() {
           </p>
           <h2 className="font-sans text-4xl md:text-5xl font-semibold text-white">Galeria de Fotos</h2>
           <div className="mx-auto mt-4 w-10 h-px bg-gold-500/50" />
-          <p className="mt-4 text-vine-400 max-w-md mx-auto text-sm leading-relaxed">
+          <p className="mt-4 text-gray-400 max-w-md mx-auto text-sm leading-relaxed">
             Memórias dos nossos cultos, eventos e ações sociais.
           </p>
         </div>

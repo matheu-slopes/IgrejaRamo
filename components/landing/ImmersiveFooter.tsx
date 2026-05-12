@@ -1,8 +1,8 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 
 export default function ImmersiveFooter() {
   return (
-    <footer className="relative text-vine-100 pt-28 pb-12 md:pt-32 md:pb-16 px-4 md:px-6 overflow-hidden">
+    <footer className="relative text-gray-100 pt-28 pb-12 md:pt-32 md:pb-16 px-4 md:px-6 overflow-hidden">
       {/* Vídeo de fundo */}
       <video
         src="/hero-bg.mp4"
@@ -14,10 +14,10 @@ export default function ImmersiveFooter() {
         style={{ filter: "brightness(0.75)", objectPosition: "50% 32%" }}
       />
       {/* Overlay escuro adicional */}
-      <div className="absolute inset-0 bg-vine-950/20 pointer-events-none" />
+      <div className="absolute inset-0 bg-black/20 pointer-events-none" />
 
       <div className="relative z-10 max-w-5xl mx-auto -translate-y-12">
-        <div className="flex flex-col md:flex-row items-center justify-between gap-6 md:gap-8 pb-8 md:pb-10 border-b border-vine-100/20">
+        <div className="flex flex-col md:flex-row items-center justify-between gap-6 md:gap-8 pb-8 md:pb-10 border-b border-gray-100/20">
           <div className="flex flex-col items-center md:items-start gap-2">
             <p className="font-serif text-2xl md:text-3xl font-bold text-white tracking-wide">Igreja Ramo da Vida</p>
             <p className="font-sans italic text-white/80 text-base max-w-[320px] leading-relaxed text-center md:text-left">

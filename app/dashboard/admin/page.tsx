@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -24,7 +24,7 @@ const ROLE_COR: Record<Role, string> = {
   admin:      "bg-red-100 text-red-700 border-red-200",
   pastor:     "bg-purple-100 text-purple-700 border-purple-200",
   lider:      "bg-gold-100 text-gold-800 border-gold-200",
-  voluntario: "bg-vine-100 text-vine-700 border-vine-200",
+  voluntario: "bg-gray-100 text-gray-900 border-gray-200",
   membro:     "bg-gray-100 text-gray-600 border-gray-200",
 };
 
@@ -43,7 +43,7 @@ const COR_LABEL: Record<string, string> = {
   blue: "Azul", green: "Verde", rose: "Rosa",
 };
 const COR_BG: Record<string, string> = {
-  vine: "bg-vine-600", grape: "bg-grape-700", bark: "bg-bark-600", gold: "bg-gold-500",
+  vine: "bg-gray-800", grape: "bg-grape-700", bark: "bg-bark-600", gold: "bg-gold-500",
   blue: "bg-blue-600", green: "bg-green-600", rose: "bg-rose-500",
 };
 
@@ -106,8 +106,8 @@ export default function AdminPage() {
       <div className="flex items-center justify-between">
         <div>
           <div className="flex items-center gap-2 mb-0.5">
-            <Shield className="w-5 h-5 text-vine-700" />
-            <h1 className="text-2xl font-sans font-semibold text-vine-950">Painel Admin</h1>
+            <Shield className="w-5 h-5 text-gray-900" />
+            <h1 className="text-2xl font-sans font-semibold text-black">Painel Admin</h1>
           </div>
           <p className="text-sm text-gray-500">
             Gerencie usuários, roles e permissões individuais sem editar código.
@@ -115,7 +115,7 @@ export default function AdminPage() {
         </div>
         <button
           onClick={() => { setPainel("novo"); setEditando(null); }}
-          className="flex items-center gap-1.5 bg-vine-800 text-white text-sm font-semibold px-4 py-2.5 rounded-xl hover:bg-vine-700 transition shadow-sm"
+          className="flex items-center gap-1.5 bg-gray-900 text-white text-sm font-semibold px-4 py-2.5 rounded-xl hover:bg-black transition shadow-sm"
         >
           <UserPlus className="w-4 h-4" /> Novo usuário
         </button>
@@ -131,7 +131,7 @@ export default function AdminPage() {
               value={busca}
               onChange={(e) => setBusca(e.target.value)}
               placeholder="Buscar por nome ou e-mail..."
-              className="w-full pl-9 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl outline-none focus:border-vine-400 focus:ring-1 focus:ring-vine-100"
+              className="w-full pl-9 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl outline-none focus:border-gray-400 focus:ring-1 focus:ring-gray-300"
             />
           </div>
 
@@ -169,14 +169,14 @@ export default function AdminPage() {
                       key={u.id}
                       className={clsx(
                         "border-b border-gray-50 hover:bg-gray-50 transition cursor-pointer",
-                        editando?.id === u.id && "bg-vine-50 hover:bg-vine-50",
+                        editando?.id === u.id && "bg-gray-50 hover:bg-gray-50",
                         !u.ativo && "opacity-50"
                       )}
                       onClick={() => setEditando(u)}
                     >
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2.5">
-                          <div className="w-8 h-8 bg-vine-100 text-vine-800 rounded-full flex items-center justify-center font-bold text-xs shrink-0">
+                          <div className="w-8 h-8 bg-gray-100 text-gray-900 rounded-full flex items-center justify-center font-bold text-xs shrink-0">
                             {u.nome.charAt(0)}
                           </div>
                           <div className="min-w-0">
@@ -286,7 +286,7 @@ function MinisteriosTab({
           const isEditing = editandoMin === min;
           return (
             <div key={min} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-              <div className="flex items-center justify-between px-5 py-3 bg-vine-700">
+              <div className="flex items-center justify-between px-5 py-3 bg-black">
                 <span className="font-semibold text-white">{min}</span>
                 <div className="flex items-center gap-2">
                   <a
@@ -331,7 +331,7 @@ function MinisteriosTab({
                             checked={!!jaEsta}
                             disabled={salvando}
                             onChange={() => toggleMembro(u, min)}
-                            className="accent-vine-700 w-4 h-4"
+                            className="accent-black w-4 h-4"
                           />
                           <span className="text-sm text-gray-700">{u.nome}</span>
                           <span className="text-xs text-gray-400 capitalize ml-auto">{u.role}</span>
@@ -408,7 +408,7 @@ function EditarUsuarioPanel({
       {/* Header */}
       <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
         <div className="flex items-center gap-2.5">
-          <div className="w-9 h-9 bg-vine-100 text-vine-800 rounded-full flex items-center justify-center font-bold text-sm">
+          <div className="w-9 h-9 bg-gray-100 text-gray-900 rounded-full flex items-center justify-center font-bold text-sm">
             {usuario.nome.charAt(0)}
           </div>
           <div className="min-w-0">
@@ -473,7 +473,7 @@ function EditarUsuarioPanel({
                   className={clsx(
                     "text-xs px-2.5 py-1 rounded-full border transition",
                     ativo
-                      ? "bg-vine-100 text-vine-800 border-vine-200 font-medium"
+                      ? "bg-gray-100 text-gray-900 border-gray-200 font-medium"
                       : "border-gray-200 text-gray-400 hover:border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
                   )}
                 >
@@ -558,7 +558,7 @@ function EditarUsuarioPanel({
                         className={clsx(
                           "w-full flex items-center gap-2.5 px-3 py-2 rounded-xl border text-left transition text-[12px]",
                           ativa
-                            ? "bg-vine-50 border-vine-200 text-vine-800"
+                            ? "bg-gray-50 border-gray-200 text-gray-900"
                             : "bg-gray-50 border-gray-150 text-gray-400",
                           podeatribuir && "hover:opacity-80 cursor-pointer",
                           !podeatribuir && "cursor-default opacity-70",
@@ -567,7 +567,7 @@ function EditarUsuarioPanel({
                       >
                         <div className={clsx(
                           "w-4 h-4 rounded flex items-center justify-center shrink-0 border transition",
-                          ativa ? "bg-vine-700 border-vine-700 text-white" : "border-gray-300 bg-white"
+                          ativa ? "bg-black border-gray-900 text-white" : "border-gray-300 bg-white"
                         )}>
                           {ativa && <Check className="w-2.5 h-2.5" />}
                         </div>
@@ -597,7 +597,7 @@ function EditarUsuarioPanel({
                 value={novaSenha}
                 onChange={(e) => { setNovaSenha(e.target.value); setErroSenha(""); setOkSenha(false); }}
                 placeholder="Nova senha (mín. 6 caracteres)"
-                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-vine-400 focus:ring-1 focus:ring-vine-100 pr-9"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-gray-400 focus:ring-1 focus:ring-gray-300 pr-9"
               />
               <button
                 type="button"
@@ -614,7 +614,7 @@ function EditarUsuarioPanel({
                 "px-3 py-2 rounded-xl text-sm font-semibold border transition whitespace-nowrap",
                 okSenha
                   ? "bg-green-50 text-green-700 border-green-200"
-                  : "bg-vine-50 text-vine-800 border-vine-200 hover:bg-vine-100 disabled:opacity-50"
+                  : "bg-gray-50 text-gray-900 border-gray-200 hover:bg-gray-100 disabled:opacity-50"
               )}
             >
               {salvandoSenha ? "..." : okSenha ? "Salvo!" : "Salvar"}
@@ -693,7 +693,7 @@ function NovoUsuarioForm({
     setTimeout(() => setCopiado(false), 2000);
   }
 
-  const inputCls = "w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-vine-400 focus:ring-1 focus:ring-vine-100";
+  const inputCls = "w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-gray-400 focus:ring-1 focus:ring-gray-300";
 
   // ── Tela de sucesso: exibe credenciais ──
   if (criado) {
@@ -723,7 +723,7 @@ function NovoUsuarioForm({
               "w-full py-2.5 rounded-xl text-sm font-semibold transition border",
               copiado
                 ? "bg-green-50 text-green-700 border-green-200"
-                : "bg-vine-50 text-vine-800 border-vine-200 hover:bg-vine-100"
+                : "bg-gray-50 text-gray-900 border-gray-200 hover:bg-gray-100"
             )}
           >
             {copiado ? "Copiado!" : "Copiar credenciais"}
@@ -743,7 +743,7 @@ function NovoUsuarioForm({
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden sticky top-4">
       <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
         <div className="flex items-center gap-2">
-          <UserPlus className="w-4 h-4 text-vine-700" />
+          <UserPlus className="w-4 h-4 text-gray-900" />
           <p className="font-semibold text-gray-800 text-sm">Novo usuário</p>
         </div>
         <button onClick={onCancelar} className="text-gray-400 hover:text-gray-600 p-1">
@@ -839,7 +839,7 @@ function NovoUsuarioForm({
                   className={clsx(
                     "text-xs px-2.5 py-1 rounded-full border transition",
                     ativo
-                      ? "bg-vine-100 text-vine-800 border-vine-200 font-medium"
+                      ? "bg-gray-100 text-gray-900 border-gray-200 font-medium"
                       : "border-gray-200 text-gray-400"
                   )}
                 >
@@ -868,7 +868,7 @@ function NovoUsuarioForm({
           <button
             onClick={submeter}
             disabled={!form.nome || !form.email || !senha || loading}
-            className="flex-1 text-sm bg-vine-800 text-white font-semibold py-2.5 rounded-xl hover:bg-vine-700 transition disabled:opacity-40 disabled:cursor-not-allowed"
+            className="flex-1 text-sm bg-gray-900 text-white font-semibold py-2.5 rounded-xl hover:bg-black transition disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {loading ? "Criando..." : "Criar usuário"}
           </button>
@@ -994,7 +994,7 @@ function LocaisTab() {
             onChange={(e) => setAvisoConteudo(e.target.value)}
             placeholder="Ex: 📌 Ensaio às 17h. Confirmar presença com Pedro."
             rows={3}
-            className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-vine-400 resize-none placeholder:text-gray-300"
+            className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-gray-400 resize-none placeholder:text-gray-300"
           />
           <div className="flex items-center justify-between">
             {avisoSalvo && (
@@ -1004,7 +1004,7 @@ function LocaisTab() {
             )}
             <button
               onClick={salvarAviso}
-              className="ml-auto flex items-center gap-1.5 bg-vine-700 text-white text-sm font-semibold px-4 py-2 rounded-xl hover:bg-vine-800 transition"
+              className="ml-auto flex items-center gap-1.5 bg-black text-white text-sm font-semibold px-4 py-2 rounded-xl hover:bg-gray-900 transition"
             >
               <Save className="w-3.5 h-3.5" /> Salvar aviso
             </button>
@@ -1016,13 +1016,13 @@ function LocaisTab() {
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 bg-gray-50">
           <div className="flex items-center gap-2">
-            <MapPin className="w-4 h-4 text-vine-600" />
+            <MapPin className="w-4 h-4 text-gray-800" />
             <p className="font-semibold text-gray-800 text-sm">Locais Cadastrados</p>
-            <span className="text-xs bg-vine-100 text-vine-700 font-bold px-2 py-0.5 rounded-full">{locais.length}</span>
+            <span className="text-xs bg-gray-100 text-gray-900 font-bold px-2 py-0.5 rounded-full">{locais.length}</span>
           </div>
           <button
             onClick={() => setAdicionando(true)}
-            className="flex items-center gap-1.5 text-sm font-semibold text-vine-700 bg-vine-50 hover:bg-vine-100 px-3 py-1.5 rounded-xl border border-vine-200 transition"
+            className="flex items-center gap-1.5 text-sm font-semibold text-gray-900 bg-gray-50 hover:bg-gray-100 px-3 py-1.5 rounded-xl border border-gray-200 transition"
           >
             <Plus className="w-3.5 h-3.5" /> Novo local
           </button>
@@ -1036,14 +1036,14 @@ function LocaisTab() {
                   <input
                     value={editandoLocal.nome}
                     onChange={(e) => setEditandoLocal({ ...editandoLocal, nome: e.target.value })}
-                    className="flex-1 min-w-[140px] border border-gray-200 rounded-xl px-3 py-1.5 text-sm outline-none focus:border-vine-400"
+                    className="flex-1 min-w-[140px] border border-gray-200 rounded-xl px-3 py-1.5 text-sm outline-none focus:border-gray-400"
                     placeholder="Nome do local"
                     autoFocus
                   />
                   <input
                     value={editandoLocal.descricao ?? ""}
                     onChange={(e) => setEditandoLocal({ ...editandoLocal, descricao: e.target.value })}
-                    className="flex-1 min-w-[140px] border border-gray-200 rounded-xl px-3 py-1.5 text-sm outline-none focus:border-vine-400"
+                    className="flex-1 min-w-[140px] border border-gray-200 rounded-xl px-3 py-1.5 text-sm outline-none focus:border-gray-400"
                     placeholder="Descrição (opcional)"
                   />
                   <button onClick={salvarEdicao} className="text-green-700 hover:text-green-900 transition">
@@ -1056,8 +1056,8 @@ function LocaisTab() {
               ) : (
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-8 h-8 rounded-xl bg-vine-50 border border-vine-100 flex items-center justify-center shrink-0">
-                      <MapPin className="w-3.5 h-3.5 text-vine-500" />
+                    <div className="w-8 h-8 rounded-xl bg-gray-50 border border-gray-100 flex items-center justify-center shrink-0">
+                      <MapPin className="w-3.5 h-3.5 text-gray-600" />
                     </div>
                     <div className="min-w-0">
                       <p className="text-sm font-semibold text-gray-800 truncate">{local.nome}</p>
@@ -1067,7 +1067,7 @@ function LocaisTab() {
                   <div className="flex items-center gap-2 shrink-0">
                     <button
                       onClick={() => setEditandoLocal(local)}
-                      className="text-gray-300 hover:text-vine-600 transition"
+                      className="text-gray-300 hover:text-gray-800 transition"
                     >
                       <Pencil className="w-4 h-4" />
                     </button>
@@ -1085,11 +1085,11 @@ function LocaisTab() {
 
           {/* Formulário de novo local */}
           {adicionando && (
-            <div className="px-5 py-3.5 bg-vine-50/50 flex items-center gap-2 flex-wrap border-t border-vine-100">
+            <div className="px-5 py-3.5 bg-gray-50/50 flex items-center gap-2 flex-wrap border-t border-gray-100">
               <input
                 value={novoNome}
                 onChange={(e) => setNovoNome(e.target.value)}
-                className="flex-1 min-w-[140px] border border-gray-200 rounded-xl px-3 py-1.5 text-sm outline-none focus:border-vine-400 bg-white"
+                className="flex-1 min-w-[140px] border border-gray-200 rounded-xl px-3 py-1.5 text-sm outline-none focus:border-gray-400 bg-white"
                 placeholder="Nome do local *"
                 autoFocus
                 onKeyDown={(e) => e.key === "Enter" && adicionarLocal()}
@@ -1097,7 +1097,7 @@ function LocaisTab() {
               <input
                 value={novaDesc}
                 onChange={(e) => setNovaDesc(e.target.value)}
-                className="flex-1 min-w-[140px] border border-gray-200 rounded-xl px-3 py-1.5 text-sm outline-none focus:border-vine-400 bg-white"
+                className="flex-1 min-w-[140px] border border-gray-200 rounded-xl px-3 py-1.5 text-sm outline-none focus:border-gray-400 bg-white"
                 placeholder="Descrição (opcional)"
                 onKeyDown={(e) => e.key === "Enter" && adicionarLocal()}
               />
@@ -1261,10 +1261,10 @@ function DevocionalBlocosPreview({ blocos }: { blocos: DevocionalBloco[] }) {
 
         if (bloco.tipo === "citacao") {
           return (
-            <blockquote key={bloco.id} className="rounded-2xl bg-vine-50 border border-vine-100 px-5 py-4">
-              <Quote className="w-5 h-5 text-vine-400 mb-2" />
-              <p className="text-vine-900 italic leading-relaxed">{bloco.texto}</p>
-              {bloco.referencia && <cite className="text-vine-600 text-sm not-italic font-semibold mt-2 block">{bloco.referencia}</cite>}
+            <blockquote key={bloco.id} className="rounded-2xl bg-gray-50 border border-gray-100 px-5 py-4">
+              <Quote className="w-5 h-5 text-gray-400 mb-2" />
+              <p className="text-black italic leading-relaxed">{bloco.texto}</p>
+              {bloco.referencia && <cite className="text-gray-800 text-sm not-italic font-semibold mt-2 block">{bloco.referencia}</cite>}
             </blockquote>
           );
         }
@@ -1282,7 +1282,7 @@ function DevocionalPreviewModal({ dev, onClose }: { dev: Devocional | Devocional
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-gray-950/60 px-4 py-6 backdrop-blur-sm">
       <div className="w-full max-w-3xl overflow-hidden rounded-2xl bg-cream shadow-2xl">
-        <div className="sticky top-0 z-10 flex items-center justify-between bg-vine-950 px-4 py-4 text-white">
+        <div className="sticky top-0 z-10 flex items-center justify-between bg-black px-4 py-4 text-white">
           <div className="flex items-center gap-2">
             <BookOpen className="w-5 h-5 text-gold-400" />
             <span className="font-semibold text-base">Devocional Diário</span>
@@ -1301,7 +1301,7 @@ function DevocionalPreviewModal({ dev, onClose }: { dev: Devocional | Devocional
                 <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
               </div>
             ) : (
-              <div className="flex h-32 items-center justify-center bg-gradient-to-br from-vine-800 to-vine-950">
+              <div className="flex h-32 items-center justify-center bg-gradient-to-br from-gray-900 to-black">
                 <BookOpen className="w-12 h-12 text-white/30" />
               </div>
             )}
@@ -1320,9 +1320,9 @@ function DevocionalPreviewModal({ dev, onClose }: { dev: Devocional | Devocional
               <DevocionalBlocosPreview blocos={blocos} />
 
               {dev.versiculo && (
-                <blockquote className="border-l-4 border-vine-400 py-1 pl-4">
-                  <p className="text-base italic leading-relaxed text-vine-800">&ldquo;{dev.versiculo}&rdquo;</p>
-                  {dev.referencia && <cite className="mt-1 block text-sm font-semibold not-italic text-vine-500">— {dev.referencia}</cite>}
+                <blockquote className="border-l-4 border-gray-400 py-1 pl-4">
+                  <p className="text-base italic leading-relaxed text-gray-900">&ldquo;{dev.versiculo}&rdquo;</p>
+                  {dev.referencia && <cite className="mt-1 block text-sm font-semibold not-italic text-gray-600">— {dev.referencia}</cite>}
                 </blockquote>
               )}
             </div>
@@ -1533,8 +1533,8 @@ function ConteudoTab({ initSecao }: { initSecao?: string }) {
     setDevs((prev) => prev.filter((d) => d.id !== id));
   }
 
-  const inputCls = "w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-vine-400 bg-gray-50";
-  const textareaCls = "w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-vine-400 bg-gray-50 resize-none";
+  const inputCls = "w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-400 bg-gray-50";
+  const textareaCls = "w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-400 bg-gray-50 resize-none";
   const devAtual = editandoDev ?? novoDev;
   const maxVideoBytes = 50 * 1024 * 1024;
 
@@ -1704,13 +1704,13 @@ function ConteudoTab({ initSecao }: { initSecao?: string }) {
               <p className="font-semibold text-gray-800 text-sm">Avisos</p>
               <p className="text-xs text-gray-400 mt-0.5">Controle quem vê cada aviso — página inicial, dashboard ou roles específicos</p>
             </div>
-            <button onClick={() => setAdicionandoAviso(true)} disabled={adicionandoAviso} className="flex items-center gap-1.5 bg-vine-700 hover:bg-vine-800 text-white text-xs font-semibold px-3 py-2 rounded-xl transition disabled:opacity-40">
+            <button onClick={() => setAdicionandoAviso(true)} disabled={adicionandoAviso} className="flex items-center gap-1.5 bg-black hover:bg-gray-900 text-white text-xs font-semibold px-3 py-2 rounded-xl transition disabled:opacity-40">
               <Plus className="w-3.5 h-3.5" /> Novo aviso
             </button>
           </div>
 
           {adicionandoAviso && (
-            <div className="px-5 py-4 border-b border-vine-50 bg-vine-50/30 space-y-3">
+            <div className="px-5 py-4 border-b border-gray-50 bg-gray-50/30 space-y-3">
               <input className={inputCls} placeholder="Título do aviso" value={novoAviso.titulo} onChange={(e) => setNovoAviso((p) => ({ ...p, titulo: e.target.value }))} />
               <textarea className={textareaCls} rows={3} placeholder="Conteúdo do aviso..." value={novoAviso.conteudo} onChange={(e) => setNovoAviso((p) => ({ ...p, conteudo: e.target.value }))} />
 
@@ -1724,7 +1724,7 @@ function ConteudoTab({ initSecao }: { initSecao?: string }) {
                     type="checkbox"
                     checked={novoAviso.visivelHome}
                     onChange={(e) => setNovoAviso((p) => ({ ...p, visivelHome: e.target.checked }))}
-                    className="accent-vine-700 w-4 h-4 mt-0.5"
+                    className="accent-black w-4 h-4 mt-0.5"
                   />
                   <div>
                     <span className="text-sm font-medium text-gray-700">Exibir na página inicial do site</span>
@@ -1741,7 +1741,7 @@ function ConteudoTab({ initSecao }: { initSecao?: string }) {
                       type="checkbox"
                       checked={novoAviso.destinatariosTodos}
                       onChange={(e) => setNovoAviso((p) => ({ ...p, destinatariosTodos: e.target.checked, rolesSel: [] }))}
-                      className="accent-vine-700 w-4 h-4"
+                      className="accent-black w-4 h-4"
                     />
                     <span className="text-sm text-gray-700">Todos os membros cadastrados</span>
                   </label>
@@ -1758,7 +1758,7 @@ function ConteudoTab({ initSecao }: { initSecao?: string }) {
                                 ? [...p.rolesSel, role]
                                 : p.rolesSel.filter((r) => r !== role),
                             }))}
-                            className="accent-vine-700 w-4 h-4"
+                            className="accent-black w-4 h-4"
                           />
                           <span className="text-sm text-gray-700">{ROLE_LABEL[role]}</span>
                         </label>
@@ -1803,7 +1803,7 @@ function ConteudoTab({ initSecao }: { initSecao?: string }) {
               )}
               <div className="flex gap-2 justify-end">
                 <button onClick={() => { setAdicionandoAviso(false); setErroAviso(null); setNovoAviso(novoAvisoInicial()); }} className="px-4 py-2 rounded-xl text-sm text-gray-500 hover:bg-gray-100 transition">Cancelar</button>
-                <button onClick={criarAviso} disabled={salvandoAviso} className="flex items-center gap-1.5 bg-vine-700 hover:bg-vine-800 text-white text-sm font-semibold px-4 py-2 rounded-xl transition disabled:opacity-60">
+                <button onClick={criarAviso} disabled={salvandoAviso} className="flex items-center gap-1.5 bg-black hover:bg-gray-900 text-white text-sm font-semibold px-4 py-2 rounded-xl transition disabled:opacity-60">
                   <Save className="w-3.5 h-3.5" /> {salvandoAviso ? "Publicando..." : "Publicar"}
                 </button>
               </div>
@@ -1820,7 +1820,7 @@ function ConteudoTab({ initSecao }: { initSecao?: string }) {
               })();
               const editando = editandoAvisoId === a.id;
               return (
-                <div key={a.id} className={clsx("px-5 py-4", editando ? "bg-vine-50/40" : "hover:bg-gray-50/50")}>
+                <div key={a.id} className={clsx("px-5 py-4", editando ? "bg-gray-50/40" : "hover:bg-gray-50/50")}>
                   {editando ? (
                     <div className="space-y-3">
                       <input className={inputCls} placeholder="Título do aviso" value={editAviso.titulo} onChange={(e) => setEditAviso((p) => ({ ...p, titulo: e.target.value }))} />
@@ -1828,7 +1828,7 @@ function ConteudoTab({ initSecao }: { initSecao?: string }) {
                       <div className="space-y-3 pt-1 border-t border-gray-100">
                         <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider pt-2">Visibilidade</p>
                         <label className="flex items-start gap-2.5 cursor-pointer select-none">
-                          <input type="checkbox" checked={editAviso.visivelHome} onChange={(e) => setEditAviso((p) => ({ ...p, visivelHome: e.target.checked }))} className="accent-vine-700 w-4 h-4 mt-0.5" />
+                          <input type="checkbox" checked={editAviso.visivelHome} onChange={(e) => setEditAviso((p) => ({ ...p, visivelHome: e.target.checked }))} className="accent-black w-4 h-4 mt-0.5" />
                           <div>
                             <span className="text-sm font-medium text-gray-700">Exibir na página inicial do site</span>
                             <p className="text-xs text-gray-400">Visível para qualquer visitante, sem necessidade de login</p>
@@ -1837,14 +1837,14 @@ function ConteudoTab({ initSecao }: { initSecao?: string }) {
                         <div className="space-y-2">
                           <p className="text-xs font-medium text-gray-500">Quem vê no dashboard?</p>
                           <label className="flex items-center gap-2.5 cursor-pointer select-none">
-                            <input type="checkbox" checked={editAviso.destinatariosTodos} onChange={(e) => setEditAviso((p) => ({ ...p, destinatariosTodos: e.target.checked, rolesSel: [] }))} className="accent-vine-700 w-4 h-4" />
+                            <input type="checkbox" checked={editAviso.destinatariosTodos} onChange={(e) => setEditAviso((p) => ({ ...p, destinatariosTodos: e.target.checked, rolesSel: [] }))} className="accent-black w-4 h-4" />
                             <span className="text-sm text-gray-700">Todos os membros cadastrados</span>
                           </label>
                           {!editAviso.destinatariosTodos && (
                             <div className="grid grid-cols-2 gap-1.5 ml-6">
                               {ROLES.filter((r) => r !== "admin" && r !== "pastor").map((role) => (
                                 <label key={role} className="flex items-center gap-2 cursor-pointer select-none">
-                                  <input type="checkbox" checked={editAviso.rolesSel.includes(role)} onChange={(e) => setEditAviso((p) => ({ ...p, rolesSel: e.target.checked ? [...p.rolesSel, role] : p.rolesSel.filter((r) => r !== role) }))} className="accent-vine-700 w-4 h-4" />
+                                  <input type="checkbox" checked={editAviso.rolesSel.includes(role)} onChange={(e) => setEditAviso((p) => ({ ...p, rolesSel: e.target.checked ? [...p.rolesSel, role] : p.rolesSel.filter((r) => r !== role) }))} className="accent-black w-4 h-4" />
                                   <span className="text-sm text-gray-700">{ROLE_LABEL[role]}</span>
                                 </label>
                               ))}
@@ -1884,14 +1884,14 @@ function ConteudoTab({ initSecao }: { initSecao?: string }) {
                       )}
                       <div className="flex gap-2 justify-end">
                         <button onClick={() => setEditandoAvisoId(null)} className="px-4 py-2 rounded-xl text-sm text-gray-500 hover:bg-gray-100 transition">Cancelar</button>
-                        <button onClick={salvarEdicaoAviso} disabled={salvandoEdicaoAviso} className="flex items-center gap-1.5 bg-vine-700 hover:bg-vine-800 text-white text-sm font-semibold px-4 py-2 rounded-xl transition disabled:opacity-60">
+                        <button onClick={salvarEdicaoAviso} disabled={salvandoEdicaoAviso} className="flex items-center gap-1.5 bg-black hover:bg-gray-900 text-white text-sm font-semibold px-4 py-2 rounded-xl transition disabled:opacity-60">
                           <Save className="w-3.5 h-3.5" /> {salvandoEdicaoAviso ? "Salvando..." : "Salvar"}
                         </button>
                       </div>
                     </div>
                   ) : (
                     <div className="flex items-start gap-3">
-                      <Bell className="w-4 h-4 text-vine-400 mt-0.5 shrink-0" />
+                      <Bell className="w-4 h-4 text-gray-400 mt-0.5 shrink-0" />
                       <div className="flex-1 min-w-0">
                         <p className="font-semibold text-sm text-gray-800">{a.titulo}</p>
                         <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{a.conteudo}</p>
@@ -1899,7 +1899,7 @@ function ConteudoTab({ initSecao }: { initSecao?: string }) {
                           {a.visivel_home && (
                             <span className="text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-full">Página inicial</span>
                           )}
-                          <span className="text-[10px] font-medium bg-vine-50 text-vine-700 border border-vine-100 px-2 py-0.5 rounded-full">{destLabel}</span>
+                          <span className="text-[10px] font-medium bg-gray-50 text-gray-900 border border-gray-100 px-2 py-0.5 rounded-full">{destLabel}</span>
                           {a.ministerios?.map((m) => (
                             <span key={m} className="text-[10px] font-medium bg-gold-50 text-gold-700 border border-gold-200 px-2 py-0.5 rounded-full">{m}</span>
                           ))}
@@ -1907,7 +1907,7 @@ function ConteudoTab({ initSecao }: { initSecao?: string }) {
                         </div>
                       </div>
                       <div className="flex items-center gap-1 shrink-0">
-                        <button onClick={() => abrirEdicaoAviso(a)} className="p-1.5 hover:bg-vine-50 rounded-lg text-gray-300 hover:text-vine-500 transition">
+                        <button onClick={() => abrirEdicaoAviso(a)} className="p-1.5 hover:bg-gray-50 rounded-lg text-gray-300 hover:text-gray-600 transition">
                           <Pencil className="w-4 h-4" />
                         </button>
                         <button onClick={() => removerAviso(a.id)} className="p-1.5 hover:bg-red-50 rounded-lg text-gray-300 hover:text-red-400 transition">
@@ -1938,18 +1938,18 @@ function ConteudoTab({ initSecao }: { initSecao?: string }) {
               <button
                 onClick={() => setPreviewDevOpen(true)}
                 disabled={!adicionandoDev && !editandoDev}
-                className="flex items-center gap-1.5 rounded-xl border border-vine-100 bg-white px-3 py-2 text-xs font-semibold text-vine-700 transition hover:bg-vine-50 disabled:cursor-not-allowed disabled:opacity-40"
+                className="flex items-center gap-1.5 rounded-xl border border-gray-100 bg-white px-3 py-2 text-xs font-semibold text-gray-900 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 <Eye className="w-3.5 h-3.5" /> Preview
               </button>
-              <button onClick={() => { setEditandoDev(null); setAdicionandoDev(true); }} className="flex items-center gap-1.5 bg-vine-700 hover:bg-vine-800 text-white text-xs font-semibold px-3 py-2 rounded-xl transition">
+              <button onClick={() => { setEditandoDev(null); setAdicionandoDev(true); }} className="flex items-center gap-1.5 bg-black hover:bg-gray-900 text-white text-xs font-semibold px-3 py-2 rounded-xl transition">
                 <Plus className="w-3.5 h-3.5" /> Novo devocional
               </button>
             </div>
           </div>
 
           {(adicionandoDev || editandoDev) && (
-            <div className="px-5 py-4 border-b border-vine-50 bg-vine-50/30 space-y-3">
+            <div className="px-5 py-4 border-b border-gray-50 bg-gray-50/30 space-y-3">
               {erroUploadDev && (
                 <p className="rounded-xl border border-red-100 bg-red-50 px-3 py-2 text-xs text-red-600">{erroUploadDev}</p>
               )}
@@ -1959,7 +1959,7 @@ function ConteudoTab({ initSecao }: { initSecao?: string }) {
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div className="space-y-2">
-                  <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-vine-200 bg-white px-3 py-2 text-sm font-semibold text-vine-700 transition hover:bg-vine-50">
+                  <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-900 transition hover:bg-gray-50">
                     <ImageIcon className="w-4 h-4" />
                     {uploadingCapaDev ? "Enviando capa..." : devAtual.imagem_url ? "Trocar imagem principal" : "Subir imagem principal"}
                     <input
@@ -1996,7 +1996,7 @@ function ConteudoTab({ initSecao }: { initSecao?: string }) {
                       key={tipo}
                       type="button"
                       onClick={() => adicionarBlocoDev(tipo)}
-                      className="flex items-center gap-1.5 rounded-xl border border-vine-100 bg-white px-3 py-2 text-xs font-semibold text-vine-700 hover:bg-vine-50 transition"
+                      className="flex items-center gap-1.5 rounded-xl border border-gray-100 bg-white px-3 py-2 text-xs font-semibold text-gray-900 hover:bg-gray-50 transition"
                     >
                       <Icon className="w-3.5 h-3.5" /> {label}
                     </button>
@@ -2040,7 +2040,7 @@ function ConteudoTab({ initSecao }: { initSecao?: string }) {
 
                       {bloco.tipo === "imagem" && (
                         <div className="space-y-2">
-                          <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-vine-200 bg-vine-50/60 px-3 py-3 text-sm font-semibold text-vine-700 transition hover:bg-vine-50">
+                          <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-gray-200 bg-gray-50/60 px-3 py-3 text-sm font-semibold text-gray-900 transition hover:bg-gray-50">
                             <ImageIcon className="w-4 h-4" />
                             {uploadingBlocoId === bloco.id ? "Enviando imagem..." : bloco.url ? "Trocar imagem" : "Subir imagem"}
                             <input
@@ -2067,7 +2067,7 @@ function ConteudoTab({ initSecao }: { initSecao?: string }) {
 
                       {bloco.tipo === "video" && (
                         <div className="space-y-2">
-                          <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-vine-200 bg-vine-50/60 px-3 py-3 text-sm font-semibold text-vine-700 transition hover:bg-vine-50">
+                          <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-gray-200 bg-gray-50/60 px-3 py-3 text-sm font-semibold text-gray-900 transition hover:bg-gray-50">
                             <Video className="w-4 h-4" />
                             {uploadingBlocoId === bloco.id ? "Enviando vídeo..." : bloco.url ? "Trocar vídeo" : "Subir vídeo"}
                             <input
@@ -2115,7 +2115,7 @@ function ConteudoTab({ initSecao }: { initSecao?: string }) {
               </label>
               <div className="flex gap-2 justify-end">
                 <button onClick={() => { setAdicionandoDev(false); setEditandoDev(null); }} className="px-4 py-2 rounded-xl text-sm text-gray-500 hover:bg-gray-100 transition">Cancelar</button>
-                <button onClick={editandoDev ? salvarEdicaoDev : criarDevocional} disabled={salvandoDev} className="flex items-center gap-1.5 bg-vine-700 hover:bg-vine-800 text-white text-sm font-semibold px-4 py-2 rounded-xl transition disabled:opacity-60">
+                <button onClick={editandoDev ? salvarEdicaoDev : criarDevocional} disabled={salvandoDev} className="flex items-center gap-1.5 bg-black hover:bg-gray-900 text-white text-sm font-semibold px-4 py-2 rounded-xl transition disabled:opacity-60">
                   <Save className="w-3.5 h-3.5" /> {editandoDev ? "Salvar" : "Publicar"}
                 </button>
               </div>
@@ -2125,7 +2125,7 @@ function ConteudoTab({ initSecao }: { initSecao?: string }) {
           <div className="divide-y divide-gray-50">
             {devs.map((d) => (
               <div key={d.id} className="flex items-start gap-3 px-5 py-4 hover:bg-gray-50/50">
-                <BookOpen className="w-4 h-4 text-vine-400 mt-0.5 shrink-0" />
+                <BookOpen className="w-4 h-4 text-gray-400 mt-0.5 shrink-0" />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <p className="font-semibold text-sm text-gray-800">{d.titulo}</p>
@@ -2133,11 +2133,11 @@ function ConteudoTab({ initSecao }: { initSecao?: string }) {
                   </div>
                   {d.subtitulo && <p className="text-xs text-gray-500 mt-0.5">{d.subtitulo}</p>}
                   <p className="text-xs text-gray-400 mt-0.5 line-clamp-2">{resumoDevocional(d)}</p>
-                  {d.versiculo && <p className="text-xs text-vine-600 mt-1 italic">&ldquo;{d.versiculo}&rdquo; {d.referencia && `— ${d.referencia}`}</p>}
+                  {d.versiculo && <p className="text-xs text-gray-800 mt-1 italic">&ldquo;{d.versiculo}&rdquo; {d.referencia && `— ${d.referencia}`}</p>}
                   <p className="text-xs text-gray-400 mt-1">{new Date(d.data + "T00:00:00").toLocaleDateString("pt-BR")}</p>
                 </div>
                 <div className="flex gap-1 shrink-0">
-                  <button onClick={() => iniciarEdicaoDev(d)} className="p-1.5 hover:bg-vine-50 rounded-lg text-gray-300 hover:text-vine-600 transition">
+                  <button onClick={() => iniciarEdicaoDev(d)} className="p-1.5 hover:bg-gray-50 rounded-lg text-gray-300 hover:text-gray-800 transition">
                     <Pencil className="w-4 h-4" />
                   </button>
                   <button onClick={() => removerDev(d.id)} className="p-1.5 hover:bg-red-50 rounded-lg text-gray-300 hover:text-red-400 transition">

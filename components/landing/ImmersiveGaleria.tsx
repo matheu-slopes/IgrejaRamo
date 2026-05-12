@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
@@ -33,10 +33,10 @@ export default function ImmersiveGaleria() {
           viewport={{ once: true }}
           className="text-center mb-16"
         >
-          <p className="text-vine-600/70 text-[11px] tracking-[0.4em] uppercase mb-3">
+          <p className="text-gray-800/70 text-[11px] tracking-[0.4em] uppercase mb-3">
             Momentos
           </p>
-          <h2 className="font-sans text-4xl md:text-5xl font-semibold text-vine-900">
+          <h2 className="font-sans text-4xl md:text-5xl font-semibold text-black">
             Galeria
           </h2>
           <div className="mx-auto mt-4 w-12 h-px bg-gray-200" />

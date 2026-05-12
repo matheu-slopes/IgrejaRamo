@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -102,7 +102,7 @@ function MinistryEventRow({
               <p className="text-xs text-gray-400">{eventos.length} evento{eventos.length !== 1 ? "s" : ""}</p>
             </div>
             {isLider && (
-              <span className="text-xs bg-vine-50 text-vine-600 font-semibold px-2.5 py-1 rounded-full border border-vine-200">
+              <span className="text-xs bg-gray-50 text-gray-800 font-semibold px-2.5 py-1 rounded-full border border-gray-200">
                 + Novo
               </span>
             )}
@@ -133,7 +133,7 @@ function MinistryEventRow({
                 );
               })}
               {proximos.length > 2 && (
-                <button onClick={() => onOpen(ministerio)} className="w-full text-center text-xs text-vine-600 font-semibold py-1">
+                <button onClick={() => onOpen(ministerio)} className="w-full text-center text-xs text-gray-800 font-semibold py-1">
                   Ver mais {proximos.length - 2} eventos →
                 </button>
               )}
@@ -150,10 +150,10 @@ function MinistryEventRow({
         >
           <span className="text-2xl leading-none">{EMOJI[ministerio] ?? "📋"}</span>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-bold text-gray-800 truncate group-hover:text-vine-700 transition">{ministerio}</p>
+            <p className="text-sm font-bold text-gray-800 truncate group-hover:text-gray-900 transition">{ministerio}</p>
             <p className="text-xs text-gray-400 mt-0.5">{eventos.length} evento{eventos.length !== 1 ? "s" : ""}</p>
           </div>
-          <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-vine-500 shrink-0 transition" />
+          <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-gray-600 shrink-0 transition" />
         </button>
         <div className="w-px bg-gray-100 my-4 shrink-0" />
         <div className="flex-1 min-w-0 px-5 py-4 flex items-center">
@@ -161,7 +161,7 @@ function MinistryEventRow({
             <div className="flex items-center gap-3">
               <p className="text-sm text-gray-300 italic">Sem eventos criados.</p>
               {isLider && (
-                <button onClick={() => onOpen(ministerio)} className="flex items-center gap-1.5 text-sm text-vine-600 hover:text-vine-800 font-semibold border border-vine-200 hover:border-vine-400 px-3 py-2 rounded-xl transition">
+                <button onClick={() => onOpen(ministerio)} className="flex items-center gap-1.5 text-sm text-gray-800 hover:text-gray-900 font-semibold border border-gray-200 hover:border-gray-400 px-3 py-2 rounded-xl transition">
                   <Plus className="w-4 h-4" /> Criar
                 </button>
               )}
@@ -174,7 +174,7 @@ function MinistryEventRow({
               )}
               {passados.map((ev) => <EventoMiniCard key={ev.id} ev={ev} />)}
               {isLider && (
-                <button onClick={() => onOpen(ministerio)} className="flex-shrink-0 flex flex-col items-center justify-center gap-1.5 w-20 rounded-2xl border-2 border-dashed border-gray-200 text-gray-400 hover:border-vine-300 hover:text-vine-600 transition min-h-[6rem]">
+                <button onClick={() => onOpen(ministerio)} className="flex-shrink-0 flex flex-col items-center justify-center gap-1.5 w-20 rounded-2xl border-2 border-dashed border-gray-200 text-gray-400 hover:border-gray-300 hover:text-gray-800 transition min-h-[6rem]">
                   <Plus className="w-5 h-5" />
                   <span className="text-xs font-semibold">Novo</span>
                 </button>
@@ -213,7 +213,7 @@ export default function EventosDashboardPage() {
             ← Voltar
           </button>
           <span className="text-gray-300">/</span>
-          <h1 className="text-base font-bold text-vine-950">
+          <h1 className="text-base font-bold text-black">
             {EMOJI[editing]} {editing}
           </h1>
         </div>
@@ -229,7 +229,7 @@ export default function EventosDashboardPage() {
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <h1 className="text-xl md:text-2xl font-sans font-semibold text-vine-950">Eventos</h1>
+        <h1 className="text-xl md:text-2xl font-sans font-semibold text-black">Eventos</h1>
         <p className="text-sm text-gray-500 mt-0.5 hidden sm:block">Clique num ministério para gerenciar os eventos.</p>
       </div>
 

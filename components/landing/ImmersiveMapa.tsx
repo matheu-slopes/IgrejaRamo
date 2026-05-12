@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { motion } from "framer-motion";
 import { MapPin, Clock, Phone, Navigation } from "lucide-react";
@@ -34,7 +34,7 @@ export default function ImmersiveMapa() {
   return (
     <section id="localizacao" className="bg-[#F5F1EB]">
       {/* ── Divisor clean ── */}
-      <div className="w-full border-t border-vine-200 py-8" />
+      <div className="w-full border-t border-gray-200 py-8" />
 
       <div className="py-16 px-4 md:py-20 md:px-6">
       <div className="max-w-5xl mx-auto space-y-8 md:space-y-10">
@@ -42,7 +42,7 @@ export default function ImmersiveMapa() {
         {/* ── Título centralizado ── */}
         <motion.h2
           {...fadeUp(0)}
-          className="text-center font-sans text-4xl md:text-6xl font-bold text-vine-950"
+          className="text-center font-sans text-4xl md:text-6xl font-bold text-black"
         >
           Localização
         </motion.h2>
@@ -50,7 +50,7 @@ export default function ImmersiveMapa() {
         {/* ── Mapa full-width ── */}
         <motion.div {...fadeUp(0.05)}>
           <div
-            className="w-full h-[240px] md:h-[360px] rounded-2xl md:rounded-3xl overflow-hidden border border-vine-200/50 shadow-sm"
+            className="w-full h-[240px] md:h-[360px] rounded-2xl md:rounded-3xl overflow-hidden border border-gray-200/50 shadow-sm"
           >
             <iframe
               title="Localização Igreja Ramo da Vida"
@@ -65,17 +65,17 @@ export default function ImmersiveMapa() {
         {/* ── Card inferior com 4 colunas ── */}
         <motion.div
           {...fadeUp(0.1)}
-          className="bg-white rounded-3xl border border-vine-100 shadow-sm overflow-hidden"
+          className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden"
         >
-          <div className="grid grid-cols-1 md:grid-cols-[1fr_1.7fr_1fr_160px] divide-y md:divide-y-0 md:divide-x divide-vine-100">
+          <div className="grid grid-cols-1 md:grid-cols-[1fr_1.7fr_1fr_160px] divide-y md:divide-y-0 md:divide-x divide-gray-100">
 
             {/* Coluna 1 — Endereço */}
             <div className="p-6 md:p-9">
               <div className="flex items-center gap-2 mb-5">
-                <MapPin className="w-5 h-5 text-vine-500" strokeWidth={1.5} />
-                <p className="text-vine-800 text-base font-semibold">Endereço</p>
+                <MapPin className="w-5 h-5 text-gray-600" strokeWidth={1.5} />
+                <p className="text-gray-900 text-base font-semibold">Endereço</p>
               </div>
-              <p className="text-vine-700/75 text-sm leading-relaxed">
+              <p className="text-gray-900/75 text-sm leading-relaxed">
                 R. Fernão Pompeu de Camargo, 1293 | Jardim do Trevo —{" "}
                 Campinas, SP | CEP 13040-010
               </p>
@@ -83,7 +83,7 @@ export default function ImmersiveMapa() {
                 href="https://maps.google.com/?q=R.+Fernão+Pompeu+de+Camargo,+1293,+Campinas,+SP"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 mt-6 text-vine-600 hover:text-vine-800 text-sm font-semibold transition-colors group"
+                className="inline-flex items-center gap-1.5 mt-6 text-gray-800 hover:text-gray-900 text-sm font-semibold transition-colors group"
               >
                 <Navigation className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
                 Traçar rota no Google Maps →
@@ -93,15 +93,15 @@ export default function ImmersiveMapa() {
             {/* Coluna 2 — Horários em grade 3×2 */}
             <div className="p-6 md:p-9">
               <div className="flex items-center gap-2 mb-5">
-                <Clock className="w-5 h-5 text-vine-500" strokeWidth={1.5} />
-                <p className="text-vine-800 text-base font-semibold">Horários dos Cultos</p>
+                <Clock className="w-5 h-5 text-gray-600" strokeWidth={1.5} />
+                <p className="text-gray-900 text-base font-semibold">Horários dos Cultos</p>
               </div>
               <div className="grid grid-cols-3 gap-x-4 gap-y-4">
                 {horarios.map((h) =>
                   h.destaque ? (
                     <div
                       key={h.dia}
-                      className="bg-vine-700 text-white rounded-xl px-3 py-3 text-center"
+                      className="bg-black text-white rounded-xl px-3 py-3 text-center"
                     >
                       <p className="text-xs font-bold uppercase tracking-wide leading-none">
                         {h.dia}
@@ -111,9 +111,9 @@ export default function ImmersiveMapa() {
                     </div>
                   ) : (
                     <div key={h.dia} className="text-center">
-                      <p className="text-vine-800 text-sm font-semibold leading-tight">{h.dia}</p>
-                      <p className="text-vine-500 text-xs">{h.desc}</p>
-                      <p className="text-vine-700 text-sm font-bold mt-0.5">{h.hora}</p>
+                      <p className="text-gray-900 text-sm font-semibold leading-tight">{h.dia}</p>
+                      <p className="text-gray-600 text-xs">{h.desc}</p>
+                      <p className="text-gray-900 text-sm font-bold mt-0.5">{h.hora}</p>
                     </div>
                   )
                 )}
@@ -123,15 +123,15 @@ export default function ImmersiveMapa() {
             {/* Coluna 3 — Contato & Visita */}
             <div className="p-6 md:p-9">
               <div className="flex items-center gap-2 mb-5">
-                <Phone className="w-5 h-5 text-vine-500" strokeWidth={1.5} />
-                <p className="text-vine-800 text-base font-semibold">Contato &amp; Visita</p>
+                <Phone className="w-5 h-5 text-gray-600" strokeWidth={1.5} />
+                <p className="text-gray-900 text-base font-semibold">Contato &amp; Visita</p>
               </div>
-              <p className="text-vine-900 font-bold text-lg mb-5">{PHONE}</p>
+              <p className="text-black font-bold text-lg mb-5">{PHONE}</p>
 
               <div className="space-y-3">
                 <a
                   href={`tel:+${WHATSAPP}`}
-                  className="flex items-center justify-center gap-1.5 w-full border border-vine-200 hover:border-vine-400 text-vine-800 text-sm font-semibold py-2.5 rounded-xl transition-colors"
+                  className="flex items-center justify-center gap-1.5 w-full border border-gray-200 hover:border-gray-400 text-gray-900 text-sm font-semibold py-2.5 rounded-xl transition-colors"
                 >
                   Ligar Agora
                 </a>
@@ -139,21 +139,21 @@ export default function ImmersiveMapa() {
                   href={`https://wa.me/${WHATSAPP}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center justify-center gap-1.5 w-full border border-vine-200 hover:border-vine-400 text-vine-800 text-sm font-semibold py-2.5 rounded-xl transition-colors"
+                  className="flex items-center justify-center gap-1.5 w-full border border-gray-200 hover:border-gray-400 text-gray-900 text-sm font-semibold py-2.5 rounded-xl transition-colors"
                 >
                   <WhatsAppIcon className="w-4 h-4 text-green-600" />
                   Falar no WhatsApp
                 </a>
               </div>
 
-              <p className="text-vine-600/70 text-sm leading-relaxed mt-5">
+              <p className="text-gray-800/70 text-sm leading-relaxed mt-5">
                 Aberto a todos.<br />Venha nos conhecer!
               </p>
             </div>
 
             {/* Coluna 4 — Foto da comunidade */}
             <div
-              className="relative hidden md:block bg-vine-200/40 min-h-[200px]"
+              className="relative hidden md:block bg-gray-200/40 min-h-[200px]"
               style={{
                 backgroundImage: "url('/imagem_localização.jpg')",
                 backgroundSize: "cover",

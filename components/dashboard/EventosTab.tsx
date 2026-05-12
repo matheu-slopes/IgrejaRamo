@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -92,7 +92,7 @@ export function EventosTab({
         {isLider && (
           <button
             onClick={() => setShowForm(true)}
-            className="flex items-center gap-1.5 bg-gold-500 text-vine-950 text-sm font-semibold px-4 py-2 rounded-xl hover:bg-gold-400 transition"
+            className="flex items-center gap-1.5 bg-gold-500 text-black text-sm font-semibold px-4 py-2 rounded-xl hover:bg-gold-400 transition"
           >
             <Plus className="w-4 h-4" /> Novo evento
           </button>
@@ -102,7 +102,7 @@ export function EventosTab({
       {/* Formulário */}
       {showForm && (
         <div className="bg-gold-50 border border-gold-200 rounded-2xl p-5 space-y-3">
-          <p className="text-sm font-semibold text-vine-800">Novo evento</p>
+          <p className="text-sm font-semibold text-gray-900">Novo evento</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <input
               value={form.titulo}
@@ -140,7 +140,7 @@ export function EventosTab({
                 type="checkbox"
                 checked={form.publico}
                 onChange={(e) => setForm({ ...form, publico: e.target.checked })}
-                className="accent-vine-700 w-4 h-4 rounded"
+                className="accent-black w-4 h-4 rounded"
               />
               Visível na página pública
             </label>
@@ -156,7 +156,7 @@ export function EventosTab({
             <button
               onClick={criarEvento}
               disabled={criando}
-              className="text-sm bg-gold-500 text-vine-950 font-semibold px-4 py-1.5 rounded-xl hover:bg-gold-400 transition disabled:opacity-50"
+              className="text-sm bg-gold-500 text-black font-semibold px-4 py-1.5 rounded-xl hover:bg-gold-400 transition disabled:opacity-50"
             >
               {criando ? "Salvando..." : "Criar evento"}
             </button>
@@ -184,7 +184,7 @@ export function EventosTab({
               <div className="flex items-start gap-4">
                 <div className="shrink-0 w-12 text-center">
                   <p className="text-xs text-gray-400 uppercase">{diaSemana(e.data).slice(0, 3)}</p>
-                  <p className="text-2xl font-sans font-bold text-vine-800 leading-none">{e.data.split("-")[2]}</p>
+                  <p className="text-2xl font-sans font-bold text-gray-900 leading-none">{e.data.split("-")[2]}</p>
                   <p className="text-xs text-gray-400">{formatarData(e.data).split(" ").slice(1).join(" ")}</p>
                 </div>
                 <div>
@@ -202,7 +202,7 @@ export function EventosTab({
                 <div className="relative">
                   <button
                     onClick={() => setCalendarMenu(calendarMenu === e.id ? null : e.id)}
-                    className="flex items-center gap-1.5 text-xs font-medium bg-vine-50 text-vine-700 border border-vine-200 px-3 py-1.5 rounded-xl hover:bg-vine-100 transition"
+                    className="flex items-center gap-1.5 text-xs font-medium bg-gray-50 text-gray-900 border border-gray-200 px-3 py-1.5 rounded-xl hover:bg-gray-100 transition"
                   >
                     <Calendar className="w-3.5 h-3.5" />
                     Calendário

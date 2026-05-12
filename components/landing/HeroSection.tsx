@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Image from "next/image";
 import { useRef } from "react";
@@ -38,7 +38,7 @@ export default function HeroSection() {
   return (
     <section
       ref={sectionRef}
-      className="relative min-h-screen flex flex-col items-center justify-center text-center px-6 overflow-hidden bg-vine-950"
+      className="relative min-h-screen flex flex-col items-center justify-center text-center px-6 overflow-hidden bg-black"
     >
       {/* Vídeo de fundo em loop */}
       <video
@@ -50,12 +50,12 @@ export default function HeroSection() {
         src="/0416.mp4"
       />
       {/* Overlay escuro para legibilidade */}
-      <div className="absolute inset-0 bg-vine-950/55 pointer-events-none" />
+      <div className="absolute inset-0 bg-black/55 pointer-events-none" />
 
       {/* Orbs com parallax */}
       <motion.div
         style={{ y: orb1Y }}
-        className="absolute -top-40 -left-40 w-[560px] h-[560px] bg-vine-700/20 rounded-full blur-3xl pointer-events-none"
+        className="absolute -top-40 -left-40 w-[560px] h-[560px] bg-black/20 rounded-full blur-3xl pointer-events-none"
       />
       <motion.div
         style={{ y: orb2Y }}
@@ -98,7 +98,7 @@ export default function HeroSection() {
 
         {/* Passagem bíblica */}
         <motion.div {...fadeUp(0.45)} className="max-w-xs mx-auto space-y-1.5">
-          <p className="font-sans italic text-[1.15rem] text-vine-200/90 leading-relaxed">
+          <p className="font-sans italic text-[1.15rem] text-gray-200/90 leading-relaxed">
             "Eu sou a videira; vós sois os ramos."
           </p>
           <span className="block text-[11px] tracking-[0.25em] text-gold-500/80 uppercase">
@@ -117,7 +117,7 @@ export default function HeroSection() {
             href="#cultos"
             onMouseMove={handleMouseMove}
             className="relative overflow-hidden inline-flex items-center
-                       bg-gold-500 text-vine-950 font-semibold px-9 py-3.5 rounded-full
+                       bg-gold-500 text-black font-semibold px-9 py-3.5 rounded-full
                        shadow-[0_4px_24px_0_rgba(212,154,18,0.35)]
                        hover:shadow-[0_4px_44px_0_rgba(212,154,18,0.7)]
                        transition-shadow duration-300 text-[14px] tracking-wide group"
@@ -139,7 +139,7 @@ export default function HeroSection() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 1, delay: 1.5 }}
-        className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1.5 text-vine-600 animate-bounce"
+        className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1.5 text-gray-800 animate-bounce"
       >
         <ArrowDown className="w-4 h-4" />
         <span className="text-[10px] tracking-[0.3em] uppercase">Role</span>

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -37,7 +37,7 @@ export default function Navbar() {
   ];
 
   return (
-    <nav className="bg-vine-800 text-white w-full">
+    <nav className="bg-gray-900 text-white w-full">
       <div className="max-w-6xl mx-auto px-4 flex items-center justify-between h-14">
         <Link href="/dashboard" className="flex items-center gap-2 font-bold text-lg">
           <Church className="w-6 h-6" />
@@ -52,8 +52,8 @@ export default function Navbar() {
               className={clsx(
                 "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition relative",
                 pathname === href || pathname.startsWith(href + "/")
-                  ? "bg-vine-950"
-                  : "hover:bg-vine-700"
+                  ? "bg-black"
+                  : "hover:bg-black"
               )}
             >
               <span className="relative">
@@ -71,7 +71,7 @@ export default function Navbar() {
 
         <div className="flex items-center gap-3">
           {user && (
-            <span className="text-xs text-vine-300 hidden sm:block">
+            <span className="text-xs text-gray-300 hidden sm:block">
               {user.nome.split(" ")[0]} · {user.role}
             </span>
           )}

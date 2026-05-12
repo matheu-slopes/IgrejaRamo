@@ -1,4 +1,4 @@
-/**
+﻿/**
  * calendarUtils.ts
  * ─────────────────────────────────────────────────────────────────
  * Utilitários para integração com calendários externos.

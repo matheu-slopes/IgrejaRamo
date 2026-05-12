@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect, useRef } from "react";
 import { useSearchParams } from "next/navigation";
@@ -28,7 +28,7 @@ function formatTime(iso: string) {
 function roleBadge(role: string) {
   const map: Record<string, string> = {
     pastor: "bg-gold-100 text-gold-700", admin: "bg-blue-100 text-blue-700",
-    lider: "bg-vine-100 text-vine-700", voluntario: "bg-green-100 text-green-700",
+    lider: "bg-gray-100 text-gray-900", voluntario: "bg-green-100 text-green-700",
     membro: "bg-gray-100 text-gray-600",
   };
   return map[role] ?? "bg-gray-100 text-gray-600";
@@ -196,7 +196,7 @@ export default function ConversasPage() {
     <div className="max-w-4xl mx-auto flex flex-col h-[calc(100vh-8rem)]">
       {/* Header */}
       <div className="mb-4">
-        <h1 className="text-2xl font-sans font-semibold text-vine-950">Conversas</h1>
+        <h1 className="text-2xl font-sans font-semibold text-black">Conversas</h1>
         <p className="text-sm text-gray-500 mt-0.5">
           Comunicação interna por ministério — texto, imagens e áudios.
         </p>
@@ -211,8 +211,8 @@ export default function ConversasPage() {
             className={clsx(
               "flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-semibold transition",
               activeMin === value
-                ? "bg-vine-700 text-white shadow"
-                : "bg-white text-gray-500 border border-gray-200 hover:border-vine-300 hover:text-vine-700"
+                ? "bg-black text-white shadow"
+                : "bg-white text-gray-500 border border-gray-200 hover:border-gray-300 hover:text-gray-900"
             )}
           >
             <Icon className="w-4 h-4" />
@@ -242,7 +242,7 @@ export default function ConversasPage() {
             >
               <div className={clsx(
                 "w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-xs shrink-0",
-                isMe ? "bg-vine-700" : "bg-gray-400"
+                isMe ? "bg-black" : "bg-gray-400"
               )}>
                 {msg.autorNome.charAt(0)}
               </div>
@@ -266,7 +266,7 @@ export default function ConversasPage() {
                 <div className={clsx(
                   "rounded-2xl overflow-hidden text-sm",
                   (!msg.tipo || msg.tipo === "texto")
-                    ? clsx("px-4 py-2.5 leading-relaxed", isMe ? "bg-vine-700 text-white rounded-tr-sm" : "bg-gray-100 text-gray-800 rounded-tl-sm")
+                    ? clsx("px-4 py-2.5 leading-relaxed", isMe ? "bg-black text-white rounded-tr-sm" : "bg-gray-100 text-gray-800 rounded-tl-sm")
                     : "border border-gray-200 bg-white"
                 )}>
                   {(!msg.tipo || msg.tipo === "texto") && msg.conteudo}
@@ -291,7 +291,7 @@ export default function ConversasPage() {
                       {msg.reacoes.map((r) => (
                         <span
                           key={r.emoji}
-                          className="text-xs bg-gray-100 rounded-full px-1.5 py-0.5 cursor-pointer hover:bg-vine-100 transition"
+                          className="text-xs bg-gray-100 rounded-full px-1.5 py-0.5 cursor-pointer hover:bg-gray-100 transition"
                         >
                           {r.emoji} {r.count}
                         </span>
@@ -314,7 +314,7 @@ export default function ConversasPage() {
           <button onClick={() => setImagemPreview(null)} className="text-gray-400 hover:text-red-400 transition"><X className="w-4 h-4" /></button>
           <button
             onClick={enviarImagem}
-            className="bg-vine-700 text-white text-sm font-semibold px-4 py-2 rounded-xl hover:bg-vine-600 transition flex items-center gap-1.5"
+            className="bg-black text-white text-sm font-semibold px-4 py-2 rounded-xl hover:bg-gray-800 transition flex items-center gap-1.5"
           >
             <Send className="w-3.5 h-3.5" /> Enviar
           </button>
@@ -327,7 +327,7 @@ export default function ConversasPage() {
           <button onClick={cancelarAudio} className="text-gray-400 hover:text-red-400 transition"><X className="w-4 h-4" /></button>
           <button
             onClick={enviarAudio}
-            className="bg-vine-700 text-white text-sm font-semibold px-4 py-2 rounded-xl hover:bg-vine-600 transition flex items-center gap-1.5"
+            className="bg-black text-white text-sm font-semibold px-4 py-2 rounded-xl hover:bg-gray-800 transition flex items-center gap-1.5"
           >
             <Send className="w-3.5 h-3.5" /> Enviar
           </button>
@@ -358,14 +358,14 @@ export default function ConversasPage() {
             onChange={(e) => setTexto(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && (e.preventDefault(), enviar())}
             placeholder={`Mensagem para ${activeMin}…`}
-            className="flex-1 bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-vine-300 shadow-sm"
+            className="flex-1 bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gray-300 shadow-sm"
           />
 
           {/* Imagem */}
           <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleImageSelect} />
           <button
             onClick={() => fileRef.current?.click()}
-            className="p-2.5 rounded-xl border border-gray-200 bg-white text-gray-500 hover:text-vine-700 hover:border-vine-300 transition"
+            className="p-2.5 rounded-xl border border-gray-200 bg-white text-gray-500 hover:text-gray-900 hover:border-gray-300 transition"
             title="Enviar imagem"
           >
             <ImageIcon className="w-5 h-5" />
@@ -374,7 +374,7 @@ export default function ConversasPage() {
           {/* Gravar áudio */}
           <button
             onClick={iniciarGravacao}
-            className="p-2.5 rounded-xl border border-gray-200 bg-white text-gray-500 hover:text-vine-700 hover:border-vine-300 transition"
+            className="p-2.5 rounded-xl border border-gray-200 bg-white text-gray-500 hover:text-gray-900 hover:border-gray-300 transition"
             title="Gravar áudio"
           >
             <Mic className="w-5 h-5" />
@@ -383,7 +383,7 @@ export default function ConversasPage() {
           <button
             onClick={() => enviar()}
             disabled={!texto.trim()}
-            className="bg-vine-700 hover:bg-vine-800 disabled:opacity-40 text-white px-4 py-2.5 rounded-xl transition flex items-center gap-1.5 font-semibold text-sm"
+            className="bg-black hover:bg-gray-900 disabled:opacity-40 text-white px-4 py-2.5 rounded-xl transition flex items-center gap-1.5 font-semibold text-sm"
           >
             <Send className="w-4 h-4" />
           </button>

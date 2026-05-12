@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useState, useRef, useEffect } from "react";
 import { useParams } from "next/navigation";
@@ -22,10 +22,18 @@ import { EventosTab } from "@/components/dashboard/EventosTab";
 type Tab = "chat" | "membros" | "eventos" | "escalas";
 
 const corMap: Record<string, string> = {
-  grape: "bg-grape-800",
-  vine:  "bg-vine-800",
-  bark:  "bg-bark-700",
-  gold:  "bg-gold-500",
+  Louvor:        "bg-rose-700",
+  "Mídias":      "bg-blue-700",
+  Ensino:        "bg-amber-700",
+  Infantil:      "bg-emerald-700",
+  "Ação Social": "bg-orange-700",
+  Jovens:        "bg-violet-700",
+  Limpeza:       "bg-teal-700",
+  // legado
+  grape: "bg-rose-700",
+  vine:  "bg-gray-900",
+  bark:  "bg-amber-700",
+  gold:  "bg-amber-600",
 };
 
 export default function CanalMinisterioPage() {
@@ -74,7 +82,7 @@ export default function CanalMinisterioPage() {
     );
   }
 
-  const corBg = corMap[canalBase.cor] ?? "bg-vine-800";
+  const corBg = corMap[slug] ?? corMap[canalBase.cor] ?? "bg-gray-900";
 
   return (
     <div className="space-y-0">

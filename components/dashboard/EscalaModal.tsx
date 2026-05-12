@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect, useRef } from "react";
 import {
@@ -48,13 +48,13 @@ function corBg(culto: string) {
   if (culto.includes("Quinta"))   return "bg-grape-50";
   if (culto.includes("Domingo"))  return "bg-gold-50";
   if (culto.includes("Especial")) return "bg-blue-50";
-  return "bg-vine-50";
+  return "bg-gray-50";
 }
 function corBadge(culto: string) {
   if (culto.includes("Quinta"))   return "bg-grape-100 text-grape-900";
   if (culto.includes("Domingo"))  return "bg-gold-100 text-gold-900";
   if (culto.includes("Especial")) return "bg-blue-100 text-blue-800";
-  return "bg-vine-100 text-vine-900";
+  return "bg-gray-100 text-black";
 }
 
 // ─── componente principal ─────────────────────────────────────────────────────
@@ -296,7 +296,7 @@ export function EscalaModal({ escala, podeEditar, onClose, onUpdate, onDelete }:
                 <>
                   <button
                     onClick={() => { setForm(toForm(escala)); setMode("edit"); setSubTab("detalhes"); }}
-                    className="p-2 text-gray-500 hover:text-vine-700 hover:bg-white/70 rounded-xl transition"
+                    className="p-2 text-gray-500 hover:text-gray-900 hover:bg-white/70 rounded-xl transition"
                     title="Editar"
                   >
                     <Pencil className="w-4 h-4" />
@@ -366,7 +366,7 @@ export function EscalaModal({ escala, podeEditar, onClose, onUpdate, onDelete }:
                       </thead>
                       <tbody className="divide-y divide-gray-50">
                         {escala.itens.map((it, i) => (
-                          <tr key={i} className={it.voluntarioId === user?.id ? "bg-vine-50" : ""}>
+                          <tr key={i} className={it.voluntarioId === user?.id ? "bg-gray-50" : ""}>
                             <td className="px-3 py-2.5">
                               <span className="text-xs font-bold text-grape-800 bg-grape-50 px-2 py-0.5 rounded-full">
                                 {it.funcao}
@@ -375,7 +375,7 @@ export function EscalaModal({ escala, podeEditar, onClose, onUpdate, onDelete }:
                             <td className="px-3 py-2.5 font-medium text-gray-800 text-sm">
                               {it.voluntarioNome}
                               {it.voluntarioId === user?.id && (
-                                <span className="ml-1.5 text-[10px] bg-vine-700 text-white px-1.5 py-0.5 rounded-full font-bold">você</span>
+                                <span className="ml-1.5 text-[10px] bg-black text-white px-1.5 py-0.5 rounded-full font-bold">você</span>
                               )}
                               {it.observacao && (
                                 <p className="text-xs text-gray-400 font-normal mt-0.5">{it.observacao}</p>
@@ -484,7 +484,7 @@ export function EscalaModal({ escala, podeEditar, onClose, onUpdate, onDelete }:
                           }}
                           className={clsx(
                             "text-xs font-semibold px-3 py-1.5 rounded-full border transition hover:opacity-80",
-                            form.culto === t.label ? t.cor + " ring-2 ring-offset-1 ring-vine-400" : t.cor
+                            form.culto === t.label ? t.cor + " ring-2 ring-offset-1 ring-gray-400" : t.cor
                           )}
                         >{t.label}</button>
                       ))}
@@ -503,8 +503,8 @@ export function EscalaModal({ escala, podeEditar, onClose, onUpdate, onDelete }:
                             className={clsx(
                               "text-xs font-semibold px-3 py-1.5 rounded-xl border transition",
                               form.data === iso
-                                ? "bg-vine-700 text-white border-vine-700"
-                                : "bg-white text-gray-700 border-gray-200 hover:border-vine-400"
+                                ? "bg-black text-white border-gray-900"
+                                : "bg-white text-gray-700 border-gray-200 hover:border-gray-400"
                             )}
                           >{formatDateSimples(iso)}</button>
                         ))}
@@ -519,7 +519,7 @@ export function EscalaModal({ escala, podeEditar, onClose, onUpdate, onDelete }:
                         type="date"
                         value={form.data}
                         onChange={(e) => setForm((f) => ({ ...f, data: e.target.value }))}
-                        className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-vine-400"
+                        className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-gray-400"
                       />
                     </div>
                     <div>
@@ -528,7 +528,7 @@ export function EscalaModal({ escala, podeEditar, onClose, onUpdate, onDelete }:
                         type="time"
                         value={form.horario}
                         onChange={(e) => setForm((f) => ({ ...f, horario: e.target.value }))}
-                        className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-vine-400"
+                        className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-gray-400"
                       />
                     </div>
                   </div>
@@ -539,7 +539,7 @@ export function EscalaModal({ escala, podeEditar, onClose, onUpdate, onDelete }:
                       value={form.observacoes}
                       onChange={(e) => setForm((f) => ({ ...f, observacoes: e.target.value }))}
                       rows={3}
-                      className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-vine-400 resize-none"
+                      className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-gray-400 resize-none"
                     />
                   </div>
 
@@ -548,7 +548,7 @@ export function EscalaModal({ escala, podeEditar, onClose, onUpdate, onDelete }:
                       type="checkbox"
                       checked={form.visivel}
                       onChange={(e) => setForm((f) => ({ ...f, visivel: e.target.checked }))}
-                      className="w-4 h-4 accent-vine-700"
+                      className="w-4 h-4 accent-black"
                     />
                     <span className="text-sm text-gray-700 font-medium">Publicar escala (visível para os membros)</span>
                   </label>
@@ -563,7 +563,7 @@ export function EscalaModal({ escala, podeEditar, onClose, onUpdate, onDelete }:
                     <select
                       value={novaFuncao}
                       onChange={(e) => setNovaFuncao(e.target.value)}
-                      className="border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-vine-400"
+                      className="border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-gray-400"
                     >
                       {(FUNCOES_POR_MIN[escala.ministerio] ?? FUNCOES_POR_MIN.Louvor).map((f) => (
                         <option key={f}>{f}</option>
@@ -572,7 +572,7 @@ export function EscalaModal({ escala, podeEditar, onClose, onUpdate, onDelete }:
                     <select
                       value={novoMembroId}
                       onChange={(e) => setNovoMembroId(e.target.value)}
-                      className="flex-1 min-w-0 border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-vine-400"
+                      className="flex-1 min-w-0 border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-gray-400"
                     >
                       <option value="">Selecionar membro...</option>
                       {membros.map((m) => (
@@ -582,7 +582,7 @@ export function EscalaModal({ escala, podeEditar, onClose, onUpdate, onDelete }:
                     <button
                       onClick={addParticipante}
                       disabled={!novoMembroId}
-                      className="flex items-center gap-1 px-3 py-2 bg-vine-700 text-white text-sm font-semibold rounded-xl hover:bg-vine-800 transition disabled:opacity-40"
+                      className="flex items-center gap-1 px-3 py-2 bg-black text-white text-sm font-semibold rounded-xl hover:bg-gray-900 transition disabled:opacity-40"
                     >
                       <Plus className="w-4 h-4" />
                     </button>
@@ -672,7 +672,7 @@ export function EscalaModal({ escala, podeEditar, onClose, onUpdate, onDelete }:
                         value={buscaMusica}
                         onChange={(e) => setBuscaMusica(e.target.value)}
                         placeholder="Buscar música..."
-                        className="w-full border border-gray-200 rounded-xl pl-8 pr-4 py-2 text-sm outline-none focus:border-vine-400"
+                        className="w-full border border-gray-200 rounded-xl pl-8 pr-4 py-2 text-sm outline-none focus:border-gray-400"
                       />
                     </div>
                     {buscaMusica && (
@@ -708,7 +708,7 @@ export function EscalaModal({ escala, podeEditar, onClose, onUpdate, onDelete }:
                                 <button
                                   onClick={() => addMusica(m)}
                                   disabled={jaAdicionada}
-                                  className="p-1.5 text-white bg-vine-700 rounded-lg hover:bg-vine-800 transition disabled:opacity-30"
+                                  className="p-1.5 text-white bg-black rounded-lg hover:bg-gray-900 transition disabled:opacity-30"
                                 >
                                   <Plus className="w-3.5 h-3.5" />
                                 </button>
@@ -728,19 +728,19 @@ export function EscalaModal({ escala, podeEditar, onClose, onUpdate, onDelete }:
                     <button
                       type="button"
                       onClick={() => setAddingNova((v) => !v)}
-                      className="w-full flex items-center justify-between px-3 py-2 text-sm font-semibold text-vine-700 hover:bg-vine-50 transition"
+                      className="w-full flex items-center justify-between px-3 py-2 text-sm font-semibold text-gray-900 hover:bg-gray-50 transition"
                     >
                       <span className="flex items-center gap-2"><Plus className="w-3.5 h-3.5" /> Nova música</span>
                       {addingNova ? <X className="w-3.5 h-3.5 text-gray-400" /> : null}
                     </button>
                     {addingNova && (
-                      <div className="px-3 pb-3 pt-1 space-y-2 bg-vine-50/40">
+                      <div className="px-3 pb-3 pt-1 space-y-2 bg-gray-50/40">
                         <div className="flex gap-2">
                           <input
                             value={novaMusica.titulo}
                             onChange={(e) => setNovaMusica((n) => ({ ...n, titulo: e.target.value }))}
                             placeholder="Título"
-                            className="flex-1 border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm outline-none focus:border-vine-400 bg-white"
+                            className="flex-1 border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm outline-none focus:border-gray-400 bg-white"
                           />
                           <select
                             value={novaMusica.tom}
@@ -756,12 +756,12 @@ export function EscalaModal({ escala, podeEditar, onClose, onUpdate, onDelete }:
                             value={novaMusica.artista}
                             onChange={(e) => setNovaMusica((n) => ({ ...n, artista: e.target.value }))}
                             placeholder="Artista / Banda"
-                            className="flex-1 border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm outline-none focus:border-vine-400 bg-white"
+                            className="flex-1 border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm outline-none focus:border-gray-400 bg-white"
                           />
                           <button
                             onClick={salvarNovaMusica}
                             disabled={savingNova || !novaMusica.titulo.trim() || !novaMusica.artista.trim()}
-                            className="px-3 py-1.5 text-sm font-bold text-white bg-vine-700 rounded-lg hover:bg-vine-800 transition disabled:opacity-40"
+                            className="px-3 py-1.5 text-sm font-bold text-white bg-black rounded-lg hover:bg-gray-900 transition disabled:opacity-40"
                           >
                             {savingNova ? "..." : "+ Add"}
                           </button>
@@ -791,7 +791,7 @@ export function EscalaModal({ escala, podeEditar, onClose, onUpdate, onDelete }:
             <button
               onClick={salvar}
               disabled={saving || !form.culto || !form.data || !form.horario}
-              className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-white bg-vine-700 rounded-xl hover:bg-vine-800 transition disabled:opacity-50"
+              className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-white bg-black rounded-xl hover:bg-gray-900 transition disabled:opacity-50"
             >
               <Save className="w-4 h-4" />
               {saving ? "Salvando..." : "Salvar"}

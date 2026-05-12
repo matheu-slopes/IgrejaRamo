@@ -1,4 +1,4 @@
-﻿"use client";
+﻿﻿"use client";
 
 import { useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
@@ -29,14 +29,14 @@ export default function LoginPage() {
         setError("E-mail ou senha incorretos. Verifique e tente novamente.");
       }
     } catch {
-      setError("Erro de conexão. Tente novamente.");
+      setError("Erro de conex�o. Tente novamente.");
     } finally {
       setLoading(false);
     }
   }
 
   const inputCls =
-    "w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-vine-500 bg-gray-50 placeholder:text-gray-400";
+    "w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gray-400 bg-gray-50 placeholder:text-gray-400";
 
   return (
     <main className="min-h-screen flex items-center justify-center bg-cream px-4 py-12">
@@ -55,7 +55,7 @@ export default function LoginPage() {
           </Link>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-md border border-vine-100 overflow-hidden">
+        <div className="bg-white rounded-2xl shadow-md border border-gray-100 overflow-hidden">
           <div className="px-7 pt-6 pb-1">
             <h1 className="text-lg font-bold text-gray-800">Entrar</h1>
             <p className="text-xs text-gray-400 mt-0.5">
@@ -88,7 +88,7 @@ export default function LoginPage() {
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
+                  placeholder="��������"
                   className={inputCls + " pr-10"}
                 />
                 <button
@@ -111,7 +111,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="bg-vine-700 text-white py-2.5 rounded-xl font-semibold hover:bg-vine-800 transition mt-1 disabled:opacity-60"
+              className="bg-black text-white py-2.5 rounded-xl font-semibold hover:bg-gray-900 transition mt-1 disabled:opacity-60"
             >
               {loading ? "Entrando..." : "Entrar"}
             </button>
@@ -119,13 +119,14 @@ export default function LoginPage() {
         </div>
 
         <p className="text-center text-xs text-gray-400 mt-6">
-          <Link href="/" className="hover:text-vine-600 transition">
-            ← Voltar ao site
+          <Link href="/" className="hover:text-gray-800 transition">
+            ? Voltar ao site
           </Link>
         </p>
       </div>
     </main>
   );
 }
+
 
 

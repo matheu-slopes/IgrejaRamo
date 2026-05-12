@@ -3,12 +3,12 @@
 import { motion } from "framer-motion";
 import { Calendar, Users2, Sprout, Heart } from "lucide-react";
 
-// ── Métricas — edite conforme necessário ─────────────────────────────────────
+// -- M�tricas � edite conforme necess�rio -------------------------------------
 const metrics = [
-  { numero: "2019", label: "Fundação e\nPrimeiros Passos",         icon: Calendar },
-  { numero: "6",    label: "Ministérios Ativos\ne Diversificados", icon: Users2   },
+  { numero: "2019", label: "Funda��o e\nPrimeiros Passos",         icon: Calendar },
+  { numero: "6",    label: "Minist�rios Ativos\ne Diversificados", icon: Users2   },
   { numero: "6+",   label: "Cultos\nSemanais",                     icon: Sprout   },
-  { numero: "∞",    label: "Amor Incondicional\ne Serviço",        icon: Heart    },
+  { numero: "8",    label: "Amor Incondicional\ne Servi�o",        icon: Heart    },
 ];
 
 // Ramo decorativo naturalista com folhas e frutinhos
@@ -36,12 +36,12 @@ function LeafDecor({ className }: { className?: string }) {
         d="M68 148 C55 140 46 132 38 120"
         stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" opacity="0.45"
       />
-      {/* Sub-galho direito médio */}
+      {/* Sub-galho direito m�dio */}
       <path
         d="M55 105 C67 95 80 90 90 80"
         stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" opacity="0.4"
       />
-      {/* Sub-galho esquerdo médio */}
+      {/* Sub-galho esquerdo m�dio */}
       <path
         d="M52 88 C40 80 30 70 26 56"
         stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" opacity="0.4"
@@ -52,20 +52,20 @@ function LeafDecor({ className }: { className?: string }) {
         stroke="currentColor" strokeWidth="1" strokeLinecap="round" opacity="0.4"
       />
 
-      {/* Folha 1 — direita inferior */}
+      {/* Folha 1 � direita inferior */}
       <ellipse cx="108" cy="104" rx="13" ry="7" transform="rotate(-30 108 104)" fill="currentColor" opacity="0.22"/>
-      {/* Folha 2 — esquerda inferior */}
+      {/* Folha 2 � esquerda inferior */}
       <ellipse cx="35" cy="117" rx="12" ry="6.5" transform="rotate(20 35 117)" fill="currentColor" opacity="0.22"/>
-      {/* Folha 3 — direita médio */}
+      {/* Folha 3 � direita m�dio */}
       <ellipse cx="93" cy="76" rx="13" ry="6.5" transform="rotate(-40 93 76)" fill="currentColor" opacity="0.20"/>
-      {/* Folha 4 — esquerda médio */}
+      {/* Folha 4 � esquerda m�dio */}
       <ellipse cx="23" cy="53" rx="11" ry="6" transform="rotate(15 23 53)" fill="currentColor" opacity="0.20"/>
-      {/* Folha 5 — topo */}
+      {/* Folha 5 � topo */}
       <ellipse cx="76" cy="28" rx="10" ry="5.5" transform="rotate(-50 76 28)" fill="currentColor" opacity="0.20"/>
-      {/* Folha 6 — topo direita */}
+      {/* Folha 6 � topo direita */}
       <ellipse cx="56" cy="16" rx="9" ry="5" transform="rotate(-20 56 16)" fill="currentColor" opacity="0.18"/>
 
-      {/* Frutinhos — bolinhas vermelhas */}
+      {/* Frutinhos � bolinhas vermelhas */}
       <circle cx="64" cy="132" r="3.5" fill="#C0392B" opacity="0.7"/>
       <circle cx="60" cy="125" r="2.5" fill="#C0392B" opacity="0.5"/>
       <circle cx="70" cy="120" r="2"   fill="#C0392B" opacity="0.4"/>
@@ -85,26 +85,26 @@ export default function ScrollyQuemSomos() {
     <section id="quem-somos" className="bg-[#F5F1EB] py-16 px-4 md:py-24 md:px-6">
       <div className="max-w-5xl mx-auto space-y-20">
 
-        {/* ── 1. Título + parágrafo  |  Foto da comunidade ─────────────── */}
+        {/* -- 1. T�tulo + par�grafo  |  Foto da comunidade --------------- */}
         <motion.div
           {...fadeUp(0)}
           className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-10 items-center"
         >
           {/* Texto */}
           <div>
-            <h2 className="font-sans text-3xl md:text-5xl font-bold text-vine-950 leading-tight mb-5">
-              Nossa História:<br />Uma Comunidade Viva
+            <h2 className="font-sans text-3xl md:text-5xl font-bold text-black leading-tight mb-5">
+              Nossa Hist�ria:<br />Uma Comunidade Viva
             </h2>
-            <p className="text-vine-800/75 text-base leading-relaxed">
-              Nascidos do coração de Deus para manifestar o caráter de Cristo, a comunidade cristã{" "}
-              <strong className="text-vine-950 font-bold">Ramo da Vida</strong> se manifesta através da
-              comunhão nos cultos, em ações sociais e no testemunho pessoal e coletivo de seus membros,
-              líderes e simpatizantes do mesmo propósito.
+            <p className="text-gray-900/75 text-base leading-relaxed">
+              Nascidos do cora��o de Deus para manifestar o car�ter de Cristo, a comunidade crist�{" "}
+              <strong className="text-black font-bold">Ramo da Vida</strong> se manifesta atrav�s da
+              comunh�o nos cultos, em a��es sociais e no testemunho pessoal e coletivo de seus membros,
+              l�deres e simpatizantes do mesmo prop�sito.
             </p>
           </div>
 
-          {/* Vídeo em loop */}
-          <div className="relative aspect-[4/3] rounded-2xl overflow-hidden shadow-md bg-vine-200/40 w-full">
+          {/* V�deo em loop */}
+          <div className="relative aspect-[4/3] rounded-2xl overflow-hidden shadow-md bg-gray-200/40 w-full">
             <video
               src="/nossa_historia.mp4"
               autoPlay
@@ -116,16 +116,16 @@ export default function ScrollyQuemSomos() {
           </div>
         </motion.div>
 
-        {/* ── 2. Métricas — timeline horizontal com videira decorativa ─── */}
+        {/* -- 2. M�tricas � timeline horizontal com videira decorativa --- */}
         <motion.div {...fadeUp(0.05)}>
-          <h3 className="font-sans text-2xl font-bold text-vine-950 mb-10">
-            Nosso Impacto e Trajetória
+          <h3 className="font-sans text-2xl font-bold text-black mb-10">
+            Nosso Impacto e Trajet�ria
           </h3>
 
           {/* Container relativo para a videira de fundo */}
           <div className="relative py-10">
 
-            {/* Videira SVG de fundo — full width */}
+            {/* Videira SVG de fundo � full width */}
             <svg
               viewBox="0 0 1000 200"
               fill="none"
@@ -185,24 +185,24 @@ export default function ScrollyQuemSomos() {
               <ellipse cx="855" cy="118" rx="8" ry="4"   transform="rotate(10 855 118)" fill="#8B9E7A" opacity="0.14"/>
             </svg>
 
-            {/* Linha horizontal sólida centralizada */}
-            <div className="absolute left-0 right-0 top-1/2 -translate-y-1/2 h-px bg-vine-300/40" />
+            {/* Linha horizontal s�lida centralizada */}
+            <div className="absolute left-0 right-0 top-1/2 -translate-y-1/2 h-px bg-gray-300/40" />
 
             {/* Itens da timeline */}
             <div className="relative grid grid-cols-2 md:grid-cols-4 gap-y-8 md:gap-y-0">
               {metrics.map(({ numero, label, icon: Icon }, i) => (
                 <div key={label} className="flex flex-col items-center text-center px-4 gap-2">
-                  {/* Número acima da linha */}
-                  <p className="font-sans text-[2.4rem] md:text-[3.2rem] font-bold text-vine-950 leading-none tracking-tight mb-3">
+                  {/* N�mero acima da linha */}
+                  <p className="font-sans text-[2.4rem] md:text-[3.2rem] font-bold text-black leading-none tracking-tight mb-3">
                     {numero}
                   </p>
 
                   {/* Ponto na linha */}
-                  <div className="w-2.5 h-2.5 rounded-full bg-vine-400/60 border-2 border-vine-300/60 z-10 shrink-0" />
+                  <div className="w-2.5 h-2.5 rounded-full bg-gray-400/60 border-2 border-gray-300/60 z-10 shrink-0" />
 
-                  {/* Ícone + label abaixo da linha */}
-                  <Icon className="w-5 h-5 text-vine-500 mt-2" strokeWidth={1.5} />
-                  <p className="text-vine-700 text-[11px] leading-snug whitespace-pre-line mt-0.5">
+                  {/* �cone + label abaixo da linha */}
+                  <Icon className="w-5 h-5 text-gray-600 mt-2" strokeWidth={1.5} />
+                  <p className="text-gray-900 text-[11px] leading-snug whitespace-pre-line mt-0.5">
                     {label}
                   </p>
                 </div>
@@ -211,23 +211,23 @@ export default function ScrollyQuemSomos() {
           </div>
         </motion.div>
 
-        {/* ── 3. Citação — João 15:5 com folhas decorativas ─────────────── */}
+        {/* -- 3. Cita��o � Jo�o 15:5 com folhas decorativas --------------- */}
         <motion.div
           {...fadeUp(0.08)}
           className="relative rounded-3xl bg-[#E8E0D2] px-6 py-12 md:px-10 md:py-16 text-center overflow-hidden"
         >
           {/* Folhas decorativas */}
-          <LeafDecor className="absolute -bottom-4 -left-2 w-36 text-vine-700 rotate-12" />
-          <LeafDecor className="absolute -top-4 -right-2 w-36 text-vine-700 -rotate-12 scale-x-[-1] scale-y-[-1]" />
+          <LeafDecor className="absolute -bottom-4 -left-2 w-36 text-gray-900 rotate-12" />
+          <LeafDecor className="absolute -top-4 -right-2 w-36 text-gray-900 -rotate-12 scale-x-[-1] scale-y-[-1]" />
 
-          <p className="relative z-10 font-sans italic text-xl md:text-3xl text-vine-900 leading-relaxed max-w-2xl mx-auto">
-            "Eu sou a videira; vós sois os ramos.{" "}
+          <p className="relative z-10 font-sans italic text-xl md:text-3xl text-black leading-relaxed max-w-2xl mx-auto">
+            "Eu sou a videira; v�s sois os ramos.{" "}
             <br className="hidden md:block" />
-            Quem permanece em mim e eu nele, esse dá muito fruto."
+            Quem permanece em mim e eu nele, esse d� muito fruto."
           </p>
-          <div className="mx-auto mt-7 w-8 h-px bg-vine-400/60 relative z-10" />
-          <span className="relative z-10 block text-vine-500 text-[10px] tracking-[0.4em] uppercase mt-5">
-            João 15:5
+          <div className="mx-auto mt-7 w-8 h-px bg-gray-400/60 relative z-10" />
+          <span className="relative z-10 block text-gray-600 text-[10px] tracking-[0.4em] uppercase mt-5">
+            Jo�o 15:5
           </span>
         </motion.div>
 

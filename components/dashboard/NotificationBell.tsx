@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect } from "react";
 import { Bell, X, CheckCheck, CalendarDays, MessageSquare, AlertCircle, Users } from "lucide-react";
@@ -9,7 +9,7 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 
 const tipoIcon: Record<TipoNotificacao, React.ReactNode> = {
-  escala:     <CalendarDays className="w-4 h-4 text-vine-400"  />,
+  escala:     <CalendarDays className="w-4 h-4 text-gray-400"  />,
   evento:     <CalendarDays className="w-4 h-4 text-gold-500"  />,
   aviso:      <AlertCircle  className="w-4 h-4 text-amber-500" />,
   ministerio: <MessageSquare className="w-4 h-4 text-grape-400"/>,
@@ -126,10 +126,10 @@ export default function NotificationBell() {
             {/* Header */}
             <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
               <div className="flex items-center gap-2">
-                <Bell className="w-4 h-4 text-vine-700" />
+                <Bell className="w-4 h-4 text-gray-900" />
                 <h3 className="text-sm font-semibold text-gray-800">Notificações</h3>
                 {naoLidas > 0 && (
-                  <span className="bg-vine-100 text-vine-700 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                  <span className="bg-gray-100 text-gray-900 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
                     {naoLidas} nova{naoLidas > 1 ? "s" : ""}
                   </span>
                 )}
@@ -137,7 +137,7 @@ export default function NotificationBell() {
               {naoLidas > 0 && (
                 <button
                   onClick={marcarTodas}
-                  className="text-[11px] text-vine-600 hover:text-vine-800 flex items-center gap-1 font-medium"
+                  className="text-[11px] text-gray-800 hover:text-gray-900 flex items-center gap-1 font-medium"
                 >
                   <CheckCheck className="w-3.5 h-3.5" /> Marcar todas
                 </button>
@@ -157,7 +157,7 @@ export default function NotificationBell() {
                     key={n.id}
                     className={clsx(
                       "flex items-start gap-3 px-4 py-3 hover:bg-gray-50 transition group",
-                      !n.lida && "bg-vine-50"
+                      !n.lida && "bg-gray-50"
                     )}
                   >
                     <div className="mt-0.5 shrink-0">
@@ -195,7 +195,7 @@ export default function NotificationBell() {
                       {!n.lida && (
                         <button
                           onClick={() => marcarUma(n.id)}
-                          className="w-2 h-2 rounded-full bg-vine-500 hover:bg-vine-800 transition"
+                          className="w-2 h-2 rounded-full bg-gray-500 hover:bg-gray-900 transition"
                           title="Marcar como lida"
                         />
                       )}

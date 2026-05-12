@@ -1,4 +1,4 @@
-export type Role = "admin" | "pastor" | "lider" | "voluntario" | "membro";
+﻿export type Role = "admin" | "pastor" | "lider" | "voluntario" | "membro";
 
 // ─────────────────────────────────────────────
 // Sistema de permissões
@@ -262,7 +262,7 @@ export interface Grupo {
   nome: string;
   tipo: TipoGrupo;
   emoji: string;
-  cor: string;            // classe tailwind bg (ex: "bg-vine-700")
+  cor: string;            // classe tailwind bg (ex: "bg-black")
   descricao?: string;
   ministerio?: Ministerio; // preenchido quando tipo === "ministerio"
   eventoId?: string;       // ref a Evento.id para tipo "culto" | "evento"

@@ -20,17 +20,17 @@ const days: CultoDay[] = [
     id: "seg",
     short: "SEG",
     full: "Segunda-feira",
-    title: "Oração",
-    description: "Busca, intercessão coletiva e fortalecimento espiritual.",
+    title: "Ora��o",
+    description: "Busca, intercess�o coletiva e fortalecimento espiritual.",
     time: "20h00",
     place: "Templo Principal",
   },
   {
     id: "ter",
     short: "TER",
-    full: "Terça-feira",
+    full: "Ter�a-feira",
     title: "Mulheres & Ensino",
-    description: "1ª terça: culto de mulheres. 2ª terça: ensino bíblico.",
+    description: "1� ter�a: culto de mulheres. 2� ter�a: ensino b�blico.",
     time: "19h30 / 19h45",
     place: "Templo Principal",
   },
@@ -39,16 +39,16 @@ const days: CultoDay[] = [
     short: "QUI",
     full: "Quinta-feira",
     title: "Culto de Quinta",
-    description: "Louvor, oração e Palavra para renovar a fé no meio da semana.",
+    description: "Louvor, ora��o e Palavra para renovar a f� no meio da semana.",
     time: "20h00",
     place: "Templo Principal",
   },
   {
     id: "sab",
-    short: "SÁB",
-    full: "Sábado",
+    short: "S�B",
+    full: "S�bado",
     title: "Jovens",
-    description: "Encontro quinzenal com adoração, comunhão e palavra para a juventude.",
+    description: "Encontro quinzenal com adora��o, comunh�o e palavra para a juventude.",
     time: "19h30",
     place: "Sala 3",
   },
@@ -57,14 +57,14 @@ const days: CultoDay[] = [
     short: "DOM",
     full: "Domingo",
     title: "Culto Dominical",
-    description: "Celebração com louvor, mensagem e comunhão para toda a família.",
+    description: "Celebra��o com louvor, mensagem e comunh�o para toda a fam�lia.",
     time: "18h30",
     place: "Templo Principal",
     featured: true,
   },
 ];
 
-/* ── Stagger variants ── */
+/* -- Stagger variants -- */
 const stagger = {
   hidden: {},
   show: { transition: { staggerChildren: 0.1, delayChildren: 0.2 } },
@@ -90,7 +90,7 @@ export default function CylinderCarousel() {
       {/* Fade de entrada */}
       <div className="absolute top-0 left-0 right-0 h-20 bg-gradient-to-b from-[#FDFDFB] to-transparent pointer-events-none z-10" />
 
-      {/* Ramo botânico — lateral esquerda */}
+      {/* Ramo bot�nico � lateral esquerda */}
       <motion.svg
         aria-hidden="true"
         style={{ y: branchLeft, filter: "blur(3px)" }}
@@ -111,7 +111,7 @@ export default function CylinderCarousel() {
         <ellipse cx="148" cy="18" rx="3.5" ry="8" transform="rotate(20 148 18)" fill="#276f2a" opacity="0.6"/>
       </motion.svg>
 
-      {/* Ramo botânico — lateral direita */}
+      {/* Ramo bot�nico � lateral direita */}
       <motion.svg
         aria-hidden="true"
         style={{ y: branchRight, filter: "blur(3px)", scaleX: -1 }}
@@ -141,8 +141,8 @@ export default function CylinderCarousel() {
           transition={{ duration: 0.6 }}
           className="text-center mb-14"
         >
-          <p className="mb-3 text-[11px] uppercase tracking-[0.45em] text-vine-600">
-            Programação Semanal
+          <p className="mb-3 text-[11px] uppercase tracking-[0.45em] text-gray-800">
+            Programa��o Semanal
           </p>
           <h2 className="font-sans text-3xl md:text-4xl font-semibold leading-none text-[#1A1A1A] tracking-tight">
             Nossos Cultos
@@ -172,46 +172,46 @@ export default function CylinderCarousel() {
               whileHover={{ borderColor: "rgba(0,0,0,0.04)" }}
             >
               {/* Divisor gradiente inferior */}
-              <div className="absolute bottom-0 left-6 right-6 h-px bg-gradient-to-r from-transparent via-vine-300/40 to-transparent" />
+              <div className="absolute bottom-0 left-6 right-6 h-px bg-gradient-to-r from-transparent via-gray-300/40 to-transparent" />
 
               <div className="relative z-10 flex items-center gap-5">
                 {/* Dia da semana */}
                 <span
                   className={`w-14 shrink-0 font-sans text-lg font-bold tracking-[0.12em] transition-colors duration-300 ${
                     day.featured
-                      ? "text-vine-800"
-                      : "text-vine-600 group-hover:text-vine-900"
+                      ? "text-gray-900"
+                      : "text-gray-800 group-hover:text-black"
                   }`}
                 >
                   {day.short}
                 </span>
 
                 {/* Separador vertical */}
-                <span className="h-10 w-px shrink-0 bg-gradient-to-b from-transparent via-vine-300/50 to-transparent" />
+                <span className="h-10 w-px shrink-0 bg-gradient-to-b from-transparent via-gray-300/50 to-transparent" />
 
-                {/* Conteúdo */}
+                {/* Conte�do */}
                 <div className="flex flex-1 flex-col gap-1 min-w-0">
                   <span
                     className={`text-base font-semibold leading-tight transition-colors duration-300 ${
                       day.featured
                         ? "text-[#1A1A1A]"
-                        : "text-vine-900 group-hover:text-[#1A1A1A]"
+                        : "text-black group-hover:text-[#1A1A1A]"
                     }`}
                   >
                     {day.title}
                   </span>
-                  <span className="text-[13px] leading-relaxed text-vine-500/80 group-hover:text-vine-600 transition-colors duration-300">
+                  <span className="text-[13px] leading-relaxed text-gray-600/80 group-hover:text-gray-800 transition-colors duration-300">
                     {day.description}
                   </span>
                 </div>
 
-                {/* Horário e local */}
+                {/* Hor�rio e local */}
                 <div className="hidden shrink-0 flex-col items-end gap-1.5 sm:flex">
-                  <span className="flex items-center gap-1.5 text-xs font-medium text-vine-700 group-hover:text-vine-900 transition-colors">
-                    <Clock3 className="h-3.5 w-3.5 text-vine-400/70" />
+                  <span className="flex items-center gap-1.5 text-xs font-medium text-gray-900 group-hover:text-black transition-colors">
+                    <Clock3 className="h-3.5 w-3.5 text-gray-400/70" />
                     {day.time}
                   </span>
-                  <span className="flex items-center gap-1.5 text-[11px] text-vine-400 group-hover:text-vine-600 transition-colors">
+                  <span className="flex items-center gap-1.5 text-[11px] text-gray-400 group-hover:text-gray-800 transition-colors">
                     <MapPin className="h-3 w-3" />
                     {day.place}
                   </span>
@@ -221,19 +221,19 @@ export default function CylinderCarousel() {
           ))}
         </motion.ol>
 
-        {/* Endereço */}
+        {/* Endere�o */}
         <motion.p
           initial={{ opacity: 0 }}
           whileInView={{ opacity: 1 }}
           viewport={{ once: true }}
           transition={{ delay: 0.8 }}
-          className="mt-10 text-center text-[10px] tracking-[0.3em] text-vine-400 uppercase"
+          className="mt-10 text-center text-[10px] tracking-[0.3em] text-gray-400 uppercase"
         >
-          R. Fernão Pompeu de Camargo, 1293 · Campinas
+          R. Fern�o Pompeu de Camargo, 1293 � Campinas
         </motion.p>
       </div>
 
-      {/* Fade de saída */}
+      {/* Fade de sa�da */}
       <div className="absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-b from-transparent to-[#FDFDFB]/60 pointer-events-none z-10" />
     </section>
   );

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
@@ -125,10 +125,10 @@ function ConteudoRico({ blocos }: { blocos: DevocionalBloco[] }) {
 
         if (bloco.tipo === "citacao") {
           return (
-            <blockquote key={bloco.id} className="rounded-2xl bg-vine-50 border border-vine-100 px-5 py-4">
-              <Quote className="w-5 h-5 text-vine-400 mb-2" />
-              <p className="text-vine-900 italic leading-relaxed">{bloco.texto}</p>
-              {bloco.referencia && <cite className="text-vine-600 text-sm not-italic font-semibold mt-2 block">{bloco.referencia}</cite>}
+            <blockquote key={bloco.id} className="rounded-2xl bg-gray-50 border border-gray-100 px-5 py-4">
+              <Quote className="w-5 h-5 text-gray-400 mb-2" />
+              <p className="text-black italic leading-relaxed">{bloco.texto}</p>
+              {bloco.referencia && <cite className="text-gray-800 text-sm not-italic font-semibold mt-2 block">{bloco.referencia}</cite>}
             </blockquote>
           );
         }
@@ -197,7 +197,7 @@ export default function DevocionalPage() {
   return (
     <main className="min-h-screen bg-cream">
       {/* Header */}
-      <div className="bg-vine-950 text-white px-4 py-4 flex items-center gap-3">
+      <div className="bg-black text-white px-4 py-4 flex items-center gap-3">
         <Link href="/" className="p-2 hover:bg-white/10 rounded-xl transition">
           <ArrowLeft className="w-5 h-5" />
         </Link>
@@ -210,7 +210,7 @@ export default function DevocionalPage() {
       <div className="max-w-2xl mx-auto px-4 py-10">
         {loading && (
           <div className="flex items-center justify-center py-24">
-            <div className="w-8 h-8 border-4 border-vine-300 border-t-vine-700 rounded-full animate-spin" />
+            <div className="w-8 h-8 border-4 border-gray-300 border-t-black rounded-full animate-spin" />
           </div>
         )}
 
@@ -221,7 +221,7 @@ export default function DevocionalPage() {
             <p className="text-sm mt-1">{erro}</p>
             <button
               onClick={() => setReloadKey((key) => key + 1)}
-              className="mt-5 rounded-xl bg-vine-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-vine-800"
+              className="mt-5 rounded-xl bg-black px-4 py-2 text-sm font-semibold text-white transition hover:bg-gray-900"
             >
               Tentar novamente
             </button>
@@ -244,7 +244,7 @@ export default function DevocionalPage() {
                 <button
                   onClick={() => setIdx((i) => Math.min(i + 1, devs.length - 1))}
                   disabled={idx >= devs.length - 1}
-                  className="flex items-center gap-1 px-3 py-1.5 rounded-xl hover:bg-vine-50 disabled:opacity-30 transition"
+                  className="flex items-center gap-1 px-3 py-1.5 rounded-xl hover:bg-gray-50 disabled:opacity-30 transition"
                 >
                   <ChevronLeft className="w-4 h-4" /> Anterior
                 </button>
@@ -252,7 +252,7 @@ export default function DevocionalPage() {
                 <button
                   onClick={() => setIdx((i) => Math.max(i - 1, 0))}
                   disabled={idx <= 0}
-                  className="flex items-center gap-1 px-3 py-1.5 rounded-xl hover:bg-vine-50 disabled:opacity-30 transition"
+                  className="flex items-center gap-1 px-3 py-1.5 rounded-xl hover:bg-gray-50 disabled:opacity-30 transition"
                 >
                   Próximo <ChevronRight className="w-4 h-4" />
                 </button>
@@ -277,7 +277,7 @@ export default function DevocionalPage() {
 
               {/* Sem imagem: header colorido */}
               {!dev.imagem_url && (
-                <div className="h-32 bg-gradient-to-br from-vine-800 to-vine-950 flex items-center justify-center">
+                <div className="h-32 bg-gradient-to-br from-gray-900 to-black flex items-center justify-center">
                   <BookOpen className="w-12 h-12 text-white/30" />
                 </div>
               )}
@@ -302,10 +302,10 @@ export default function DevocionalPage() {
 
                 {/* Versículo destaque */}
                 {dev.versiculo && (
-                  <blockquote className="border-l-4 border-vine-400 pl-4 py-1">
-                    <p className="text-vine-800 italic text-base leading-relaxed">&ldquo;{dev.versiculo}&rdquo;</p>
+                  <blockquote className="border-l-4 border-gray-400 pl-4 py-1">
+                    <p className="text-gray-900 italic text-base leading-relaxed">&ldquo;{dev.versiculo}&rdquo;</p>
                     {dev.referencia && (
-                      <cite className="text-vine-500 text-sm not-italic font-semibold mt-1 block">— {dev.referencia}</cite>
+                      <cite className="text-gray-600 text-sm not-italic font-semibold mt-1 block">— {dev.referencia}</cite>
                     )}
                   </blockquote>
                 )}

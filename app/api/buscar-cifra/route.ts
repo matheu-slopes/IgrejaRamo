@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import * as cheerio from "cheerio";
 import { createClient } from "@supabase/supabase-js";
 

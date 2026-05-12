@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 
 const CHANNEL_ID = "UCxVJzTbWMncD0-QJTpYenoQ";
 
