@@ -983,20 +983,25 @@ function MembrosTab({
   useEffect(() => {
     // Os membros ficam em `perfis` com o array `ministerios`
     supabase.from("perfis")
-      .select("id, nome, email, telefone, role, data_ingresso")
+      .select("id, nome, email, telefone, role, lider_ministerios, data_ingresso")
       .contains("ministerios", [ministerio])
       .eq("ativo", true)
+      .neq("role", "admin")
       .then(({ data }) => {
-        if (data) setMembros(data.map((p: Record<string, unknown>) => ({
-          id: p.id as string,
-          nome: p.nome as string,
-          email: p.email as string,
-          telefone: (p.telefone as string) ?? undefined,
-          funcao: (p.role === "pastor" || p.role === "lider" ? "Líder" : "Membro") as FuncaoMinisterio,
-          ministerio,
-          ativo: true,
-          dataEntrada: (p.data_ingresso as string) ?? "",
-        })));
+        if (data) setMembros(data.map((p: Record<string, unknown>) => {
+          const liderMins = (p.lider_ministerios as string[]) ?? [];
+          const eLider = p.role === "pastor" || liderMins.includes(ministerio);
+          return {
+            id: p.id as string,
+            nome: p.nome as string,
+            email: p.email as string,
+            telefone: (p.telefone as string) ?? undefined,
+            funcao: (eLider ? "Líder" : "Membro") as FuncaoMinisterio,
+            ministerio,
+            ativo: true,
+            dataEntrada: (p.data_ingresso as string) ?? "",
+          };
+        }));
       });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ministerio]);
