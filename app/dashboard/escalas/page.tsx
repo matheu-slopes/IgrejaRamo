@@ -74,6 +74,7 @@ function parseEscala(e: Record<string, unknown>): Escala {
         titulo: m.titulo as string,
         artista: m.artista as string,
         tom: (m.tom as string) ?? "",
+        bpm: (m.bpm as number) ?? undefined,
         artistaSlug: (m.artista_slug as string) ?? undefined,
         musicaSlug: (m.musica_slug as string) ?? undefined,
       })),
@@ -167,6 +168,11 @@ function MusicasSection({ musicas }: { musicas: EscalaMusica[] }) {
               {m.tom && (
                 <span className="text-xs font-bold bg-grape-100 text-grape-700 px-2 py-0.5 rounded-full shrink-0">
                   {m.tom}
+                </span>
+              )}
+              {m.bpm && (
+                <span className="text-xs font-semibold text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full shrink-0">
+                  {m.bpm}
                 </span>
               )}
               <button
