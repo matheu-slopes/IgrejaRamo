@@ -400,11 +400,12 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
     let itensFinais = [...form.itens];
     if (editandoIdx !== null && novoMembroId) {
       const membro = membros.find((m) => m.id === novoMembroId);
-      if (membro) {
+      const nomeResolv = membro?.nome ?? form.itens[editandoIdx]?.voluntarioNome;
+      if (nomeResolv) {
         const novoItem: import("@/types").ItemEscala = {
           funcao: novaFuncao as FuncaoEscala,
-          voluntarioId: membro.id,
-          voluntarioNome: membro.nome,
+          voluntarioId: novoMembroId,
+          voluntarioNome: nomeResolv,
           observacao: novaObs.trim() || undefined,
         };
         itensFinais = itensFinais.map((it, i) => i === editandoIdx ? novoItem : it);
@@ -515,13 +516,15 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
   function addParticipante() {
     if (!novoMembroId) return;
     const membro = membros.find((m) => m.id === novoMembroId);
-    if (!membro) return;
+    // Se editando e membro não está na lista do ministério, usa nome do item atual como fallback
+    const nomeResolv = membro?.nome ?? (editandoIdx !== null ? form.itens[editandoIdx]?.voluntarioNome : undefined);
+    if (!nomeResolv) return;
     // Allow update if editing the same slot; block true duplicates otherwise
     if (form.itens.some((i, idx) => idx !== editandoIdx && i.voluntarioId === novoMembroId && i.funcao === novaFuncao)) return;
     const novoItem: import("@/types").ItemEscala = {
       funcao: novaFuncao as FuncaoEscala,
-      voluntarioId: membro.id,
-      voluntarioNome: membro.nome,
+      voluntarioId: novoMembroId,
+      voluntarioNome: nomeResolv,
       observacao: novaObs.trim() || undefined,
     };
     if (editandoIdx !== null) {
@@ -1372,6 +1375,10 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
                 className="border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-gray-400 bg-white col-span-1"
               >
                 <option value="">Selecionar membro</option>
+                {/* Se editando e o membro não está no ministério, exibe ele mesmo assim */}
+                {editandoIdx !== null && novoMembroId && !membros.find((m) => m.id === novoMembroId) && (
+                  <option value={novoMembroId}>{form.itens[editandoIdx]?.voluntarioNome ?? novoMembroId}</option>
+                )}
                 {membros.map((m) => <option key={m.id} value={m.id}>{m.nome}</option>)}
               </select>
               <select
