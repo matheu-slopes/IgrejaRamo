@@ -108,9 +108,9 @@ export default function CanalMinisterioPage() {
         <div className="flex items-center gap-1 mt-5 border-t border-white/20 pt-4">
           {([
             { id: "chat",    label: "Chat",    icon: MessageSquare },
+            { id: "escalas", label: "Escalas", icon: CalendarDays  },
+            { id: "eventos", label: "Eventos", icon: Calendar      },
             { id: "membros", label: "Membros", icon: Users         },
-            { id: "eventos", label: "Eventos", icon: CalendarDays  },
-            { id: "escalas", label: "Escalas", icon: Music2        },
           ] as { id: Tab; label: string; icon: React.ElementType }[]).map(({ id, label, icon: Icon }) => (
             <button
               key={id}
