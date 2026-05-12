@@ -21,7 +21,7 @@ export const TONS = [
 ];
 
 export const FUNCOES_POR_MIN: Record<string, string[]> = {
-  Louvor:        ["Ministro(a)","Guitarra","Baixo","Cajón","Teclado","Backing Vocal","Violão","Pandeiro"],
+  Louvor:        ["Ministro","Guitarra","Baixo","Cajón","Teclado","Backing Vocal","Violão","Pandeiro"],
   "Mídias":      ["Transmissão","Projeção/Letras","Fotografia","Câmera"],
   Cantina:       ["Abertura","Oferta","Recepção"],
   Limpeza:       ["Escala de Limpeza"],
@@ -248,6 +248,8 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
   const [novaMusica, setNovaMusica] = useState({ titulo: "", artista: "", tom: "" });
   const [savingNova, setSavingNova] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [salvarErro, setSalvarErro] = useState("");
+  const [editandoIdx, setEditandoIdx] = useState<number | null>(null);
   const [viewMode, setViewMode] = useState<"minhas" | "culto">("culto");
   const [busca, setBusca] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -302,38 +304,48 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
   async function salvar() {
     if (!form.culto || !form.data || !form.horario) return;
     setSaving(true);
+    setSalvarErro("");
     const obsDB = ministerio === "Infantil"
       ? ([form.ageGroup, form.temaInfantil].filter(Boolean).join("|") || null)
       : buildObs(form.equipe, form.observacoes);
     try {
       if (editId) {
-        await supabase.from("escalas").update({
+        const { error: upErr } = await supabase.from("escalas").update({
           culto: form.culto, horario: form.horario, data: form.data,
           observacoes: obsDB,
           visivel: form.visivel,
           confirmacao_participantes: form.confirmacaoParticipantes,
         }).eq("id", editId);
-        await supabase.from("escala_itens").delete().eq("escala_id", editId);
+        if (upErr) throw new Error(upErr.message);
+
+        const { error: delItens } = await supabase.from("escala_itens").delete().eq("escala_id", editId);
+        if (delItens) throw new Error(delItens.message);
+
         if (form.itens.length > 0) {
-          await supabase.from("escala_itens").insert(
+          const { error: insItens } = await supabase.from("escala_itens").insert(
             form.itens.map((i) => {
               const norm = normalizeFuncaoParaDB(i.funcao, i.observacao);
               return { escala_id: editId, funcao: norm.funcao, voluntario_id: i.voluntarioId || null, voluntario_nome: i.voluntarioNome, observacao: norm.observacao };
             })
           );
+          if (insItens) throw new Error(insItens.message);
         }
-        await supabase.from("escala_musicas").delete().eq("escala_id", editId);
+
+        const { error: delMus } = await supabase.from("escala_musicas").delete().eq("escala_id", editId);
+        if (delMus) throw new Error(delMus.message);
+
         if (form.musicas.length > 0) {
-          await supabase.from("escala_musicas").insert(
+          const { error: insMus } = await supabase.from("escala_musicas").insert(
             form.musicas.map((m, idx) => ({
               escala_id: editId, musica_id: m.musicaId || null,
               titulo: m.titulo, artista: m.artista, tom: m.tom, ordem: idx,
             }))
           );
+          if (insMus) throw new Error(insMus.message);
         }
         setEscalas((prev) => prev.map((e) => e.id === editId ? { ...e, ...form, observacoes: obsDB ?? undefined } : e));
       } else {
-        const { data: inserted } = await supabase.from("escalas").insert({
+        const { data: inserted, error: insEsc } = await supabase.from("escalas").insert({
           ministerio, data: form.data, horario: form.horario,
           culto: form.culto,
           observacoes: obsDB,
@@ -341,22 +353,25 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
           confirmacao_participantes: form.confirmacaoParticipantes,
           criado_por: user?.id ?? null,
         }).select().single();
+        if (insEsc) throw new Error(insEsc.message);
         if (inserted) {
           if (form.itens.length > 0) {
-            await supabase.from("escala_itens").insert(
+            const { error: insItens } = await supabase.from("escala_itens").insert(
               form.itens.map((i) => {
                 const norm = normalizeFuncaoParaDB(i.funcao, i.observacao);
                 return { escala_id: inserted.id, funcao: norm.funcao, voluntario_id: i.voluntarioId || null, voluntario_nome: i.voluntarioNome, observacao: norm.observacao };
               })
             );
+            if (insItens) throw new Error(insItens.message);
           }
           if (form.musicas.length > 0) {
-            await supabase.from("escala_musicas").insert(
+            const { error: insMus } = await supabase.from("escala_musicas").insert(
               form.musicas.map((m, idx) => ({
                 escala_id: inserted.id, musica_id: m.musicaId || null,
                 titulo: m.titulo, artista: m.artista, tom: m.tom, ordem: idx,
               }))
             );
+            if (insMus) throw new Error(insMus.message);
           }
           const nova: Escala = {
             id: inserted.id, ministerio, criadoPor: user?.id ?? "",
@@ -365,10 +380,12 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
           setEscalas((prev) => [nova, ...prev]);
         }
       }
+      setModo("lista");
+    } catch (err) {
+      setSalvarErro(err instanceof Error ? err.message : "Erro ao salvar. Tente novamente.");
     } finally {
       setSaving(false);
     }
-    setModo("lista");
   }
 
   async function excluir(id: string) {
@@ -380,22 +397,43 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
     if (!novoMembroId) return;
     const membro = membros.find((m) => m.id === novoMembroId);
     if (!membro) return;
-    if (form.itens.some((i) => i.voluntarioId === novoMembroId && i.funcao === novaFuncao)) return;
-    setForm((f) => ({
-      ...f,
-      itens: [...f.itens, {
-        funcao: novaFuncao as FuncaoEscala,
-        voluntarioId: membro.id,
-        voluntarioNome: membro.nome,
-        observacao: novaObs.trim() || undefined,
-      }],
-    }));
+    // Allow update if editing the same slot; block true duplicates otherwise
+    if (form.itens.some((i, idx) => idx !== editandoIdx && i.voluntarioId === novoMembroId && i.funcao === novaFuncao)) return;
+    const novoItem: import("@/types").ItemEscala = {
+      funcao: novaFuncao as FuncaoEscala,
+      voluntarioId: membro.id,
+      voluntarioNome: membro.nome,
+      observacao: novaObs.trim() || undefined,
+    };
+    if (editandoIdx !== null) {
+      setForm((f) => ({ ...f, itens: f.itens.map((it, i) => i === editandoIdx ? novoItem : it) }));
+      setEditandoIdx(null);
+    } else {
+      setForm((f) => ({ ...f, itens: [...f.itens, novoItem] }));
+    }
     setNovoMembroId("");
     setNovaObs("");
   }
 
+  function editarParticipante(idx: number) {
+    const it = form.itens[idx];
+    setNovoMembroId(it.voluntarioId ?? "");
+    setNovaFuncao(displayFuncao(it));
+    setNovaObs(displayObs(it) ?? "");
+    setEditandoIdx(idx);
+  }
+
+  function cancelarEdicaoParticipante() {
+    setEditandoIdx(null);
+    setNovoMembroId("");
+    setNovaObs("");
+    setNovaFuncao(funcoesMinisterio[0]);
+  }
+
   function removeParticipante(idx: number) {
+    if (editandoIdx === idx) cancelarEdicaoParticipante();
     setForm((f) => ({ ...f, itens: f.itens.filter((_, i) => i !== idx) }));
+    if (editandoIdx !== null && editandoIdx > idx) setEditandoIdx(editandoIdx - 1);
   }
 
   const musicasFiltradas = musicas.filter((m) =>
@@ -1232,8 +1270,10 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
       {/* ── Participantes ── */}
       {subTab === "participantes" && (
         <div className="space-y-4">
-          <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 space-y-2">
-            <p className="text-xs font-semibold text-gray-600">Adicionar participante</p>
+          <div className={clsx("border rounded-xl p-3 space-y-2", editandoIdx !== null ? "bg-vine-50 border-vine-300" : "bg-gray-50 border-gray-200")}>
+            <p className="text-xs font-semibold text-gray-600">
+              {editandoIdx !== null ? `Editando participante #${editandoIdx + 1}` : "Adicionar participante"}
+            </p>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               <select
                 value={novoMembroId}
@@ -1257,30 +1297,56 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
                 className="border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-vine-400"
               />
             </div>
-            <button
-              onClick={addParticipante}
-              className="flex items-center gap-1.5 bg-vine-700 text-white text-xs font-semibold px-4 py-2 rounded-xl hover:bg-vine-800 transition"
-            >
-              <Plus className="w-3.5 h-3.5" /> Adicionar
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={addParticipante}
+                className={clsx(
+                  "flex items-center gap-1.5 text-white text-xs font-semibold px-4 py-2 rounded-xl transition",
+                  editandoIdx !== null ? "bg-vine-700 hover:bg-vine-800" : "bg-vine-700 hover:bg-vine-800"
+                )}
+              >
+                {editandoIdx !== null ? <><Save className="w-3.5 h-3.5" /> Atualizar</> : <><Plus className="w-3.5 h-3.5" /> Adicionar</>}
+              </button>
+              {editandoIdx !== null && (
+                <button
+                  onClick={cancelarEdicaoParticipante}
+                  className="text-xs text-gray-500 px-3 py-2 rounded-xl hover:bg-gray-100 transition"
+                >
+                  Cancelar
+                </button>
+              )}
+            </div>
           </div>
           <div className="space-y-2">
             {form.itens.length === 0 && (
               <p className="text-sm text-gray-400 text-center py-8">Nenhum participante adicionado.</p>
             )}
             {form.itens.map((it, i) => (
-              <div key={i} className="flex items-center justify-between bg-white border border-gray-100 rounded-xl px-4 py-3 shadow-sm">
+              <div key={i} className={clsx(
+                "flex items-center justify-between bg-white border rounded-xl px-4 py-3 shadow-sm",
+                editandoIdx === i ? "border-vine-400 ring-1 ring-vine-200" : "border-gray-100"
+              )}>
                 <div>
                   <p className="text-sm font-semibold text-gray-800">{it.voluntarioNome}</p>
                   <p className="text-xs text-grape-700 font-medium">{displayFuncao(it)}</p>
                   {displayObs(it) && <p className="text-xs text-gray-400 mt-0.5">{displayObs(it)}</p>}
                 </div>
-                <button
-                  onClick={() => removeParticipante(i)}
-                  className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition"
-                >
-                  <X className="w-4 h-4" />
-                </button>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => editarParticipante(i)}
+                    className="p-2 text-gray-400 hover:text-vine-600 hover:bg-vine-50 rounded-xl transition"
+                    title="Editar"
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    onClick={() => removeParticipante(i)}
+                    className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition"
+                    title="Remover"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -1473,6 +1539,11 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
       )}
 
       {/* Botão salvar */}
+      {salvarErro && (
+        <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-xl px-3 py-2">
+          ⚠ {salvarErro}
+        </p>
+      )}
       <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-100">
         <button
           onClick={() => setModo("lista")}
