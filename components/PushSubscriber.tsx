@@ -42,33 +42,44 @@ export default function PushSubscriber() {
   async function solicitarPermissao() {
     setLoading(true);
     setErro(null);
+    setMostrarBanner(false); // fecha imediatamente ao clicar
     try {
       const permission = await Notification.requestPermission();
       if (permission === "granted") {
         await registrarSubscription();
       } else {
         setErro("Permissão negada. Habilite manualmente nas configurações do navegador.");
+        setMostrarBanner(true); // reabre só se negou
       }
     } catch (e) {
       console.error("PushSubscriber.solicitarPermissao:", e);
       setErro(String(e).replace("Error: ", ""));
+      setMostrarBanner(true); // reabre com o erro
     } finally {
       setLoading(false);
     }
   }
 
   async function registrarSubscription() {
-    const registration = await navigator.serviceWorker.ready;
+    // Aguarda o SW ficar ativo com timeout de 10s
+    const registration = await Promise.race([
+      navigator.serviceWorker.ready,
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("Service Worker demorou demais para ficar ativo. Tente recarregar a página.")), 10000)
+      ),
+    ]);
+
     let sub = await registration.pushManager.getSubscription();
 
     if (!sub) {
       const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
       if (!vapidKey) {
-        throw new Error("Chave VAPID não configurada (NEXT_PUBLIC_VAPID_PUBLIC_KEY ausente).");
+        throw new Error("Chave VAPID não configurada. Contate o administrador.");
       }
+      // Passa o Uint8Array diretamente (não .buffer) — exigido pela spec do Web Push
       sub = await registration.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(vapidKey).buffer as ArrayBuffer,
+        applicationServerKey: urlBase64ToUint8Array(vapidKey),
       });
     }
 

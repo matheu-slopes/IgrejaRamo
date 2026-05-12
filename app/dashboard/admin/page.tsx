@@ -934,17 +934,23 @@ function TestePushPanel() {
         return;
       }
 
-      const registration = await navigator.serviceWorker.ready;
+      const registration = await Promise.race([
+        navigator.serviceWorker.ready,
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("Service Worker demorou demais. Tente fechar e reabrir o PWA.")), 10000)
+        ),
+      ]);
       let sub = await registration.pushManager.getSubscription();
       if (!sub) {
         const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
         if (!vapidKey) {
-          setResultadoRegistro({ ok: false, msg: "NEXT_PUBLIC_VAPID_PUBLIC_KEY não disponível no bundle. Verifique as variáveis do Vercel e faça um novo deploy." });
+          setResultadoRegistro({ ok: false, msg: "NEXT_PUBLIC_VAPID_PUBLIC_KEY não disponível. Verifique as variáveis do Vercel e faça um novo deploy." });
           return;
         }
+        // Passa Uint8Array diretamente (não .buffer) — exigido pela spec do Web Push
         sub = await registration.pushManager.subscribe({
           userVisibleOnly: true,
-          applicationServerKey: urlBase64ToUint8Array(vapidKey).buffer as ArrayBuffer,
+          applicationServerKey: urlBase64ToUint8Array(vapidKey),
         });
       }
 
