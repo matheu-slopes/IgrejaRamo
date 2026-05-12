@@ -15,6 +15,7 @@ jobs:
     steps:
       - name: Enviar lembretes de escala
         run: |
+          URL=$(echo "${{ secrets.APP_URL }}" | sed 's:/$::')
           curl -s -o /dev/null -w "%{http_code}" \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
-            "${{ secrets.APP_URL }}/api/push/escalas-reminder"
+            "${URL}/api/push/escalas-reminder"
