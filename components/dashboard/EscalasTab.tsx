@@ -303,6 +303,26 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
 
   async function salvar() {
     if (!form.culto || !form.data || !form.horario) return;
+
+    // Auto-aplica edição de participante pendente (usuário trocou função mas não clicou Atualizar)
+    let itensFinais = [...form.itens];
+    if (editandoIdx !== null && novoMembroId) {
+      const membro = membros.find((m) => m.id === novoMembroId);
+      if (membro) {
+        const novoItem: import("@/types").ItemEscala = {
+          funcao: novaFuncao as FuncaoEscala,
+          voluntarioId: membro.id,
+          voluntarioNome: membro.nome,
+          observacao: novaObs.trim() || undefined,
+        };
+        itensFinais = itensFinais.map((it, i) => i === editandoIdx ? novoItem : it);
+        setForm((f) => ({ ...f, itens: itensFinais }));
+        setEditandoIdx(null);
+        setNovoMembroId("");
+        setNovaObs("");
+      }
+    }
+
     setSaving(true);
     setSalvarErro("");
     const obsDB = ministerio === "Infantil"
@@ -310,25 +330,28 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
       : buildObs(form.equipe, form.observacoes);
     try {
       if (editId) {
-        const { error: upErr } = await supabase.from("escalas").update({
+        const { error: upErr, data: upData } = await supabase.from("escalas").update({
           culto: form.culto, horario: form.horario, data: form.data,
           observacoes: obsDB,
           visivel: form.visivel,
           confirmacao_participantes: form.confirmacaoParticipantes,
-        }).eq("id", editId);
+        }).eq("id", editId).select("id");
         if (upErr) throw new Error(upErr.message);
+        if (!upData || upData.length === 0) throw new Error("Sem permissão para atualizar esta escala.");
 
         const { error: delItens } = await supabase.from("escala_itens").delete().eq("escala_id", editId);
         if (delItens) throw new Error(delItens.message);
 
-        if (form.itens.length > 0) {
-          const { error: insItens } = await supabase.from("escala_itens").insert(
-            form.itens.map((i) => {
-              const norm = normalizeFuncaoParaDB(i.funcao, i.observacao);
-              return { escala_id: editId, funcao: norm.funcao, voluntario_id: i.voluntarioId || null, voluntario_nome: i.voluntarioNome, observacao: norm.observacao };
-            })
-          );
+        if (itensFinais.length > 0) {
+          const itensParaSalvar = itensFinais.map((i) => {
+            const norm = normalizeFuncaoParaDB(i.funcao, i.observacao);
+            return { escala_id: editId, funcao: norm.funcao, voluntario_id: i.voluntarioId || null, voluntario_nome: i.voluntarioNome, observacao: norm.observacao };
+          });
+          const { error: insItens, data: insData } = await supabase.from("escala_itens").insert(itensParaSalvar).select("id");
           if (insItens) throw new Error(insItens.message);
+          if (!insData || insData.length !== itensFinais.length) {
+            throw new Error(`Erro ao salvar participantes (${insData?.length ?? 0}/${itensFinais.length}). Possível função inválida.`);
+          }
         }
 
         const { error: delMus } = await supabase.from("escala_musicas").delete().eq("escala_id", editId);
@@ -343,7 +366,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
           );
           if (insMus) throw new Error(insMus.message);
         }
-        setEscalas((prev) => prev.map((e) => e.id === editId ? { ...e, ...form, observacoes: obsDB ?? undefined } : e));
+        setEscalas((prev) => prev.map((e) => e.id === editId ? { ...e, ...form, itens: itensFinais, observacoes: obsDB ?? undefined } : e));
       } else {
         const { data: inserted, error: insEsc } = await supabase.from("escalas").insert({
           ministerio, data: form.data, horario: form.horario,
@@ -355,9 +378,9 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
         }).select().single();
         if (insEsc) throw new Error(insEsc.message);
         if (inserted) {
-          if (form.itens.length > 0) {
+          if (itensFinais.length > 0) {
             const { error: insItens } = await supabase.from("escala_itens").insert(
-              form.itens.map((i) => {
+              itensFinais.map((i) => {
                 const norm = normalizeFuncaoParaDB(i.funcao, i.observacao);
                 return { escala_id: inserted.id, funcao: norm.funcao, voluntario_id: i.voluntarioId || null, voluntario_nome: i.voluntarioNome, observacao: norm.observacao };
               })
@@ -375,7 +398,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
           }
           const nova: Escala = {
             id: inserted.id, ministerio, criadoPor: user?.id ?? "",
-            ...form, observacoes: obsDB ?? undefined,
+            ...form, itens: itensFinais, observacoes: obsDB ?? undefined,
           };
           setEscalas((prev) => [nova, ...prev]);
         }
