@@ -1041,6 +1041,21 @@ function MembrosTab({
   function salvarEdicao(id: string) {
     setMembros((prev) => prev.map((m) => m.id === id ? { ...m, funcao: novaFuncao } : m));
     setEditandoId(null);
+    // Persistir lider_ministerios no DB
+    supabase.from("perfis").select("lider_ministerios, role").eq("id", id).single().then(({ data }) => {
+      if (!data) return;
+      const atual: string[] = data.lider_ministerios ?? [];
+      let updated: string[];
+      if (novaFuncao === "L\u00edder") {
+        updated = atual.includes(ministerio) ? atual : [...atual, ministerio];
+      } else {
+        updated = atual.filter((m) => m !== ministerio);
+      }
+      const updates: Record<string, unknown> = { lider_ministerios: updated };
+      if (novaFuncao === "L\u00edder" && data.role === "membro") updates.role = "lider";
+      if (novaFuncao === "Membro" && updated.length === 0 && data.role === "lider") updates.role = "membro";
+      supabase.from("perfis").update(updates).eq("id", id).then(() => {});
+    });
   }
 
   function remover(id: string) {
