@@ -95,6 +95,10 @@ export default function AdminPage() {
         <MinisteriosTab usuarios={usuarios} temPermissao={temPermissao} />
       )}
 
+      {adminTab === "ministerios" && podeGerenciar && (
+        <TestePushPanel />
+      )}
+
       {adminTab === "locais" && podeGerenciar && (
         <LocaisTab />
       )}
@@ -879,6 +883,89 @@ function NovoUsuarioForm({
   );
 }
 
+
+// ─── TestePushPanel ───────────────────────────────────────────────────────────
+
+const TIPOS_PUSH = [
+  { tipo: "aviso",  label: "📢 Aviso",        desc: "Broadcast para todos os usuários" },
+  { tipo: "evento", label: "📅 Evento",       desc: "Broadcast para todos os usuários" },
+  { tipo: "chat",   label: "💬 Chat",         desc: "Somente para você (logado)" },
+  { tipo: "escala", label: "🎸 Escala",       desc: "Somente para você (logado)" },
+] as const;
+
+function TestePushPanel() {
+  const [loading, setLoading] = useState<string | null>(null);
+  const [resultado, setResultado] = useState<{ ok: boolean; msg: string } | null>(null);
+
+  async function testar(tipo: string) {
+    setLoading(tipo);
+    setResultado(null);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch("/api/push/test", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session?.access_token ?? ""}`,
+        },
+        body: JSON.stringify({ tipo }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setResultado({ ok: false, msg: data.error ?? "Erro desconhecido" });
+      } else {
+        const destino = data.enviado === "broadcast" ? `${data.subscriptions} dispositivo(s)` : "seu dispositivo";
+        setResultado({ ok: true, msg: `Notificação "${tipo}" enviada para ${destino}!` });
+      }
+    } catch {
+      setResultado({ ok: false, msg: "Falha na requisição" });
+    } finally {
+      setLoading(null);
+    }
+  }
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
+      <div className="flex items-center gap-2 mb-1">
+        <Bell className="w-4 h-4 text-vine-700" />
+        <h2 className="font-semibold text-gray-900 text-sm">Testar Notificações Push</h2>
+      </div>
+      <p className="text-xs text-gray-500 mb-4">
+        Dispara notificações de teste para verificar se o sistema está funcionando.
+        Certifique-se de ter ativado as notificações no PWA antes de testar.
+      </p>
+
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        {TIPOS_PUSH.map(({ tipo, label, desc }) => (
+          <button
+            key={tipo}
+            onClick={() => testar(tipo)}
+            disabled={loading !== null}
+            className="flex flex-col items-start gap-1 px-3 py-2.5 rounded-xl border border-gray-200 bg-gray-50 hover:bg-vine-50 hover:border-vine-300 transition text-left disabled:opacity-50"
+          >
+            <span className="text-sm font-medium text-gray-800">{label}</span>
+            <span className="text-[11px] text-gray-400 leading-tight">{desc}</span>
+            {loading === tipo && (
+              <span className="text-[11px] text-vine-600 font-medium">Enviando…</span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {resultado && (
+        <div className={clsx(
+          "mt-3 text-xs px-3 py-2 rounded-lg flex items-center gap-2",
+          resultado.ok
+            ? "bg-green-50 text-green-700 border border-green-200"
+            : "bg-red-50 text-red-700 border border-red-200"
+        )}>
+          {resultado.ok ? <Check className="w-3.5 h-3.5 flex-shrink-0" /> : <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />}
+          {resultado.msg}
+        </div>
+      )}
+    </div>
+  );
+}
 
 // ─── LocaisTab ────────────────────────────────────────────────────────────────
 
