@@ -98,8 +98,10 @@ interface EscalaForm {
   culto: string;
   data: string;
   horario: string;
-  observacoes: string;  // notas livres (sem o prefixo de equipe)
-  equipe: string;       // ex: "Equipe 1" | "Equipe 2" | "Equipe 3" | ""
+  observacoes: string;    // notas livres (sem o prefixo de equipe)
+  equipe: string;         // Louvor: "Equipe 1" | "Equipe 2" | "Equipe 3" | ""
+  ageGroup: string;       // Infantil: "4-7 anos" | "8-11 anos" | "12-13 anos"
+  temaInfantil: string;   // Infantil: tema do mês (ex: "Honra")
   visivel: boolean;
   confirmacaoParticipantes: boolean;
   itens: ItemEscala[];
@@ -118,6 +120,13 @@ function parseEquipeObs(raw: string | undefined): { equipe: string; notas: strin
 function buildObs(equipe: string, notas: string): string | null {
   const parts = [equipe, notas].filter(Boolean).join("\n");
   return parts || null;
+}
+
+/** Extrai faixa etária e tema do mês do campo observacoes do Infantil (formato: "4-7 anos|Honra") */
+function parseInfantilObs(raw: string | undefined): { ageGroup: string; tema: string } {
+  if (!raw) return { ageGroup: "", tema: "" };
+  const parts = raw.split("|");
+  return { ageGroup: parts[0].trim(), tema: (parts[1] ?? "").trim() };
 }
 
 // O DB usa ENUM funcao_escala que ainda não tem Cajón/Pandeiro/Violão nem variantes gender-neutral.
@@ -159,6 +168,7 @@ function normalizeFuncaoParaDB(funcao: string, obs?: string): { funcao: string; 
 
 const EMPTY_FORM: EscalaForm = {
   culto: "", data: "", horario: "", observacoes: "", equipe: "",
+  ageGroup: "", temaInfantil: "",
   visivel: true, confirmacaoParticipantes: false,
   itens: [], musicas: [],
 };
@@ -250,12 +260,17 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
 
   function abrirEdicao(esc: Escala) {
     const { equipe, notas } = parseEquipeObs(esc.observacoes);
+    const { ageGroup, tema } = esc.ministerio === "Infantil"
+      ? parseInfantilObs(esc.observacoes)
+      : { ageGroup: "", tema: "" };
     setForm({
       culto: esc.culto,
       data: esc.data,
       horario: esc.horario,
-      observacoes: notas,
-      equipe,
+      observacoes: esc.ministerio === "Infantil" ? "" : notas,
+      equipe: esc.ministerio === "Infantil" ? "" : equipe,
+      ageGroup,
+      temaInfantil: tema,
       visivel: esc.visivel ?? true,
       confirmacaoParticipantes: esc.confirmacaoParticipantes ?? false,
       itens: [...esc.itens],
@@ -284,7 +299,9 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
   async function salvar() {
     if (!form.culto || !form.data || !form.horario) return;
     setSaving(true);
-    const obsDB = buildObs(form.equipe, form.observacoes);
+    const obsDB = ministerio === "Infantil"
+      ? ([form.ageGroup, form.temaInfantil].filter(Boolean).join("|") || null)
+      : buildObs(form.equipe, form.observacoes);
     try {
       if (editId) {
         await supabase.from("escalas").update({
@@ -491,11 +508,23 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
                     {equipeLabel}
                   </span>
                 )}
-                {esc.ministerio === "Infantil" && esc.observacoes && (
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-800 border border-yellow-200">
-                    {esc.observacoes}
-                  </span>
-                )}
+                {esc.ministerio === "Infantil" && esc.observacoes && (() => {
+                  const { ageGroup, tema } = parseInfantilObs(esc.observacoes);
+                  return (
+                    <>
+                      {ageGroup && (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-800 border border-yellow-200">
+                          {ageGroup}
+                        </span>
+                      )}
+                      {tema && (
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-orange-50 text-orange-600 border border-orange-100">
+                          {tema}
+                        </span>
+                      )}
+                    </>
+                  );
+                })()}
                 {esc.visivel
                   ? <span className="text-[10px] bg-green-100 text-green-700 font-semibold px-1.5 py-0.5 rounded-full">✓</span>
                   : <span className="text-[10px] bg-gray-100 text-gray-400 font-semibold px-1.5 py-0.5 rounded-full">◦</span>
@@ -636,11 +665,23 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
                           {selectedEscala.observacoes.match(/^(Equipe \d)/)?.[1]}
                         </span>
                       )}
-                      {selectedEscala.ministerio === "Infantil" && selectedEscala.observacoes && (
-                        <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-800 border border-yellow-200">
-                          {selectedEscala.observacoes}
-                        </span>
-                      )}
+                      {selectedEscala.ministerio === "Infantil" && selectedEscala.observacoes && (() => {
+                        const { ageGroup, tema } = parseInfantilObs(selectedEscala.observacoes);
+                        return (
+                          <>
+                            {ageGroup && (
+                              <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-800 border border-yellow-200">
+                                {ageGroup}
+                              </span>
+                            )}
+                            {tema && (
+                              <span className="text-[11px] px-2 py-0.5 rounded-full bg-orange-50 text-orange-600 border border-orange-100">
+                                Tema: {tema}
+                              </span>
+                            )}
+                          </>
+                        );
+                      })()}
                       {selectedEscala.visivel
                         ? <span className="text-[10px] bg-green-100 text-green-700 font-bold px-2 py-0.5 rounded-full">Publicada</span>
                         : <span className="text-[10px] bg-white/70 text-gray-500 font-bold px-2 py-0.5 rounded-full">Rascunho</span>
@@ -759,8 +800,8 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
                   </div>
                 )}
 
-                {/* Observações */}
-                {selectedEscala.observacoes && (
+                {/* Observações (oculto para Infantil pois é dado estruturado) */}
+                {selectedEscala.observacoes && selectedEscala.ministerio !== "Infantil" && (
                   <div className="space-y-1.5">
                     <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Observações</p>
                     <p className="text-sm text-gray-600 bg-gray-50 rounded-xl px-3 py-2.5 leading-relaxed">
@@ -981,16 +1022,52 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
             </div>
           </div>
 
-          <div>
-            <textarea
-              value={form.observacoes}
-              onChange={(e) => setForm({ ...form, observacoes: e.target.value.slice(0, 500) })}
-              placeholder="Observações"
-              rows={3}
-              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-vine-400 resize-none"
-            />
-            <p className="text-right text-[10px] text-gray-400">{form.observacoes.length}/500</p>
-          </div>
+          {/* Faixa etária + Tema (somente Infantil) */}
+          {ministerio === "Infantil" && (
+            <div className="space-y-3">
+              <div>
+                <p className="text-xs text-gray-400 mb-2 font-semibold uppercase tracking-widest">Faixa etária</p>
+                <div className="flex gap-2 flex-wrap">
+                  {["4-7 anos", "8-11 anos", "12-13 anos"].map((age) => (
+                    <button
+                      key={age}
+                      onClick={() => setForm((f) => ({ ...f, ageGroup: age }))}
+                      className={clsx(
+                        "text-xs font-semibold px-3 py-1.5 rounded-full border transition",
+                        form.ageGroup === age
+                          ? "bg-yellow-500 text-white border-yellow-500"
+                          : "bg-white text-gray-600 border-gray-200 hover:border-yellow-400"
+                      )}
+                    >
+                      {age}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="text-xs text-gray-400 mb-1.5 block font-semibold uppercase tracking-widest">Tema do mês</label>
+                <input
+                  value={form.temaInfantil}
+                  onChange={(e) => setForm({ ...form, temaInfantil: e.target.value })}
+                  placeholder="ex: Honra"
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-vine-400"
+                />
+              </div>
+            </div>
+          )}
+
+          {ministerio !== "Infantil" && (
+            <div>
+              <textarea
+                value={form.observacoes}
+                onChange={(e) => setForm({ ...form, observacoes: e.target.value.slice(0, 500) })}
+                placeholder="Observações"
+                rows={3}
+                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-vine-400 resize-none"
+              />
+              <p className="text-right text-[10px] text-gray-400">{form.observacoes.length}/500</p>
+            </div>
+          )}
 
           <div className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-xl px-4 py-3">
             <div className="flex items-center gap-2">
@@ -1055,7 +1132,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
               <input
                 value={novaObs}
                 onChange={(e) => setNovaObs(e.target.value)}
-                placeholder="Observação (opcional)"
+                placeholder={ministerio === "Infantil" && novaFuncao === "Professor(a)" ? "Tópico (ex: Honrando meu corpo)" : "Observação (opcional)"}
                 className="border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-vine-400"
               />
             </div>

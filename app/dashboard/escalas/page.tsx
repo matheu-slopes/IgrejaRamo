@@ -102,6 +102,13 @@ function labelMes(iso: string): string {
   return d.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
 }
 
+/** Extrai faixa etária e tema do mês do campo observacoes do Infantil (formato: "4-7 anos|Honra") */
+function parseInfantilObs(raw: string | undefined): { ageGroup: string; tema: string } {
+  if (!raw) return { ageGroup: "", tema: "" };
+  const parts = raw.split("|");
+  return { ageGroup: parts[0].trim(), tema: (parts[1] ?? "").trim() };
+}
+
 // ─── Seção de músicas (repertório) ───────────────────────────────────────────
 
 function MusicasSection({ musicas }: { musicas: { titulo: string; artista: string; tom?: string }[] }) {
@@ -179,11 +186,14 @@ function MinisterioSection({
               {escala.observacoes.match(/^(Equipe \d)/)?.[1]}
             </span>
           )}
-          {ministerio === "Infantil" && escala.observacoes && (
-            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-800 border border-yellow-200">
-              {escala.observacoes}
-            </span>
-          )}
+          {ministerio === "Infantil" && escala.observacoes && (() => {
+            const { ageGroup } = parseInfantilObs(escala.observacoes);
+            return ageGroup ? (
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-800 border border-yellow-200">
+                {ageGroup}
+              </span>
+            ) : null;
+          })()}
         </div>
         <div className="flex items-center gap-1 shrink-0">
           {isLider && (
@@ -236,6 +246,113 @@ function MinisterioSection({
               ))}
             </div>
           )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Seção unificada do Infantil (uma só, com sub-seções por faixa etária) ────
+
+function InfantilSection({
+  escalas, userId, isLider, onGerenciar,
+}: {
+  escalas: Escala[];
+  userId: string;
+  isLider: boolean;
+  onGerenciar: () => void;
+}) {
+  const [open, setOpen] = useState(true);
+  const temMinha = escalas.some((e) => e.itens.some((it) => it.voluntarioId === userId));
+
+  return (
+    <div className={clsx("px-4 py-3", temMinha && "bg-vine-50/40")}>
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={() => setOpen((v) => !v)}
+        onKeyDown={(e) => e.key === "Enter" && setOpen((v) => !v)}
+        className="w-full flex items-center justify-between gap-2 cursor-pointer"
+      >
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-base leading-none">🧒</span>
+          <span className={clsx("text-[11px] font-bold px-2 py-0.5 rounded-full", COR_MIN_BADGE["Infantil"])}>
+            Infantil
+          </span>
+          {temMinha && (
+            <span className="text-[10px] bg-vine-700 text-white font-bold px-1.5 py-0.5 rounded-full">você</span>
+          )}
+        </div>
+        <div className="flex items-center gap-1 shrink-0">
+          {isLider && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onGerenciar(); }}
+              className="p-1 text-gray-300 hover:text-vine-600 rounded-lg transition"
+              title="Gerenciar escala"
+            >
+              <Settings2 className="w-3.5 h-3.5" />
+            </button>
+          )}
+          {open
+            ? <ChevronUp className="w-3.5 h-3.5 text-gray-300" />
+            : <ChevronDown className="w-3.5 h-3.5 text-gray-300" />
+          }
+        </div>
+      </div>
+
+      {open && (
+        <div className="mt-2.5 space-y-2">
+          {escalas.map((esc) => {
+            const { ageGroup, tema } = parseInfantilObs(esc.observacoes);
+            const temMinhaEsc = esc.itens.some((it) => it.voluntarioId === userId);
+            return (
+              <div
+                key={esc.id}
+                className={clsx("rounded-xl border overflow-hidden", temMinhaEsc ? "border-vine-200" : "border-gray-100")}
+              >
+                <div className={clsx("px-3 py-2 flex items-center gap-2 flex-wrap", temMinhaEsc ? "bg-vine-50" : "bg-yellow-50/40")}>
+                  {ageGroup && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-800 border border-yellow-200">
+                      {ageGroup}
+                    </span>
+                  )}
+                  {tema && (
+                    <span className="text-[10px] text-orange-600 font-medium italic">Tema: {tema}</span>
+                  )}
+                </div>
+                {esc.itens.length === 0 ? (
+                  <p className="px-3 py-2 text-xs text-gray-400 italic">Equipe não definida.</p>
+                ) : (
+                  <div className="px-3 py-2 grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                    {esc.itens.map((it, i) => (
+                      <div
+                        key={i}
+                        className={clsx(
+                          "flex items-start gap-2 px-2.5 py-1.5 rounded-lg",
+                          it.voluntarioId === userId
+                            ? "bg-vine-100 border border-vine-200"
+                            : "bg-gray-50 border border-gray-100"
+                        )}
+                      >
+                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide shrink-0 w-20 truncate pt-0.5">
+                          {showFuncao(it)}
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <span className="text-sm font-semibold text-gray-800 truncate block">{it.voluntarioNome}</span>
+                          {it.observacao && !["Cajón", "Pandeiro", "Violão"].includes(it.observacao) && (
+                            <span className="text-[10px] text-gray-400 italic truncate block">{it.observacao}</span>
+                          )}
+                        </div>
+                        {it.voluntarioId === userId && (
+                          <span className="w-1.5 h-1.5 rounded-full bg-vine-500 shrink-0 mt-1.5" />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
@@ -323,6 +440,19 @@ function CultoCard({
       {ministeriosNeste.length > 0 && (
         <div className="bg-white divide-y divide-gray-50">
           {ministeriosNeste.map((min) => {
+            if (min === "Infantil") {
+              const escalasInfantil = escalas.filter((e) => e.ministerio === "Infantil");
+              if (escalasInfantil.length === 0) return null;
+              return (
+                <InfantilSection
+                  key="infantil"
+                  escalas={escalasInfantil}
+                  userId={userId}
+                  isLider={isLider}
+                  onGerenciar={() => onGerenciarMinisterio("Infantil")}
+                />
+              );
+            }
             const escalasMin = escalas.filter((e) => e.ministerio === min);
             if (escalasMin.length === 0) return null;
             return escalasMin.map((escala) => (
