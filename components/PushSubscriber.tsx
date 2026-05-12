@@ -64,32 +64,23 @@ export default function PushSubscriber() {
       });
     }
 
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) throw new Error("Sessão expirada. Faça login novamente.");
+    // sub.toJSON().keys retorna base64url (formato correto para web-push no servidor)
+    const json = sub.toJSON();
+    const p256dh = json.keys?.p256dh ?? "";
+    const authKey = json.keys?.auth ?? "";
+    if (!p256dh || !authKey) throw new Error("Não foi possível obter as chaves da subscription.");
 
-    const key = sub.getKey("p256dh");
-    const auth = sub.getKey("auth");
-    if (!key || !auth) throw new Error("Não foi possível obter as chaves da subscription.");
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Sessão expirada. Faça login novamente.");
 
-    const res = await fetch("/api/push/subscribe", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${session.access_token}`,
-      },
-      body: JSON.stringify({
-        endpoint: sub.endpoint,
-        p256dh: btoa(String.fromCharCode(...new Uint8Array(key))),
-        auth: btoa(String.fromCharCode(...new Uint8Array(auth))),
-      }),
-    });
+    // Salva diretamente no Supabase (cliente autenticado, RLS aplica automaticamente)
+    const { error } = await supabase.from("push_subscriptions").upsert(
+      { user_id: user.id, endpoint: sub.endpoint, p256dh, auth: authKey },
+      { onConflict: "user_id,endpoint" }
+    );
 
-    if (!res.ok) {
-      const d = await res.json().catch(() => ({}));
-      throw new Error(`Erro ${res.status}: ${d.error ?? "desconhecido"}`);
-    }
+    if (error) throw new Error(`Erro ao salvar: ${error.message}`);
 
-    // Sucesso — fecha banner após 2s
     setStatus("sucesso");
     setMsg(null);
     setTimeout(() => setMostrarBanner(false), 2000);

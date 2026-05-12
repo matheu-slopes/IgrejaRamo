@@ -28,4 +28,7 @@ CREATE POLICY "push_subs_own_insert" ON push_subscriptions
 CREATE POLICY "push_subs_own_delete" ON push_subscriptions
   FOR DELETE USING (auth.uid() = user_id);
 
+CREATE POLICY "push_subs_own_update" ON push_subscriptions
+  FOR UPDATE USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+
 -- Service role bypassa RLS automaticamente (usado nas APIs server-side)
