@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Ministerio, Escala, FuncaoEscala } from "@/types";
 import { EscalasTab } from "@/components/dashboard/EscalasTab";
@@ -388,8 +388,6 @@ function CultoCard({
   });
 
   const temMinha = escalas.some((e) => e.itens.some((it) => it.voluntarioId === userId));
-  const escalaLouvor = escalas.find((e) => e.ministerio === "Louvor");
-  const temMusicas = (escalaLouvor?.musicas ?? []).length > 0;
 
   return (
     <div className={clsx(
@@ -456,17 +454,20 @@ function CultoCard({
             const escalasMin = escalas.filter((e) => e.ministerio === min);
             if (escalasMin.length === 0) return null;
             return escalasMin.map((escala) => (
-              <MinisterioSection
-                key={escala.id}
-                ministerio={min}
-                escala={escala}
-                userId={userId}
-                isLider={isLider}
-                onGerenciar={() => onGerenciarMinisterio(min)}
-              />
+              <React.Fragment key={escala.id}>
+                <MinisterioSection
+                  ministerio={min}
+                  escala={escala}
+                  userId={userId}
+                  isLider={isLider}
+                  onGerenciar={() => onGerenciarMinisterio(min)}
+                />
+                {min === "Louvor" && (escala.musicas ?? []).length > 0 && (
+                  <MusicasSection musicas={escala.musicas ?? []} />
+                )}
+              </React.Fragment>
             ));
           })}
-          {temMusicas && <MusicasSection musicas={escalaLouvor!.musicas ?? []} />}
         </div>
       )}
     </div>
