@@ -22,7 +22,7 @@ export const TONS = [
 ];
 
 export const FUNCOES_POR_MIN: Record<string, string[]> = {
-  Louvor:        ["Ministro","Guitarra","Baixo","Cajón","Teclado","Backing Vocal","Violão","Pandeiro"],
+  Louvor:        ["Ministro","Guitarra","Baixo","Cajón","Teclado","Backing Vocal","Violão"],
   "Mídias":      ["Transmissão","Projeção/Letras","Fotografia","Câmera"],
   Cantina:       ["Abertura","Oferta","Recepção"],
   Limpeza:       ["Escala de Limpeza"],
@@ -1486,20 +1486,26 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
                     className="border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-gray-400"
                   />
                 </div>
-                {/* Funções — badges clicáveis (multi-seleção) */}
+                {/* Funções — badges clicáveis; Backing Vocal permite múltiplos, demais apenas 1 */}
                 <div className="flex flex-wrap gap-1.5">
                   {funcoesMinisterio.map((f) => {
                     const sel = novasFuncoes.includes(f);
+                    const permiteMultiplos = f === "Backing Vocal";
+                    const jaOcupada = !permiteMultiplos && form.itens.some((it) => it.funcao === f);
                     return (
                       <button
                         key={f}
                         type="button"
-                        onClick={() => setNovasFuncoes((prev) => sel ? prev.filter((x) => x !== f) : [...prev, f])}
+                        disabled={jaOcupada}
+                        onClick={() => !jaOcupada && setNovasFuncoes((prev) => sel ? prev.filter((x) => x !== f) : [...prev, f])}
+                        title={jaOcupada ? "Já há alguém nesta função" : undefined}
                         className={clsx(
                           "text-xs font-medium px-3 py-1 rounded-full border transition",
-                          sel
-                            ? "bg-gray-900 text-white border-gray-900"
-                            : "bg-white text-gray-600 border-gray-300 hover:border-gray-500"
+                          jaOcupada
+                            ? "bg-gray-100 text-gray-300 border-gray-200 cursor-not-allowed line-through"
+                            : sel
+                              ? "bg-gray-900 text-white border-gray-900"
+                              : "bg-white text-gray-600 border-gray-300 hover:border-gray-500"
                         )}
                       >
                         {f}
