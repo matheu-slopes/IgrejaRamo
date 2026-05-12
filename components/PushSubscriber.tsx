@@ -61,13 +61,8 @@ export default function PushSubscriber() {
   }
 
   async function registrarSubscription() {
-    // Aguarda o SW ficar ativo com timeout de 10s
-    const registration = await Promise.race([
-      navigator.serviceWorker.ready,
-      new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error("Service Worker demorou demais para ficar ativo. Tente recarregar a página.")), 10000)
-      ),
-    ]);
+    // Aguarda o SW ficar ativo — sem timeout fixo, resolve assim que pronto
+    const registration = await navigator.serviceWorker.ready;
 
     let sub = await registration.pushManager.getSubscription();
 
@@ -122,8 +117,14 @@ export default function PushSubscriber() {
   return (
     <div className="fixed bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-2rem)] max-w-sm flex flex-col gap-2">
       {erro && (
-        <div className="bg-red-600 text-white rounded-xl shadow-lg px-3 py-2 text-xs leading-snug">
-          ⚠️ {erro}
+        <div className="bg-red-600 text-white rounded-xl shadow-lg px-3 py-2 text-xs leading-snug flex items-start justify-between gap-2">
+          <span>⚠️ {erro}</span>
+          <button
+            onClick={() => { setErro(null); solicitarPermissao(); }}
+            className="shrink-0 underline font-semibold whitespace-nowrap"
+          >
+            Tentar novamente
+          </button>
         </div>
       )}
       <div className="bg-vine-900 text-white rounded-2xl shadow-2xl px-4 py-3 flex items-center gap-3">

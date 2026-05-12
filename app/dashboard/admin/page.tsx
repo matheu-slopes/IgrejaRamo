@@ -937,7 +937,7 @@ function TestePushPanel() {
       const registration = await Promise.race([
         navigator.serviceWorker.ready,
         new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error("Service Worker demorou demais. Tente fechar e reabrir o PWA.")), 10000)
+          setTimeout(() => reject(new Error("Service Worker demorou demais. Tente fechar e reabrir o PWA.")), 30000)
         ),
       ]);
       let sub = await registration.pushManager.getSubscription();
