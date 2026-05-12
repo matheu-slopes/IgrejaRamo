@@ -38,7 +38,7 @@ export const EQUIPES_LOUVOR = [
     membros: [
       { id: "093a4e47-e3b6-4ffe-9ac0-efcdf0800bf9", nome: "Pastor Flavio",       funcao: "Ministro",      obs: "" },
       { id: "2a5a89e6-0452-4643-af64-c17f7881e7e5", nome: "Isadora Fernandes",  funcao: "Backing Vocal", obs: "" },
-      { id: null,                                   nome: "Tudes",              funcao: "Backing Vocal", obs: "" },
+      { id: "8ecd6e4e-67c0-437d-9e36-8edb80d5276c", nome: "Eduarda Tudes",     funcao: "Backing Vocal", obs: "" },
       { id: "af737764-2a81-4f89-8153-672571c5df16", nome: "Ricardo Bortot",     funcao: "Cajón",         obs: "" },
     ],
   },
@@ -48,7 +48,7 @@ export const EQUIPES_LOUVOR = [
       { id: "4c646c5d-cf1a-401f-a8bf-5bc9af996cdf", nome: "Matheus Alves",      funcao: "Ministro",      obs: "" },
       { id: "4d729cce-d0a0-42b1-9d09-62d3cd4b7b87", nome: "Lívia Martins",      funcao: "Backing Vocal", obs: "" },
       { id: null,                                   nome: "Edeni",              funcao: "Backing Vocal", obs: "" },
-      { id: null,                                   nome: "Victor",             funcao: "Cajón",         obs: "" },
+      { id: "d935d257-c430-44fe-9577-2e15a2ab94fa", nome: "Victor Sabino",       funcao: "Cajón",         obs: "" },
       { id: "ad69a900-1be0-41fa-943b-20c30a5bfb3c", nome: "Thaíná Victoria",   funcao: "Backing Vocal", obs: "" },
     ],
   },
