@@ -193,6 +193,7 @@ export default function BentoGrid() {
     supabase
       .from("avisos")
       .select()
+      .eq("visivel_home", true)
       .order("criado_em", { ascending: false })
       .limit(5)
       .then(({ data }) => {
