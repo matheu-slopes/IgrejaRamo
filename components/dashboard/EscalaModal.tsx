@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import {
   X, Pencil, Trash2, Save, Plus, Music2,
-  ChevronUp as ArrowUp, ChevronDown as ArrowDown, Search,
+  ChevronUp as ArrowUp, ChevronDown as ArrowDown, Search, Youtube,
 } from "lucide-react";
 import clsx from "clsx";
 import {
@@ -80,7 +80,11 @@ export function EscalaModal({ escala, podeEditar, onClose, onUpdate, onDelete }:
   const [novaObs, setNovaObs] = useState("");
   const [buscaMusica, setBuscaMusica] = useState("");
   const [tomOverride, setTomOverride] = useState<Record<string, string>>({});
+  const [addingNova, setAddingNova] = useState(false);
+  const [novaMusica, setNovaMusica] = useState({ titulo: "", artista: "", tom: "" });
+  const [savingNova, setSavingNova] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [salvarErro, setSalvarErro] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
   const backdropRef = useRef<HTMLDivElement>(null);
 
@@ -126,18 +130,21 @@ export function EscalaModal({ escala, podeEditar, onClose, onUpdate, onDelete }:
   async function salvar() {
     if (!form.culto || !form.data || !form.horario) return;
     setSaving(true);
+    setSalvarErro("");
     try {
-      await supabase.from("escalas").update({
+      const { error: errUpdate } = await supabase.from("escalas").update({
         culto: form.culto,
         horario: form.horario,
         data: form.data,
         observacoes: form.observacoes || null,
         visivel: form.visivel,
       }).eq("id", escala.id);
+      if (errUpdate) throw new Error(errUpdate.message);
 
-      await supabase.from("escala_itens").delete().eq("escala_id", escala.id);
+      const { error: errDelItens } = await supabase.from("escala_itens").delete().eq("escala_id", escala.id);
+      if (errDelItens) throw new Error(errDelItens.message);
       if (form.itens.length > 0) {
-        await supabase.from("escala_itens").insert(
+        const { error: errInsItens } = await supabase.from("escala_itens").insert(
           form.itens.map((i) => ({
             escala_id: escala.id,
             funcao: i.funcao,
@@ -146,11 +153,13 @@ export function EscalaModal({ escala, podeEditar, onClose, onUpdate, onDelete }:
             observacao: i.observacao || null,
           }))
         );
+        if (errInsItens) throw new Error(errInsItens.message);
       }
 
-      await supabase.from("escala_musicas").delete().eq("escala_id", escala.id);
+      const { error: errDelMusicas } = await supabase.from("escala_musicas").delete().eq("escala_id", escala.id);
+      if (errDelMusicas) throw new Error(errDelMusicas.message);
       if (form.musicas.length > 0) {
-        await supabase.from("escala_musicas").insert(
+        const { error: errInsMusicas } = await supabase.from("escala_musicas").insert(
           form.musicas.map((m, idx) => ({
             escala_id: escala.id,
             musica_id: m.musicaId || null,
@@ -160,11 +169,14 @@ export function EscalaModal({ escala, podeEditar, onClose, onUpdate, onDelete }:
             ordem: idx,
           }))
         );
+        if (errInsMusicas) throw new Error(errInsMusicas.message);
       }
 
       const updated: Escala = { ...escala, ...form };
       onUpdate(updated);
       setMode("view");
+    } catch (err) {
+      setSalvarErro(err instanceof Error ? err.message : "Erro ao salvar. Tente novamente.");
     } finally {
       setSaving(false);
     }
@@ -194,7 +206,31 @@ export function EscalaModal({ escala, podeEditar, onClose, onUpdate, onDelete }:
     m.titulo.toLowerCase().includes(buscaMusica.toLowerCase()) ||
     m.artista.toLowerCase().includes(buscaMusica.toLowerCase())
   );
+  function youtubeUrl(titulo: string, artista: string) {
+    return `https://www.youtube.com/results?search_query=${encodeURIComponent(`${titulo} ${artista}`)}`;
+  }
 
+  async function salvarNovaMusica() {
+    if (!novaMusica.titulo.trim() || !novaMusica.artista.trim()) return;
+    setSavingNova(true);
+    try {
+      const { data, error } = await supabase
+        .from("musicas")
+        .insert({ titulo: novaMusica.titulo.trim(), artista: novaMusica.artista.trim(), tom: novaMusica.tom || null })
+        .select()
+        .single();
+      if (error) throw error;
+      const nova = data as Musica;
+      setMusicas((prev) => [...prev, nova].sort((a, b) => a.titulo.localeCompare(b.titulo, "pt-BR")));
+      addMusica(nova);
+      setNovaMusica({ titulo: "", artista: "", tom: "" });
+      setAddingNova(false);
+    } catch (err) {
+      console.error("Erro ao salvar música:", err);
+    } finally {
+      setSavingNova(false);
+    }
+  }
   function addMusica(m: Musica) {
     if (form.musicas.some((em) => em.musicaId === m.id)) return;
     setForm((f) => ({
@@ -650,6 +686,16 @@ export function EscalaModal({ escala, podeEditar, onClose, onUpdate, onDelete }:
                                 <p className="text-xs text-gray-400 truncate">{m.artista}</p>
                               </div>
                               <div className="flex items-center gap-2 shrink-0">
+                                <a
+                                  href={youtubeUrl(m.titulo, m.artista)}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition"
+                                  title="Ouvir no YouTube"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <Youtube className="w-3.5 h-3.5" />
+                                </a>
                                 <select
                                   value={tomOverride[m.id] ?? m.tom ?? ""}
                                   onChange={(e) => setTomOverride((prev) => ({ ...prev, [m.id]: e.target.value }))}
@@ -676,6 +722,53 @@ export function EscalaModal({ escala, podeEditar, onClose, onUpdate, onDelete }:
                       </div>
                     )}
                   </div>
+
+                  {/* Nova música */}
+                  <div className="border border-dashed border-gray-200 rounded-xl overflow-hidden">
+                    <button
+                      type="button"
+                      onClick={() => setAddingNova((v) => !v)}
+                      className="w-full flex items-center justify-between px-3 py-2 text-sm font-semibold text-vine-700 hover:bg-vine-50 transition"
+                    >
+                      <span className="flex items-center gap-2"><Plus className="w-3.5 h-3.5" /> Nova música</span>
+                      {addingNova ? <X className="w-3.5 h-3.5 text-gray-400" /> : null}
+                    </button>
+                    {addingNova && (
+                      <div className="px-3 pb-3 pt-1 space-y-2 bg-vine-50/40">
+                        <div className="flex gap-2">
+                          <input
+                            value={novaMusica.titulo}
+                            onChange={(e) => setNovaMusica((n) => ({ ...n, titulo: e.target.value }))}
+                            placeholder="Título"
+                            className="flex-1 border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm outline-none focus:border-vine-400 bg-white"
+                          />
+                          <select
+                            value={novaMusica.tom}
+                            onChange={(e) => setNovaMusica((n) => ({ ...n, tom: e.target.value }))}
+                            className="border border-gray-200 rounded-lg px-2 py-1.5 text-sm outline-none bg-white w-20"
+                          >
+                            <option value="">Tom</option>
+                            {TONS.map((t) => <option key={t}>{t}</option>)}
+                          </select>
+                        </div>
+                        <div className="flex gap-2">
+                          <input
+                            value={novaMusica.artista}
+                            onChange={(e) => setNovaMusica((n) => ({ ...n, artista: e.target.value }))}
+                            placeholder="Artista / Banda"
+                            className="flex-1 border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm outline-none focus:border-vine-400 bg-white"
+                          />
+                          <button
+                            onClick={salvarNovaMusica}
+                            disabled={savingNova || !novaMusica.titulo.trim() || !novaMusica.artista.trim()}
+                            className="px-3 py-1.5 text-sm font-bold text-white bg-vine-700 rounded-lg hover:bg-vine-800 transition disabled:opacity-40"
+                          >
+                            {savingNova ? "..." : "+ Add"}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
@@ -684,9 +777,13 @@ export function EscalaModal({ escala, podeEditar, onClose, onUpdate, onDelete }:
 
         {/* ── Footer de ações (edit mode) ── */}
         {mode === "edit" && (
-          <div className="px-6 py-3 border-t border-gray-100 bg-white flex items-center justify-end gap-2">
+          <div className="px-6 py-3 border-t border-gray-100 bg-white flex flex-col gap-2">
+            {salvarErro && (
+              <p className="text-xs text-red-600 text-right font-medium">{salvarErro}</p>
+            )}
+            <div className="flex items-center justify-end gap-2">
             <button
-              onClick={() => setMode("view")}
+              onClick={() => { setMode("view"); setSalvarErro(""); }}
               className="px-4 py-2 text-sm font-semibold text-gray-600 hover:text-gray-800 bg-gray-100 rounded-xl hover:bg-gray-200 transition"
             >
               Cancelar
@@ -699,6 +796,7 @@ export function EscalaModal({ escala, podeEditar, onClose, onUpdate, onDelete }:
               <Save className="w-4 h-4" />
               {saving ? "Salvando..." : "Salvar"}
             </button>
+            </div>
           </div>
         )}
       </div>

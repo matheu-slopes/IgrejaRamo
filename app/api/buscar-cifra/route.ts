@@ -331,13 +331,21 @@ export async function GET(req: NextRequest) {
   const ytMatch = scripts.match(/"(?:youtube_id|youtubeId)"\s*:\s*"([A-Za-z0-9_-]{10,12})"/);
   if (ytMatch) youtubeUrl = `https://www.youtube.com/watch?v=${ytMatch[1]}`;
 
-  // Tom: tenta extrair do HTML (elemento .cifra_tom ou variável JS)
-  const tomEl = $(".cifra_tom a, .tom_atual, [data-cy='cifra-tom'] a").first().text().trim();
-  if (tomEl) {
+  // Tom: tenta extrair do HTML (vários seletores + variáveis JS)
+  const tomEl = $(
+    ".cifra_tom a, .tom_atual, [data-cy='cifra-tom'] a, " +
+    "#cifra_tom, .g-song-key, [class*='tom'] a, " +
+    "[class*='key'] a, [data-key], .cifra-tom"
+  ).first().text().trim().replace(/^tom:?\s*/i, "");
+  if (tomEl && /^[A-G][#b]?m?$/.test(tomEl)) {
     tomOriginal = tomEl;
   } else {
-    const tomMatch = scripts.match(/"tom"\s*:\s*"([^"]{1,5})"/);
-    if (tomMatch) tomOriginal = tomMatch[1];
+    // Tenta regex no JSON embutido no HTML
+    const tomMatch =
+      scripts.match(/"tom"\s*:\s*"([A-G][#b]?m?[0-9]*)"/) ||
+      scripts.match(/"key"\s*:\s*"([A-G][#b]?m?)"/) ||
+      scripts.match(/tom:\s*["']([A-G][#b]?m?[0-9]*)["']/);
+    if (tomMatch) tomOriginal = tomMatch[1].replace(/[0-9]+$/, "");
   }
 
   return NextResponse.json({
