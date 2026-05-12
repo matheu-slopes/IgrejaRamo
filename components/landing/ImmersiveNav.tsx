@@ -9,7 +9,6 @@ const links = [
   { href: "#cultos",      label: "Cultos"       },
   { href: "#quem-somos",  label: "Quem Somos"   },
   { href: "#avisos",      label: "Mural"        },
-  { href: "#galeria",     label: "Galeria"      },
   { href: "#localizacao", label: "Localização"  },
 ];
 

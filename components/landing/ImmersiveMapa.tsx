@@ -1,184 +1,170 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { MapPin, Clock, Phone, Navigation, ExternalLink } from "lucide-react";
+import { MapPin, Clock, Phone, Navigation } from "lucide-react";
+
+function WhatsAppIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
+      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+    </svg>
+  );
+}
 
 const horarios = [
-  { dia: "Segunda", desc: "Oração", hora: "20h" },
-  { dia: "1ª Terça", desc: "Mulheres", hora: "19h30" },
-  { dia: "2ª Terça", desc: "Ensino", hora: "19h45" },
-  { dia: "Quinta", desc: "Culto", hora: "20h" },
-  { dia: "Sábado", desc: "Jovens", hora: "19h30" },
-  { dia: "Domingo", desc: "Culto Principal", hora: "18h30", destaque: true },
+  { dia: "Segunda",    desc: "Oração",         hora: "20h"   },
+  { dia: "Terça (1ª)", desc: "Mulheres",        hora: "19h30" },
+  { dia: "Terça (2ª)", desc: "Ensino",          hora: "19h45" },
+  { dia: "Quinta",     desc: "Culto",           hora: "20h"   },
+  { dia: "Sábado",     desc: "Jovens",          hora: "19h30" },
+  { dia: "Domingo",    desc: "Culto Principal", hora: "18h30", destaque: true },
 ];
+
+const WHATSAPP = "5519995953536";
+const PHONE    = "(19) 99595-3536";
+
+const fadeUp = (delay = 0) => ({
+  initial: { opacity: 0, y: 20 },
+  whileInView: { opacity: 1, y: 0 },
+  viewport: { once: true, margin: "-60px" } as const,
+  transition: { duration: 0.6, delay, ease: "easeOut" as const },
+});
 
 export default function ImmersiveMapa() {
   return (
-    <section id="localizacao" className="relative py-32 px-5 overflow-hidden bg-vine-950">
+    <section id="localizacao" className="bg-[#F5F1EB]">
+      {/* ── Divisor clean ── */}
+      <div className="w-full border-t border-vine-200 py-8" />
 
-      {/* Glows de fundo */}
-      <div className="absolute -top-40 -left-40 w-[500px] h-[500px] bg-vine-800/20 rounded-full blur-[140px] pointer-events-none" />
-      <div className="absolute -bottom-40 -right-20 w-[400px] h-[400px] bg-gold-500/10 rounded-full blur-[120px] pointer-events-none" />
+      <div className="py-16 px-4 md:py-20 md:px-6">
+      <div className="max-w-5xl mx-auto space-y-8 md:space-y-10">
 
-      {/* Grain texture overlay */}
-      <div
-        className="absolute inset-0 opacity-[0.03] pointer-events-none"
-        style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E\")" }}
-      />
-
-      <div className="max-w-6xl mx-auto relative z-10">
-
-        {/* Header */}
-        <motion.div
-          initial={{ opacity: 0, y: 24 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          className="text-center mb-20"
+        {/* ── Título centralizado ── */}
+        <motion.h2
+          {...fadeUp(0)}
+          className="text-center font-sans text-4xl md:text-6xl font-bold text-vine-950"
         >
-          <span className="inline-flex items-center gap-2 text-gold-400 text-[11px] tracking-[0.45em] uppercase font-medium mb-4">
-            <span className="w-6 h-px bg-gold-400/60" />
-            Como chegar
-            <span className="w-6 h-px bg-gold-400/60" />
-          </span>
-          <h2 className="font-sans text-4xl md:text-5xl font-semibold text-white leading-tight">
-            Localização
-          </h2>
-          <p className="mt-4 text-vine-300/70 text-base max-w-sm mx-auto">
-            Venha nos visitar. Será uma honra recebê-lo!
-          </p>
+          Localização
+        </motion.h2>
+
+        {/* ── Mapa full-width ── */}
+        <motion.div {...fadeUp(0.05)}>
+          <div
+            className="w-full h-[240px] md:h-[360px] rounded-2xl md:rounded-3xl overflow-hidden border border-vine-200/50 shadow-sm"
+          >
+            <iframe
+              title="Localização Igreja Ramo da Vida"
+              src="https://maps.google.com/maps?q=R.+Fern%C3%A3o+Pompeu+de+Camargo%2C+1293%2C+Jardim+do+Trevo%2C+Campinas%2C+SP%2C+13040-010&output=embed"
+              className="w-full h-full border-0"
+              loading="lazy"
+              referrerPolicy="no-referrer-when-downgrade"
+            />
+          </div>
         </motion.div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 items-start">
+        {/* ── Card inferior com 4 colunas ── */}
+        <motion.div
+          {...fadeUp(0.1)}
+          className="bg-white rounded-3xl border border-vine-100 shadow-sm overflow-hidden"
+        >
+          <div className="grid grid-cols-1 md:grid-cols-[1fr_1.7fr_1fr_160px] divide-y md:divide-y-0 md:divide-x divide-vine-100">
 
-          {/* Info panel — 2 cols */}
-          <motion.div
-            initial={{ opacity: 0, x: -30 }}
-            whileInView={{ opacity: 1, x: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.7 }}
-            className="lg:col-span-2 space-y-5"
-          >
-            {/* Endereço */}
-            <div className="group bg-white/5 border border-white/10 rounded-2xl p-5 hover:bg-white/8 hover:border-vine-400/30 transition-all duration-300">
-              <div className="flex items-start gap-4">
-                <div className="w-10 h-10 bg-vine-600/20 border border-vine-500/30 rounded-xl flex items-center justify-center shrink-0">
-                  <MapPin className="w-5 h-5 text-vine-300" />
-                </div>
-                <div>
-                  <p className="font-semibold text-white mb-1 text-sm">Endereço</p>
-                  <p className="text-vine-300/80 text-sm leading-relaxed">
-                    R. Fernão Pompeu de Camargo, 1293<br />
-                    Jardim do Trevo — Campinas, SP<br />
-                    CEP 13040-010
-                  </p>
-                  <a
-                    href="https://maps.google.com/?q=R.+Fernão+Pompeu+de+Camargo,+1293,+Campinas,+SP"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 mt-3 text-gold-400 text-xs font-medium hover:text-gold-300 transition-colors"
-                  >
-                    <ExternalLink className="w-3.5 h-3.5" />
-                    Abrir no Google Maps
-                  </a>
-                </div>
+            {/* Coluna 1 — Endereço */}
+            <div className="p-6 md:p-9">
+              <div className="flex items-center gap-2 mb-5">
+                <MapPin className="w-5 h-5 text-vine-500" strokeWidth={1.5} />
+                <p className="text-vine-800 text-base font-semibold">Endereço</p>
               </div>
+              <p className="text-vine-700/75 text-sm leading-relaxed">
+                R. Fernão Pompeu de Camargo, 1293 | Jardim do Trevo —{" "}
+                Campinas, SP | CEP 13040-010
+              </p>
+              <a
+                href="https://maps.google.com/?q=R.+Fernão+Pompeu+de+Camargo,+1293,+Campinas,+SP"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 mt-6 text-vine-600 hover:text-vine-800 text-sm font-semibold transition-colors group"
+              >
+                <Navigation className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
+                Traçar rota no Google Maps →
+              </a>
             </div>
 
-            {/* Horários */}
-            <div className="bg-white/5 border border-white/10 rounded-2xl p-5 hover:bg-white/8 hover:border-vine-400/30 transition-all duration-300">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 bg-vine-600/20 border border-vine-500/30 rounded-xl flex items-center justify-center shrink-0">
-                  <Clock className="w-5 h-5 text-vine-300" />
-                </div>
-                <p className="font-semibold text-white text-sm">Horários dos Cultos</p>
+            {/* Coluna 2 — Horários em grade 3×2 */}
+            <div className="p-6 md:p-9">
+              <div className="flex items-center gap-2 mb-5">
+                <Clock className="w-5 h-5 text-vine-500" strokeWidth={1.5} />
+                <p className="text-vine-800 text-base font-semibold">Horários dos Cultos</p>
               </div>
-              <div className="space-y-2">
-                {horarios.map((h) => (
-                  <div
-                    key={h.dia}
-                    className={`flex items-center justify-between rounded-lg px-3 py-2 text-sm transition-colors ${
-                      h.destaque
-                        ? "bg-vine-600/25 border border-vine-500/30"
-                        : "hover:bg-white/5"
-                    }`}
-                  >
-                    <div className="flex items-center gap-2">
-                      {h.destaque && <span className="w-1.5 h-1.5 rounded-full bg-gold-400 shrink-0" />}
-                      <span className={h.destaque ? "text-white font-semibold" : "text-vine-300/80"}>
+              <div className="grid grid-cols-3 gap-x-4 gap-y-4">
+                {horarios.map((h) =>
+                  h.destaque ? (
+                    <div
+                      key={h.dia}
+                      className="bg-vine-700 text-white rounded-xl px-3 py-3 text-center"
+                    >
+                      <p className="text-xs font-bold uppercase tracking-wide leading-none">
                         {h.dia}
-                      </span>
-                      <span className={h.destaque ? "text-vine-200/70 text-xs" : "text-vine-400/60 text-xs"}>
-                        {h.desc}
-                      </span>
+                      </p>
+                      <p className="text-[10px] opacity-80 mt-1">{h.desc}</p>
+                      <p className="text-base font-bold mt-1.5">{h.hora}</p>
                     </div>
-                    <span className={h.destaque ? "text-gold-400 font-bold" : "text-vine-300/70 font-medium"}>
-                      {h.hora}
-                    </span>
-                  </div>
-                ))}
+                  ) : (
+                    <div key={h.dia} className="text-center">
+                      <p className="text-vine-800 text-sm font-semibold leading-tight">{h.dia}</p>
+                      <p className="text-vine-500 text-xs">{h.desc}</p>
+                      <p className="text-vine-700 text-sm font-bold mt-0.5">{h.hora}</p>
+                    </div>
+                  )
+                )}
               </div>
             </div>
 
-            {/* Contato */}
-            <div className="bg-white/5 border border-white/10 rounded-2xl p-5 hover:bg-white/8 hover:border-vine-400/30 transition-all duration-300">
-              <div className="flex items-start gap-4">
-                <div className="w-10 h-10 bg-vine-600/20 border border-vine-500/30 rounded-xl flex items-center justify-center shrink-0">
-                  <Phone className="w-5 h-5 text-vine-300" />
-                </div>
-                <div>
-                  <p className="font-semibold text-white mb-1 text-sm">Contato</p>
-                  <p className="text-vine-300/80 text-sm">(19) 99999-9999</p>
-                </div>
+            {/* Coluna 3 — Contato & Visita */}
+            <div className="p-6 md:p-9">
+              <div className="flex items-center gap-2 mb-5">
+                <Phone className="w-5 h-5 text-vine-500" strokeWidth={1.5} />
+                <p className="text-vine-800 text-base font-semibold">Contato &amp; Visita</p>
               </div>
+              <p className="text-vine-900 font-bold text-lg mb-5">{PHONE}</p>
+
+              <div className="space-y-3">
+                <a
+                  href={`tel:+${WHATSAPP}`}
+                  className="flex items-center justify-center gap-1.5 w-full border border-vine-200 hover:border-vine-400 text-vine-800 text-sm font-semibold py-2.5 rounded-xl transition-colors"
+                >
+                  Ligar Agora
+                </a>
+                <a
+                  href={`https://wa.me/${WHATSAPP}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-center gap-1.5 w-full border border-vine-200 hover:border-vine-400 text-vine-800 text-sm font-semibold py-2.5 rounded-xl transition-colors"
+                >
+                  <WhatsAppIcon className="w-4 h-4 text-green-600" />
+                  Falar no WhatsApp
+                </a>
+              </div>
+
+              <p className="text-vine-600/70 text-sm leading-relaxed mt-5">
+                Aberto a todos.<br />Venha nos conhecer!
+              </p>
             </div>
 
-            {/* CTA */}
-            <a
-              href="https://maps.google.com/?q=R.+Fernão+Pompeu+de+Camargo,+1293,+Campinas,+SP"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center justify-center gap-2 w-full bg-vine-600 hover:bg-vine-500 text-white text-sm font-semibold py-3.5 rounded-xl transition-all duration-300 shadow-lg shadow-vine-900/50 group"
-            >
-              <Navigation className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
-              Traçar Rota
-            </a>
-          </motion.div>
+            {/* Coluna 4 — Foto da comunidade */}
+            <div
+              className="relative hidden md:block bg-vine-200/40 min-h-[200px]"
+              style={{
+                backgroundImage: "url('/imagem_localização.jpg')",
+                backgroundSize: "cover",
+                backgroundPosition: "center",
+              }}
+            />
 
-          {/* Mapa — 3 cols */}
-          <motion.div
-            initial={{ opacity: 0, x: 30 }}
-            whileInView={{ opacity: 1, x: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.7 }}
-            className="lg:col-span-3"
-          >
-            <div className="relative rounded-2xl overflow-hidden border border-white/10 shadow-2xl shadow-black/50"
-              style={{ height: "520px" }}>
-              {/* Borda brilhante */}
-              <div className="absolute inset-0 rounded-2xl pointer-events-none z-10"
-                style={{ boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.08)" }} />
+          </div>
+        </motion.div>
 
-              <iframe
-                title="Localização Igreja Ramo da Vida"
-                src="https://maps.google.com/maps?q=R.+Fern%C3%A3o+Pompeu+de+Camargo%2C+1293%2C+Jardim+do+Trevo%2C+Campinas%2C+SP%2C+13040-010&output=embed"
-                className="w-full h-full border-0"
-                loading="lazy"
-                referrerPolicy="no-referrer-when-downgrade"
-              />
-
-              {/* Overlay gradiente sutil na base */}
-              <div className="absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t from-vine-950/60 to-transparent pointer-events-none z-10" />
-
-              {/* Badge no mapa */}
-              <div className="absolute bottom-4 left-4 z-20 flex items-center gap-2.5 bg-vine-950/90 backdrop-blur-sm border border-white/10 rounded-xl px-4 py-2.5">
-                <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-                <span className="text-white text-xs font-medium">Igreja Ramo da Vida</span>
-                <span className="text-vine-400 text-xs">Campinas, SP</span>
-              </div>
-            </div>
-          </motion.div>
-
-        </div>
+      </div>
       </div>
     </section>
   );
