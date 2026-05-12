@@ -77,14 +77,14 @@ export default function Sidebar() {
   return (
     <aside
       className={clsx(
-        "relative hidden md:flex flex-col h-screen bg-black text-white transition-all duration-300 shrink-0",
+        "relative hidden md:flex flex-col h-screen bg-vine-900 text-white transition-all duration-300 shrink-0",
         collapsed ? "w-16" : "w-60"
       )}
     >
       {/* Collapse toggle */}
       <button
         onClick={() => setCollapsed(!collapsed)}
-        className="absolute -right-3 top-6 bg-white/10 rounded-full p-0.5 shadow text-white hover:bg-white/20 transition z-10"
+        className="absolute -right-3 top-6 bg-vine-700 rounded-full p-0.5 shadow text-white hover:bg-vine-600 transition z-10"
         aria-label="Toggle sidebar"
       >
         {collapsed ? (
@@ -95,14 +95,14 @@ export default function Sidebar() {
       </button>
 
       {/* Logo */}
-      <div className="flex items-center gap-3 px-4 h-16 border-b border-white/8">
+      <div className="flex items-center gap-3 px-4 h-16 border-b border-vine-700">
         <Image
           src="/logo.png"
           alt="Ramo da Vida"
           width={32}
           height={32}
           className="h-8 w-auto shrink-0"
-          style={{ filter: "invert(1)", mixBlendMode: "screen" }}
+          style={{ filter: "brightness(0) invert(1)", opacity: 0.9 }}
         />
         {!collapsed && (
           <span className="font-bold text-white text-base truncate">
@@ -123,8 +123,8 @@ export default function Sidebar() {
               className={clsx(
                 "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition",
                 pathname === href
-                  ? "bg-white text-black"
-                  : "text-white/85 hover:bg-white/10 hover:text-white"
+                  ? "bg-vine-600 text-white"
+                  : "text-vine-100/80 hover:bg-vine-800 hover:text-white"
               )}
               title={collapsed ? label : undefined}
             >
@@ -164,11 +164,11 @@ export default function Sidebar() {
           return (
             <>
               {!collapsed && (
-                <p className="px-3 pt-5 pb-1 text-xs font-bold uppercase tracking-widest text-white/30">
+                <p className="px-3 pt-5 pb-1 text-xs font-bold uppercase tracking-widest text-vine-300/70">
                   Meus Ministérios
                 </p>
               )}
-              {collapsed && <div className="border-t border-white/8 my-3 mx-1" />}
+              {collapsed && <div className="border-t border-vine-700 my-3 mx-1" />}
               {meusItens.map(({ label, icon: Icon, href, cor }) => {
                 const eLider = user?.liderMinisterios?.some(
                   (um) => um.toLowerCase() === label.toLowerCase()
@@ -208,18 +208,18 @@ export default function Sidebar() {
         {temPermissao("gerenciar_usuarios") && (
           <>
             {!collapsed && (
-              <p className="px-3 pt-5 pb-1 text-xs font-bold uppercase tracking-widest text-white/30">
+              <p className="px-3 pt-5 pb-1 text-xs font-bold uppercase tracking-widest text-vine-300/70">
                 Painel Admin
               </p>
             )}
-            {collapsed && <div className="border-t border-white/8 my-3 mx-1" />}
+            {collapsed && <div className="border-t border-vine-700 my-3 mx-1" />}
             {navAdmin.map(({ href, label, icon: Icon }) => (
               <Link
                 key={href}
                 href={href}
                 className={clsx(
                   "flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition",
-                  isActive(href) ? "bg-white text-black" : "text-white/85 hover:bg-white/10 hover:text-white"
+                  isActive(href) ? "bg-vine-600 text-white" : "text-vine-100/80 hover:bg-vine-800 hover:text-white"
                 )}
                 title={collapsed ? label : undefined}
               >
@@ -234,11 +234,11 @@ export default function Sidebar() {
         {!temPermissao("gerenciar_usuarios") && temPermissao("criar_aviso") && (
           <>
             {!collapsed && (
-              <p className="px-3 pt-5 pb-1 text-xs font-bold uppercase tracking-widest text-white/30">
+              <p className="px-3 pt-5 pb-1 text-xs font-bold uppercase tracking-widest text-vine-300/70">
                 Conteúdo
               </p>
             )}
-            {collapsed && <div className="border-t border-white/8 my-3 mx-1" />}
+            {collapsed && <div className="border-t border-vine-700 my-3 mx-1" />}
             {[
               { href: "/dashboard/admin?tab=conteudo&secao=avisos",     label: "Avisos",     icon: Bell     },
               { href: "/dashboard/admin?tab=conteudo&secao=devocional", label: "Devocional", icon: BookOpen },
@@ -248,7 +248,7 @@ export default function Sidebar() {
                 href={href}
                 className={clsx(
                   "flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition",
-                  isActive(href) ? "bg-white text-black" : "text-white/85 hover:bg-white/10 hover:text-white"
+                  isActive(href) ? "bg-vine-600 text-white" : "text-vine-100/80 hover:bg-vine-800 hover:text-white"
                 )}
                 title={collapsed ? label : undefined}
               >
@@ -261,18 +261,18 @@ export default function Sidebar() {
       </nav>
 
       {/* User info + logout */}
-      <div className="border-t border-white/8 p-3">
+      <div className="border-t border-vine-700 p-3">
         {user && !collapsed && (
           <div className="mb-2 px-1">
             <p className="text-xs font-semibold text-white truncate">
               {user.nome.split(" ")[0]}
             </p>
-            <p className="text-xs text-white/50 capitalize">{user.role}</p>
+            <p className="text-xs text-vine-300/70 capitalize">{user.role}</p>
           </div>
         )}
         <button
           onClick={handleLogout}
-          className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-white/50 hover:bg-white/10 hover:text-white transition w-full"
+          className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-vine-300/70 hover:bg-vine-800 hover:text-white transition w-full"
           title="Sair"
         >
           <LogOut className="w-4 h-4 shrink-0" />

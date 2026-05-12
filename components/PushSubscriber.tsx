@@ -36,7 +36,7 @@ export default function PushSubscriber() {
           const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!;
           sub = await registration.pushManager.subscribe({
             userVisibleOnly: true,
-            applicationServerKey: urlBase64ToUint8Array(vapidKey),
+            applicationServerKey: urlBase64ToUint8Array(vapidKey).buffer as ArrayBuffer,
           });
         }
 

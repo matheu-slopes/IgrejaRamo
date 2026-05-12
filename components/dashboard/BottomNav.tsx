@@ -164,7 +164,7 @@ export default function BottomNav() {
               href={href}
               className={clsx(
                 "flex-1 flex flex-col items-center justify-center gap-0.5 py-2 transition-colors relative",
-                active ? "text-gray-900" : "text-gray-400"
+                active ? "text-vine-600" : "text-gray-400"
               )}
             >
               <div className="relative">
@@ -175,11 +175,11 @@ export default function BottomNav() {
                   </span>
                 )}
               </div>
-              <span className={clsx("text-[10px] font-semibold leading-none", active ? "text-gray-900" : "text-gray-400")}>
+              <span className={clsx("text-[10px] font-semibold leading-none", active ? "text-vine-600" : "text-gray-400")}>
                 {label}
               </span>
               {active && (
-                <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-gray-800 rounded-full" />
+                <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-vine-600 rounded-full" />
               )}
             </Link>
           );
@@ -197,15 +197,15 @@ export default function BottomNav() {
                 href={m?.href ?? "/dashboard"}
                 className={clsx(
                   "flex-1 flex flex-col items-center justify-center gap-0.5 py-2 transition-colors relative",
-                  active ? "text-gray-900" : "text-gray-400"
+                  active ? "text-vine-600" : "text-gray-400"
                 )}
               >
                 <Layers className={clsx("w-5 h-5 transition-transform", active && "scale-110")} />
-                <span className={clsx("text-[10px] font-semibold leading-none", active ? "text-gray-900" : "text-gray-400")}>
+                <span className={clsx("text-[10px] font-semibold leading-none", active ? "text-vine-600" : "text-gray-400")}>
                   {nome}
                 </span>
                 {active && (
-                  <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-gray-800 rounded-full" />
+                  <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-vine-600 rounded-full" />
                 )}
               </Link>
             );
@@ -216,17 +216,17 @@ export default function BottomNav() {
             onClick={() => setDrawerOpen(true)}
             className={clsx(
               "flex-1 flex flex-col items-center justify-center gap-0.5 py-2 transition-colors relative",
-              drawerOpen ? "text-gray-900" : "text-gray-400"
+              drawerOpen ? "text-vine-600" : "text-gray-400"
             )}
           >
             <div className="relative">
               <Layers className={clsx("w-5 h-5 transition-transform", drawerOpen && "scale-110")} />
             </div>
-            <span className={clsx("text-[10px] font-semibold leading-none", drawerOpen ? "text-gray-900" : "text-gray-400")}>
+            <span className={clsx("text-[10px] font-semibold leading-none", drawerOpen ? "text-vine-600" : "text-gray-400")}>
               Ministérios
             </span>
             {drawerOpen && (
-              <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-gray-800 rounded-full" />
+              <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-vine-600 rounded-full" />
             )}
           </button>
         ) : (
