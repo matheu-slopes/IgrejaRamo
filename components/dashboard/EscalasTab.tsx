@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   Plus, Trash2, Pencil, X, Save, Music2, Users, Eye, EyeOff, UserCheck,
-  ChevronUp as ArrowUp, ChevronDown as ArrowDown, Star, Filter, Search,
+  ChevronUp as ArrowUp, ChevronDown as ArrowDown, Star, Filter, Search, Youtube,
 } from "lucide-react";
 import clsx from "clsx";
 import {
@@ -244,6 +244,9 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
   const [novaObs, setNovaObs] = useState("");
   const [buscaMusica, setBuscaMusica] = useState("");
   const [tomOverride, setTomOverride] = useState<Record<string, string>>({});
+  const [addingNova, setAddingNova] = useState(false);
+  const [novaMusica, setNovaMusica] = useState({ titulo: "", artista: "", tom: "" });
+  const [savingNova, setSavingNova] = useState(false);
   const [saving, setSaving] = useState(false);
   const [viewMode, setViewMode] = useState<"minhas" | "culto">("culto");
   const [busca, setBusca] = useState("");
@@ -430,6 +433,32 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
       ...f,
       musicas: f.musicas.map((m) => m.musicaId === musicaId ? { ...m, tom } : m),
     }));
+  }
+
+  function youtubeUrl(titulo: string, artista: string) {
+    return `https://www.youtube.com/results?search_query=${encodeURIComponent(`${titulo} ${artista}`)}` ;
+  }
+
+  async function salvarNovaMusica() {
+    if (!novaMusica.titulo.trim() || !novaMusica.artista.trim()) return;
+    setSavingNova(true);
+    try {
+      const { data, error } = await supabase
+        .from("musicas")
+        .insert({ titulo: novaMusica.titulo.trim(), artista: novaMusica.artista.trim(), tom: novaMusica.tom || null })
+        .select()
+        .single();
+      if (error) throw error;
+      const nova = data as Musica;
+      setMusicas((prev) => [...prev, nova].sort((a, b) => a.titulo.localeCompare(b.titulo, "pt-BR")));
+      addMusica(nova);
+      setNovaMusica({ titulo: "", artista: "", tom: "" });
+      setAddingNova(false);
+    } catch (err) {
+      console.error("Erro ao salvar música:", err);
+    } finally {
+      setSavingNova(false);
+    }
   }
 
   // ── LISTA ────────────────────────────────────────────────────────────────────
@@ -1177,8 +1206,11 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
               className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-vine-400"
             />
             <div className="max-h-52 overflow-y-auto space-y-1 border border-gray-100 rounded-xl p-1 bg-gray-50">
-              {musicasFiltradas.length === 0 && (
+              {musicasFiltradas.length === 0 && buscaMusica && (
                 <p className="text-xs text-gray-400 text-center py-4">Nenhuma música encontrada.</p>
+              )}
+              {musicasFiltradas.length === 0 && !buscaMusica && (
+                <p className="text-xs text-gray-400 text-center py-4">Digite para buscar no repertório.</p>
               )}
               {musicasFiltradas.map((m) => {
                 const jaAdicionada = form.musicas.some((em) => em.musicaId === m.id);
@@ -1189,6 +1221,15 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
                       <p className="text-xs text-gray-400">{m.artista} {m.estilo && `· ${m.estilo}`}</p>
                     </div>
                     <div className="flex items-center gap-2 shrink-0 ml-2">
+                      <a
+                        href={youtubeUrl(m.titulo, m.artista)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition"
+                        title="Ouvir no YouTube"
+                      >
+                        <Youtube className="w-3.5 h-3.5" />
+                      </a>
                       <select
                         value={tomOverride[m.id] ?? m.tom ?? ""}
                         onChange={(e) => setTomOverride((prev) => ({ ...prev, [m.id]: e.target.value }))}
@@ -1214,6 +1255,53 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
             </div>
           </div>
 
+          {/* Nova música */}
+          <div className="border border-dashed border-gray-200 rounded-xl overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setAddingNova((v) => !v)}
+              className="w-full flex items-center justify-between px-3 py-2.5 text-sm font-semibold text-vine-700 hover:bg-vine-50 transition"
+            >
+              <span className="flex items-center gap-2"><Plus className="w-4 h-4" /> Adicionar música nova ao repertório</span>
+              {addingNova ? <X className="w-4 h-4 text-gray-400" /> : null}
+            </button>
+            {addingNova && (
+              <div className="px-3 pb-3 pt-1 space-y-2 bg-vine-50/40">
+                <div className="flex gap-2">
+                  <input
+                    value={novaMusica.titulo}
+                    onChange={(e) => setNovaMusica((n) => ({ ...n, titulo: e.target.value }))}
+                    placeholder="Título da música"
+                    className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-vine-400 bg-white"
+                  />
+                  <select
+                    value={novaMusica.tom}
+                    onChange={(e) => setNovaMusica((n) => ({ ...n, tom: e.target.value }))}
+                    className="border border-gray-200 rounded-lg px-2 py-2 text-sm outline-none bg-white w-20"
+                  >
+                    <option value="">Tom</option>
+                    {TONS.map((t) => <option key={t}>{t}</option>)}
+                  </select>
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    value={novaMusica.artista}
+                    onChange={(e) => setNovaMusica((n) => ({ ...n, artista: e.target.value }))}
+                    placeholder="Artista / Banda"
+                    className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-vine-400 bg-white"
+                  />
+                  <button
+                    onClick={salvarNovaMusica}
+                    disabled={savingNova || !novaMusica.titulo.trim() || !novaMusica.artista.trim()}
+                    className="px-4 py-2 text-sm font-bold text-white bg-vine-700 rounded-lg hover:bg-vine-800 transition disabled:opacity-40"
+                  >
+                    {savingNova ? "..." : "+ Add"}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
           {form.musicas.length > 0 && (
             <div className="space-y-2">
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest">Na escala</p>
@@ -1224,6 +1312,15 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
                     <p className="text-sm font-semibold text-gray-800">{em.titulo}</p>
                     <p className="text-xs text-gray-400">{em.artista}</p>
                   </div>
+                  <a
+                    href={youtubeUrl(em.titulo, em.artista)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition shrink-0"
+                    title="Ouvir no YouTube"
+                  >
+                    <Youtube className="w-3.5 h-3.5" />
+                  </a>
                   <select
                     value={em.tom ?? ""}
                     onChange={(e) => atualizarTomNaEscala(em.musicaId, e.target.value)}
