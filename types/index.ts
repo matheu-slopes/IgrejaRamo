@@ -130,6 +130,8 @@ export interface EscalaMusica {
   titulo: string;
   artista: string;
   tom?: string;       // tom usado nessa escala especificamente
+  artistaSlug?: string; // slug do Cifra Club para buscar cifra on-demand
+  musicaSlug?: string;
 }
 
 export interface Escala {

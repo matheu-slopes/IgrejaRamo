@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   Plus, Trash2, Pencil, X, Save, Music2, Users, Eye, EyeOff, UserCheck,
@@ -12,6 +12,7 @@ import {
   Ministerio, MembroMinisterio, Musica, FuncaoMinisterio,
 } from "@/types";
 import { supabase } from "@/lib/supabase";
+import BuscarCifraModal from "@/components/dashboard/BuscarCifraModal";
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
 
@@ -226,6 +227,8 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
               titulo: m.titulo as string,
               artista: m.artista as string,
               tom: (m.tom as string) ?? "",
+              artistaSlug: (m.artista_slug as string) ?? undefined,
+              musicaSlug: (m.musica_slug as string) ?? undefined,
             })),
         })));
       });
@@ -243,13 +246,35 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
   const [novaFuncao, setNovaFuncao] = useState<string>((FUNCOES_POR_MIN[ministerio] ?? FUNCOES_POR_MIN.Louvor)[0]);
   const [novaObs, setNovaObs] = useState("");
   const [buscaMusica, setBuscaMusica] = useState("");
+  const [modalCifra, setModalCifra] = useState(false);
   const [tomOverride, setTomOverride] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [viewMode, setViewMode] = useState<"minhas" | "culto">("culto");
   const [busca, setBusca] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // cifra inline
+  const [cifraAberta, setCifraAberta] = useState<{ idx: number; escalaId: string } | null>(null);
+  const [cifraInline, setCifraInline] = useState<string[] | null>(null);
+  const [loadingCifraInline, setLoadingCifraInline] = useState(false);
 
   const funcoesMinisterio = FUNCOES_POR_MIN[ministerio] ?? FUNCOES_POR_MIN.Louvor;
+
+  async function abrirCifraInline(escalaId: string, idx: number, m: EscalaMusica) {
+    if (cifraAberta?.escalaId === escalaId && cifraAberta?.idx === idx) {
+      setCifraAberta(null); setCifraInline(null); return;
+    }
+    if (!m.artistaSlug || !m.musicaSlug) return;
+    setCifraAberta({ escalaId, idx });
+    setCifraInline(null);
+    setLoadingCifraInline(true);
+    try {
+      const res = await fetch(`/api/buscar-cifra?artista=${m.artistaSlug}&musica=${m.musicaSlug}`);
+      const data = await res.json();
+      if (data.cifra) setCifraInline(data.cifra);
+    } finally {
+      setLoadingCifraInline(false);
+    }
+  }
 
   function abrirNova() {
     setForm(EMPTY_FORM);
@@ -325,6 +350,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
             form.musicas.map((m, idx) => ({
               escala_id: editId, musica_id: m.musicaId || null,
               titulo: m.titulo, artista: m.artista, tom: m.tom, ordem: idx,
+              artista_slug: m.artistaSlug ?? null, musica_slug: m.musicaSlug ?? null,
             }))
           );
         }
@@ -352,6 +378,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
               form.musicas.map((m, idx) => ({
                 escala_id: inserted.id, musica_id: m.musicaId || null,
                 titulo: m.titulo, artista: m.artista, tom: m.tom, ordem: idx,
+                artista_slug: m.artistaSlug ?? null, musica_slug: m.musicaSlug ?? null,
               }))
             );
           }
@@ -362,10 +389,12 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
           setEscalas((prev) => [nova, ...prev]);
         }
       }
+    } catch (e) {
+      console.error("[salvar escala]", e);
     } finally {
       setSaving(false);
+      setModo("lista");
     }
-    setModo("lista");
   }
 
   async function excluir(id: string) {
@@ -779,20 +808,35 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
                         </thead>
                         <tbody className="divide-y divide-gray-50">
                           {(selectedEscala.musicas ?? []).map((m, i) => (
-                            <tr key={i}>
-                              <td className="text-center px-2 py-2.5 text-xs font-bold text-gray-300">{i + 1}</td>
-                              <td className="px-3 py-2.5">
-                                <p className="font-semibold text-gray-800 text-sm leading-tight">{m.titulo}</p>
-                                <p className="text-xs text-gray-400">{m.artista}</p>
-                              </td>
-                              <td className="px-3 py-2.5">
-                                {m.tom && (
-                                  <span className="text-xs font-bold bg-grape-100 text-grape-800 px-2 py-0.5 rounded-full">
-                                    {m.tom}
-                                  </span>
-                                )}
-                              </td>
-                            </tr>
+                            <React.Fragment key={i}>
+                              <tr key={i} className={clsx(m.artistaSlug && m.musicaSlug ? "cursor-pointer hover:bg-gray-50" : "")} onClick={() => abrirCifraInline(selectedEscala.id, i, m)}>
+                                <td className="text-center px-2 py-2.5 text-xs font-bold text-gray-300">{i + 1}</td>
+                                <td className="px-3 py-2.5">
+                                  <p className={clsx("font-semibold text-sm leading-tight", m.artistaSlug ? "text-grape-700" : "text-gray-800")}>{m.titulo}{m.artistaSlug && " ↓"}</p>
+                                  <p className="text-xs text-gray-400">{m.artista}</p>
+                                </td>
+                                <td className="px-3 py-2.5">
+                                  {m.tom && (
+                                    <span className="text-xs font-bold bg-grape-100 text-grape-800 px-2 py-0.5 rounded-full">
+                                      {m.tom}
+                                    </span>
+                                  )}
+                                </td>
+                              </tr>
+                              {cifraAberta?.escalaId === selectedEscala.id && cifraAberta?.idx === i && (
+                                <tr key={`cifra-${i}`}>
+                                  <td colSpan={3} className="px-3 py-3 bg-gray-50 border-t border-gray-100">
+                                    {loadingCifraInline ? (
+                                      <p className="text-xs text-gray-400 animate-pulse">Carregando cifra...</p>
+                                    ) : cifraInline ? (
+                                      <pre className="text-xs font-mono text-gray-700 whitespace-pre-wrap leading-relaxed max-h-96 overflow-y-auto">{cifraInline.join("\n")}</pre>
+                                    ) : (
+                                      <p className="text-xs text-gray-400">Cifra não disponível.</p>
+                                    )}
+                                  </td>
+                                </tr>
+                              )}
+                            </React.Fragment>
                           ))}
                         </tbody>
                       </table>
@@ -1169,13 +1213,41 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
       {/* ── Músicas ── */}
       {subTab === "musicas" && (
         <div className="space-y-4">
-          <div className="space-y-2">
-            <input
-              value={buscaMusica}
-              onChange={(e) => setBuscaMusica(e.target.value)}
-              placeholder="Buscar no repertório..."
-              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-vine-400"
+          {modalCifra && (
+            <BuscarCifraModal
+              onClose={() => setModalCifra(false)}
+              onSalva={(nova) => {
+                setForm((f) => ({
+                  ...f,
+                  musicas: [...f.musicas, {
+                    musicaId: "",
+                    titulo: nova.titulo,
+                    artista: nova.artista,
+                    tom: nova.tom,
+                    artistaSlug: nova.artistaSlug,
+                    musicaSlug: nova.musicaSlug,
+                  }],
+                }));
+                setModalCifra(false);
+              }}
             />
+          )}
+          <div className="space-y-2">
+            <div className="flex gap-2">
+              <input
+                value={buscaMusica}
+                onChange={(e) => setBuscaMusica(e.target.value)}
+                placeholder="Buscar no repertório..."
+                className="flex-1 border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-vine-400"
+              />
+              <button
+                onClick={() => setModalCifra(true)}
+                className="flex items-center gap-1.5 bg-grape-700 text-white text-xs font-semibold px-3 py-2 rounded-xl hover:bg-grape-800 transition shrink-0"
+              >
+                <Music2 className="w-3.5 h-3.5" />
+                Buscar no Cifra Club
+              </button>
+            </div>
             <div className="max-h-52 overflow-y-auto space-y-1 border border-gray-100 rounded-xl p-1 bg-gray-50">
               {musicasFiltradas.length === 0 && (
                 <p className="text-xs text-gray-400 text-center py-4">Nenhuma música encontrada.</p>

@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Inter, Lora } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/contexts/AuthContext";
+import PwaUpdater from "@/components/PwaUpdater";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -93,6 +94,7 @@ export default function RootLayout({
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
       </head>
         <body className="bg-cream text-gray-900 antialiased font-sans" suppressHydrationWarning>
+        <PwaUpdater />
         <AuthProvider>{children}</AuthProvider>
       </body>
     </html>

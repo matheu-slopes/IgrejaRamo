@@ -18,6 +18,7 @@ DROP TABLE IF EXISTS escala_musicas       CASCADE;
 DROP TABLE IF EXISTS escala_itens         CASCADE;
 DROP TABLE IF EXISTS escalas              CASCADE;
 DROP TABLE IF EXISTS musicas              CASCADE;
+DROP TABLE IF EXISTS busca_cache          CASCADE;
 DROP TABLE IF EXISTS locais               CASCADE;
 DROP TABLE IF EXISTS aviso_fixado         CASCADE;
 DROP TABLE IF EXISTS avisos               CASCADE;
@@ -157,6 +158,7 @@ CREATE TABLE musicas (
   tom          TEXT,
   estilo       TEXT,
   link_youtube TEXT,
+  cifra        TEXT,
   created_at   TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -437,6 +439,18 @@ CREATE POLICY "musicas_select" ON musicas FOR SELECT USING (auth.uid() IS NOT NU
 CREATE POLICY "musicas_insert" ON musicas FOR INSERT WITH CHECK (auth.uid() IS NOT NULL);
 CREATE POLICY "musicas_update" ON musicas FOR UPDATE USING (auth.uid() IS NOT NULL);
 CREATE POLICY "musicas_delete" ON musicas FOR DELETE USING (auth.uid() IS NOT NULL);
+
+-- ──────────────────────────────────────────────────────────────
+-- BUSCA CACHE (resultados de busca no Cifra Club por 30 dias)
+-- Gerenciado server-side (service role), sem acesso de clientes
+-- ──────────────────────────────────────────────────────────────
+CREATE TABLE busca_cache (
+  query      TEXT PRIMARY KEY,
+  results    JSONB NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+ALTER TABLE busca_cache ENABLE ROW LEVEL SECURITY;
+-- Somente o service role acessa (sem policies públicas)
 
 -- Locais: leitura + CRUD para autenticados
 CREATE POLICY "locais_select" ON locais FOR SELECT USING (auth.uid() IS NOT NULL);
