@@ -7,6 +7,7 @@ import { ChatUnreadProvider } from "@/contexts/ChatUnreadContext";
 import Sidebar from "@/components/Sidebar";
 import BottomNav from "@/components/dashboard/BottomNav";
 import NotificationBell from "@/components/dashboard/NotificationBell";
+import PushSubscriber from "@/components/PushSubscriber";
 import Image from "next/image";
 import { User, Permissao } from "@/types";
 import {
@@ -389,6 +390,7 @@ export default function DashboardLayout({
 
   return (
     <ChatUnreadProvider>
+    <PushSubscriber />
     <div className="flex h-dvh overflow-hidden bg-gray-50">
       {/* Sidebar — apenas desktop */}
       <Sidebar />
