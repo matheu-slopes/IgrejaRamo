@@ -84,6 +84,7 @@ export function EscalaModal({ escala, podeEditar, onClose, onUpdate, onDelete }:
   const [novaMusica, setNovaMusica] = useState({ titulo: "", artista: "", tom: "" });
   const [savingNova, setSavingNova] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [salvarErro, setSalvarErro] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
   const backdropRef = useRef<HTMLDivElement>(null);
 
@@ -129,18 +130,21 @@ export function EscalaModal({ escala, podeEditar, onClose, onUpdate, onDelete }:
   async function salvar() {
     if (!form.culto || !form.data || !form.horario) return;
     setSaving(true);
+    setSalvarErro("");
     try {
-      await supabase.from("escalas").update({
+      const { error: errUpdate } = await supabase.from("escalas").update({
         culto: form.culto,
         horario: form.horario,
         data: form.data,
         observacoes: form.observacoes || null,
         visivel: form.visivel,
       }).eq("id", escala.id);
+      if (errUpdate) throw new Error(errUpdate.message);
 
-      await supabase.from("escala_itens").delete().eq("escala_id", escala.id);
+      const { error: errDelItens } = await supabase.from("escala_itens").delete().eq("escala_id", escala.id);
+      if (errDelItens) throw new Error(errDelItens.message);
       if (form.itens.length > 0) {
-        await supabase.from("escala_itens").insert(
+        const { error: errInsItens } = await supabase.from("escala_itens").insert(
           form.itens.map((i) => ({
             escala_id: escala.id,
             funcao: i.funcao,
@@ -149,11 +153,13 @@ export function EscalaModal({ escala, podeEditar, onClose, onUpdate, onDelete }:
             observacao: i.observacao || null,
           }))
         );
+        if (errInsItens) throw new Error(errInsItens.message);
       }
 
-      await supabase.from("escala_musicas").delete().eq("escala_id", escala.id);
+      const { error: errDelMusicas } = await supabase.from("escala_musicas").delete().eq("escala_id", escala.id);
+      if (errDelMusicas) throw new Error(errDelMusicas.message);
       if (form.musicas.length > 0) {
-        await supabase.from("escala_musicas").insert(
+        const { error: errInsMusicas } = await supabase.from("escala_musicas").insert(
           form.musicas.map((m, idx) => ({
             escala_id: escala.id,
             musica_id: m.musicaId || null,
@@ -163,11 +169,14 @@ export function EscalaModal({ escala, podeEditar, onClose, onUpdate, onDelete }:
             ordem: idx,
           }))
         );
+        if (errInsMusicas) throw new Error(errInsMusicas.message);
       }
 
       const updated: Escala = { ...escala, ...form };
       onUpdate(updated);
       setMode("view");
+    } catch (err) {
+      setSalvarErro(err instanceof Error ? err.message : "Erro ao salvar. Tente novamente.");
     } finally {
       setSaving(false);
     }
@@ -768,9 +777,13 @@ export function EscalaModal({ escala, podeEditar, onClose, onUpdate, onDelete }:
 
         {/* ── Footer de ações (edit mode) ── */}
         {mode === "edit" && (
-          <div className="px-6 py-3 border-t border-gray-100 bg-white flex items-center justify-end gap-2">
+          <div className="px-6 py-3 border-t border-gray-100 bg-white flex flex-col gap-2">
+            {salvarErro && (
+              <p className="text-xs text-red-600 text-right font-medium">{salvarErro}</p>
+            )}
+            <div className="flex items-center justify-end gap-2">
             <button
-              onClick={() => setMode("view")}
+              onClick={() => { setMode("view"); setSalvarErro(""); }}
               className="px-4 py-2 text-sm font-semibold text-gray-600 hover:text-gray-800 bg-gray-100 rounded-xl hover:bg-gray-200 transition"
             >
               Cancelar
@@ -783,6 +796,7 @@ export function EscalaModal({ escala, podeEditar, onClose, onUpdate, onDelete }:
               <Save className="w-4 h-4" />
               {saving ? "Salvando..." : "Salvar"}
             </button>
+            </div>
           </div>
         )}
       </div>
