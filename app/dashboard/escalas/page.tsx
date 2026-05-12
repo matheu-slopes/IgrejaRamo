@@ -15,7 +15,7 @@ import clsx from "clsx";
 // ─── Constantes ───────────────────────────────────────────────────────────────
 // Nomes de exibição (o valor do DB permanece igual)
 const MIN_LABEL: Record<string, string> = {
-  Cantina: "Portaria",
+  Cantina: "Recepcionamento",
   Ensino:  "Pregação",
 };
 const minLabel = (m: string) => MIN_LABEL[m] ?? m;
@@ -23,9 +23,9 @@ const minLabel = (m: string) => MIN_LABEL[m] ?? m;
 const showFuncao = (it: { funcao: string; observacao?: string }) => {
   if (it.observacao && ["Cajón","Pandeiro","Violão"].includes(it.observacao)) return it.observacao;
   if (it.funcao === "Bateria") return "Cajón";
-  if (it.funcao === "Ministro") return "Ministro(a)";
   if (it.funcao === "Professora" || it.funcao === "Professor") return "Professor(a)";
   if (it.funcao === "Monitor") return "Monitor(a)";
+  if (it.funcao === "Voluntário") return "Voluntário(a)";
   return it.funcao;
 };
 
@@ -34,7 +34,7 @@ const MINISTERIOS_CULTO: Ministerio[] = ["Limpeza", "Cantina", "Louvor", "Mídia
 const TODOS: Ministerio[] = ["Limpeza", "Cantina", "Louvor", "Mídias", "Ensino", "Infantil", "Jovens"];
 
 const EMOJI: Record<string, string> = {
-  Louvor: "🎸", "Mídias": "📹", Cantina: "🚪",
+  Louvor: "🎸", "Mídias": "📹", Cantina: "🤝",
   Infantil: "🧒", Jovens: "⚡", Ensino: "📖", Limpeza: "🧽",
 };
 
@@ -179,6 +179,11 @@ function MinisterioSection({
               {escala.observacoes.match(/^(Equipe \d)/)?.[1]}
             </span>
           )}
+          {ministerio === "Infantil" && escala.observacoes && (
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-800 border border-yellow-200">
+              {escala.observacoes}
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-1 shrink-0">
           {isLider && (
@@ -216,9 +221,14 @@ function MinisterioSection({
                   <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide shrink-0 w-20 truncate">
                     {showFuncao(it)}
                   </span>
-                  <span className="text-sm font-semibold text-gray-800 truncate flex-1">
-                    {it.voluntarioNome}
-                  </span>
+                  <div className="flex-1 min-w-0">
+                    <span className="text-sm font-semibold text-gray-800 truncate block">
+                      {it.voluntarioNome}
+                    </span>
+                    {it.observacao && !["Cajón","Pandeiro","Violão"].includes(it.observacao) && (
+                      <span className="text-[10px] text-gray-400 italic truncate block">{it.observacao}</span>
+                    )}
+                  </div>
                   {it.voluntarioId === userId && (
                     <span className="w-1.5 h-1.5 rounded-full bg-vine-500 shrink-0" />
                   )}
@@ -313,18 +323,18 @@ function CultoCard({
       {ministeriosNeste.length > 0 && (
         <div className="bg-white divide-y divide-gray-50">
           {ministeriosNeste.map((min) => {
-            const escala = escalas.find((e) => e.ministerio === min);
-            if (!escala) return null;
-            return (
+            const escalasMin = escalas.filter((e) => e.ministerio === min);
+            if (escalasMin.length === 0) return null;
+            return escalasMin.map((escala) => (
               <MinisterioSection
-                key={min}
+                key={escala.id}
                 ministerio={min}
                 escala={escala}
                 userId={userId}
                 isLider={isLider}
                 onGerenciar={() => onGerenciarMinisterio(min)}
               />
-            );
+            ));
           })}
           {temMusicas && <MusicasSection musicas={escalaLouvor!.musicas ?? []} />}
         </div>

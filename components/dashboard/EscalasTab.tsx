@@ -120,23 +120,28 @@ function buildObs(equipe: string, notas: string): string | null {
   return parts || null;
 }
 
-// O DB usa ENUM funcao_escala que ainda não tem Cajón/Pandeiro/Violão.
+// O DB usa ENUM funcao_escala que ainda não tem Cajón/Pandeiro/Violão nem variantes gender-neutral.
 // Mapeamos para o valor válido mais próximo e preservamos o nome real em observacao.
 const FUNCAO_DB_MAP: Partial<Record<string, string>> = {
-  "Cajón":   "Bateria",
-  "Pandeiro": "Bateria",
-  "Violão":  "Guitarra",
+  "Cajón":        "Bateria",
+  "Pandeiro":     "Bateria",
+  "Violão":       "Guitarra",
+  "Professor(a)": "Professora",
+  "Monitor(a)":   "Monitor",
+  "Voluntário(a)": "Voluntário",
+  "Preletor(a)":  "Ministro",
+  "Abertura":     "Abertura/Oferta",
+  "Oferta":       "Abertura/Oferta",
 };
-const FUNCAO_ALIAS_SET = new Set(["Cajón", "Pandeiro", "Violão"]);
+const FUNCAO_ALIAS_SET = new Set(["Cajón", "Pandeiro", "Violão", "Professor(a)", "Monitor(a)", "Voluntário(a)", "Preletor(a)", "Abertura", "Oferta"]);
 
 /** Retorna a função a exibir: prioriza observação quando é um alias de instrumento; Bateria → Cajón */
 export function displayFuncao(it: { funcao: string; observacao?: string }): string {
   if (it.observacao && FUNCAO_ALIAS_SET.has(it.observacao)) return it.observacao;
   if (it.funcao === "Bateria") return "Cajón";
-  if (it.funcao === "Ministro") return "Ministro(a)";
-  if (it.funcao === "Professora" || it.funcao === "Professor") return "Professor(a)";
+  if (it.funcao === "Professora") return "Professor(a)";
   if (it.funcao === "Monitor") return "Monitor(a)";
-  if (it.funcao === "Abertura/Oferta") return "Abertura/Oferta";
+  if (it.funcao === "Voluntário") return "Voluntário(a)";
   return it.funcao;
 }
 /** Retorna a observação real (ocultando alias de instrumento que já aparece em displayFuncao) */
@@ -486,6 +491,11 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
                     {equipeLabel}
                   </span>
                 )}
+                {esc.ministerio === "Infantil" && esc.observacoes && (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-800 border border-yellow-200">
+                    {esc.observacoes}
+                  </span>
+                )}
                 {esc.visivel
                   ? <span className="text-[10px] bg-green-100 text-green-700 font-semibold px-1.5 py-0.5 rounded-full">✓</span>
                   : <span className="text-[10px] bg-gray-100 text-gray-400 font-semibold px-1.5 py-0.5 rounded-full">◦</span>
@@ -624,6 +634,11 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
                       {selectedEscala.observacoes?.match(/^(Equipe \d)/)?.[1] && (
                         <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-vine-100 text-vine-800 border border-vine-200">
                           {selectedEscala.observacoes.match(/^(Equipe \d)/)?.[1]}
+                        </span>
+                      )}
+                      {selectedEscala.ministerio === "Infantil" && selectedEscala.observacoes && (
+                        <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-800 border border-yellow-200">
+                          {selectedEscala.observacoes}
                         </span>
                       )}
                       {selectedEscala.visivel
