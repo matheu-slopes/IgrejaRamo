@@ -255,6 +255,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
   const [saving, setSaving] = useState(false);
   const [salvarErro, setSalvarErro] = useState("");
   const [editandoIdx, setEditandoIdx] = useState<number | null>(null);
+  const [adicionandoParticipante, setAdicionandoParticipante] = useState(false);
   const [viewMode, setViewMode] = useState<"minhas" | "culto">("culto");
   const [busca, setBusca] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -532,6 +533,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
       setEditandoIdx(null);
     } else {
       setForm((f) => ({ ...f, itens: [...f.itens, novoItem] }));
+      setAdicionandoParticipante(false);
     }
     setNovoMembroId("");
     setNovaObs("");
@@ -547,6 +549,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
 
   function cancelarEdicaoParticipante() {
     setEditandoIdx(null);
+    setAdicionandoParticipante(false);
     setNovoMembroId("");
     setNovaObs("");
     setNovaFuncao(funcoesMinisterio[0]);
@@ -1363,91 +1366,139 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
 
       {/* -- Participantes -- */}
       {subTab === "participantes" && (
-        <div className="space-y-4">
-          <div className={clsx("border rounded-xl p-3 space-y-2", editandoIdx !== null ? "bg-gray-50 border-gray-300" : "bg-gray-50 border-gray-200")}>
-            <p className="text-xs font-semibold text-gray-600">
-              {editandoIdx !== null ? `Editando participante #${editandoIdx + 1}` : "Adicionar participante"}
-            </p>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-              <select
-                value={novoMembroId}
-                onChange={(e) => setNovoMembroId(e.target.value)}
-                className="border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-gray-400 bg-white col-span-1"
-              >
-                <option value="">Selecionar membro</option>
-                {/* Se editando e o membro não está no ministério, exibe ele mesmo assim */}
-                {editandoIdx !== null && novoMembroId && !membros.find((m) => m.id === novoMembroId) && (
-                  <option value={novoMembroId}>{form.itens[editandoIdx]?.voluntarioNome ?? novoMembroId}</option>
+        <div className="space-y-3">
+          {/* Lista de participantes */}
+          <div className="space-y-2">
+            {form.itens.length === 0 && !adicionandoParticipante && (
+              <p className="text-sm text-gray-400 text-center py-6">Nenhum participante adicionado.</p>
+            )}
+            {form.itens.map((it, i) => (
+              <div key={i}>
+                {editandoIdx === i ? (
+                  /* Form de edição inline no card */
+                  <div className="border border-gray-300 rounded-xl p-3 space-y-2 bg-gray-50">
+                    <p className="text-xs font-semibold text-gray-500">Editando: <span className="text-gray-800">{it.voluntarioNome}</span></p>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      <select
+                        value={novoMembroId}
+                        onChange={(e) => setNovoMembroId(e.target.value)}
+                        className="border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-gray-400 bg-white"
+                      >
+                        <option value="">Selecionar membro</option>
+                        {novoMembroId && !membros.find((m) => m.id === novoMembroId) && (
+                          <option value={novoMembroId}>{it.voluntarioNome}</option>
+                        )}
+                        {membros.map((m) => <option key={m.id} value={m.id}>{m.nome}</option>)}
+                      </select>
+                      <select
+                        value={novaFuncao}
+                        onChange={(e) => setNovaFuncao(e.target.value)}
+                        className="border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-gray-400 bg-white"
+                      >
+                        {funcoesMinisterio.map((f) => <option key={f}>{f}</option>)}
+                      </select>
+                      <input
+                        value={novaObs}
+                        onChange={(e) => setNovaObs(e.target.value)}
+                        placeholder={ministerio === "Infantil" && novaFuncao === "Professor(a)" ? "Tópico (ex: Honrando meu corpo)" : "Observação (opcional)"}
+                        className="border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-gray-400"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={addParticipante}
+                        className="flex items-center gap-1.5 text-white text-xs font-semibold px-4 py-2 rounded-xl bg-black hover:bg-gray-900 transition"
+                      >
+                        <Save className="w-3.5 h-3.5" /> Confirmar
+                      </button>
+                      <button
+                        onClick={cancelarEdicaoParticipante}
+                        className="text-xs text-gray-500 px-3 py-2 rounded-xl hover:bg-gray-100 transition"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  /* Card normal do participante */
+                  <div className="flex items-center justify-between bg-white border border-gray-100 rounded-xl px-4 py-3 shadow-sm">
+                    <div>
+                      <p className="text-sm font-semibold text-gray-800">{it.voluntarioNome}</p>
+                      <p className="text-xs text-grape-700 font-medium">{displayFuncao(it)}</p>
+                      {displayObs(it) && <p className="text-xs text-gray-400 mt-0.5">{displayObs(it)}</p>}
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => { setAdicionandoParticipante(false); editarParticipante(i); }}
+                        className="p-2 text-gray-400 hover:text-gray-800 hover:bg-gray-50 rounded-xl transition"
+                        title="Editar"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => removeParticipante(i)}
+                        className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition"
+                        title="Remover"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
                 )}
-                {membros.map((m) => <option key={m.id} value={m.id}>{m.nome}</option>)}
-              </select>
-              <select
-                value={novaFuncao}
-                onChange={(e) => setNovaFuncao(e.target.value)}
-                className="border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-gray-400 bg-white"
-              >
-                {funcoesMinisterio.map((f) => <option key={f}>{f}</option>)}
-              </select>
-              <input
-                value={novaObs}
-                onChange={(e) => setNovaObs(e.target.value)}
-                placeholder={ministerio === "Infantil" && novaFuncao === "Professor(a)" ? "Tópico (ex: Honrando meu corpo)" : "Observação (opcional)"}
-                className="border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-gray-400"
-              />
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={addParticipante}
-                className={clsx(
-                  "flex items-center gap-1.5 text-white text-xs font-semibold px-4 py-2 rounded-xl transition",
-                  editandoIdx !== null ? "bg-black hover:bg-gray-900" : "bg-black hover:bg-gray-900"
-                )}
-              >
-                {editandoIdx !== null ? <><Save className="w-3.5 h-3.5" /> Atualizar</> : <><Plus className="w-3.5 h-3.5" /> Adicionar</>}
-              </button>
-              {editandoIdx !== null && (
+              </div>
+            ))}
+          </div>
+
+          {/* Form de adição (colapsável) */}
+          {adicionandoParticipante ? (
+            <div className="border border-gray-200 rounded-xl p-3 space-y-2 bg-gray-50">
+              <p className="text-xs font-semibold text-gray-600">Adicionar participante</p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <select
+                  value={novoMembroId}
+                  onChange={(e) => setNovoMembroId(e.target.value)}
+                  className="border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-gray-400 bg-white"
+                >
+                  <option value="">Selecionar membro</option>
+                  {membros.map((m) => <option key={m.id} value={m.id}>{m.nome}</option>)}
+                </select>
+                <select
+                  value={novaFuncao}
+                  onChange={(e) => setNovaFuncao(e.target.value)}
+                  className="border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-gray-400 bg-white"
+                >
+                  {funcoesMinisterio.map((f) => <option key={f}>{f}</option>)}
+                </select>
+                <input
+                  value={novaObs}
+                  onChange={(e) => setNovaObs(e.target.value)}
+                  placeholder={ministerio === "Infantil" && novaFuncao === "Professor(a)" ? "Tópico (ex: Honrando meu corpo)" : "Observação (opcional)"}
+                  className="border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-gray-400"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={addParticipante}
+                  className="flex items-center gap-1.5 text-white text-xs font-semibold px-4 py-2 rounded-xl bg-black hover:bg-gray-900 transition"
+                >
+                  <Plus className="w-3.5 h-3.5" /> Confirmar
+                </button>
                 <button
                   onClick={cancelarEdicaoParticipante}
                   className="text-xs text-gray-500 px-3 py-2 rounded-xl hover:bg-gray-100 transition"
                 >
                   Cancelar
                 </button>
-              )}
-            </div>
-          </div>
-          <div className="space-y-2">
-            {form.itens.length === 0 && (
-              <p className="text-sm text-gray-400 text-center py-8">Nenhum participante adicionado.</p>
-            )}
-            {form.itens.map((it, i) => (
-              <div key={i} className={clsx(
-                "flex items-center justify-between bg-white border rounded-xl px-4 py-3 shadow-sm",
-                editandoIdx === i ? "border-gray-400 ring-1 ring-gray-200" : "border-gray-100"
-              )}>
-                <div>
-                  <p className="text-sm font-semibold text-gray-800">{it.voluntarioNome}</p>
-                  <p className="text-xs text-grape-700 font-medium">{displayFuncao(it)}</p>
-                  {displayObs(it) && <p className="text-xs text-gray-400 mt-0.5">{displayObs(it)}</p>}
-                </div>
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => editarParticipante(i)}
-                    className="p-2 text-gray-400 hover:text-gray-800 hover:bg-gray-50 rounded-xl transition"
-                    title="Editar"
-                  >
-                    <Pencil className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    onClick={() => removeParticipante(i)}
-                    className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition"
-                    title="Remover"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
               </div>
-            ))}
-          </div>
+            </div>
+          ) : (
+            <button
+              onClick={() => { cancelarEdicaoParticipante(); setAdicionandoParticipante(true); }}
+              className="flex items-center gap-1.5 text-xs font-semibold text-gray-600 border border-dashed border-gray-300 rounded-xl px-4 py-2.5 hover:border-gray-400 hover:bg-gray-50 w-full justify-center transition"
+            >
+              <Plus className="w-3.5 h-3.5" /> Adicionar participante
+            </button>
+          )}
         </div>
       )}
 
