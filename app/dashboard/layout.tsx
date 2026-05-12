@@ -301,12 +301,15 @@ function ProfileDropdown({
                 <div className="px-4 py-3 space-y-2">
                   {user.ministerios.length === 0 ? (
                     <p className="text-sm text-gray-400 text-center py-4">Nenhum ministério atribuído.</p>
-                  ) : user.ministerios.map((m) => (
-                    <div key={m} className="flex items-center gap-2.5 bg-vine-50 border border-vine-100 rounded-xl px-3 py-2">
-                      <Layers className="w-4 h-4 text-vine-500 shrink-0" />
-                      <p className="text-sm font-medium text-vine-800">{m}</p>
-                    </div>
-                  ))}
+                  ) : user.ministerios.map((m) => {
+                    const MIN_LABEL: Record<string, string> = { Cantina: "Recepcionamento", Ensino: "Pregação" };
+                    return (
+                      <div key={m} className="flex items-center gap-2.5 bg-vine-50 border border-vine-100 rounded-xl px-3 py-2">
+                        <Layers className="w-4 h-4 text-vine-500 shrink-0" />
+                        <p className="text-sm font-medium text-vine-800">{MIN_LABEL[m] ?? m}</p>
+                      </div>
+                    );
+                  })}
                   <p className="text-[11px] text-gray-400 text-center pt-1">Para alterar ministérios, fale com um administrador.</p>
                 </div>
               </>
