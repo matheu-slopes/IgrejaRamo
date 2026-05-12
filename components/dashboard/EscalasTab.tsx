@@ -1,10 +1,10 @@
-﻿"use client";
+"use client";
 
 import React, { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   Plus, Trash2, Pencil, X, Save, Music2, Users, Eye, EyeOff, UserCheck,
-  ChevronUp as ArrowUp, ChevronDown as ArrowDown, Star, Filter, Search, Youtube, ClipboardCopy, Check,
+  ChevronUp as ArrowUp, ChevronDown as ArrowDown, Star, Filter, Search, Youtube, ClipboardCopy, Check, ChevronLeft,
 } from "lucide-react";
 import clsx from "clsx";
 import {
@@ -14,7 +14,7 @@ import {
 import { supabase } from "@/lib/supabase";
 import BuscarCifraModal from "@/components/dashboard/BuscarCifraModal";
 
-// ─── Constantes ───────────────────────────────────────────────────────────────
+// --- Constantes ---------------------------------------------------------------
 
 export const TONS = [
   "C","C#","Db","D","D#","Eb","E","F","F#","Gb","G","G#","Ab","A","A#","Bb","B",
@@ -22,35 +22,35 @@ export const TONS = [
 ];
 
 export const FUNCOES_POR_MIN: Record<string, string[]> = {
-  Louvor:        ["Ministro","Guitarra","Baixo","Cajón","Teclado","Backing Vocal","Violão","Pandeiro"],
-  "Mídias":      ["Transmissão","Projeção/Letras","Fotografia","Câmera"],
-  Cantina:       ["Abertura","Oferta","Recepção"],
+  Louvor:        ["Ministro","Guitarra","Baixo","Caj�n","Teclado","Backing Vocal","Viol�o","Pandeiro"],
+  "M�dias":      ["Transmiss�o","Proje��o/Letras","Fotografia","C�mera"],
+  Cantina:       ["Abertura","Oferta","Recep��o"],
   Limpeza:       ["Escala de Limpeza"],
   Infantil:      ["Professor(a)","Monitor(a)","Auxiliar"],
-  "Ação Social": ["Coordenação","Voluntário(a)"],
-  Jovens:        ["Líder","Auxiliar"],
+  "A��o Social": ["Coordena��o","Volunt�rio(a)"],
+  Jovens:        ["L�der","Auxiliar"],
   Ensino:        ["Preletor(a)"],
 };
 
-// ─── Equipes fixas do Louvor ────────────────────────────────────────────────
+// --- Equipes fixas do Louvor ------------------------------------------------
 export const EQUIPES_LOUVOR = [
   {
-    numero: 1, label: "Equipe 1", responsavel: "Pr Flávio",
+    numero: 1, label: "Equipe 1", responsavel: "Pr Fl�vio",
     membros: [
       { id: "093a4e47-e3b6-4ffe-9ac0-efcdf0800bf9", nome: "Pastor Flavio",       funcao: "Ministro",      obs: "" },
       { id: "2a5a89e6-0452-4643-af64-c17f7881e7e5", nome: "Isadora Fernandes",  funcao: "Backing Vocal", obs: "" },
       { id: "8ecd6e4e-67c0-437d-9e36-8edb80d5276c", nome: "Eduarda Tudes",     funcao: "Backing Vocal", obs: "" },
-      { id: "af737764-2a81-4f89-8153-672571c5df16", nome: "Ricardo Bortot",     funcao: "Cajón",         obs: "" },
+      { id: "af737764-2a81-4f89-8153-672571c5df16", nome: "Ricardo Bortot",     funcao: "Caj�n",         obs: "" },
     ],
   },
   {
     numero: 2, label: "Equipe 2", responsavel: "Matheus Alves",
     membros: [
       { id: "4c646c5d-cf1a-401f-a8bf-5bc9af996cdf", nome: "Matheus Alves",      funcao: "Ministro",      obs: "" },
-      { id: "4d729cce-d0a0-42b1-9d09-62d3cd4b7b87", nome: "Lívia Martins",      funcao: "Backing Vocal", obs: "" },
+      { id: "4d729cce-d0a0-42b1-9d09-62d3cd4b7b87", nome: "L�via Martins",      funcao: "Backing Vocal", obs: "" },
       { id: null,                                   nome: "Edeni",              funcao: "Backing Vocal", obs: "" },
-      { id: "d935d257-c430-44fe-9577-2e15a2ab94fa", nome: "Victor Sabino",       funcao: "Cajón",         obs: "" },
-      { id: "ad69a900-1be0-41fa-943b-20c30a5bfb3c", nome: "Thaíná Victoria",   funcao: "Backing Vocal", obs: "" },
+      { id: "d935d257-c430-44fe-9577-2e15a2ab94fa", nome: "Victor Sabino",       funcao: "Caj�n",         obs: "" },
+      { id: "ad69a900-1be0-41fa-943b-20c30a5bfb3c", nome: "Tha�n� Victoria",   funcao: "Backing Vocal", obs: "" },
     ],
   },
   {
@@ -59,7 +59,7 @@ export const EQUIPES_LOUVOR = [
       { id: "253ebd74-151a-405b-ba2a-87e64107ab59", nome: "Matheus Lopes",      funcao: "Ministro",      obs: "" },
       { id: "01c938ee-69b0-430b-9fe3-cd6632d70982", nome: "Luisa Lopes",        funcao: "Backing Vocal", obs: "" },
       { id: "d153862e-bdc6-4769-8bbd-4814b10b3846", nome: "Melissa Vaz",        funcao: "Backing Vocal", obs: "" },
-      { id: "c9db7bdf-0d50-4698-8728-d45b91e09c63", nome: "Larissa Pedro",      funcao: "Cajón",         obs: "" },
+      { id: "c9db7bdf-0d50-4698-8728-d45b91e09c63", nome: "Larissa Pedro",      funcao: "Caj�n",         obs: "" },
     ],
   },
 ];
@@ -70,7 +70,7 @@ export const TEMPLATES_CULTO = [
   { id: "especial", label: "Outro",            horario: "19:00", diaSemana: null, cor: "bg-blue-100 text-blue-800 border-blue-200" },
 ];
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// --- Helpers ------------------------------------------------------------------
 
 export function proximasDatas(diaSemana: number, qtd = 5): string[] {
   const datas: string[] = [];
@@ -91,7 +91,7 @@ export function formatDateSimples(iso: string) {
   return d.toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "short" });
 }
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+// --- Types --------------------------------------------------------------------
 
 type EscalaSubTab = "detalhes" | "participantes" | "musicas" | "roteiro";
 
@@ -102,7 +102,7 @@ interface EscalaForm {
   observacoes: string;    // notas livres (sem o prefixo de equipe)
   equipe: string;         // Louvor: "Equipe 1" | "Equipe 2" | "Equipe 3" | ""
   ageGroup: string;       // Infantil: "4-7 anos" | "8-11 anos" | "12-13 anos"
-  temaInfantil: string;   // Infantil: tema do mês (ex: "Honra")
+  temaInfantil: string;   // Infantil: tema do m�s (ex: "Honra")
   visivel: boolean;
   confirmacaoParticipantes: boolean;
   itens: ItemEscala[];
@@ -117,52 +117,52 @@ function parseEquipeObs(raw: string | undefined): { equipe: string; notas: strin
   return { equipe: "", notas: raw };
 }
 
-/** Reconstrói o campo observacoes para salvar no banco */
+/** Reconstr�i o campo observacoes para salvar no banco */
 function buildObs(equipe: string, notas: string): string | null {
   const parts = [equipe, notas].filter(Boolean).join("\n");
   return parts || null;
 }
 
-/** Extrai faixa etária e tema do mês do campo observacoes do Infantil (formato: "4-7 anos|Honra") */
+/** Extrai faixa et�ria e tema do m�s do campo observacoes do Infantil (formato: "4-7 anos|Honra") */
 function parseInfantilObs(raw: string | undefined): { ageGroup: string; tema: string } {
   if (!raw) return { ageGroup: "", tema: "" };
   const parts = raw.split("|");
   return { ageGroup: parts[0].trim(), tema: (parts[1] ?? "").trim() };
 }
 
-// O DB usa ENUM funcao_escala que ainda não tem Cajón/Pandeiro/Violão nem variantes gender-neutral.
-// Mapeamos para o valor válido mais próximo e preservamos o nome real em observacao.
+// O DB usa ENUM funcao_escala que ainda n�o tem Caj�n/Pandeiro/Viol�o nem variantes gender-neutral.
+// Mapeamos para o valor v�lido mais pr�ximo e preservamos o nome real em observacao.
 const FUNCAO_DB_MAP: Partial<Record<string, string>> = {
-  "Cajón":        "Bateria",
+  "Caj�n":        "Bateria",
   "Pandeiro":     "Bateria",
-  "Violão":       "Guitarra",
+  "Viol�o":       "Guitarra",
   "Professor(a)": "Professora",
   "Monitor(a)":   "Monitor",
-  "Voluntário(a)": "Voluntário",
+  "Volunt�rio(a)": "Volunt�rio",
   "Preletor(a)":  "Ministro",
   "Abertura":     "Abertura/Oferta",
   "Oferta":       "Abertura/Oferta",
 };
-const FUNCAO_ALIAS_SET = new Set(["Cajón", "Pandeiro", "Violão", "Professor(a)", "Monitor(a)", "Voluntário(a)", "Preletor(a)", "Abertura", "Oferta"]);
+const FUNCAO_ALIAS_SET = new Set(["Caj�n", "Pandeiro", "Viol�o", "Professor(a)", "Monitor(a)", "Volunt�rio(a)", "Preletor(a)", "Abertura", "Oferta"]);
 
-/** Retorna a função a exibir: prioriza observação quando é um alias de instrumento; Bateria → Cajón */
+/** Retorna a fun��o a exibir: prioriza observa��o quando � um alias de instrumento; Bateria ? Caj�n */
 export function displayFuncao(it: { funcao: string; observacao?: string }): string {
   if (it.observacao && FUNCAO_ALIAS_SET.has(it.observacao)) return it.observacao;
-  if (it.funcao === "Bateria") return "Cajón";
+  if (it.funcao === "Bateria") return "Caj�n";
   if (it.funcao === "Professora") return "Professor(a)";
   if (it.funcao === "Monitor") return "Monitor(a)";
-  if (it.funcao === "Voluntário") return "Voluntário(a)";
+  if (it.funcao === "Volunt�rio") return "Volunt�rio(a)";
   return it.funcao;
 }
-/** Retorna a observação real (ocultando alias de instrumento que já aparece em displayFuncao) */
+/** Retorna a observa��o real (ocultando alias de instrumento que j� aparece em displayFuncao) */
 export function displayObs(it: { observacao?: string }): string | undefined {
   return (it.observacao && FUNCAO_ALIAS_SET.has(it.observacao)) ? undefined : it.observacao;
 }
-/** Normaliza funcao para salvar no DB (resolve aliases → enum válido + preserva em obs) */
+/** Normaliza funcao para salvar no DB (resolve aliases ? enum v�lido + preserva em obs) */
 function normalizeFuncaoParaDB(funcao: string, obs?: string): { funcao: string; observacao: string | null } {
   const mapped = FUNCAO_DB_MAP[funcao];
   if (mapped) {
-    return { funcao: mapped, observacao: obs ? `${funcao} · ${obs}` : funcao };
+    return { funcao: mapped, observacao: obs ? `${funcao} � ${obs}` : funcao };
   }
   return { funcao, observacao: obs || null };
 }
@@ -174,7 +174,7 @@ const EMPTY_FORM: EscalaForm = {
   itens: [], musicas: [],
 };
 
-// ─── Componente principal ─────────────────────────────────────────────────────
+// --- Componente principal -----------------------------------------------------
 
 export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; isLider: boolean }) {
   const { user } = useAuth();
@@ -193,7 +193,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
           nome: p.nome as string,
           email: (p.email ?? "") as string,
           telefone: (p.telefone as string) ?? undefined,
-          funcao: (p.role === "pastor" || p.role === "lider" ? "Líder" : "Membro") as FuncaoMinisterio,
+          funcao: (p.role === "pastor" || p.role === "lider" ? "L�der" : "Membro") as FuncaoMinisterio,
           ministerio,
           ativo: true,
           dataEntrada: (p.data_ingresso as string) ?? "",
@@ -274,7 +274,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
         setCopyLetraOk(idx);
         setTimeout(() => setCopyLetraOk(null), 2500);
       } else {
-        alert(data.error ?? "Letra não encontrada.");
+        alert(data.error ?? "Letra n�o encontrada.");
       }
     } catch {
       alert("Erro ao buscar a letra.");
@@ -287,7 +287,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
   const [cifraAberta, setCifraAberta] = useState<{ idx: number; escalaId: string } | null>(null);
   const [cifraInline, setCifraInline] = useState<string[] | null>(null);
   const [loadingCifraInline, setLoadingCifraInline] = useState(false);
-  // cache de cifras no formulário: índice → linhas no tom original
+  // cache de cifras no formul�rio: �ndice ? linhas no tom original
   const [cifraFormCache, setCifraFormCache] = useState<Record<number, { lines: string[]; tomOrig: string; tomAtFetch: string }>>({});
   const [cifraFormAberta, setCifraFormAberta] = useState<number | null>(null);
   const [loadingCifraForm, setLoadingCifraForm] = useState<number | null>(null);
@@ -395,7 +395,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
   async function salvar() {
     if (!form.culto || !form.data || !form.horario) return;
 
-    // Auto-aplica edição de participante pendente (usuário trocou função mas não clicou Atualizar)
+    // Auto-aplica edi��o de participante pendente (usu�rio trocou fun��o mas n�o clicou Atualizar)
     let itensFinais = [...form.itens];
     if (editandoIdx !== null && novoMembroId) {
       const membro = membros.find((m) => m.id === novoMembroId);
@@ -428,7 +428,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
           confirmacao_participantes: form.confirmacaoParticipantes,
         }).eq("id", editId).select("id");
         if (upErr) throw new Error(upErr.message);
-        if (!upData || upData.length === 0) throw new Error("Sem permissão para atualizar esta escala.");
+        if (!upData || upData.length === 0) throw new Error("Sem permiss�o para atualizar esta escala.");
 
         const { error: delItens } = await supabase.from("escala_itens").delete().eq("escala_id", editId);
         if (delItens) throw new Error(delItens.message);
@@ -441,7 +441,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
           const { error: insItens, data: insData } = await supabase.from("escala_itens").insert(itensParaSalvar).select("id");
           if (insItens) throw new Error(insItens.message);
           if (!insData || insData.length !== itensFinais.length) {
-            throw new Error(`Erro ao salvar participantes (${insData?.length ?? 0}/${itensFinais.length}). Possível função inválida.`);
+            throw new Error(`Erro ao salvar participantes (${insData?.length ?? 0}/${itensFinais.length}). Poss�vel fun��o inv�lida.`);
           }
         }
 
@@ -591,7 +591,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
     }));
   }
 
-  // Transpõe linhas de cifra de tomOrig para tomDest
+  // Transp�e linhas de cifra de tomOrig para tomDest
   function transposeCifraLocal(lines: string[], tomOrig: string, tomDest: string): string[] {
     if (!tomOrig || !tomDest || tomOrig === tomDest) return lines;
     const NOTES_S = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
@@ -625,7 +625,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
     setCifraFormAberta(idx);
     const m = form.musicas[idx];
     if (!m.artistaSlug || !m.musicaSlug) return;
-    // usa cache se já buscou
+    // usa cache se j� buscou
     if (cifraFormCache[idx]) return;
     setLoadingCifraForm(idx);
     try {
@@ -666,13 +666,13 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
       setNovaMusica({ titulo: "", artista: "", tom: "" });
       setAddingNova(false);
     } catch (err) {
-      console.error("Erro ao salvar música:", err);
+      console.error("Erro ao salvar m�sica:", err);
     } finally {
       setSavingNova(false);
     }
   }
 
-  // ── LISTA ────────────────────────────────────────────────────────────────────
+  // -- LISTA --------------------------------------------------------------------
   if (modo === "lista") {
     const hojeStr = new Date().toISOString().split("T")[0];
 
@@ -695,7 +695,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
     const passadas = escalasVisiveis.filter((e) => e.data < hojeStr).reverse();
     const selectedEscala = selectedId ? escalas.find((e) => e.id === selectedId) ?? null : null;
 
-    // Cores por tipo de culto (strings completas para o Tailwind não purgar)
+    // Cores por tipo de culto (strings completas para o Tailwind n�o purgar)
     const corBorda = (culto: string) => {
       if (culto.includes("Quinta")) return "border-l-grape-500";
       if (culto.includes("Domingo")) return "border-l-gold-500";
@@ -766,8 +766,8 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
                   );
                 })()}
                 {esc.visivel
-                  ? <span className="text-[10px] bg-green-100 text-green-700 font-semibold px-1.5 py-0.5 rounded-full">✓</span>
-                  : <span className="text-[10px] bg-gray-100 text-gray-400 font-semibold px-1.5 py-0.5 rounded-full">◦</span>
+                  ? <span className="text-[10px] bg-green-100 text-green-700 font-semibold px-1.5 py-0.5 rounded-full">?</span>
+                  : <span className="text-[10px] bg-gray-100 text-gray-400 font-semibold px-1.5 py-0.5 rounded-full">?</span>
                 }
               </div>
               <p className="text-xs text-gray-400">{esc.horario}</p>
@@ -804,7 +804,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
 
     return (
       <div className="flex flex-col w-full gap-4">
-        {/* Header: tabs + botão */}
+        {/* Header: tabs + bot�o */}
         <div className="flex items-center justify-between gap-3">
           <div className="flex gap-1 bg-gray-100 p-1 rounded-xl shrink-0">
             <button
@@ -847,16 +847,16 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
           />
         </div>
 
-        {/* Conteúdo: lista + painel de detalhe */}
+        {/* Conte�do: lista + painel de detalhe */}
         <div className="flex gap-4 items-start">
 
           {/* Lista */}
-          <div className={clsx("flex flex-col gap-3 min-w-0", selectedEscala ? "w-full lg:w-72 shrink-0" : "w-full")}>
+          <div className={clsx("flex flex-col gap-3 min-w-0", selectedEscala ? "hidden lg:flex lg:w-72 shrink-0" : "w-full")}>
             {escalasVisiveis.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 gap-2 bg-gray-50 rounded-2xl border border-dashed border-gray-200 text-center">
                 <Users className="w-7 h-7 text-gray-300" />
                 <p className="text-sm text-gray-400">
-                  {viewMode === "minhas" ? "Você não está escalado em nenhum culto." : "Nenhuma escala criada."}
+                  {viewMode === "minhas" ? "Voc� n�o est� escalado em nenhum culto." : "Nenhuma escala criada."}
                 </p>
                 {isLider && viewMode === "culto" && (
                   <button onClick={abrirNova} className="text-sm text-gray-900 font-semibold hover:underline">
@@ -869,7 +869,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
                 {proximas.length > 0 && (
                   <div className="space-y-1.5">
                     <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest px-1">
-                      Próximas · {proximas.length}
+                      Pr�ximas � {proximas.length}
                     </p>
                     {proximas.map(renderCard)}
                   </div>
@@ -877,7 +877,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
                 {passadas.length > 0 && (
                   <div className="space-y-1.5">
                     <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest px-1 pt-1">
-                      Passadas · {passadas.length}
+                      Passadas � {passadas.length}
                     </p>
                     {passadas.map(renderCard)}
                   </div>
@@ -886,9 +886,9 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
             )}
           </div>
 
-          {/* Painel de detalhe (desktop) */}
+          {/* Painel de detalhe */}
           {selectedEscala && (
-            <div className="hidden lg:flex flex-col flex-1 min-w-0 bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm sticky top-4">
+            <div className="flex flex-col flex-1 min-w-0 bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm lg:sticky lg:top-4">
               {/* Header do painel */}
               <div className={clsx(
                 "px-5 py-4 border-b border-gray-100",
@@ -928,10 +928,17 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
                       }
                     </div>
                     <p className="text-sm text-gray-600 font-medium">
-                      {formatDateSimples(selectedEscala.data)} · {selectedEscala.horario}
+                      {formatDateSimples(selectedEscala.data)} � {selectedEscala.horario}
                     </p>
                   </div>
                   <div className="flex items-center gap-0.5 shrink-0">
+                    <button
+                      onClick={() => setSelectedId(null)}
+                      className="lg:hidden p-2 text-gray-500 hover:text-gray-800 rounded-xl transition mr-1"
+                      title="Voltar"
+                    >
+                      <ChevronLeft className="w-5 h-5" />
+                    </button>
                     {isLider && (
                       <>
                         <button
@@ -965,13 +972,13 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
                 {selectedEscala.itens.length > 0 ? (
                   <div className="space-y-2">
                     <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">
-                      Participantes · {selectedEscala.itens.length}
+                      Participantes � {selectedEscala.itens.length}
                     </p>
                     <div className="rounded-xl border border-gray-100 overflow-hidden">
                       <table className="w-full text-sm">
                         <thead>
                           <tr className="bg-gray-50 border-b border-gray-100">
-                            <th className="text-left text-xs font-semibold text-gray-500 px-3 py-2">Função</th>
+                            <th className="text-left text-xs font-semibold text-gray-500 px-3 py-2">Fun��o</th>
                             <th className="text-left text-xs font-semibold text-gray-500 px-3 py-2">Nome</th>
                           </tr>
                         </thead>
@@ -986,7 +993,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
                               <td className="px-3 py-2.5 font-medium text-gray-800 text-sm">
                                 {it.voluntarioNome}
                                 {it.voluntarioId === user?.id && (
-                                  <span className="ml-1.5 text-[10px] bg-black text-white px-1.5 py-0.5 rounded-full font-bold">você</span>
+                                  <span className="ml-1.5 text-[10px] bg-black text-white px-1.5 py-0.5 rounded-full font-bold">voc�</span>
                                 )}
                                 {displayObs(it) && (
                                   <p className="text-xs text-gray-400 font-normal mt-0.5">{displayObs(it)}</p>
@@ -1002,18 +1009,18 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
                   <p className="text-sm text-gray-400 italic">Nenhum participante definido.</p>
                 )}
 
-                {/* Tabela de músicas */}
+                {/* Tabela de m�sicas */}
                 {(selectedEscala.musicas ?? []).length > 0 && (
                   <div className="space-y-2">
                     <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">
-                      Músicas · {(selectedEscala.musicas ?? []).length}
+                      M�sicas � {(selectedEscala.musicas ?? []).length}
                     </p>
                     <div className="rounded-xl border border-gray-100 overflow-hidden">
                       <table className="w-full text-sm">
                         <thead>
                           <tr className="bg-gray-50 border-b border-gray-100">
                             <th className="text-center text-xs font-semibold text-gray-400 px-2 py-2 w-7">#</th>
-                            <th className="text-left text-xs font-semibold text-gray-500 px-3 py-2">Música</th>
+                            <th className="text-left text-xs font-semibold text-gray-500 px-3 py-2">M�sica</th>
                             <th className="text-left text-xs font-semibold text-gray-500 px-3 py-2">Tom</th>
                           </tr>
                         </thead>
@@ -1023,7 +1030,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
                               <tr key={i} className={clsx(m.artistaSlug && m.musicaSlug ? "cursor-pointer hover:bg-gray-50" : "")} onClick={() => abrirCifraInline(selectedEscala.id, i, m)}>
                                 <td className="text-center px-2 py-2.5 text-xs font-bold text-gray-300">{i + 1}</td>
                                 <td className="px-3 py-2.5">
-                                  <p className={clsx("font-semibold text-sm leading-tight", m.artistaSlug ? "text-grape-700" : "text-gray-800")}>{m.titulo}{m.artistaSlug && " ↓"}</p>
+                                  <p className={clsx("font-semibold text-sm leading-tight", m.artistaSlug ? "text-grape-700" : "text-gray-800")}>{m.titulo}{m.artistaSlug && " ?"}</p>
                                   <p className="text-xs text-gray-400">{m.artista}</p>
                                 </td>
                                 <td className="px-3 py-2.5">
@@ -1061,7 +1068,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
                                     ) : cifraInline ? (
                                       <pre className="text-xs font-mono text-gray-700 whitespace-pre-wrap leading-relaxed max-h-96 overflow-y-auto">{cifraInline.join("\n")}</pre>
                                     ) : (
-                                      <p className="text-xs text-gray-400">Cifra não disponível.</p>
+                                      <p className="text-xs text-gray-400">Cifra n�o dispon�vel.</p>
                                     )}
                                   </td>
                                 </tr>
@@ -1074,10 +1081,10 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
                   </div>
                 )}
 
-                {/* Observações (oculto para Infantil pois é dado estruturado) */}
+                {/* Observa��es (oculto para Infantil pois � dado estruturado) */}
                 {selectedEscala.observacoes && selectedEscala.ministerio !== "Infantil" && (
                   <div className="space-y-1.5">
-                    <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Observações</p>
+                    <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Observa��es</p>
                     <p className="text-sm text-gray-600 bg-gray-50 rounded-xl px-3 py-2.5 leading-relaxed">
                       {selectedEscala.observacoes}
                     </p>
@@ -1088,162 +1095,16 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
           )}
         </div>
 
-        {/* Detalhe mobile — bottom sheet */}
-        {selectedEscala && (
-          <div className="lg:hidden">
-            {/* Overlay escuro */}
-            <div
-              className="fixed inset-0 bg-black/40 z-40"
-              onClick={() => setSelectedId(null)}
-            />
-            {/* Sheet */}
-            <div className={clsx(
-              "fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-2xl shadow-2xl max-h-[85vh] flex flex-col overflow-hidden",
-            )}>
-              {/* Alça */}
-              <div className="flex justify-center pt-3 pb-1 shrink-0">
-                <div className="w-10 h-1 rounded-full bg-gray-300" />
-              </div>
-
-              {/* Header */}
-              <div className={clsx(
-                "px-4 py-3 border-b border-gray-100 flex items-center justify-between gap-2 shrink-0",
-                selectedEscala.culto.includes("Quinta") ? "bg-grape-50" :
-                selectedEscala.culto.includes("Domingo") ? "bg-gold-50" : "bg-gray-50"
-              )}>
-                <div>
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <p className="font-bold text-gray-900">{selectedEscala.culto}</p>
-                    {selectedEscala.observacoes?.match(/^(Equipe \d)/)?.[1] && (
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-900 border border-gray-200">
-                        {selectedEscala.observacoes.match(/^(Equipe \d)/)?.[1]}
-                      </span>
-                    )}
-                    {selectedEscala.visivel
-                      ? <span className="text-[10px] bg-green-100 text-green-700 font-bold px-2 py-0.5 rounded-full">Publicada</span>
-                      : <span className="text-[10px] bg-gray-100 text-gray-500 font-bold px-2 py-0.5 rounded-full">Rascunho</span>
-                    }
-                  </div>
-                  <p className="text-xs text-gray-500">{formatDateSimples(selectedEscala.data)} · {selectedEscala.horario}</p>
-                </div>
-                <div className="flex gap-1 shrink-0">
-                  {isLider && (
-                    <>
-                      <button onClick={() => { setSelectedId(null); abrirEdicao(selectedEscala); }} className="p-2 text-gray-500 hover:text-gray-900 rounded-xl transition"><Pencil className="w-4 h-4" /></button>
-                      <button onClick={() => { excluir(selectedEscala.id); setSelectedId(null); }} className="p-2 text-gray-500 hover:text-red-600 rounded-xl transition"><Trash2 className="w-4 h-4" /></button>
-                    </>
-                  )}
-                  <button onClick={() => setSelectedId(null)} className="p-2 text-gray-400 rounded-xl transition"><X className="w-4 h-4" /></button>
-                </div>
-              </div>
-
-              {/* Conteúdo com scroll */}
-              <div className="overflow-y-auto flex-1 px-4 py-4 space-y-4">
-                {/* Participantes */}
-                {selectedEscala.itens.length > 0 ? (
-                  <div className="space-y-2">
-                    <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">
-                      Participantes · {selectedEscala.itens.length}
-                    </p>
-                    <div className="rounded-xl border border-gray-100 overflow-hidden">
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr className="bg-gray-50 border-b border-gray-100">
-                            <th className="text-left text-xs font-semibold text-gray-500 px-3 py-2">Função</th>
-                            <th className="text-left text-xs font-semibold text-gray-500 px-3 py-2">Nome</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-50">
-                          {selectedEscala.itens.map((it, i) => (
-                            <tr key={i} className={it.voluntarioId === user?.id ? "bg-gray-50" : ""}>
-                              <td className="px-3 py-2.5">
-                                <span className="text-xs font-bold text-grape-800 bg-grape-50 px-2 py-0.5 rounded-full">
-                                  {displayFuncao(it)}
-                                </span>
-                              </td>
-                              <td className="px-3 py-2.5 font-medium text-gray-800 text-sm">
-                                {it.voluntarioNome}
-                                {it.voluntarioId === user?.id && (
-                                  <span className="ml-1.5 text-[10px] bg-black text-white px-1.5 py-0.5 rounded-full font-bold">você</span>
-                                )}
-                                {displayObs(it) && (
-                                  <p className="text-xs text-gray-400 font-normal mt-0.5">{displayObs(it)}</p>
-                                )}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                ) : (
-                  <p className="text-sm text-gray-400 italic">Nenhum participante definido.</p>
-                )}
-
-                {/* Músicas */}
-                {(selectedEscala.musicas ?? []).length > 0 && (
-                  <div className="space-y-2">
-                    <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">
-                      Músicas · {(selectedEscala.musicas ?? []).length}
-                    </p>
-                    <div className="rounded-xl border border-gray-100 overflow-hidden">
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr className="bg-gray-50 border-b border-gray-100">
-                            <th className="text-center text-xs font-semibold text-gray-400 px-2 py-2 w-7">#</th>
-                            <th className="text-left text-xs font-semibold text-gray-500 px-3 py-2">Música</th>
-                            <th className="text-left text-xs font-semibold text-gray-500 px-3 py-2">Tom</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-50">
-                          {(selectedEscala.musicas ?? []).map((m, i) => (
-                            <tr key={i}>
-                              <td className="text-center px-2 py-2.5 text-xs font-bold text-gray-300">{i + 1}</td>
-                              <td className="px-3 py-2.5">
-                                <p className="font-semibold text-gray-800 text-sm leading-tight">{m.titulo}</p>
-                                <p className="text-xs text-gray-400">{m.artista}</p>
-                              </td>
-                              <td className="px-3 py-2.5">
-                                {m.tom && (
-                                  <span className="text-xs font-bold bg-grape-100 text-grape-800 px-2 py-0.5 rounded-full">
-                                    {m.tom}
-                                  </span>
-                                )}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                )}
-
-                {/* Observações */}
-                {selectedEscala.observacoes && selectedEscala.ministerio !== "Infantil" && (
-                  <div className="space-y-1.5">
-                    <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Observações</p>
-                    <p className="text-sm text-gray-600 bg-gray-50 rounded-xl px-3 py-2.5 leading-relaxed">
-                      {selectedEscala.observacoes}
-                    </p>
-                  </div>
-                )}
-
-                {/* Espaço extra para não ficar atrás da bottom nav */}
-                <div className="h-6" />
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     );
   }
 
-  // ── FORMULÁRIO ────────────────────────────────────────────────────────────────
-  // ── FORMULÁRIO ────────────────────────────────────────────────────────────────
+  // -- FORMUL�RIO ----------------------------------------------------------------
+  // -- FORMUL�RIO ----------------------------------------------------------------
   const subTabs: { id: EscalaSubTab; label: string; count?: number }[] = [
     { id: "detalhes",      label: "Detalhes" },
     { id: "participantes", label: "Participantes", count: form.itens.length },
-    { id: "musicas",       label: "Músicas",       count: form.musicas.length },
+    { id: "musicas",       label: "M�sicas",       count: form.musicas.length },
     { id: "roteiro",       label: "Roteiro" },
   ];
 
@@ -1284,7 +1145,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
         ))}
       </div>
 
-      {/* ── Detalhes ── */}
+      {/* -- Detalhes -- */}
       {subTab === "detalhes" && (
         <div className="space-y-4">
           {/* Equipe (somente Louvor) */}
@@ -1309,7 +1170,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
               </div>
               {form.equipe && (
                 <p className="text-xs text-gray-400 mt-1.5">
-                  Resp.: {EQUIPES_LOUVOR.find((e) => e.label === form.equipe)?.responsavel} · {form.itens.length} participantes carregados
+                  Resp.: {EQUIPES_LOUVOR.find((e) => e.label === form.equipe)?.responsavel} � {form.itens.length} participantes carregados
                 </p>
               )}
             </div>
@@ -1369,7 +1230,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
             <input
               value={form.culto}
               onChange={(e) => setForm({ ...form, culto: e.target.value })}
-              placeholder="Título *  ex: Culto Domingo 18h30"
+              placeholder="T�tulo *  ex: Culto Domingo 18h30"
               className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-gray-400"
             />
             <div className="grid grid-cols-2 gap-3">
@@ -1394,11 +1255,11 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
             </div>
           </div>
 
-          {/* Faixa etária + Tema (somente Infantil) */}
+          {/* Faixa et�ria + Tema (somente Infantil) */}
           {ministerio === "Infantil" && (
             <div className="space-y-3">
               <div>
-                <p className="text-xs text-gray-400 mb-2 font-semibold uppercase tracking-widest">Faixa etária</p>
+                <p className="text-xs text-gray-400 mb-2 font-semibold uppercase tracking-widest">Faixa et�ria</p>
                 <div className="flex gap-2 flex-wrap">
                   {["4-7 anos", "8-11 anos", "12-13 anos"].map((age) => (
                     <button
@@ -1417,7 +1278,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
                 </div>
               </div>
               <div>
-                <label className="text-xs text-gray-400 mb-1.5 block font-semibold uppercase tracking-widest">Tema do mês</label>
+                <label className="text-xs text-gray-400 mb-1.5 block font-semibold uppercase tracking-widest">Tema do m�s</label>
                 <input
                   value={form.temaInfantil}
                   onChange={(e) => setForm({ ...form, temaInfantil: e.target.value })}
@@ -1433,7 +1294,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
               <textarea
                 value={form.observacoes}
                 onChange={(e) => setForm({ ...form, observacoes: e.target.value.slice(0, 500) })}
-                placeholder="Observações"
+                placeholder="Observa��es"
                 rows={3}
                 className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-gray-400 resize-none"
               />
@@ -1447,7 +1308,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
               <div>
                 <p className="text-sm font-semibold text-gray-800">Visibilidade</p>
                 <p className="text-xs text-gray-500">
-                  {form.visivel ? "Publicada, visível para todos os membros." : "Rascunho, só você vê."}
+                  {form.visivel ? "Publicada, vis�vel para todos os membros." : "Rascunho, s� voc� v�."}
                 </p>
               </div>
             </div>
@@ -1465,7 +1326,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
           <div className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-xl px-4 py-3">
             <div className="flex items-center gap-2">
               <UserCheck className="w-4 h-4 text-gray-500" />
-              <p className="text-sm font-semibold text-gray-800">Solicitar confirmação dos participantes</p>
+              <p className="text-sm font-semibold text-gray-800">Solicitar confirma��o dos participantes</p>
             </div>
             <button
               onClick={() => setForm({ ...form, confirmacaoParticipantes: !form.confirmacaoParticipantes })}
@@ -1480,7 +1341,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
         </div>
       )}
 
-      {/* ── Participantes ── */}
+      {/* -- Participantes -- */}
       {subTab === "participantes" && (
         <div className="space-y-4">
           <div className={clsx("border rounded-xl p-3 space-y-2", editandoIdx !== null ? "bg-gray-50 border-gray-300" : "bg-gray-50 border-gray-200")}>
@@ -1506,7 +1367,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
               <input
                 value={novaObs}
                 onChange={(e) => setNovaObs(e.target.value)}
-                placeholder={ministerio === "Infantil" && novaFuncao === "Professor(a)" ? "Tópico (ex: Honrando meu corpo)" : "Observação (opcional)"}
+                placeholder={ministerio === "Infantil" && novaFuncao === "Professor(a)" ? "T�pico (ex: Honrando meu corpo)" : "Observa��o (opcional)"}
                 className="border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-gray-400"
               />
             </div>
@@ -1566,7 +1427,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
         </div>
       )}
 
-      {/* ── Músicas ── */}
+      {/* -- M�sicas -- */}
       {subTab === "musicas" && (
         <div className="space-y-4">
           {modalCifra && (
@@ -1593,7 +1454,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
               <input
                 value={buscaMusica}
                 onChange={(e) => setBuscaMusica(e.target.value)}
-                placeholder="Buscar no repertório..."
+                placeholder="Buscar no repert�rio..."
                 className="flex-1 border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-gray-400"
               />
               <button
@@ -1606,10 +1467,10 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
             </div>
             <div className="max-h-52 overflow-y-auto space-y-1 border border-gray-100 rounded-xl p-1 bg-gray-50">
               {musicasFiltradas.length === 0 && buscaMusica && (
-                <p className="text-xs text-gray-400 text-center py-4">Nenhuma música encontrada.</p>
+                <p className="text-xs text-gray-400 text-center py-4">Nenhuma m�sica encontrada.</p>
               )}
               {musicasFiltradas.length === 0 && !buscaMusica && (
-                <p className="text-xs text-gray-400 text-center py-4">Digite para buscar no repertório.</p>
+                <p className="text-xs text-gray-400 text-center py-4">Digite para buscar no repert�rio.</p>
               )}
               {musicasFiltradas.map((m) => {
                 const jaAdicionada = form.musicas.some((em) => em.musicaId === m.id);
@@ -1617,7 +1478,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
                   <div key={m.id} className="flex items-center justify-between bg-white rounded-lg px-3 py-2 border border-gray-100">
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold text-gray-800 truncate">{m.titulo}</p>
-                      <p className="text-xs text-gray-400">{m.artista} {m.estilo && `· ${m.estilo}`}</p>
+                      <p className="text-xs text-gray-400">{m.artista} {m.estilo && `� ${m.estilo}`}</p>
                     </div>
                     <div className="flex items-center gap-2 shrink-0 ml-2">
                       <a
@@ -1645,7 +1506,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
                           jaAdicionada ? "bg-gray-100 text-gray-400 cursor-not-allowed" : "bg-black text-white hover:bg-gray-900"
                         )}
                       >
-                        {jaAdicionada ? "✓" : "+ Add"}
+                        {jaAdicionada ? "?" : "+ Add"}
                       </button>
                     </div>
                   </div>
@@ -1654,14 +1515,14 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
             </div>
           </div>
 
-          {/* Nova música */}
+          {/* Nova m�sica */}
           <div className="border border-dashed border-gray-200 rounded-xl overflow-hidden">
             <button
               type="button"
               onClick={() => setAddingNova((v) => !v)}
               className="w-full flex items-center justify-between px-3 py-2.5 text-sm font-semibold text-gray-900 hover:bg-gray-50 transition"
             >
-              <span className="flex items-center gap-2"><Plus className="w-4 h-4" /> Adicionar música nova ao repertório</span>
+              <span className="flex items-center gap-2"><Plus className="w-4 h-4" /> Adicionar m�sica nova ao repert�rio</span>
               {addingNova ? <X className="w-4 h-4 text-gray-400" /> : null}
             </button>
             {addingNova && (
@@ -1670,7 +1531,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
                   <input
                     value={novaMusica.titulo}
                     onChange={(e) => setNovaMusica((n) => ({ ...n, titulo: e.target.value }))}
-                    placeholder="Título da música"
+                    placeholder="T�tulo da m�sica"
                     className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-gray-400 bg-white"
                   />
                   <select
@@ -1758,7 +1619,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
                           ).join("\n")}
                         </pre>
                       ) : (
-                        <p className="text-xs text-gray-400">Cifra não disponível.</p>
+                        <p className="text-xs text-gray-400">Cifra n�o dispon�vel.</p>
                       )}
                     </div>
                   )}
@@ -1769,12 +1630,12 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
         </div>
       )}
 
-      {/* ── Roteiro ── */}
+      {/* -- Roteiro -- */}
       {subTab === "roteiro" && (
         <div className="space-y-3">
           {form.musicas.length === 0 && (
             <p className="text-sm text-gray-400 text-center py-12">
-              Adicione músicas na aba "Músicas" primeiro.
+              Adicione m�sicas na aba "M�sicas" primeiro.
             </p>
           )}
           {form.musicas.map((em, i) => (
@@ -1783,7 +1644,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-gray-800">{em.titulo}</p>
                 <p className="text-xs text-gray-400">
-                  {em.artista}{em.tom && <span className="font-semibold text-grape-700"> · {em.tom}</span>}
+                  {em.artista}{em.tom && <span className="font-semibold text-grape-700"> � {em.tom}</span>}
                 </p>
               </div>
               <div className="flex flex-col gap-0.5">
@@ -1807,10 +1668,10 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
         </div>
       )}
 
-      {/* Botão salvar */}
+      {/* Bot�o salvar */}
       {salvarErro && (
         <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-xl px-3 py-2">
-          ⚠ {salvarErro}
+          ? {salvarErro}
         </p>
       )}
       <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-100">
