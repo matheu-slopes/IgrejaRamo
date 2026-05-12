@@ -1017,12 +1017,16 @@ function MembrosTab({
   }
 
   const FUNCAO_ORDER: Record<FuncaoMinisterio, number> = { "L\u00edder": 0, "Sub-l\u00edder": 1, "Membro": 2, "Visitante": 3 };
-  const membrosOrdenados = [...membros].sort((a, b) => {
-    let cmp = 0;
-    if (sortBy === "nome") cmp = a.nome.localeCompare(b.nome, "pt-BR");
-    else cmp = (FUNCAO_ORDER[a.funcao] ?? 9) - (FUNCAO_ORDER[b.funcao] ?? 9);
-    return sortDir === "asc" ? cmp : -cmp;
-  });
+  const eLider = (m: MembroMinisterio) => m.funcao === "L\u00edder" || m.funcao === "Sub-l\u00edder";
+  const membrosOrdenados = [
+    ...membros.filter(eLider).sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR")),
+    ...membros.filter((m) => !eLider(m)).sort((a, b) => {
+      let cmp = 0;
+      if (sortBy === "nome") cmp = a.nome.localeCompare(b.nome, "pt-BR");
+      else cmp = (FUNCAO_ORDER[a.funcao] ?? 9) - (FUNCAO_ORDER[b.funcao] ?? 9);
+      return sortDir === "asc" ? cmp : -cmp;
+    }),
+  ];
 
   // Per-member canal permissions
   const [permissoesMembro, setPermissoesMembro] = useState<Record<string, string[]>>({});
