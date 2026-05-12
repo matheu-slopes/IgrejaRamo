@@ -30,7 +30,12 @@ export default function PushSubscriber() {
       setTimeout(() => setMostrarBanner(true), 3000);
     } else if (Notification.permission === "granted") {
       // Permissão já concedida — garante que a subscription está salva
-      registrarSubscription().catch(console.error);
+      // Se falhar, mostra o banner com o erro para o usuário poder tentar de novo
+      registrarSubscription().catch((e) => {
+        console.error("PushSubscriber (silent):", e);
+        setErro("Erro ao registrar subscription: " + String(e));
+        setMostrarBanner(true);
+      });
     }
   }, [user]);
 
@@ -43,73 +48,62 @@ export default function PushSubscriber() {
         await registrarSubscription();
       } else {
         setErro("Permissão negada. Habilite manualmente nas configurações do navegador.");
-        setTimeout(() => setMostrarBanner(false), 5000);
       }
     } catch (e) {
       console.error("PushSubscriber.solicitarPermissao:", e);
-      setErro("Erro ao solicitar permissão: " + String(e));
+      setErro(String(e).replace("Error: ", ""));
     } finally {
       setLoading(false);
     }
   }
 
   async function registrarSubscription() {
-    try {
-      const registration = await navigator.serviceWorker.ready;
-      let sub = await registration.pushManager.getSubscription();
+    const registration = await navigator.serviceWorker.ready;
+    let sub = await registration.pushManager.getSubscription();
 
-      if (!sub) {
-        const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-        if (!vapidKey) {
-          setErro("Chave VAPID não configurada. Contate o administrador.");
-          console.error("PushSubscriber: NEXT_PUBLIC_VAPID_PUBLIC_KEY não definida");
-          return;
-        }
-        sub = await registration.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: urlBase64ToUint8Array(vapidKey).buffer as ArrayBuffer,
-        });
+    if (!sub) {
+      const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+      if (!vapidKey) {
+        throw new Error("Chave VAPID não configurada (NEXT_PUBLIC_VAPID_PUBLIC_KEY ausente).");
       }
-
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        setErro("Sessão expirada. Faça login novamente.");
-        return;
-      }
-
-      const key = sub.getKey("p256dh");
-      const auth = sub.getKey("auth");
-      if (!key || !auth) {
-        setErro("Erro ao obter chaves de criptografia da subscription.");
-        return;
-      }
-
-      const res = await fetch("/api/push/subscribe", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({
-          endpoint: sub.endpoint,
-          p256dh: btoa(String.fromCharCode(...new Uint8Array(key))),
-          auth: btoa(String.fromCharCode(...new Uint8Array(auth))),
-        }),
+      sub = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(vapidKey).buffer as ArrayBuffer,
       });
-
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        setErro(`Erro ao salvar subscription (${res.status}): ${data.error ?? "desconhecido"}`);
-        console.error("push/subscribe response:", res.status, data);
-        return;
-      }
-
-      // Sucesso — fecha o banner
-      setMostrarBanner(false);
-    } catch (e) {
-      console.error("PushSubscriber.registrarSubscription:", e);
-      setErro("Erro ao registrar notificações: " + String(e));
     }
+
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      throw new Error("Sessão expirada. Faça login novamente.");
+    }
+
+    const key = sub.getKey("p256dh");
+    const auth = sub.getKey("auth");
+    if (!key || !auth) {
+      throw new Error("Erro ao obter chaves de criptografia da subscription.");
+    }
+
+    const res = await fetch("/api/push/subscribe", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({
+        endpoint: sub.endpoint,
+        p256dh: btoa(String.fromCharCode(...new Uint8Array(key))),
+        auth: btoa(String.fromCharCode(...new Uint8Array(auth))),
+      }),
+    });
+
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(`Erro ${res.status} ao salvar subscription: ${data.error ?? "desconhecido"}`);
+    }
+
+    // Sucesso — fecha o banner
+    setErro(null);
+    setMostrarBanner(false);
   }
 
   if (!mostrarBanner) return null;
