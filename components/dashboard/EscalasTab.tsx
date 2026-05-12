@@ -66,7 +66,7 @@ export const EQUIPES_LOUVOR = [
 export const TEMPLATES_CULTO = [
   { id: "quinta",   label: "Culto de Quinta",  horario: "20:00", diaSemana: 4, cor: "bg-grape-100 text-grape-800 border-grape-200" },
   { id: "domingo",  label: "Culto de Domingo", horario: "18:30", diaSemana: 0, cor: "bg-gold-100 text-gold-800 border-gold-200" },
-  { id: "especial", label: "Culto Especial",   horario: "19:00", diaSemana: null, cor: "bg-blue-100 text-blue-800 border-blue-200" },
+  { id: "especial", label: "Outro",            horario: "19:00", diaSemana: null, cor: "bg-blue-100 text-blue-800 border-blue-200" },
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -1134,24 +1134,30 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
           <div>
             <p className="text-xs text-gray-400 mb-2 font-semibold uppercase tracking-widest">Tipo de culto</p>
             <div className="flex gap-2 flex-wrap">
-              {TEMPLATES_CULTO.map((t) => (
+              {TEMPLATES_CULTO.map((t) => {
+                const isOutro = t.id === "especial";
+                const isActive = isOutro
+                  ? (form.culto !== "Culto de Quinta" && form.culto !== "Culto de Domingo")
+                  : form.culto === t.label;
+                return (
                 <button
                   key={t.id}
                   onClick={() => {
                     const primeiraData = t.diaSemana !== null ? proximasDatas(t.diaSemana, 1)[0] : "";
                     setForm((f) => ({
                       ...f,
-                      culto: t.label,
+                      culto: isOutro ? "" : t.label,
                       horario: t.horario,
                       data: f.data || primeiraData,
                     }));
                   }}
                   className={clsx(
                     "text-xs font-semibold px-3 py-1.5 rounded-full border transition hover:opacity-80",
-                    form.culto === t.label ? t.cor + " ring-2 ring-offset-1 ring-vine-400" : t.cor
+                    isActive ? t.cor + " ring-2 ring-offset-1 ring-vine-400" : t.cor
                   )}
                 >{t.label}</button>
-              ))}
+                );
+              })}
             </div>
           </div>
 
