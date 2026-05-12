@@ -843,57 +843,149 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
           )}
         </div>
 
-        {/* Detalhe mobile (abaixo da lista quando selecionado) */}
+        {/* Detalhe mobile — bottom sheet */}
         {selectedEscala && (
-          <div className="lg:hidden bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
+          <div className="lg:hidden">
+            {/* Overlay escuro */}
+            <div
+              className="fixed inset-0 bg-black/40 z-40"
+              onClick={() => setSelectedId(null)}
+            />
+            {/* Sheet */}
             <div className={clsx(
-              "px-4 py-3 border-b border-gray-100 flex items-center justify-between gap-2",
-              selectedEscala.culto.includes("Quinta") ? "bg-grape-50" :
-              selectedEscala.culto.includes("Domingo") ? "bg-gold-50" : "bg-vine-50"
+              "fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-2xl shadow-2xl max-h-[85vh] flex flex-col overflow-hidden",
             )}>
-              <div>
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <p className="font-bold text-gray-900">{selectedEscala.culto}</p>
-                  {selectedEscala.observacoes?.match(/^(Equipe \d)/)?.[1] && (
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-vine-100 text-vine-800 border border-vine-200">
-                      {selectedEscala.observacoes.match(/^(Equipe \d)/)?.[1]}
-                    </span>
+              {/* Alça */}
+              <div className="flex justify-center pt-3 pb-1 shrink-0">
+                <div className="w-10 h-1 rounded-full bg-gray-300" />
+              </div>
+
+              {/* Header */}
+              <div className={clsx(
+                "px-4 py-3 border-b border-gray-100 flex items-center justify-between gap-2 shrink-0",
+                selectedEscala.culto.includes("Quinta") ? "bg-grape-50" :
+                selectedEscala.culto.includes("Domingo") ? "bg-gold-50" : "bg-vine-50"
+              )}>
+                <div>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <p className="font-bold text-gray-900">{selectedEscala.culto}</p>
+                    {selectedEscala.observacoes?.match(/^(Equipe \d)/)?.[1] && (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-vine-100 text-vine-800 border border-vine-200">
+                        {selectedEscala.observacoes.match(/^(Equipe \d)/)?.[1]}
+                      </span>
+                    )}
+                    {selectedEscala.visivel
+                      ? <span className="text-[10px] bg-green-100 text-green-700 font-bold px-2 py-0.5 rounded-full">Publicada</span>
+                      : <span className="text-[10px] bg-gray-100 text-gray-500 font-bold px-2 py-0.5 rounded-full">Rascunho</span>
+                    }
+                  </div>
+                  <p className="text-xs text-gray-500">{formatDateSimples(selectedEscala.data)} · {selectedEscala.horario}</p>
+                </div>
+                <div className="flex gap-1 shrink-0">
+                  {isLider && (
+                    <>
+                      <button onClick={() => { setSelectedId(null); abrirEdicao(selectedEscala); }} className="p-2 text-gray-500 hover:text-vine-700 rounded-xl transition"><Pencil className="w-4 h-4" /></button>
+                      <button onClick={() => { excluir(selectedEscala.id); setSelectedId(null); }} className="p-2 text-gray-500 hover:text-red-600 rounded-xl transition"><Trash2 className="w-4 h-4" /></button>
+                    </>
                   )}
+                  <button onClick={() => setSelectedId(null)} className="p-2 text-gray-400 rounded-xl transition"><X className="w-4 h-4" /></button>
                 </div>
-                <p className="text-xs text-gray-500">{formatDateSimples(selectedEscala.data)} · {selectedEscala.horario}</p>
               </div>
-              <div className="flex gap-1">
-                {isLider && (
-                  <>
-                    <button onClick={() => abrirEdicao(selectedEscala)} className="p-1.5 text-gray-500 hover:text-vine-700 rounded-xl transition"><Pencil className="w-4 h-4" /></button>
-                    <button onClick={() => { excluir(selectedEscala.id); setSelectedId(null); }} className="p-1.5 text-gray-500 hover:text-red-600 rounded-xl transition"><Trash2 className="w-4 h-4" /></button>
-                  </>
+
+              {/* Conteúdo com scroll */}
+              <div className="overflow-y-auto flex-1 px-4 py-4 space-y-4">
+                {/* Participantes */}
+                {selectedEscala.itens.length > 0 ? (
+                  <div className="space-y-2">
+                    <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">
+                      Participantes · {selectedEscala.itens.length}
+                    </p>
+                    <div className="rounded-xl border border-gray-100 overflow-hidden">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="bg-gray-50 border-b border-gray-100">
+                            <th className="text-left text-xs font-semibold text-gray-500 px-3 py-2">Função</th>
+                            <th className="text-left text-xs font-semibold text-gray-500 px-3 py-2">Nome</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-50">
+                          {selectedEscala.itens.map((it, i) => (
+                            <tr key={i} className={it.voluntarioId === user?.id ? "bg-vine-50" : ""}>
+                              <td className="px-3 py-2.5">
+                                <span className="text-xs font-bold text-grape-800 bg-grape-50 px-2 py-0.5 rounded-full">
+                                  {displayFuncao(it)}
+                                </span>
+                              </td>
+                              <td className="px-3 py-2.5 font-medium text-gray-800 text-sm">
+                                {it.voluntarioNome}
+                                {it.voluntarioId === user?.id && (
+                                  <span className="ml-1.5 text-[10px] bg-vine-700 text-white px-1.5 py-0.5 rounded-full font-bold">você</span>
+                                )}
+                                {displayObs(it) && (
+                                  <p className="text-xs text-gray-400 font-normal mt-0.5">{displayObs(it)}</p>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-400 italic">Nenhum participante definido.</p>
                 )}
-                <button onClick={() => setSelectedId(null)} className="p-1.5 text-gray-400 hover:text-gray-700 rounded-xl transition"><X className="w-4 h-4" /></button>
+
+                {/* Músicas */}
+                {(selectedEscala.musicas ?? []).length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">
+                      Músicas · {(selectedEscala.musicas ?? []).length}
+                    </p>
+                    <div className="rounded-xl border border-gray-100 overflow-hidden">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="bg-gray-50 border-b border-gray-100">
+                            <th className="text-center text-xs font-semibold text-gray-400 px-2 py-2 w-7">#</th>
+                            <th className="text-left text-xs font-semibold text-gray-500 px-3 py-2">Música</th>
+                            <th className="text-left text-xs font-semibold text-gray-500 px-3 py-2">Tom</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-50">
+                          {(selectedEscala.musicas ?? []).map((m, i) => (
+                            <tr key={i}>
+                              <td className="text-center px-2 py-2.5 text-xs font-bold text-gray-300">{i + 1}</td>
+                              <td className="px-3 py-2.5">
+                                <p className="font-semibold text-gray-800 text-sm leading-tight">{m.titulo}</p>
+                                <p className="text-xs text-gray-400">{m.artista}</p>
+                              </td>
+                              <td className="px-3 py-2.5">
+                                {m.tom && (
+                                  <span className="text-xs font-bold bg-grape-100 text-grape-800 px-2 py-0.5 rounded-full">
+                                    {m.tom}
+                                  </span>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* Observações */}
+                {selectedEscala.observacoes && selectedEscala.ministerio !== "Infantil" && (
+                  <div className="space-y-1.5">
+                    <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Observações</p>
+                    <p className="text-sm text-gray-600 bg-gray-50 rounded-xl px-3 py-2.5 leading-relaxed">
+                      {selectedEscala.observacoes}
+                    </p>
+                  </div>
+                )}
+
+                {/* Espaço extra para não ficar atrás da bottom nav */}
+                <div className="h-6" />
               </div>
-            </div>
-            <div className="px-4 py-3 space-y-3">
-              {selectedEscala.itens.length > 0 && (
-                <div className="flex flex-wrap gap-1.5">
-                  {selectedEscala.itens.map((it, i) => (
-                    <span key={i} className={clsx(
-                      "text-xs px-2 py-1 rounded-full border font-medium",
-                      it.voluntarioId === user?.id ? "bg-vine-100 text-vine-800 border-vine-200" : "bg-grape-50 text-grape-800 border-grape-100"
-                    )}>
-                      <strong>{displayFuncao(it)}</strong>: {it.voluntarioNome}
-                    </span>
-                  ))}
-                </div>
-              )}
-              {(selectedEscala.musicas ?? []).length > 0 && (
-                <div className="flex flex-wrap gap-1.5">
-                  {(selectedEscala.musicas ?? []).map((m, i) => (
-                    <span key={i} className="flex items-center gap-1 text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded-full border border-blue-100">
-                      <Music2 className="w-3 h-3" />{m.titulo}{m.tom && <strong> ({m.tom})</strong>}
-                    </span>
-                  ))}
-                </div>
-              )}
             </div>
           </div>
         )}
