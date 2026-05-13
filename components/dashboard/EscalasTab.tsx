@@ -809,26 +809,31 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
                 }
               </div>
               <p className="text-xs text-gray-400">{esc.horario}</p>
-              {esc.itens.length > 0 && !equipeLabel && (
-                <div className="flex flex-wrap gap-1">
-                  {esc.itens.slice(0, 4).map((it, i) => (
-                    <span
-                      key={i}
-                      className={clsx(
-                        "text-[10px] px-1.5 py-0.5 rounded font-medium",
-                        it.voluntarioId === user?.id
-                          ? "bg-gray-200 text-black"
-                          : "bg-gray-100 text-gray-600"
-                      )}
-                    >
-                      {it.voluntarioNome.split(" ")[0]}
-                    </span>
-                  ))}
-                  {esc.itens.length > 4 && (
-                    <span className="text-[10px] text-gray-400">+{esc.itens.length - 4}</span>
-                  )}
-                </div>
-              )}
+              {esc.itens.length > 0 && !equipeLabel && (() => {
+                const pessoasUnicas = Array.from(
+                  new Map(esc.itens.map((it) => [it.voluntarioId ?? it.voluntarioNome, it])).values()
+                );
+                return (
+                  <div className="flex flex-wrap gap-1">
+                    {pessoasUnicas.slice(0, 4).map((it) => (
+                      <span
+                        key={it.voluntarioId ?? it.voluntarioNome}
+                        className={clsx(
+                          "text-[10px] px-1.5 py-0.5 rounded font-medium",
+                          it.voluntarioId === user?.id
+                            ? "bg-gray-200 text-black"
+                            : "bg-gray-100 text-gray-600"
+                        )}
+                      >
+                        {it.voluntarioNome.split(" ")[0]}
+                      </span>
+                    ))}
+                    {pessoasUnicas.length > 4 && (
+                      <span className="text-[10px] text-gray-400">+{pessoasUnicas.length - 4}</span>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
             {(esc.musicas ?? []).length > 0 && (
               <span className="flex items-center gap-0.5 text-[11px] text-gray-400 shrink-0">
@@ -1010,7 +1015,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
                 {selectedEscala.itens.length > 0 ? (
                   <div className="space-y-2">
                     <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">
-                      Participantes · {selectedEscala.itens.length}
+                      Participantes · {new Set(selectedEscala.itens.map((it) => it.voluntarioId ?? it.voluntarioNome)).size}
                     </p>
                     <div className="rounded-xl border border-gray-100 overflow-hidden">
                       <table className="w-full text-sm">
@@ -1167,7 +1172,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
   // -- FORMULÁRIO ----------------------------------------------------------------
   const subTabs: { id: EscalaSubTab; label: string; count?: number }[] = [
     { id: "detalhes",      label: "Detalhes" },
-    { id: "participantes", label: "Participantes", count: form.itens.length },
+    { id: "participantes", label: "Participantes", count: new Set(form.itens.map((it) => it.voluntarioId ?? it.voluntarioNome)).size },
     { id: "musicas",       label: "Músicas",       count: form.musicas.length },
     { id: "roteiro",       label: "Roteiro" },
   ];
@@ -1234,7 +1239,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
               </div>
               {form.equipe && (
                 <p className="text-xs text-gray-400 mt-1.5">
-                  Resp.: {EQUIPES_LOUVOR.find((e) => e.label === form.equipe)?.responsavel} · {form.itens.length} participantes carregados
+                  Resp.: {EQUIPES_LOUVOR.find((e) => e.label === form.equipe)?.responsavel} · {new Set(form.itens.map((it) => it.voluntarioId ?? it.voluntarioNome)).size} participantes carregados
                 </p>
               )}
             </div>
