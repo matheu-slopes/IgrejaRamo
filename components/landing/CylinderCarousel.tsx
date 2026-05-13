@@ -2,7 +2,7 @@
 
 import { useRef } from "react";
 import { motion, useScroll, useTransform } from "framer-motion";
-import { Clock3, MapPin } from "lucide-react";
+import { Clock3 } from "lucide-react";
 
 interface CultoDay {
   id: string;
@@ -205,15 +205,11 @@ export default function CylinderCarousel() {
                   </span>
                 </div>
 
-                {/* Hor�rio e local */}
+                {/* Horário */}
                 <div className="hidden shrink-0 flex-col items-end gap-1.5 sm:flex">
                   <span className="flex items-center gap-1.5 text-xs font-medium text-gray-900 group-hover:text-black transition-colors">
                     <Clock3 className="h-3.5 w-3.5 text-gray-400/70" />
                     {day.time}
-                  </span>
-                  <span className="flex items-center gap-1.5 text-[11px] text-gray-400 group-hover:text-gray-800 transition-colors">
-                    <MapPin className="h-3 w-3" />
-                    {day.place}
                   </span>
                 </div>
               </div>
