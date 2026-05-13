@@ -111,7 +111,7 @@ export default function ScrollyQuemSomos() {
               loop
               muted
               playsInline
-              className="absolute inset-0 w-full h-full object-cover"
+              className="absolute inset-0 w-full h-full object-cover scale-125"
             />
           </div>
         </motion.div>
