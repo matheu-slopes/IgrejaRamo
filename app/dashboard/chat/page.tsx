@@ -1045,8 +1045,6 @@ function NewDmModal({
 
 // --- NewGroupModal ------------------------------------------------
 
-const GROUP_EMOJIS = ["🎵","✝️","🙏","⚡","🌿","❤️","🔥","🎸","📖","🎺","👐","🕊️","🌟","🎶"];
-
 function NewGroupModal({
   currentUserId, usuarios, onClose, onCreate,
 }: {
@@ -1056,7 +1054,6 @@ function NewGroupModal({
   onCreate: (nome: string, emoji: string, membros: string[]) => void;
 }) {
   const [nome, setNome] = useState("");
-  const [emoji, setEmoji] = useState("🎵");
   const [membros, setMembros] = useState<string[]>([]);
   const [search, setSearch] = useState("");
   const others = usuarios.filter((mu) => mu.id !== currentUserId);
@@ -1072,15 +1069,7 @@ function NewGroupModal({
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition"><X className="w-4 h-4" /></button>
         </div>
         <div className="px-5 py-4 space-y-4">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-full bg-gray-100 border-2 border-gray-200 flex items-center justify-center text-2xl">{emoji}</div>
-            <input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Nome do grupo" className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-300" />
-          </div>
-          <div className="flex flex-wrap gap-1.5">
-            {GROUP_EMOJIS.map((e) => (
-              <button key={e} onClick={() => setEmoji(e)} className={clsx("text-xl w-9 h-9 rounded-xl flex items-center justify-center transition", emoji === e ? "bg-gray-100 ring-2 ring-gray-400" : "hover:bg-gray-100")}>{e}</button>
-            ))}
-          </div>
+          <input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Nome do grupo" className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-300" />
           <div>
             <p className="text-xs font-semibold text-gray-500 mb-2">Adicionar membros</p>
             <div className="flex items-center gap-2 bg-gray-100 rounded-xl px-3 py-2 mb-2">
@@ -1099,7 +1088,7 @@ function NewGroupModal({
           </div>
         </div>
         <div className="px-5 pb-4">
-          <button onClick={() => nome.trim() && onCreate(nome.trim(), emoji, membros)} disabled={!nome.trim()} className="w-full bg-slate-700 text-white rounded-xl py-2.5 text-sm font-semibold hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition">
+          <button onClick={() => nome.trim() && onCreate(nome.trim(), "", membros)} disabled={!nome.trim()} className="w-full bg-slate-700 text-white rounded-xl py-2.5 text-sm font-semibold hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition">
             Criar Grupo{membros.length > 0 ? ` (${membros.length + 1} membros)` : ""}
           </button>
         </div>
