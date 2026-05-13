@@ -114,7 +114,7 @@ function LatestCultoCard() {
         <div className="bg-white/5 backdrop-blur-sm rounded-2xl px-6 py-5 flex flex-col items-start gap-2">
           <p className="font-sans text-white/80 text-[11px] tracking-[0.3em] uppercase font-medium">Ao vivo</p>
           <h3 className="font-sans text-2xl md:text-3xl text-white font-semibold tracking-wide leading-tight">
-            Assista nosso �ltimo culto
+            Assista nosso último culto
           </h3>
         </div>
         <a
@@ -160,9 +160,9 @@ function DevocionalCard() {
       {/* Content */}
       <div className="relative z-10 flex flex-col items-start justify-end h-full text-left p-8 gap-4">
         <div className="bg-white/5 backdrop-blur-sm rounded-2xl px-6 py-5 flex flex-col items-start gap-2">
-          <p className="font-sans text-white/80 text-[11px] tracking-[0.3em] uppercase font-medium">Di�rio</p>
+          <p className="font-sans text-white/80 text-[11px] tracking-[0.3em] uppercase font-medium">Diário</p>
           <h3 className="font-sans text-2xl md:text-3xl text-white font-semibold tracking-wide leading-tight">
-            Fa�a seu devocional di�rio
+            Faça seu devocional diário
           </h3>
         </div>
         <a
@@ -320,7 +320,7 @@ export default function BentoGrid() {
           className="text-center mb-16"
         >
           <p className="text-[#1A1A1A] text-sm md:text-base font-medium tracking-[0.2em] uppercase">
-            Se liga nas �ltimas atualiza��es
+            Se liga nas últimas atualizações
           </p>
         </motion.div>
 
