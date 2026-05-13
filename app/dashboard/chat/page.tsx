@@ -1139,6 +1139,7 @@ export default function ChatPage() {
   const [showNewDmModal, setShowNewDmModal] = useState(false);
   const [showNewGroupModal, setShowNewGroupModal] = useState(false);
   const [conversaIds, setConversaIds] = useState<string[]>([]);
+  const startingDmRef = useRef(false);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const broadcastChannelsRef = useRef<Map<string, any>>(new Map());
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1505,7 +1506,12 @@ export default function ChatPage() {
       }, (payload: any) => {
         const row = payload.new;
         const cid = row.conversa_id as string;
-        if (!conversaIdsRef.current.includes(cid)) return;
+        if (!conversaIdsRef.current.includes(cid)) {
+          // Conversa ainda não carregada localmente — recarrega todas as conversas
+          // para incluir esta e então aplica a mensagem
+          carregarConversas();
+          return;
+        }
         const serverTime = row.criado_em as string;
         const msg: MensagemConversa = {
           ...rowToMensagem(row),
@@ -1683,6 +1689,9 @@ export default function ChatPage() {
   }
 
   async function startDm(userId: string, userNome: string) {
+    if (startingDmRef.current) return;
+    startingDmRef.current = true;
+    try {
     const existing = dms.find((dm) => dm.participantes.includes(u.id) && dm.participantes.includes(userId));
     if (existing) {
       openChat({ tipo: "direto", id: existing.id });
@@ -1700,6 +1709,13 @@ export default function ChatPage() {
       return;
     }
     const cid: string = json.id;
+    // Se a conversa já existe no estado local (API retornou existente), só abre
+    const alreadyLocal = dms.find(dm => dm.id === cid);
+    if (alreadyLocal) {
+      openChat({ tipo: "direto", id: cid });
+      setShowNewDmModal(false);
+      return;
+    }
     setDms((prev) => [...prev, {
       id: cid,
       participantes: [u.id, userId] as [string, string],
@@ -1709,6 +1725,9 @@ export default function ChatPage() {
     setConversaIds(prev => prev.includes(cid) ? prev : [...prev, cid]);
     openChat({ tipo: "direto", id: cid });
     setShowNewDmModal(false);
+    } finally {
+      startingDmRef.current = false;
+    }
   }
 
   async function createGroup(nome: string, emoji: string, membros: string[]) {
