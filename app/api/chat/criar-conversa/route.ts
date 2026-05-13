@@ -10,6 +10,34 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   const { tipo, nome, emoji, cor, descricao, admin_id, somente_admin, participantes } = body;
 
+  // Para conversas diretas, verifica se já existe uma entre os mesmos participantes
+  if (tipo === "direto" && participantes?.length === 2) {
+    const [p1, p2] = participantes as string[];
+    const { data: existing } = await admin
+      .from("chat_participantes")
+      .select("conversa_id")
+      .eq("user_id", p1);
+    if (existing?.length) {
+      const ids = existing.map((e: { conversa_id: string }) => e.conversa_id);
+      const { data: shared } = await admin
+        .from("chat_participantes")
+        .select("conversa_id")
+        .eq("user_id", p2)
+        .in("conversa_id", ids);
+      if (shared?.length) {
+        // Verifica se a conversa existente é do tipo "direto"
+        const sharedId = (shared[0] as { conversa_id: string }).conversa_id;
+        const { data: conv } = await admin
+          .from("chat_conversas")
+          .select("id, tipo")
+          .eq("id", sharedId)
+          .eq("tipo", "direto")
+          .single();
+        if (conv) return NextResponse.json({ id: (conv as { id: string }).id });
+      }
+    }
+  }
+
   // Cria a conversa
   const insertData: Record<string, unknown> = { tipo };
   if (nome) insertData.nome = nome;

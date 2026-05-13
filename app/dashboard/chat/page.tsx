@@ -1544,8 +1544,50 @@ export default function ChatPage() {
           ...g, mensagens: g.mensagens.map(m => m.id === msg.id ? msg : m),
         } : g));
       })
+      // -- INSERT chat_participantes: detecta novas conversas em tempo real --
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .on("postgres_changes" as any, {
+        event: "INSERT", schema: "public", table: "chat_participantes",
+        filter: `user_id=eq.${user.id}`,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      }, async (payload: any) => {
+        const cid = payload.new.conversa_id as string;
+        if (conversaIdsRef.current.includes(cid)) return;
+        const [{ data: conv }, { data: parts }] = await Promise.all([
+          supabase.from("chat_conversas").select("*").eq("id", cid).single(),
+          supabase.from("chat_participantes").select("conversa_id, user_id").eq("conversa_id", cid),
+        ]);
+        if (!conv) return;
+        const membrosIds = ((parts ?? []) as { user_id: string }[]).map(p => p.user_id);
+        const outrosIds = membrosIds.filter(id => id !== user.id);
+        const nomePorId: Record<string, string> = {};
+        if (outrosIds.length) {
+          const { data: perfisData } = await supabase.from("perfis").select("id, nome").in("id", outrosIds);
+          for (const p of (perfisData ?? []) as { id: string; nome: string }[]) nomePorId[p.id] = p.nome;
+        }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const c = conv as any;
+        if (c.tipo === "direto") {
+          const otherId = membrosIds.find(id => id !== user.id) ?? "";
+          const otherNome = nomePorId[otherId] ?? "Usuário";
+          setDms(prev => prev.some(d => d.id === cid) ? prev : [...prev, {
+            id: cid,
+            participantes: [user.id, otherId] as [string, string],
+            participantesNomes: [user.nome, otherNome] as [string, string],
+            mensagens: [],
+          }]);
+        } else {
+          setGrupos(prev => prev.some(g => g.id === cid) ? prev : [...prev, {
+            id: cid, nome: c.nome ?? "Grupo", tipo: "geral",
+            emoji: c.emoji ?? "", cor: c.cor ?? "bg-slate-700",
+            descricao: c.descricao ?? undefined, adminId: c.admin_id ?? undefined,
+            somenteAdmin: c.somente_admin ?? false, institucional: c.institucional ?? false,
+            membros: membrosIds, mensagens: [],
+          }]);
+        }
+        setConversaIds(prev => prev.includes(cid) ? prev : [...prev, cid]);
+      })
       .subscribe();
-    updatesChannelRef.current = ch;
     return () => { supabase.removeChannel(ch); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
