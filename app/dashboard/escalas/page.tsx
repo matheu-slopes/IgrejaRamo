@@ -41,7 +41,7 @@ function agruparItens(itens: Escala["itens"]) {
     } else {
       vistos.set(k, grupos.length);
       const obs = it.observacao && !["Cajón", "Pandeiro", "Violão"].includes(it.observacao) ? it.observacao : undefined;
-      grupos.push({ key: k, voluntarioId: it.voluntarioId, voluntarioNome: it.voluntario_nome ?? it.voluntarioNome, funcoes: [funcaoDisplay], observacao: obs });
+      grupos.push({ key: k, voluntarioId: it.voluntarioId, voluntarioNome: it.voluntarioNome, funcoes: [funcaoDisplay], observacao: obs });
     }
   }
   return grupos;
