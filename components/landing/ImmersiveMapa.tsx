@@ -36,13 +36,13 @@ export default function ImmersiveMapa() {
       {/* ── Divisor clean ── */}
       <div className="w-full border-t border-gray-200 py-8" />
 
-      <div className="py-16 px-4 md:py-20 md:px-6">
-      <div className="max-w-5xl mx-auto space-y-8 md:space-y-10">
+      <div className="py-10 px-4 md:py-14 md:px-6">
+      <div className="max-w-5xl mx-auto space-y-6 md:space-y-8">
 
         {/* ── Título centralizado ── */}
         <motion.h2
           {...fadeUp(0)}
-          className="text-center font-sans text-4xl md:text-6xl font-bold text-black"
+          className="text-center font-sans text-3xl md:text-4xl font-bold text-black"
         >
           Localização
         </motion.h2>
@@ -50,7 +50,7 @@ export default function ImmersiveMapa() {
         {/* ── Mapa full-width ── */}
         <motion.div {...fadeUp(0.05)}>
           <div
-            className="w-full h-[240px] md:h-[360px] rounded-2xl md:rounded-3xl overflow-hidden border border-gray-200/50 shadow-sm"
+            className="w-full h-[200px] md:h-[260px] rounded-2xl overflow-hidden border border-gray-200/50 shadow-sm"
           >
             <iframe
               title="Localização Igreja Ramo da Vida"
@@ -70,8 +70,8 @@ export default function ImmersiveMapa() {
           <div className="grid grid-cols-1 md:grid-cols-[1fr_1.7fr_1fr_160px] divide-y md:divide-y-0 md:divide-x divide-gray-100">
 
             {/* Coluna 1 — Endereço */}
-            <div className="p-6 md:p-9">
-              <div className="flex items-center gap-2 mb-5">
+            <div className="p-5 md:p-6">
+              <div className="flex items-center gap-2 mb-4">
                 <MapPin className="w-5 h-5 text-gray-600" strokeWidth={1.5} />
                 <p className="text-gray-900 text-base font-semibold">Endereço</p>
               </div>
@@ -91,8 +91,8 @@ export default function ImmersiveMapa() {
             </div>
 
             {/* Coluna 2 — Horários em grade 3×2 */}
-            <div className="p-6 md:p-9">
-              <div className="flex items-center gap-2 mb-5">
+            <div className="p-5 md:p-6">
+              <div className="flex items-center gap-2 mb-4">
                 <Clock className="w-5 h-5 text-gray-600" strokeWidth={1.5} />
                 <p className="text-gray-900 text-base font-semibold">Horários dos Cultos</p>
               </div>
@@ -121,8 +121,8 @@ export default function ImmersiveMapa() {
             </div>
 
             {/* Coluna 3 — Contato & Visita */}
-            <div className="p-6 md:p-9">
-              <div className="flex items-center gap-2 mb-5">
+            <div className="p-5 md:p-6">
+              <div className="flex items-center gap-2 mb-4">
                 <Phone className="w-5 h-5 text-gray-600" strokeWidth={1.5} />
                 <p className="text-gray-900 text-base font-semibold">Contato &amp; Visita</p>
               </div>
