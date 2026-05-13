@@ -29,6 +29,24 @@ const showFuncao = (it: { funcao: string; observacao?: string }) => {
   return it.funcao;
 };
 
+// Agrupa itens de escala por pessoa, retornando funções concatenadas
+function agruparItens(itens: Escala["itens"]) {
+  const grupos: { key: string; voluntarioId?: string; voluntarioNome: string; funcoes: string[]; observacao?: string }[] = [];
+  const vistos = new Map<string, number>();
+  for (const it of itens) {
+    const k = it.voluntarioId ?? it.voluntarioNome;
+    const funcaoDisplay = showFuncao(it);
+    if (vistos.has(k)) {
+      grupos[vistos.get(k)!].funcoes.push(funcaoDisplay);
+    } else {
+      vistos.set(k, grupos.length);
+      const obs = it.observacao && !["Cajón", "Pandeiro", "Violão"].includes(it.observacao) ? it.observacao : undefined;
+      grupos.push({ key: k, voluntarioId: it.voluntarioId, voluntarioNome: it.voluntario_nome ?? it.voluntarioNome, funcoes: [funcaoDisplay], observacao: obs });
+    }
+  }
+  return grupos;
+}
+
 // Ordem pelo fluxo do culto: Limpeza → Portaria(Cantina) → Louvor → Mídias → Pregação(Ensino) → Infantil → Jovens
 const MINISTERIOS_CULTO: Ministerio[] = ["Limpeza", "Cantina", "Louvor", "Mídias", "Ensino", "Infantil", "Jovens"];
 const TODOS: Ministerio[] = ["Limpeza", "Cantina", "Louvor", "Mídias", "Ensino", "Infantil", "Jovens"];
@@ -268,28 +286,28 @@ function MinisterioSection({
             <p className="text-xs text-gray-400 italic">Equipe não definida.</p>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-              {escala.itens.map((it, i) => (
+              {agruparItens(escala.itens).map((grp) => (
                 <div
-                  key={i}
+                  key={grp.key}
                   className={clsx(
                     "flex items-center gap-2 px-2.5 py-1.5 rounded-lg",
-                    it.voluntarioId === userId
+                    grp.voluntarioId === userId
                       ? "bg-gray-100 border border-gray-200"
                       : "bg-gray-50 border border-gray-100"
                   )}
                 >
                   <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide shrink-0 w-20 truncate">
-                    {showFuncao(it)}
+                    {grp.funcoes.join(" · ")}
                   </span>
                   <div className="flex-1 min-w-0">
                     <span className="text-sm font-semibold text-gray-800 truncate block">
-                      {it.voluntarioNome}
+                      {grp.voluntarioNome}
                     </span>
-                    {it.observacao && !["Cajón","Pandeiro","Violão"].includes(it.observacao) && (
-                      <span className="text-[10px] text-gray-400 italic truncate block">{it.observacao}</span>
+                    {grp.observacao && (
+                      <span className="text-[10px] text-gray-400 italic truncate block">{grp.observacao}</span>
                     )}
                   </div>
-                  {it.voluntarioId === userId && (
+                  {grp.voluntarioId === userId && (
                     <span className="w-1.5 h-1.5 rounded-full bg-gray-500 shrink-0" />
                   )}
                 </div>
@@ -374,26 +392,26 @@ function InfantilSection({
                   <p className="px-3 py-2 text-xs text-gray-400 italic">Equipe não definida.</p>
                 ) : (
                   <div className="px-3 py-2 grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                    {esc.itens.map((it, i) => (
+                    {agruparItens(esc.itens).map((grp) => (
                       <div
-                        key={i}
+                        key={grp.key}
                         className={clsx(
                           "flex items-start gap-2 px-2.5 py-1.5 rounded-lg",
-                          it.voluntarioId === userId
+                          grp.voluntarioId === userId
                             ? "bg-gray-100 border border-gray-200"
                             : "bg-gray-50 border border-gray-100"
                         )}
                       >
                         <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide shrink-0 w-20 truncate pt-0.5">
-                          {showFuncao(it)}
+                          {grp.funcoes.join(" · ")}
                         </span>
                         <div className="flex-1 min-w-0">
-                          <span className="text-sm font-semibold text-gray-800 truncate block">{it.voluntarioNome}</span>
-                          {it.observacao && !["Cajón", "Pandeiro", "Violão"].includes(it.observacao) && (
-                            <span className="text-[10px] text-gray-400 italic truncate block">{it.observacao}</span>
+                          <span className="text-sm font-semibold text-gray-800 truncate block">{grp.voluntarioNome}</span>
+                          {grp.observacao && (
+                            <span className="text-[10px] text-gray-400 italic truncate block">{grp.observacao}</span>
                           )}
                         </div>
-                        {it.voluntarioId === userId && (
+                        {grp.voluntarioId === userId && (
                           <span className="w-1.5 h-1.5 rounded-full bg-gray-500 shrink-0 mt-1.5" />
                         )}
                       </div>
