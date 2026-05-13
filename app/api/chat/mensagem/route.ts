@@ -2,8 +2,11 @@
 import { createClient } from "@supabase/supabase-js";
 import { sendPushToUsers } from "@/lib/sendPush";
 
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+
 const admin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  supabaseUrl,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
@@ -15,8 +18,17 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
   }
 
-  // Valida o JWT do usuário usando o client admin
-  const { data: { user }, error: authError } = await admin.auth.getUser(token);
+  // Valida o JWT com um client de usuário (anon + Authorization Bearer)
+  // para evitar falso 401 quando há diferença entre configs server/client.
+  const userClient = createClient(supabaseUrl, supabaseAnonKey, {
+    global: {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    },
+  });
+
+  const { data: { user }, error: authError } = await userClient.auth.getUser();
   if (authError || !user) {
     return NextResponse.json({ error: "Token inválido" }, { status: 401 });
   }
