@@ -5,10 +5,10 @@ import { Calendar, Users2, Sprout, Heart } from "lucide-react";
 
 // -- M�tricas � edite conforme necess�rio -------------------------------------
 const metrics = [
-  { numero: "2019", label: "Funda��o e\nPrimeiros Passos",         icon: Calendar },
-  { numero: "6",    label: "Minist�rios Ativos\ne Diversificados", icon: Users2   },
+  { numero: "2019", label: "Fundação e\nPrimeiros Passos",         icon: Calendar },
+  { numero: "6",    label: "Ministérios Ativos\ne Diversificados", icon: Users2   },
   { numero: "6+",   label: "Cultos\nSemanais",                     icon: Sprout   },
-  { numero: "8",    label: "Amor Incondicional\ne Servi�o",        icon: Heart    },
+  { numero: "8",    label: "Amor Incondicional\ne Serviço",        icon: Heart    },
 ];
 
 // Ramo decorativo naturalista com folhas e frutinhos
@@ -93,13 +93,13 @@ export default function ScrollyQuemSomos() {
           {/* Texto */}
           <div>
             <h2 className="font-sans text-3xl md:text-5xl font-bold text-black leading-tight mb-5">
-              Nossa Hist�ria:<br />Uma Comunidade Viva
+              Nossa História:<br />Uma Comunidade Viva
             </h2>
             <p className="text-gray-900/75 text-base leading-relaxed">
-              Nascidos do cora��o de Deus para manifestar o car�ter de Cristo, a comunidade crist�{" "}
-              <strong className="text-black font-bold">Ramo da Vida</strong> se manifesta atrav�s da
-              comunh�o nos cultos, em a��es sociais e no testemunho pessoal e coletivo de seus membros,
-              l�deres e simpatizantes do mesmo prop�sito.
+              Nascidos do coração de Deus para manifestar o caráter de Cristo, a comunidade cristã{" "}
+              <strong className="text-black font-bold">Ramo da Vida</strong> se manifesta através da
+              comunhão nos cultos, em ações sociais e no testemunho pessoal e coletivo de seus membros,
+              líderes e simpatizantes do mesmo propósito.
             </p>
           </div>
 
@@ -119,7 +119,7 @@ export default function ScrollyQuemSomos() {
         {/* -- 2. M�tricas � timeline horizontal com videira decorativa --- */}
         <motion.div {...fadeUp(0.05)}>
           <h3 className="font-sans text-2xl font-bold text-black mb-10">
-            Nosso Impacto e Trajet�ria
+            Nosso Impacto e Trajetória
           </h3>
 
           {/* Container relativo para a videira de fundo */}
@@ -211,7 +211,7 @@ export default function ScrollyQuemSomos() {
           </div>
         </motion.div>
 
-        {/* -- 3. Cita��o � Jo�o 15:5 com folhas decorativas --------------- */}
+        {/* -- 3. Cita��o � João 15:5 com folhas decorativas --------------- */}
         <motion.div
           {...fadeUp(0.08)}
           className="relative rounded-3xl bg-[#E8E0D2] px-6 py-12 md:px-10 md:py-16 text-center overflow-hidden"
@@ -221,13 +221,13 @@ export default function ScrollyQuemSomos() {
           <LeafDecor className="absolute -top-4 -right-2 w-36 text-gray-900 -rotate-12 scale-x-[-1] scale-y-[-1]" />
 
           <p className="relative z-10 font-sans italic text-xl md:text-3xl text-black leading-relaxed max-w-2xl mx-auto">
-            "Eu sou a videira; v�s sois os ramos.{" "}
+            "Eu sou a videira; vós sois os ramos.{" "}
             <br className="hidden md:block" />
-            Quem permanece em mim e eu nele, esse d� muito fruto."
+            Quem permanece em mim e eu nele, esse dá muito fruto."
           </p>
           <div className="mx-auto mt-7 w-8 h-px bg-gray-400/60 relative z-10" />
           <span className="relative z-10 block text-gray-600 text-[10px] tracking-[0.4em] uppercase mt-5">
-            Jo�o 15:5
+            João 15:5
           </span>
         </motion.div>
 
