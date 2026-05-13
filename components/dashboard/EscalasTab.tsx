@@ -1022,7 +1022,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
                         </thead>
                         <tbody className="divide-y divide-gray-50">
                           {(() => {
-                            // Agrupa por pessoa antes de exibir
+                            // Agrupa por pessoa, Ministro primeiro
                             const grupos: { key: string; voluntarioId?: string; voluntarioNome: string; funcoes: string[]; observacao?: string }[] = [];
                             const vistos = new Map<string, number>();
                             for (const it of selectedEscala.itens) {
@@ -1034,14 +1034,17 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
                                 grupos.push({ key: k, voluntarioId: it.voluntarioId, voluntarioNome: it.voluntarioNome, funcoes: [displayFuncao(it)], observacao: displayObs(it) });
                               }
                             }
-                            return grupos.map((grp) => (
+                            grupos.sort((a, b) => (a.funcoes.includes("Ministro") ? 0 : 1) - (b.funcoes.includes("Ministro") ? 0 : 1));
+                            return grupos.map((grp) => {
+                              const isMinistro = grp.funcoes.includes("Ministro");
+                              return (
                               <tr key={grp.key} className={grp.voluntarioId === user?.id ? "bg-gray-50" : ""}>
                                 <td className="px-3 py-2.5">
                                   <span className="text-xs font-bold text-grape-800 bg-grape-50 px-2 py-0.5 rounded-full">
                                     {grp.funcoes.join(" · ")}
                                   </span>
                                 </td>
-                                <td className="px-3 py-2.5 font-medium text-gray-800 text-sm">
+                                <td className={clsx("px-3 py-2.5 text-sm", isMinistro ? "font-bold text-gray-900" : "font-medium text-gray-800")}>
                                   {grp.voluntarioNome}
                                   {grp.voluntarioId === user?.id && (
                                     <span className="ml-1.5 text-[10px] bg-black text-white px-1.5 py-0.5 rounded-full font-bold">você</span>
@@ -1051,7 +1054,8 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
                                   )}
                                 </td>
                               </tr>
-                            ));
+                              );
+                            });
                           })()}
                         </tbody>
                       </table>

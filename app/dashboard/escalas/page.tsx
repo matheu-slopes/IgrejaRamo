@@ -44,7 +44,12 @@ function agruparItens(itens: Escala["itens"]) {
       grupos.push({ key: k, voluntarioId: it.voluntarioId, voluntarioNome: it.voluntarioNome, funcoes: [funcaoDisplay], observacao: obs });
     }
   }
-  return grupos;
+  // Ministro sempre primeiro
+  return grupos.sort((a, b) => {
+    const aMin = a.funcoes.includes("Ministro") ? 0 : 1;
+    const bMin = b.funcoes.includes("Ministro") ? 0 : 1;
+    return aMin - bMin;
+  });
 }
 
 // Ordem pelo fluxo do culto: Limpeza → Portaria(Cantina) → Louvor → Mídias → Pregação(Ensino) → Infantil → Jovens
@@ -286,7 +291,9 @@ function MinisterioSection({
             <p className="text-xs text-gray-400 italic">Equipe não definida.</p>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-              {agruparItens(escala.itens).map((grp) => (
+              {agruparItens(escala.itens).map((grp) => {
+                const isMinistro = grp.funcoes.includes("Ministro");
+                return (
                 <div
                   key={grp.key}
                   className={clsx(
@@ -300,7 +307,7 @@ function MinisterioSection({
                     {grp.funcoes.join(" · ")}
                   </span>
                   <div className="flex-1 min-w-0">
-                    <span className="text-sm font-semibold text-gray-800 truncate block">
+                    <span className={clsx("text-sm truncate block", isMinistro ? "font-bold text-gray-900" : "font-semibold text-gray-800")}>
                       {grp.voluntarioNome}
                     </span>
                     {grp.observacao && (
@@ -311,7 +318,8 @@ function MinisterioSection({
                     <span className="w-1.5 h-1.5 rounded-full bg-gray-500 shrink-0" />
                   )}
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -392,7 +400,9 @@ function InfantilSection({
                   <p className="px-3 py-2 text-xs text-gray-400 italic">Equipe não definida.</p>
                 ) : (
                   <div className="px-3 py-2 grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                    {agruparItens(esc.itens).map((grp) => (
+                    {agruparItens(esc.itens).map((grp) => {
+                      const isMinistro = grp.funcoes.includes("Ministro");
+                      return (
                       <div
                         key={grp.key}
                         className={clsx(
@@ -406,7 +416,7 @@ function InfantilSection({
                           {grp.funcoes.join(" · ")}
                         </span>
                         <div className="flex-1 min-w-0">
-                          <span className="text-sm font-semibold text-gray-800 truncate block">{grp.voluntarioNome}</span>
+                          <span className={clsx("truncate block", isMinistro ? "text-sm font-bold text-gray-900" : "text-sm font-semibold text-gray-800")}>{grp.voluntarioNome}</span>
                           {grp.observacao && (
                             <span className="text-[10px] text-gray-400 italic truncate block">{grp.observacao}</span>
                           )}
@@ -415,7 +425,8 @@ function InfantilSection({
                           <span className="w-1.5 h-1.5 rounded-full bg-gray-500 shrink-0 mt-1.5" />
                         )}
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
