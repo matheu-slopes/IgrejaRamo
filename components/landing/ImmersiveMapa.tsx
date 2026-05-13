@@ -17,7 +17,7 @@ const horarios = [
   { dia: "Terça (2ª)", desc: "Ensino",          hora: "19h45" },
   { dia: "Quinta",     desc: "Culto",           hora: "20h"   },
   { dia: "Sábado",     desc: "Jovens",          hora: "19h30" },
-  { dia: "Domingo",    desc: "Culto Principal", hora: "18h30", destaque: true },
+  { dia: "Domingo",    desc: "Culto Dominical", hora: "18h30", destaque: true },
 ];
 
 const WHATSAPP = "5519995953536";
