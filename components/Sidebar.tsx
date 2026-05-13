@@ -42,13 +42,13 @@ const navAdmin = [
 ];
 
 const ministerios = [
-  { label: "Louvor",      icon: Music,          href: "/dashboard/ministerio/Louvor",                          cor: "bg-rose-700"    },
-  { label: "Mídias",      icon: Video,          href: "/dashboard/ministerio/M%C3%ADdias",                     cor: "bg-blue-700"    },
-  { label: "Ensino",      icon: BookOpen,       href: "/dashboard/ministerio/Ensino",                           cor: "bg-amber-700"   },
-  { label: "Infantil",    icon: Baby,           href: "/dashboard/ministerio/Infantil",                         cor: "bg-emerald-700" },
-  { label: "Ação Social", icon: HeartHandshake, href: "/dashboard/ministerio/A%C3%A7%C3%A3o%20Social",          cor: "bg-orange-700"  },
-  { label: "Jovens",      icon: Users,          href: "/dashboard/ministerio/Jovens",                           cor: "bg-violet-700"  },
-  { label: "Limpeza",     icon: Sparkles,       href: "/dashboard/ministerio/Limpeza",                          cor: "bg-teal-700"    },
+  { label: "Louvor",      icon: Music,          href: "/dashboard/ministerio/Louvor"                          },
+  { label: "Mídias",      icon: Video,          href: "/dashboard/ministerio/M%C3%ADdias"                     },
+  { label: "Ensino",      icon: BookOpen,       href: "/dashboard/ministerio/Ensino"                           },
+  { label: "Infantil",    icon: Baby,           href: "/dashboard/ministerio/Infantil"                         },
+  { label: "Ação Social", icon: HeartHandshake, href: "/dashboard/ministerio/A%C3%A7%C3%A3o%20Social"          },
+  { label: "Jovens",      icon: Users,          href: "/dashboard/ministerio/Jovens"                           },
+  { label: "Limpeza",     icon: Sparkles,       href: "/dashboard/ministerio/Limpeza"                          },
 ];
 
 export default function Sidebar() {
@@ -169,7 +169,7 @@ export default function Sidebar() {
                 </p>
               )}
               {collapsed && <div className="border-t border-vine-700 my-3 mx-1" />}
-              {meusItens.map(({ label, icon: Icon, href, cor }) => {
+              {meusItens.map(({ label, icon: Icon, href }) => {
                 const eLider = user?.liderMinisterios?.some(
                   (um) => um.toLowerCase() === label.toLowerCase()
                 );
@@ -181,8 +181,8 @@ export default function Sidebar() {
                     className={clsx(
                       "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition",
                       isAtivo
-                        ? `${cor} text-white opacity-100`
-                        : `${cor} text-white opacity-60 hover:opacity-100`
+                        ? "bg-vine-600 text-white"
+                        : "text-vine-100/80 hover:bg-vine-800 hover:text-white"
                     )}
                     title={collapsed ? label : undefined}
                   >
