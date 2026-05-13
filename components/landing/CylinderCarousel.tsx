@@ -20,17 +20,17 @@ const days: CultoDay[] = [
     id: "seg",
     short: "SEG",
     full: "Segunda-feira",
-    title: "Ora��o",
-    description: "Busca, intercess�o coletiva e fortalecimento espiritual.",
+    title: "Oração",
+    description: "Busca, intercessão coletiva e fortalecimento espiritual.",
     time: "20h00",
     place: "Templo Principal",
   },
   {
     id: "ter",
     short: "TER",
-    full: "Ter�a-feira",
+    full: "Terça-feira",
     title: "Mulheres & Ensino",
-    description: "1� ter�a: culto de mulheres. 2� ter�a: ensino b�blico.",
+    description: "1ª terça: culto de mulheres. 2ª terça: ensino bíblico.",
     time: "19h30 / 19h45",
     place: "Templo Principal",
   },
@@ -39,16 +39,16 @@ const days: CultoDay[] = [
     short: "QUI",
     full: "Quinta-feira",
     title: "Culto de Quinta",
-    description: "Louvor, ora��o e Palavra para renovar a f� no meio da semana.",
+    description: "Louvor, oração e Palavra para renovar a fé no meio da semana.",
     time: "20h00",
     place: "Templo Principal",
   },
   {
     id: "sab",
-    short: "S�B",
-    full: "S�bado",
+    short: "SÁB",
+    full: "Sábado",
     title: "Jovens",
-    description: "Encontro quinzenal com adora��o, comunh�o e palavra para a juventude.",
+    description: "Encontro quinzenal com adoração, comunhão e palavra para a juventude.",
     time: "19h30",
     place: "Sala 3",
   },
@@ -57,7 +57,7 @@ const days: CultoDay[] = [
     short: "DOM",
     full: "Domingo",
     title: "Culto Dominical",
-    description: "Celebra��o com louvor, mensagem e comunh�o para toda a fam�lia.",
+    description: "Celebração com louvor, mensagem e comunhão para toda a família.",
     time: "18h30",
     place: "Templo Principal",
     featured: true,
@@ -142,7 +142,7 @@ export default function CylinderCarousel() {
           className="text-center mb-14"
         >
           <p className="mb-3 text-[11px] uppercase tracking-[0.45em] text-gray-800">
-            Programa��o Semanal
+            Programação Semanal
           </p>
           <h2 className="font-sans text-3xl md:text-4xl font-semibold leading-none text-[#1A1A1A] tracking-tight">
             Nossos Cultos
@@ -229,7 +229,7 @@ export default function CylinderCarousel() {
           transition={{ delay: 0.8 }}
           className="mt-10 text-center text-[10px] tracking-[0.3em] text-gray-400 uppercase"
         >
-          R. Fern�o Pompeu de Camargo, 1293 � Campinas
+          R. Fernão Pompeu de Camargo, 1293 — Campinas
         </motion.p>
       </div>
 
