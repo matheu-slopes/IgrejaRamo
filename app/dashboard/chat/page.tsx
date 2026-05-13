@@ -1045,7 +1045,7 @@ function NewDmModal({
 
 // --- NewGroupModal ------------------------------------------------
 
-const GROUP_EMOJIS = ["??","?","??","??","??","??","??","??","??","??","??","?","???","??"];
+const GROUP_EMOJIS = ["🎵","✝️","🙏","⚡","🌿","❤️","🔥","🎸","📖","🎺","👐","🕊️","🌟","🎶"];
 
 function NewGroupModal({
   currentUserId, usuarios, onClose, onCreate,
@@ -1056,7 +1056,7 @@ function NewGroupModal({
   onCreate: (nome: string, emoji: string, membros: string[]) => void;
 }) {
   const [nome, setNome] = useState("");
-  const [emoji, setEmoji] = useState("??");
+  const [emoji, setEmoji] = useState("🎵");
   const [membros, setMembros] = useState<string[]>([]);
   const [search, setSearch] = useState("");
   const others = usuarios.filter((mu) => mu.id !== currentUserId);
