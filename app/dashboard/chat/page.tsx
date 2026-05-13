@@ -1503,14 +1503,52 @@ export default function ChatPage() {
       .on("postgres_changes" as any, {
         event: "INSERT", schema: "public", table: "chat_mensagens",
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      }, (payload: any) => {
+      }, async (payload: any) => {
         const row = payload.new;
         const cid = row.conversa_id as string;
         if (!conversaIdsRef.current.includes(cid)) {
-          // Conversa ainda não carregada localmente — recarrega todas as conversas
-          // para incluir esta e então aplica a mensagem
-          carregarConversas();
-          return;
+          // Conversa ainda não carregada localmente: hidrata a conversa agora
+          // para não perder a primeira mensagem por condição de corrida.
+          const [{ data: conv }, { data: parts }] = await Promise.all([
+            supabase.from("chat_conversas").select("*").eq("id", cid).single(),
+            supabase.from("chat_participantes").select("user_id").eq("conversa_id", cid),
+          ]);
+
+          if (!conv) {
+            // fallback: tenta sincronizar lista inteira caso a conversa ainda não esteja visível
+            carregarConversas();
+            return;
+          }
+
+          const membrosIds = ((parts ?? []) as { user_id: string }[]).map(p => p.user_id);
+          const outrosIds = membrosIds.filter(id => id !== user.id);
+          const nomePorId: Record<string, string> = {};
+          if (outrosIds.length) {
+            const { data: perfisData } = await supabase.from("perfis").select("id, nome").in("id", outrosIds);
+            for (const p of (perfisData ?? []) as { id: string; nome: string }[]) nomePorId[p.id] = p.nome;
+          }
+
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const c = conv as any;
+          if (c.tipo === "direto") {
+            const otherId = membrosIds.find(id => id !== user.id) ?? "";
+            const otherNome = nomePorId[otherId] ?? usuarios.find(mu => mu.id === otherId)?.nome ?? "Usuário";
+            setDms(prev => prev.some(d => d.id === cid) ? prev : [...prev, {
+              id: cid,
+              participantes: [user.id, otherId] as [string, string],
+              participantesNomes: [user.nome, otherNome] as [string, string],
+              mensagens: [],
+            }]);
+          } else {
+            setGrupos(prev => prev.some(g => g.id === cid) ? prev : [...prev, {
+              id: cid, nome: c.nome ?? "Grupo", tipo: "geral",
+              emoji: c.emoji ?? "", cor: c.cor ?? "bg-slate-700",
+              descricao: c.descricao ?? undefined, adminId: c.admin_id ?? undefined,
+              somenteAdmin: c.somente_admin ?? false, institucional: c.institucional ?? false,
+              membros: membrosIds, mensagens: [],
+            }]);
+          }
+          setConversaIds(prev => prev.includes(cid) ? prev : [...prev, cid]);
         }
         const serverTime = row.criado_em as string;
         const msg: MensagemConversa = {
