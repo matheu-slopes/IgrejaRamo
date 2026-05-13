@@ -255,7 +255,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
   const [savingNova, setSavingNova] = useState(false);
   const [saving, setSaving] = useState(false);
   const [salvarErro, setSalvarErro] = useState("");
-  const [editandoIdx, setEditandoIdx] = useState<number | null>(null);
+  const [editandoKey, setEditandoKey] = useState<string | null>(null);
   const [adicionandoParticipante, setAdicionandoParticipante] = useState(false);
   const [viewMode, setViewMode] = useState<"minhas" | "culto">("culto");
   const [busca, setBusca] = useState("");
@@ -398,23 +398,25 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
   async function salvar() {
     if (!form.culto || !form.data || !form.horario) return;
 
-    // Auto-aplica edição de participante pendente (usuário trocou função mas não clicou Atualizar)
+    // Auto-aplica edição de participante pendente (usuário alterou mas não clicou Confirmar)
     let itensFinais = [...form.itens];
-    if (editandoIdx !== null && novoMembroId) {
+    if (editandoKey !== null && novoMembroId) {
       const membro = membros.find((m) => m.id === novoMembroId);
-      const nomeResolv = membro?.nome ?? form.itens[editandoIdx]?.voluntarioNome;
+      const nomeResolv = membro?.nome ?? form.itens.find((it) => (it.voluntarioId ?? it.voluntarioNome) === editandoKey)?.voluntarioNome;
       if (nomeResolv) {
-        const novoItem: import("@/types").ItemEscala = {
-          funcao: novaFuncao as FuncaoEscala,
-          voluntarioId: novoMembroId,
-          voluntarioNome: nomeResolv,
-          observacao: novaObs.trim() || undefined,
-        };
-        itensFinais = itensFinais.map((it, i) => i === editandoIdx ? novoItem : it);
-        setForm((f) => ({ ...f, itens: itensFinais }));
-        setEditandoIdx(null);
-        setNovoMembroId("");
-        setNovaObs("");
+        const funcoesSel = novasFuncoes.length > 0 ? novasFuncoes : [funcoesMinisterio[0]];
+        const itensDeOutros = itensFinais.filter((it) => (it.voluntarioId ?? it.voluntarioNome) !== editandoKey);
+        const novosItens = funcoesSel
+          .filter((f) => f === "Backing Vocal" || !itensDeOutros.some((it) => it.funcao === f || displayFuncao(it) === f))
+          .map((f) => ({ funcao: f as FuncaoEscala, voluntarioId: novoMembroId, voluntarioNome: nomeResolv, observacao: novaObs.trim() || undefined }));
+        if (novosItens.length > 0) {
+          itensFinais = [...itensDeOutros, ...novosItens];
+          setForm((f) => ({ ...f, itens: itensFinais }));
+          setEditandoKey(null);
+          setNovoMembroId("");
+          setNovaObs("");
+          setNovasFuncoes([]);
+        }
       }
     }
 
@@ -518,19 +520,19 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
   function addParticipante() {
     if (!novoMembroId) return;
     const membro = membros.find((m) => m.id === novoMembroId);
-    const nomeResolv = membro?.nome ?? (editandoIdx !== null ? form.itens[editandoIdx]?.voluntarioNome : undefined);
+    const nomeResolv = membro?.nome ?? (editandoKey !== null ? form.itens.find((it) => (it.voluntarioId ?? it.voluntarioNome) === editandoKey)?.voluntarioNome : undefined);
     if (!nomeResolv) return;
     const funcoesSel = novasFuncoes.length > 0 ? novasFuncoes : [funcoesMinisterio[0]];
 
-    if (editandoIdx !== null) {
-      // Remove o slot editado e insere um por função selecionada
-      // Funções já ocupadas por OUTRA pessoa bloqueamos; mesma pessoa pode ter múltiplos se Backing Vocal
+    if (editandoKey !== null) {
+      // Remove TODOS os slots dessa pessoa e insere um por função selecionada
+      const itensDeOutros = form.itens.filter((it) => (it.voluntarioId ?? it.voluntarioNome) !== editandoKey);
       const novosItens: import("@/types").ItemEscala[] = funcoesSel
         .filter((f) => {
           const permiteMultiplos = f === "Backing Vocal";
           if (permiteMultiplos) return true;
-          // bloqueia se já existe OUTRO participante (diferente do slot sendo editado) com essa função
-          return !form.itens.some((it, i) => i !== editandoIdx && it.funcao === f);
+          // bloqueia se já existe OUTRA pessoa com essa função
+          return !itensDeOutros.some((it) => it.funcao === f || displayFuncao(it) === f);
         })
         .map((f) => ({
           funcao: f as FuncaoEscala,
@@ -539,13 +541,12 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
           observacao: novaObs.trim() || undefined,
         }));
       if (novosItens.length === 0) return;
-      const itensRestantes = form.itens.filter((_, i) => i !== editandoIdx);
-      setForm((f) => ({ ...f, itens: [...itensRestantes, ...novosItens] }));
-      setEditandoIdx(null);
+      setForm((f) => ({ ...f, itens: [...itensDeOutros, ...novosItens] }));
+      setEditandoKey(null);
     } else {
       // Adição nova — uma entrada por função selecionada
       const novosItens: import("@/types").ItemEscala[] = funcoesSel
-        .filter((f) => !form.itens.some((it) => it.voluntarioId === novoMembroId && it.funcao === f))
+        .filter((f) => !form.itens.some((it) => it.voluntarioId === novoMembroId && (it.funcao === f || displayFuncao(it) === f)))
         .map((f) => ({
           funcao: f as FuncaoEscala,
           voluntarioId: novoMembroId,
@@ -561,16 +562,16 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
     setNovasFuncoes([]);
   }
 
-  function editarParticipante(idx: number) {
-    const it = form.itens[idx];
-    setNovoMembroId(it.voluntarioId ?? "");
-    setNovasFuncoes([displayFuncao(it)]);
-    setNovaObs(displayObs(it) ?? "");
-    setEditandoIdx(idx);
+  function editarParticipante(key: string, voluntarioId: string | undefined, voluntarioNome: string) {
+    const slots = form.itens.filter((it) => (it.voluntarioId ?? it.voluntarioNome) === key);
+    setNovoMembroId(voluntarioId ?? "");
+    setNovasFuncoes(slots.map((it) => displayFuncao(it)));
+    setNovaObs(slots.map((it) => displayObs(it)).find((o) => o !== undefined) ?? "");
+    setEditandoKey(key);
   }
 
   function cancelarEdicaoParticipante() {
-    setEditandoIdx(null);
+    setEditandoKey(null);
     setAdicionandoParticipante(false);
     setNovoMembroId("");
     setNovaObs("");
@@ -578,10 +579,9 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
     setNovasFuncoes([]);
   }
 
-  function removeParticipante(idx: number) {
-    if (editandoIdx === idx) cancelarEdicaoParticipante();
-    setForm((f) => ({ ...f, itens: f.itens.filter((_, i) => i !== idx) }));
-    if (editandoIdx !== null && editandoIdx > idx) setEditandoIdx(editandoIdx - 1);
+  function removeParticipante(key: string) {
+    if (editandoKey === key) cancelarEdicaoParticipante();
+    setForm((f) => ({ ...f, itens: f.itens.filter((it) => (it.voluntarioId ?? it.voluntarioNome) !== key) }));
   }
 
   const musicasFiltradas = musicas.filter((m) =>
@@ -1395,109 +1395,122 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
             {form.itens.length === 0 && !adicionandoParticipante && (
               <p className="text-sm text-gray-400 text-center py-6">Nenhum participante adicionado.</p>
             )}
-            {form.itens.map((it, i) => (
-              <div key={i}>
-                {editandoIdx === i ? (
-                  /* Form de edição inline — mesmo layout do form de adição */
-                  <div className="border border-gray-300 rounded-xl p-3 space-y-3 bg-gray-50">
-                    <p className="text-xs font-semibold text-gray-500">Editando: <span className="text-gray-800">{it.voluntarioNome}</span></p>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      <select
-                        value={novoMembroId}
-                        onChange={(e) => setNovoMembroId(e.target.value)}
-                        className="border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-gray-400 bg-white"
-                      >
-                        <option value="">Selecionar membro</option>
-                        {novoMembroId && !membros.find((m) => m.id === novoMembroId) && (
-                          <option value={novoMembroId}>{it.voluntarioNome}</option>
-                        )}
-                        {membros
-                          .filter((m) => m.id === novoMembroId || !form.itens.some((it2, j) => j !== i && it2.voluntarioId === m.id))
-                          .map((m) => <option key={m.id} value={m.id}>{m.nome}</option>)
-                        }
-                      </select>
-                      <input
-                        value={novaObs}
-                        onChange={(e) => setNovaObs(e.target.value)}
-                        placeholder="Observação (opcional)"
-                        className="border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-gray-400"
-                      />
+            {(() => {
+              // Agrupa participantes por pessoa (evita cards duplicados para quem tem múltiplas funções)
+              const grupos: { key: string; voluntarioId: string | undefined; voluntarioNome: string; funcoes: string[] }[] = [];
+              const vistos = new Map<string, number>();
+              for (const it of form.itens) {
+                const k = it.voluntarioId ?? it.voluntarioNome;
+                if (vistos.has(k)) {
+                  grupos[vistos.get(k)!].funcoes.push(displayFuncao(it));
+                } else {
+                  vistos.set(k, grupos.length);
+                  grupos.push({ key: k, voluntarioId: it.voluntarioId, voluntarioNome: it.voluntarioNome, funcoes: [displayFuncao(it)] });
+                }
+              }
+              return grupos.map((grp) => (
+                <div key={grp.key}>
+                  {editandoKey === grp.key ? (
+                    /* Form de edição inline */
+                    <div className="border border-gray-300 rounded-xl p-3 space-y-3 bg-gray-50">
+                      <p className="text-xs font-semibold text-gray-500">Editando: <span className="text-gray-800">{grp.voluntarioNome}</span></p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <select
+                          value={novoMembroId}
+                          onChange={(e) => setNovoMembroId(e.target.value)}
+                          className="border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-gray-400 bg-white"
+                        >
+                          <option value="">Selecionar membro</option>
+                          {novoMembroId && !membros.find((m) => m.id === novoMembroId) && (
+                            <option value={novoMembroId}>{grp.voluntarioNome}</option>
+                          )}
+                          {membros
+                            .filter((m) => m.id === novoMembroId || !form.itens.some((it2) => (it2.voluntarioId ?? it2.voluntarioNome) !== grp.key && it2.voluntarioId === m.id))
+                            .map((m) => <option key={m.id} value={m.id}>{m.nome}</option>)
+                          }
+                        </select>
+                        <input
+                          value={novaObs}
+                          onChange={(e) => setNovaObs(e.target.value)}
+                          placeholder="Observação (opcional)"
+                          className="border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-gray-400"
+                        />
+                      </div>
+                      {/* Badges de função */}
+                      <div className="flex flex-wrap gap-1.5">
+                        {funcoesMinisterio.map((f) => {
+                          const sel = novasFuncoes.includes(f);
+                          const permiteMultiplos = f === "Backing Vocal";
+                          // Bloqueia se já ocupada por OUTRA pessoa
+                          const jaOcupada = !permiteMultiplos && form.itens.some((it2) => (it2.voluntarioId ?? it2.voluntarioNome) !== grp.key && (it2.funcao === f || displayFuncao(it2) === f));
+                          return (
+                            <button
+                              key={f}
+                              type="button"
+                              disabled={jaOcupada}
+                              onClick={() => !jaOcupada && setNovasFuncoes((prev) => sel ? prev.filter((x) => x !== f) : [...prev, f])}
+                              title={jaOcupada ? "Já há alguém nesta função" : undefined}
+                              className={clsx(
+                                "text-xs font-medium px-3 py-1 rounded-full border transition",
+                                jaOcupada
+                                  ? "bg-gray-100 text-gray-300 border-gray-200 cursor-not-allowed line-through"
+                                  : sel
+                                    ? "bg-gray-900 text-white border-gray-900"
+                                    : "bg-white text-gray-600 border-gray-300 hover:border-gray-500"
+                              )}
+                            >
+                              {f}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      {novasFuncoes.length === 0 && (
+                        <p className="text-xs text-amber-600">Selecione ao menos uma função.</p>
+                      )}
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={addParticipante}
+                          disabled={!novoMembroId || novasFuncoes.length === 0}
+                          className="flex items-center gap-1.5 text-white text-xs font-semibold px-4 py-2 rounded-xl bg-black hover:bg-gray-900 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                        >
+                          <Save className="w-3.5 h-3.5" /> Confirmar
+                        </button>
+                        <button
+                          onClick={cancelarEdicaoParticipante}
+                          className="text-xs text-gray-500 px-3 py-2 rounded-xl hover:bg-gray-100 transition"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
                     </div>
-                    {/* Badges de função — mesmo comportamento do form de adição */}
-                    <div className="flex flex-wrap gap-1.5">
-                      {funcoesMinisterio.map((f) => {
-                        const sel = novasFuncoes.includes(f);
-                        const permiteMultiplos = f === "Backing Vocal";
-                        // Bloqueia se já ocupada por OUTRO slot (não o que estamos editando)
-                        const jaOcupada = !permiteMultiplos && form.itens.some((it2, j) => j !== i && it2.funcao === f);
-                        return (
-                          <button
-                            key={f}
-                            type="button"
-                            disabled={jaOcupada}
-                            onClick={() => !jaOcupada && setNovasFuncoes((prev) => sel ? prev.filter((x) => x !== f) : [...prev, f])}
-                            title={jaOcupada ? "Já há alguém nesta função" : undefined}
-                            className={clsx(
-                              "text-xs font-medium px-3 py-1 rounded-full border transition",
-                              jaOcupada
-                                ? "bg-gray-100 text-gray-300 border-gray-200 cursor-not-allowed line-through"
-                                : sel
-                                  ? "bg-gray-900 text-white border-gray-900"
-                                  : "bg-white text-gray-600 border-gray-300 hover:border-gray-500"
-                            )}
-                          >
-                            {f}
-                          </button>
-                        );
-                      })}
+                  ) : (
+                    /* Card agrupado — funções como badges na mesma linha */
+                    <div className="flex items-center justify-between bg-white border border-gray-100 rounded-xl px-4 py-3 shadow-sm">
+                      <div>
+                        <p className="text-sm font-semibold text-gray-800">{grp.voluntarioNome}</p>
+                        <p className="text-xs text-grape-700 font-medium">{grp.funcoes.join(" · ")}</p>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => { setAdicionandoParticipante(false); editarParticipante(grp.key, grp.voluntarioId, grp.voluntarioNome); }}
+                          className="p-2 text-gray-400 hover:text-gray-800 hover:bg-gray-50 rounded-xl transition"
+                          title="Editar"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => removeParticipante(grp.key)}
+                          className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition"
+                          title="Remover"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
-                    {novasFuncoes.length === 0 && (
-                      <p className="text-xs text-amber-600">Selecione ao menos uma função.</p>
-                    )}
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={addParticipante}
-                        disabled={!novoMembroId || novasFuncoes.length === 0}
-                        className="flex items-center gap-1.5 text-white text-xs font-semibold px-4 py-2 rounded-xl bg-black hover:bg-gray-900 disabled:opacity-40 disabled:cursor-not-allowed transition"
-                      >
-                        <Save className="w-3.5 h-3.5" /> Confirmar
-                      </button>
-                      <button
-                        onClick={cancelarEdicaoParticipante}
-                        className="text-xs text-gray-500 px-3 py-2 rounded-xl hover:bg-gray-100 transition"
-                      >
-                        Cancelar
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  /* Card normal do participante */
-                  <div className="flex items-center justify-between bg-white border border-gray-100 rounded-xl px-4 py-3 shadow-sm">
-                    <div>
-                      <p className="text-sm font-semibold text-gray-800">{it.voluntarioNome}</p>
-                      <p className="text-xs text-grape-700 font-medium">{displayFuncao(it)}</p>
-                      {displayObs(it) && <p className="text-xs text-gray-400 mt-0.5">{displayObs(it)}</p>}
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={() => { setAdicionandoParticipante(false); editarParticipante(i); }}
-                        className="p-2 text-gray-400 hover:text-gray-800 hover:bg-gray-50 rounded-xl transition"
-                        title="Editar"
-                      >
-                        <Pencil className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        onClick={() => removeParticipante(i)}
-                        className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition"
-                        title="Remover"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            ))}
+                  )}
+                </div>
+              ));
+            })()}
           </div>
 
           {/* Form de adição (colapsável) */}
@@ -1529,7 +1542,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
                   {funcoesMinisterio.map((f) => {
                     const sel = novasFuncoes.includes(f);
                     const permiteMultiplos = f === "Backing Vocal";
-                    const jaOcupada = !permiteMultiplos && form.itens.some((it) => it.funcao === f);
+                    const jaOcupada = !permiteMultiplos && form.itens.some((it) => it.funcao === f || displayFuncao(it) === f);
                     return (
                       <button
                         key={f}
