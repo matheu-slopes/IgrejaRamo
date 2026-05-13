@@ -170,15 +170,6 @@ const EMOJIS = [
 
 const QUICK_REACTIONS = ["??", "??", "??", "??", "??", "??"];
 
-const MOCK_MEDIA = [
-  "https://images.unsplash.com/photo-1510915361894-db8b60106cb1?w=200&q=60",
-  "https://images.unsplash.com/photo-1519451241324-20b4ea2c4220?w=200&q=60",
-  "https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=200&q=60",
-  "https://images.unsplash.com/photo-1593113598332-cd288d649433?w=200&q=60",
-  "https://images.unsplash.com/photo-1464366400600-7168b8af9bc3?w=200&q=60",
-  "https://images.unsplash.com/photo-1484820540004-14229fe36ca4?w=200&q=60",
-];
-
 // --- Helpers ------------------------------------------------------
 
 function iniciais(nome: string) {
@@ -904,6 +895,7 @@ function InfoPanel({
 }) {
   const [tab, setTab] = useState<"midia" | "favoritos">("midia");
   const starred = messages.filter((m) => starredIds.has(m.id));
+  const mediaImages = messages.filter((m) => m.tipo === "imagem" && m.mediaUrl);
 
   return (
     <div className="w-72 flex flex-col border-l border-gray-100 bg-white h-full shrink-0">
@@ -953,15 +945,21 @@ function InfoPanel({
             <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 px-4 pt-3 pb-2">
               Fotos e videos
             </p>
-            <div className="grid grid-cols-3 gap-0.5">
-              {MOCK_MEDIA.map((url, i) => (
-                <div
-                  key={i}
-                  className="aspect-square bg-gray-100 cursor-pointer hover:opacity-90 transition"
-                  style={{ backgroundImage: `url(${url})`, backgroundSize: "cover", backgroundPosition: "center" }}
-                />
-              ))}
-            </div>
+            {mediaImages.length === 0 ? (
+              <div className="flex flex-col items-center gap-2 py-8 text-gray-300">
+                <p className="text-xs text-center text-gray-400 leading-relaxed">Nenhuma foto ou vídeo compartilhado.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-3 gap-0.5">
+                {mediaImages.map((m) => (
+                  <div
+                    key={m.id}
+                    className="aspect-square bg-gray-100 cursor-pointer hover:opacity-90 transition"
+                    style={{ backgroundImage: `url(${m.mediaUrl})`, backgroundSize: "cover", backgroundPosition: "center" }}
+                  />
+                ))}
+              </div>
+            )}
           </div>
         )}
 
