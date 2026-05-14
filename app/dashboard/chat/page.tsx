@@ -1202,6 +1202,7 @@ export default function ChatPage() {
   const lastBackfillRef = useRef<string>(new Date(Date.now() - 5 * 60 * 1000).toISOString());
   const lastSequenceRef = useRef<number>(0);
   const syncRunningRef = useRef(false);
+  const notificationDispatchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Inbox de mensagens recebidas enquanto estava em outra p�gina
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const inboxRef = useRef<Record<string, any[]>>({});
@@ -1239,10 +1240,27 @@ export default function ChatPage() {
       const raw = localStorage.getItem(cacheKey(uid));
       if (!raw) return null;
       const parsed = JSON.parse(raw);
-      // Remove mensagens que ficaram presas como "? enviando m�dia�"
-      // (upload n�o conclu�do antes de recarregar a p�gina)
+      // Remove mensagens presas de upload antigo e normaliza caches de versões
+      // anteriores que salvaram campos no formato do banco (autor_id/criado_em).
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const normalizar = (m: any): MensagemConversa | null => {
+        if (m.conteudo === "? enviando m�dia�") return null;
+        const autorId = m.autorId ?? m.autor_id ?? "";
+        return {
+          ...m,
+          id: m.id,
+          autorId,
+          autorNome: m.autorNome ?? m.autor_nome ?? "",
+          conteudo: m.conteudo ?? "",
+          tipo: m.tipo ?? "texto",
+          mediaUrl: m.mediaUrl ?? m.media_url ?? undefined,
+          criadoEm: m.criadoEm ?? m.criado_em ?? new Date().toISOString(),
+          editadoEm: m.editadoEm ?? m.editado_em ?? undefined,
+          lida: autorId === uid ? true : !!m.lida,
+        };
+      };
       const limpar = (msgs: MensagemConversa[]) =>
-        msgs.filter((m) => m.conteudo !== "? enviando m�dia�");
+        msgs.map(normalizar).filter(Boolean) as MensagemConversa[];
       return {
         dms:    parsed.dms?.map((d: ConversaDireta) => ({ ...d, mensagens: limpar(d.mensagens) })) ?? [],
         grupos: parsed.grupos?.map((g: Grupo) => ({ ...g, mensagens: limpar(g.mensagens) })) ?? [],
@@ -1308,7 +1326,7 @@ export default function ChatPage() {
       const buildInboxMsg = (im: any): MensagemConversa => ({
         id: im.id, autorId: im.autorId, autorNome: im.autorNome,
         conteudo: im.conteudo ?? "", tipo: im.tipo ?? "texto",
-        mediaUrl: im.mediaUrl, criadoEm: im.criadoEm, lida: false,
+        mediaUrl: im.mediaUrl, criadoEm: im.criadoEm, lida: im.autorId === uid,
       });
 
       const mergeInboxInto = <T extends { id: string; mensagens: MensagemConversa[] }>(list: T[]): T[] =>
@@ -1500,7 +1518,7 @@ export default function ChatPage() {
       .map((im: any): MensagemConversa => ({
         id: im.id, autorId: im.autorId, autorNome: im.autorNome,
         conteudo: im.conteudo ?? "", tipo: im.tipo ?? "texto",
-        mediaUrl: im.mediaUrl, criadoEm: im.criadoEm, lida: false,
+        mediaUrl: im.mediaUrl, criadoEm: im.criadoEm, lida: im.autorId === user?.id,
       }));
 
     // MIN(cacheTime, dbTime): cache tem o tempo do broadcast (envio real do cliente),
@@ -1668,7 +1686,7 @@ export default function ChatPage() {
     sincronizarMensagensRecentes();
     const interval = window.setInterval(() => {
       sincronizarMensagensRecentes();
-    }, 1000);
+    }, 5000);
 
     window.addEventListener("focus", onFocus);
     document.addEventListener("visibilitychange", onVisibility);
@@ -1711,6 +1729,7 @@ export default function ChatPage() {
   // Limpa canais de broadcast ao desmontar
   useEffect(() => {
     return () => {
+      if (notificationDispatchTimerRef.current) clearTimeout(notificationDispatchTimerRef.current);
       broadcastChannelsRef.current.forEach(ch => supabase.removeChannel(ch));
       broadcastChannelsRef.current.clear();
       if (updatesChannelRef.current) supabase.removeChannel(updatesChannelRef.current);
@@ -1885,6 +1904,25 @@ export default function ChatPage() {
     setTimeout(() => setToast(null), 2500);
   }
 
+  async function scheduleNotificationDispatch() {
+    if (notificationDispatchTimerRef.current) return;
+    notificationDispatchTimerRef.current = setTimeout(async () => {
+      notificationDispatchTimerRef.current = null;
+      try {
+        const token = await getFreshToken();
+        if (!token) return;
+        await fetch("/api/chat/dispatch-notifications", {
+          method: "POST",
+          keepalive: true,
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ limit: 50 }),
+        });
+      } catch {
+        // A fila permanece no banco para retry por cron/manual.
+      }
+    }, 250);
+  }
+
   if (!user) return null;
   const u = user;
 
@@ -2049,6 +2087,7 @@ export default function ChatPage() {
       } : dm));
       // 4) Broadcast com timestamp do servidor � amigo recebe na ordem correta
       broadcastChannelsRef.current.get(dmId)?.send({ type: "broadcast", event: "msg", payload: finalMsg });
+      scheduleNotificationDispatch();
     } catch (err) {
       console.error("sendDm network error:", err);
       setDms((prev) => prev.map((dm) => dm.id === dmId ? { ...dm, mensagens: dm.mensagens.filter((m) => m.id !== msgId) } : dm));
@@ -2104,6 +2143,7 @@ export default function ChatPage() {
       } : g));
       // 4) Broadcast com timestamp do servidor
       broadcastChannelsRef.current.get(grupoId)?.send({ type: "broadcast", event: "msg", payload: finalMsg });
+      scheduleNotificationDispatch();
     } catch (err) {
       console.error("sendGrupo network error:", err);
       setGrupos((prev) => prev.map((g) => g.id === grupoId ? { ...g, mensagens: g.mensagens.filter((m) => m.id !== msgId) } : g));
@@ -2165,6 +2205,7 @@ export default function ChatPage() {
         setGrupos(prev => prev.map(g => g.id === conversaId ? { ...g, mensagens: g.mensagens.map(updaterFinal) } : g));
       }
       broadcastChannelsRef.current.get(conversaId)?.send({ type: "broadcast", event: "msg", payload: finalMsg });
+      scheduleNotificationDispatch();
     } catch (err: unknown) {
       const msg2 = err instanceof Error ? err.message : "Erro ao enviar imagem";
       showToast(msg2);
@@ -2229,6 +2270,7 @@ export default function ChatPage() {
         setGrupos(prev => prev.map(g => g.id === conversaId ? { ...g, mensagens: g.mensagens.map(updaterFinal) } : g));
       }
       broadcastChannelsRef.current.get(conversaId)?.send({ type: "broadcast", event: "msg", payload: finalMsg });
+      scheduleNotificationDispatch();
     } catch (err: unknown) {
       const errMsg = err instanceof Error ? err.message : "Erro ao enviar arquivo";
       showToast(errMsg);
