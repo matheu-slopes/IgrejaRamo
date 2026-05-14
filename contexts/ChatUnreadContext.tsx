@@ -24,6 +24,16 @@ function persistedCount(uid: string): number {
 function saveCount(uid: string, n: number) {
   try { localStorage.setItem(`chat_unread_${uid}`, String(n)); } catch {}
 }
+async function getFreshToken(): Promise<string> {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) return "";
+  const expiresAt = session.expires_at ?? 0;
+  if (Date.now() / 1000 > expiresAt - 60) {
+    const { data } = await supabase.auth.refreshSession();
+    return data.session?.access_token ?? "";
+  }
+  return session.access_token;
+}
 function conversaIdsFromCache(uid: string): string[] {
   try {
     const raw = localStorage.getItem(`chat_v1_${uid}`);
@@ -89,6 +99,42 @@ export function ChatUnreadProvider({ children }: { children: ReactNode }) {
     if (!user?.id) return;
     userIdRef.current = user.id;
     setTotalUnreadState(persistedCount(user.id));
+  }, [user?.id]);
+
+  async function refreshUnreadFromServer(uid: string) {
+    try {
+      const token = await getFreshToken();
+      if (!token) return;
+      const res = await fetch("/api/chat/unread", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || typeof json.total !== "number") return;
+      setTotalUnreadState(json.total);
+      saveCount(uid, json.total);
+    } catch {
+      // Mantém o contador local se estiver offline.
+    }
+  }
+
+  // Recalcula pelo banco ao entrar/relogar e ao voltar para o app.
+  useEffect(() => {
+    if (!user?.id) return;
+    const uid = user.id;
+    refreshUnreadFromServer(uid);
+
+    const onFocus = () => refreshUnreadFromServer(uid);
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") refreshUnreadFromServer(uid);
+    };
+
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 
   // Carrega as conversas do usuário no layout, sem depender da página de chat.

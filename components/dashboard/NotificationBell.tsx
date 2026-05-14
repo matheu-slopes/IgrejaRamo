@@ -25,6 +25,32 @@ function formatarTempo(iso: string) {
   return `${Math.floor(h / 24)}d atrás`;
 }
 
+async function getFreshToken(): Promise<string> {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) return "";
+  const expiresAt = session.expires_at ?? 0;
+  if (Date.now() / 1000 > expiresAt - 60) {
+    const { data } = await supabase.auth.refreshSession();
+    return data.session?.access_token ?? "";
+  }
+  return session.access_token;
+}
+
+async function persistirNotificacoes(method: "PATCH" | "DELETE", body: { ids?: string[]; all?: boolean }) {
+  const token = await getFreshToken();
+  if (!token) throw new Error("Sessão inválida");
+  const res = await fetch("/api/notificacoes", {
+    method,
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(body),
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json.error ?? "Falha ao atualizar notificações");
+}
+
 export default function NotificationBell() {
   const { user } = useAuth();
   const [notifs, setNotifs] = useState<Notificacao[]>([]);
@@ -84,17 +110,17 @@ export default function NotificationBell() {
 
   function marcarTodas() {
     const ids = notifs.filter((n) => !n.lida).map((n) => n.id);
-    if (ids.length > 0) supabase.from("notificacoes").update({ lida: true }).in("id", ids).then(() => {});
+    if (ids.length > 0) persistirNotificacoes("PATCH", { ids }).catch(console.error);
     setNotifs((prev) => prev.map((n) => ({ ...n, lida: true })));
   }
 
   function marcarUma(id: string) {
-    supabase.from("notificacoes").update({ lida: true }).eq("id", id).then(() => {});
+    persistirNotificacoes("PATCH", { ids: [id] }).catch(console.error);
     setNotifs((prev) => prev.map((n) => n.id === id ? { ...n, lida: true } : n));
   }
 
   function remover(id: string) {
-    supabase.from("notificacoes").delete().eq("id", id).then(() => {});
+    persistirNotificacoes("DELETE", { ids: [id] }).catch(console.error);
     setNotifs((prev) => prev.filter((n) => n.id !== id));
   }
 
@@ -218,7 +244,7 @@ export default function NotificationBell() {
                 <button
                   onClick={() => {
                     const ids = notifs.map((n) => n.id);
-                    if (ids.length > 0) supabase.from("notificacoes").delete().in("id", ids).then(() => {});
+                    if (ids.length > 0) persistirNotificacoes("DELETE", { all: true }).catch(console.error);
                     setNotifs([]);
                   }}
                   className="text-[11px] text-gray-400 hover:text-red-400 transition"
