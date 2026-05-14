@@ -7,6 +7,8 @@ import { Bell, Check, X } from "lucide-react";
 
 export default function PushSubscriber() {
   const { user } = useAuth();
+  const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+  const pushConfigured = Boolean(vapidPublicKey);
   const lastAttemptRef = useRef(0);
   const [mostrarBanner, setMostrarBanner] = useState(false);
   const [status, setStatus] = useState<"idle" | "loading" | "sucesso" | "erro">("idle");
@@ -15,6 +17,7 @@ export default function PushSubscriber() {
   useEffect(() => {
     if (!user) return;
     if (typeof window === "undefined") return;
+    if (!pushConfigured) return;
     if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
     if (!("Notification" in window)) return;
 
@@ -69,10 +72,16 @@ export default function PushSubscriber() {
       document.removeEventListener("visibilitychange", onVisibility);
       window.clearInterval(interval);
     };
-  }, [user]);
+  }, [pushConfigured, user]);
 
   async function ativar() {
     if (status === "loading") return;
+    if (!pushConfigured) {
+      setStatus("erro");
+      setMsg("Notificações indisponíveis no momento. Contate o administrador.");
+      setMostrarBanner(true);
+      return;
+    }
     setStatus("loading");
     setMsg(null);
     try {
@@ -102,8 +111,11 @@ export default function PushSubscriber() {
       setMsg(null);
     }
 
-    const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-    if (!vapidKey) throw new Error("Chave VAPID ausente. Contate o administrador.");
+    const vapidKey = vapidPublicKey;
+    if (!vapidKey) {
+      if (silent) return;
+      throw new Error("Notificações indisponíveis no momento. Contate o administrador.");
+    }
 
     const registration = await getServiceWorkerRegistration();
     let sub = await registration.pushManager.getSubscription();

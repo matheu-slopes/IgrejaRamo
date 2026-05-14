@@ -6,11 +6,17 @@ const vapidSubject =
   process.env.NEXT_PUBLIC_SITE_URL ||
   "https://igreja-ramo.vercel.app";
 
-webpush.setVapidDetails(
-  vapidSubject,
-  process.env.VAPID_PUBLIC_KEY!,
-  process.env.VAPID_PRIVATE_KEY!
-);
+const vapidPublicKey = process.env.VAPID_PUBLIC_KEY;
+const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY;
+const hasVapidKeys = Boolean(vapidPublicKey && vapidPrivateKey);
+
+if (hasVapidKeys) {
+  webpush.setVapidDetails(
+    vapidSubject,
+    vapidPublicKey!,
+    vapidPrivateKey!
+  );
+}
 
 const admin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -54,6 +60,14 @@ async function dispatchToSubs(subs: SubRow[], payload: PushPayload): Promise<Pus
     removed: 0,
     errors: [],
   };
+
+  if (!hasVapidKeys) {
+    result.errors.push({
+      status: "unknown",
+      message: "VAPID keys ausentes no ambiente. Envio de push ignorado.",
+    });
+    return result;
+  }
 
   if (!subs.length) return result;
 

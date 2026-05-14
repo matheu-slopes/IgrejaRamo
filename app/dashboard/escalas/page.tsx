@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Ministerio, Escala, FuncaoEscala, EscalaMusica } from "@/types";
 import { EscalasTab } from "@/components/dashboard/EscalasTab";
@@ -627,7 +627,7 @@ function MinhasEscalasList({
 // ─── Página principal ─────────────────────────────────────────────────────────
 
 export default function EscalasDashboardPage() {
-  const { user, temPermissao, temPermissaoNoMinisterio } = useAuth();
+  const { user, isLoading, temPermissao, temPermissaoNoMinisterio } = useAuth();
   const isAdmin = user?.role === "admin" || user?.role === "pastor";
   const meus = (user?.ministerios ?? []) as Ministerio[];
   const lista = isAdmin ? TODOS : meus;
@@ -638,30 +638,66 @@ export default function EscalasDashboardPage() {
   const [aba, setAba] = useState<"minhas" | "culto">("culto");
   const [visaoMes, setVisaoMes] = useState(false);
   const [semanaBase, setSemanaBase] = useState(() => semanaInicio(new Date()));
+  const fetchSeqRef = useRef(0);
 
   const hojeStr = new Date().toISOString().split("T")[0];
 
-  async function carregarTodas() {
-    const { data } = await supabase
+  const carregarTodas = useCallback(async () => {
+    if (isLoading || !user?.id) return;
+
+    const requestSeq = ++fetchSeqRef.current;
+    const { data, error } = await supabase
       .from("escalas")
       .select("*, escala_itens(*), escala_musicas(*)")
       .order("data", { ascending: true });
-    if (data) setTodasEscalas(data.map(parseEscala));
-  }
 
-  useAppRefresh(() => { void carregarTodas(); }, [], { minIntervalMs: 2000 });
+    // Ignora resposta antiga para evitar sobrescrever estado com snapshot defasado.
+    if (requestSeq !== fetchSeqRef.current) return;
+
+    if (error) {
+      console.error("Erro ao carregar escalas:", error.message);
+      return;
+    }
+
+    setTodasEscalas((data ?? []).map(parseEscala));
+  }, [isLoading, user?.id]);
+
+  useAppRefresh(() => { void carregarTodas(); }, [carregarTodas], { minIntervalMs: 2000 });
 
   useEffect(() => {
+    if (isLoading || !user?.id) return;
+    void carregarTodas();
+  }, [carregarTodas, isLoading, user?.id]);
+
+  useEffect(() => {
+    if (isLoading || !user?.id) return;
+
+    let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+    const scheduleRefresh = () => {
+      if (refreshTimer) clearTimeout(refreshTimer);
+      refreshTimer = setTimeout(() => {
+        void carregarTodas();
+      }, 180);
+    };
+
     const channel = supabase
       .channel("dashboard-escalas-refresh")
-      .on("postgres_changes", { event: "*", schema: "public", table: "escalas" }, () => carregarTodas())
-      .on("postgres_changes", { event: "*", schema: "public", table: "escala_itens" }, () => carregarTodas())
-      .on("postgres_changes", { event: "*", schema: "public", table: "escala_musicas" }, () => carregarTodas())
+      .on("postgres_changes", { event: "*", schema: "public", table: "escalas" }, scheduleRefresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "escala_itens" }, scheduleRefresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "escala_musicas" }, scheduleRefresh)
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    return () => {
+      if (refreshTimer) clearTimeout(refreshTimer);
+      supabase.removeChannel(channel);
+    };
+  }, [carregarTodas, isLoading, user?.id]);
+
+  useEffect(() => {
+    if (modalEscala && !todasEscalas.some((e) => e.id === modalEscala.id)) {
+      setModalEscala(null);
+    }
+  }, [modalEscala, todasEscalas]);
 
   const semanaFim = useMemo(() => {
     const f = new Date(semanaBase);

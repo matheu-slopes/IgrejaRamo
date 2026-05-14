@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   Plus, Trash2, Pencil, X, Save, Music2, Users, Eye, EyeOff, UserCheck,
@@ -178,81 +178,144 @@ const EMPTY_FORM: EscalaForm = {
 // --- Componente principal -----------------------------------------------------
 
 export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; isLider: boolean }) {
-  const { user } = useAuth();
+  const { user, isLoading } = useAuth();
   const [membros, setMembros] = useState<MembroMinisterio[]>([]);
   const [escalas, setEscalas] = useState<Escala[]>([]);
   const [musicas, setMusicas] = useState<Musica[]>([]);
+  const fetchSeqRef = useRef(0);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const syncChannelRef = useRef<any>(null);
 
-  function carregarDados() {
-    supabase.from("perfis")
-      .select("id, nome, email, telefone, role, data_ingresso")
-      .contains("ministerios", [ministerio])
-      .eq("ativo", true)
-      .then(({ data }) => {
-        if (data) setMembros(data.map((p: Record<string, unknown>) => ({
-          id: p.id as string,
-          nome: p.nome as string,
-          email: (p.email ?? "") as string,
-          telefone: (p.telefone as string) ?? undefined,
-          funcao: (p.role === "pastor" || p.role === "lider" ? "Líder" : "Membro") as FuncaoMinisterio,
-          ministerio,
-          ativo: true,
-          dataEntrada: (p.data_ingresso as string) ?? "",
-        })));
+  async function broadcastEscalasSync(action: "create" | "update" | "delete") {
+    const ch = syncChannelRef.current;
+    if (!ch) return;
+    try {
+      await ch.send({
+        type: "broadcast",
+        event: "changed",
+        payload: { ministerio, action, at: Date.now() },
       });
-    supabase.from("escalas")
-      .select("*, escala_itens(*), escala_musicas(*)")
-      .eq("ministerio", ministerio)
-      .order("data", { ascending: false })
-      .then(({ data }) => {
-        if (data) setEscalas(data.map((e: Record<string, unknown>) => ({
-          id: e.id as string,
-          ministerio: e.ministerio as Ministerio,
-          data: e.data as string,
-          horario: e.horario as string,
-          culto: e.culto as string,
-          observacoes: (e.observacoes as string) ?? undefined,
-          visivel: e.visivel as boolean,
-          confirmacaoParticipantes: e.confirmacao_participantes as boolean,
-          criadoPor: (e.criado_por as string) ?? "",
-          itens: ((e.escala_itens as Record<string, unknown>[]) ?? []).map((i) => ({
-            funcao: i.funcao as FuncaoEscala,
-            voluntarioId: (i.voluntario_id as string) ?? undefined,
-            voluntarioNome: i.voluntario_nome as string,
-            observacao: (i.observacao as string) ?? undefined,
-          })),
-          musicas: ((e.escala_musicas as Record<string, unknown>[]) ?? [])
-            .sort((a, b) => (a.ordem as number) - (b.ordem as number))
-            .map((m) => ({
-              musicaId: (m.musica_id as string) ?? "",
-              titulo: m.titulo as string,
-              artista: m.artista as string,
-              tom: (m.tom as string) ?? "",
-              bpm: (m.bpm as number) ?? undefined,
-              artistaSlug: (m.artista_slug as string) ?? undefined,
-              musicaSlug: (m.musica_slug as string) ?? undefined,
-            })),
-        })));
-      });
-    supabase.from("musicas").select().order("titulo").then(({ data }) => {
-      if (data) setMusicas(data as Musica[]);
-    });
+    } catch {
+      // Canal de sincronização é best-effort.
+    }
   }
 
-  useAppRefresh(() => { carregarDados(); }, [ministerio], { minIntervalMs: 2000 });
+  const carregarDados = useCallback(async () => {
+    if (isLoading || !user?.id) return;
+
+    const reqSeq = ++fetchSeqRef.current;
+    const [perfisRes, escalasRes, musicasRes] = await Promise.all([
+      supabase
+        .from("perfis")
+        .select("id, nome, email, telefone, role, data_ingresso")
+        .contains("ministerios", [ministerio])
+        .eq("ativo", true),
+      supabase
+        .from("escalas")
+        .select("*, escala_itens(*), escala_musicas(*)")
+        .eq("ministerio", ministerio)
+        .order("data", { ascending: false }),
+      supabase.from("musicas").select().order("titulo"),
+    ]);
+
+    // Evita sobrescrever com respostas antigas quando há múltiplos eventos em sequência.
+    if (reqSeq !== fetchSeqRef.current) return;
+
+    if (perfisRes.data) {
+      setMembros(perfisRes.data.map((p: Record<string, unknown>) => ({
+        id: p.id as string,
+        nome: p.nome as string,
+        email: (p.email ?? "") as string,
+        telefone: (p.telefone as string) ?? undefined,
+        funcao: (p.role === "pastor" || p.role === "lider" ? "Líder" : "Membro") as FuncaoMinisterio,
+        ministerio,
+        ativo: true,
+        dataEntrada: (p.data_ingresso as string) ?? "",
+      })));
+    }
+
+    if (escalasRes.error) {
+      console.error("Erro ao carregar escalas do ministério:", escalasRes.error.message);
+    } else {
+      setEscalas((escalasRes.data ?? []).map((e: Record<string, unknown>) => ({
+        id: e.id as string,
+        ministerio: e.ministerio as Ministerio,
+        data: e.data as string,
+        horario: e.horario as string,
+        culto: e.culto as string,
+        observacoes: (e.observacoes as string) ?? undefined,
+        visivel: e.visivel as boolean,
+        confirmacaoParticipantes: e.confirmacao_participantes as boolean,
+        criadoPor: (e.criado_por as string) ?? "",
+        itens: ((e.escala_itens as Record<string, unknown>[]) ?? []).map((i) => ({
+          funcao: i.funcao as FuncaoEscala,
+          voluntarioId: (i.voluntario_id as string) ?? undefined,
+          voluntarioNome: i.voluntario_nome as string,
+          observacao: (i.observacao as string) ?? undefined,
+        })),
+        musicas: ((e.escala_musicas as Record<string, unknown>[]) ?? [])
+          .sort((a, b) => (a.ordem as number) - (b.ordem as number))
+          .map((m) => ({
+            musicaId: (m.musica_id as string) ?? "",
+            titulo: m.titulo as string,
+            artista: m.artista as string,
+            tom: (m.tom as string) ?? "",
+            bpm: (m.bpm as number) ?? undefined,
+            artistaSlug: (m.artista_slug as string) ?? undefined,
+            musicaSlug: (m.musica_slug as string) ?? undefined,
+          })),
+      })));
+    }
+
+    if (musicasRes.data) {
+      setMusicas(musicasRes.data as Musica[]);
+    }
+  }, [isLoading, ministerio, user?.id]);
+
+  useAppRefresh(() => { void carregarDados(); }, [carregarDados], { minIntervalMs: 2000 });
 
   useEffect(() => {
+    if (isLoading || !user?.id) return;
+    void carregarDados();
+  }, [carregarDados, isLoading, user?.id]);
+
+  useEffect(() => {
+    if (isLoading || !user?.id) return;
+
+    let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+    const scheduleRefresh = () => {
+      if (refreshTimer) clearTimeout(refreshTimer);
+      refreshTimer = setTimeout(() => {
+        void carregarDados();
+      }, 180);
+    };
+
     const channel = supabase
       .channel(`escalas-tab-refresh:${ministerio}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "escalas", filter: `ministerio=eq.${ministerio}` }, () => carregarDados())
-      .on("postgres_changes", { event: "*", schema: "public", table: "escala_itens" }, () => carregarDados())
-      .on("postgres_changes", { event: "*", schema: "public", table: "escala_musicas" }, () => carregarDados())
-      .on("postgres_changes", { event: "*", schema: "public", table: "perfis" }, () => carregarDados())
+      .on("postgres_changes", { event: "*", schema: "public", table: "escalas" }, scheduleRefresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "escala_itens" }, scheduleRefresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "escala_musicas" }, scheduleRefresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "perfis" }, scheduleRefresh)
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ministerio]);
+    const syncChannel = supabase
+      .channel("escalas-sync")
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .on("broadcast", { event: "changed" }, ({ payload }: { payload: any }) => {
+        if (!payload?.ministerio || payload.ministerio === ministerio) {
+          scheduleRefresh();
+        }
+      })
+      .subscribe();
+    syncChannelRef.current = syncChannel;
+
+    return () => {
+      if (refreshTimer) clearTimeout(refreshTimer);
+      supabase.removeChannel(channel);
+      supabase.removeChannel(syncChannel);
+      syncChannelRef.current = null;
+    };
+  }, [carregarDados, isLoading, ministerio, user?.id]);
 
   const [modo, setModo] = useState<"lista" | "form">("lista");
   const [editId, setEditId] = useState<string | null>(null);
@@ -275,6 +338,16 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
   const [viewMode, setViewMode] = useState<"minhas" | "culto">("culto");
   const [busca, setBusca] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (selectedId && !escalas.some((e) => e.id === selectedId)) {
+      setSelectedId(null);
+    }
+    if (editId && !escalas.some((e) => e.id === editId)) {
+      setEditId(null);
+      setModo("lista");
+    }
+  }, [editId, escalas, selectedId]);
   // letras
   const [copyLetraIdx, setCopyLetraIdx] = useState<number | null>(null);
   const [copyLetraOk, setCopyLetraOk] = useState<number | null>(null);
@@ -480,6 +553,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
           if (insMus) throw new Error(insMus.message);
         }
         setEscalas((prev) => prev.map((e) => e.id === editId ? { ...e, ...form, itens: itensFinais, observacoes: obsDB ?? undefined } : e));
+        await broadcastEscalasSync("update");
       } else {
         const { data: inserted, error: insEsc } = await supabase.from("escalas").insert({
           ministerio, data: form.data, horario: form.horario,
@@ -515,6 +589,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
             ...form, itens: itensFinais, observacoes: obsDB ?? undefined,
           };
           setEscalas((prev) => [nova, ...prev]);
+          await broadcastEscalasSync("create");
         }
       }
       setModo("lista");
@@ -527,9 +602,24 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
     }
   }
 
-  async function excluir(id: string) {
-    await supabase.from("escalas").delete().eq("id", id);
-    setEscalas((prev) => prev.filter((e) => e.id !== id));
+  async function excluir(escala: Escala) {
+    const dataFmt = formatDateSimples(escala.data);
+    const confirmou = window.confirm(
+      [
+        "Deseja realmente excluir esta escala?",
+        "",
+        `Culto: ${escala.culto}`,
+        `Ministério: ${escala.ministerio}`,
+        `Data: ${dataFmt}`,
+        `Horário: ${escala.horario}`,
+      ].join("\n")
+    );
+
+    if (!confirmou) return;
+
+    await supabase.from("escalas").delete().eq("id", escala.id);
+    setEscalas((prev) => prev.filter((e) => e.id !== escala.id));
+    await broadcastEscalasSync("delete");
   }
 
   function addParticipante() {
@@ -1007,7 +1097,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
                           <Pencil className="w-4 h-4" />
                         </button>
                         <button
-                          onClick={() => { excluir(selectedEscala.id); setSelectedId(null); }}
+                          onClick={() => { void excluir(selectedEscala); setSelectedId(null); }}
                           className="p-2 text-gray-500 hover:text-red-600 hover:bg-white/70 rounded-xl transition"
                           title="Excluir"
                         >
