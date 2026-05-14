@@ -8,6 +8,7 @@ import { Evento, Ministerio } from "@/types";
 import { supabase } from "@/lib/supabase";
 import { downloadICS, linkGoogleCalendar, formatarData, diaSemana } from "@/lib/calendarUtils";
 import { notificarBroadcast } from "@/lib/notificarBroadcast";
+import { useAppRefresh } from "@/hooks/useAppRefresh";
 
 export function EventosTab({
   ministerio,
@@ -28,21 +29,35 @@ export function EventosTab({
   const [criando, setCriando] = useState(false);
   const [erroCriar, setErroCriar] = useState("");
 
-  useEffect(() => {
-    supabase.from("eventos").select().eq("ministerio", ministerio).order("data").then(({ data }) => {
-      if (data) setEventos(data.map((e: Record<string, unknown>) => ({
-        id: e.id as string,
-        titulo: e.titulo as string,
-        descricao: (e.descricao as string) ?? undefined,
-        data: e.data as string,
-        horario: e.horario as string,
-        local: e.local as string,
-        publico: e.publico as boolean,
-        ministerio: e.ministerio as Ministerio,
-        criadoPor: (e.criado_por as string) ?? "",
-      })));
-    });
+  function mapEventos(data: Record<string, unknown>[]) {
+    return data.map((e) => ({
+      id: e.id as string,
+      titulo: e.titulo as string,
+      descricao: (e.descricao as string) ?? undefined,
+      data: e.data as string,
+      horario: e.horario as string,
+      local: e.local as string,
+      publico: e.publico as boolean,
+      ministerio: e.ministerio as Ministerio,
+      criadoPor: (e.criado_por as string) ?? "",
+    }));
+  }
 
+  function carregarEventos() {
+    supabase.from("eventos").select().eq("ministerio", ministerio).order("data").then(({ data }) => {
+      if (data) setEventos(mapEventos(data as Record<string, unknown>[]));
+    });
+  }
+
+  useAppRefresh(() => { carregarEventos(); }, [ministerio], { minIntervalMs: 2000 });
+
+  useEffect(() => {
+    const channel = supabase
+      .channel(`eventos-tab-refresh:${ministerio}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "eventos", filter: `ministerio=eq.${ministerio}` }, () => carregarEventos())
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ministerio]);
 
@@ -66,13 +81,7 @@ export function EventosTab({
     }
     // Recarrega a lista após insert (evita depender do SELECT com RLS)
     const { data: lista } = await supabase.from("eventos").select().eq("ministerio", ministerio).order("data");
-    if (lista) setEventos(lista.map((e: Record<string, unknown>) => ({
-      id: e.id as string, titulo: e.titulo as string,
-      descricao: (e.descricao as string) ?? "",
-      data: e.data as string, horario: e.horario as string,
-      local: e.local as string, publico: e.publico as boolean,
-      ministerio: e.ministerio as Ministerio, criadoPor: (e.criado_por as string) ?? "",
-    })));
+    if (lista) setEventos(mapEventos(lista as Record<string, unknown>[]));
     setForm({ titulo: "", descricao: "", data: "", horario: "", local: "", publico: false, ministerio });
     setShowForm(false);
     // Push para membros do ministério

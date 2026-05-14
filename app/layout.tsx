@@ -3,6 +3,7 @@ import { Inter, Lora } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/contexts/AuthContext";
 import PwaUpdater from "@/components/PwaUpdater";
+import AppLifecycleSync from "@/components/AppLifecycleSync";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -95,6 +96,7 @@ export default function RootLayout({
       </head>
         <body className="bg-cream text-gray-900 antialiased font-sans" suppressHydrationWarning>
         <PwaUpdater />
+        <AppLifecycleSync />
         <AuthProvider>{children}</AuthProvider>
       </body>
     </html>

@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
+import { useAppRefresh } from "@/hooks/useAppRefresh";
 import { Ministerio, MuralMensagem, TipoMensagem } from "@/types";
 import {
   Pin, Send, Music, Video, BookOpen, Baby, HeartHandshake,
@@ -61,7 +62,7 @@ export default function ConversasPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paramMin]);
 
-  useEffect(() => {
+  function carregarMensagens() {
     supabase
       .from("mural_mensagens")
       .select()
@@ -82,6 +83,18 @@ export default function ConversasPage() {
           );
         }
       });
+  }
+
+  useAppRefresh(() => { carregarMensagens(); }, [activeMin], { minIntervalMs: 2000 });
+
+  useEffect(() => {
+    const channel = supabase
+      .channel(`mural-page-refresh:${activeMin}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "mural_mensagens", filter: `ministerio=eq.${activeMin}` }, () => carregarMensagens())
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeMin]);
 
   useEffect(() => {

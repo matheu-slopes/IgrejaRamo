@@ -5,6 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Ministerio, Evento } from "@/types";
 import { EventosTab } from "@/components/dashboard/EventosTab";
 import { supabase } from "@/lib/supabase";
+import { useAppRefresh } from "@/hooks/useAppRefresh";
 import { Plus, ChevronRight, MapPin } from "lucide-react";
 import clsx from "clsx";
 
@@ -62,7 +63,7 @@ function MinistryEventRow({
   const [eventos, setEventos] = useState<Evento[]>([]);
   const hojeStr = new Date().toISOString().split("T")[0];
 
-  useEffect(() => {
+  function carregarEventos() {
     supabase
       .from("eventos")
       .select()
@@ -81,9 +82,19 @@ function MinistryEventRow({
           criadoPor: (e.criado_por as string) ?? "",
         })));
       });
+  }
+
+  useAppRefresh(() => { carregarEventos(); }, [ministerio, reloadKey], { minIntervalMs: 2000 });
+
+  useEffect(() => {
+    const channel = supabase
+      .channel(`eventos-row-refresh:${ministerio}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "eventos", filter: `ministerio=eq.${ministerio}` }, () => carregarEventos())
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ministerio, reloadKey]);
-
   const proximos = eventos.filter((e) => e.data && e.data >= hojeStr);
   const passados = eventos.filter((e) => e.data && e.data < hojeStr).reverse();
 

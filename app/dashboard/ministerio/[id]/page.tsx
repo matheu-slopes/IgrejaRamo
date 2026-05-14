@@ -18,6 +18,7 @@ import { supabase } from "@/lib/supabase";
 import { downloadICS, linkGoogleCalendar, formatarData, diaSemana } from "@/lib/calendarUtils";
 import { EscalasTab } from "@/components/dashboard/EscalasTab";
 import { EventosTab } from "@/components/dashboard/EventosTab";
+import { useAppRefresh } from "@/hooks/useAppRefresh";
 
 type Tab = "chat" | "membros" | "eventos" | "escalas";
 
@@ -46,7 +47,7 @@ export default function CanalMinisterioPage() {
   const [canalBase, setCanalBase] = useState<{ ministerio: string; descricao: string; chatBloqueado: boolean; cor: string } | null>(null);
   const [chatBloqueado, setChatBloqueado] = useState(false);
 
-  useEffect(() => {
+  function carregarCanalBase() {
     // Timeout de segurança: se demorar mais de 3s, usa fallback e não trava
     const fallbackTimer = setTimeout(() => {
       setCanalBase((prev) => prev ?? { ministerio: slug, descricao: "", chatBloqueado: false, cor: "vine" });
@@ -64,7 +65,14 @@ export default function CanalMinisterioPage() {
     });
 
     return () => clearTimeout(fallbackTimer);
+  }
+
+  useEffect(() => {
+    return carregarCanalBase();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug]);
+
+  useAppRefresh(() => { carregarCanalBase(); }, [slug], { runOnMount: false, minIntervalMs: 3000 });
 
   // ── permissão ─────────────────────────────────────────────────────
   const isAdmin               = user?.role === "admin" || user?.role === "pastor";
@@ -1096,7 +1104,7 @@ function MembrosTab({
 }) {
   const [membros, setMembros] = useState<MembroMinisterio[]>([]);
 
-  useEffect(() => {
+  function carregarMembros() {
     // Os membros ficam em `perfis` com o array `ministerios`
     supabase.from("perfis")
       .select("id, nome, email, telefone, role, lider_ministerios, data_ingresso")
@@ -1118,6 +1126,17 @@ function MembrosTab({
           };
         }));
       });
+  }
+
+  useAppRefresh(() => { carregarMembros(); }, [ministerio], { minIntervalMs: 2500 });
+
+  useEffect(() => {
+    const channel = supabase
+      .channel(`membros-ministerio-refresh:${ministerio}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "perfis" }, () => carregarMembros())
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ministerio]);
   const [editandoId, setEditandoId] = useState<string | null>(null);

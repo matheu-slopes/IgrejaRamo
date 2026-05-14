@@ -12,6 +12,7 @@ import {
   Ministerio, MembroMinisterio, Musica, FuncaoMinisterio,
 } from "@/types";
 import { supabase } from "@/lib/supabase";
+import { useAppRefresh } from "@/hooks/useAppRefresh";
 import BuscarCifraModal from "@/components/dashboard/BuscarCifraModal";
 
 // --- Constantes ---------------------------------------------------------------
@@ -182,7 +183,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
   const [escalas, setEscalas] = useState<Escala[]>([]);
   const [musicas, setMusicas] = useState<Musica[]>([]);
 
-  useEffect(() => {
+  function carregarDados() {
     supabase.from("perfis")
       .select("id, nome, email, telefone, role, data_ingresso")
       .contains("ministerios", [ministerio])
@@ -236,6 +237,20 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
     supabase.from("musicas").select().order("titulo").then(({ data }) => {
       if (data) setMusicas(data as Musica[]);
     });
+  }
+
+  useAppRefresh(() => { carregarDados(); }, [ministerio], { minIntervalMs: 2000 });
+
+  useEffect(() => {
+    const channel = supabase
+      .channel(`escalas-tab-refresh:${ministerio}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "escalas", filter: `ministerio=eq.${ministerio}` }, () => carregarDados())
+      .on("postgres_changes", { event: "*", schema: "public", table: "escala_itens" }, () => carregarDados())
+      .on("postgres_changes", { event: "*", schema: "public", table: "escala_musicas" }, () => carregarDados())
+      .on("postgres_changes", { event: "*", schema: "public", table: "perfis" }, () => carregarDados())
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ministerio]);
 

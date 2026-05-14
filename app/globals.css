@@ -11,6 +11,7 @@
     text-size-adjust: 100%;
     /* height para cobrir a tela inteira no PWA */
     height: 100%;
+    min-height: 100%;
   }
   body {
     font-feature-settings: "kern" 1, "liga" 1, "calt" 1;
@@ -24,6 +25,13 @@
     user-select: none;
     /* Ocupa toda a altura no standalone */
     min-height: 100%;
+    min-height: var(--app-vvh, 100dvh);
+    overflow-x: hidden;
+  }
+
+  body.chat-conversation-open {
+    overflow: hidden;
+    background-color: #f9fafb;
   }
   /* Permitir seleção somente em textos legíveis */
   p, h1, h2, h3, h4, h5, h6, span, a, li, td, th, label {

@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
+import { useAppRefresh } from "@/hooks/useAppRefresh";
 import { Evento, Aviso } from "@/types";
 import {
   CalendarCheck,
@@ -42,7 +43,9 @@ export default function DashboardPage() {
   const [avisosFiltrados, setAvisosFiltrados] = useState<Aviso[]>([]);
   const [escala, setEscala] = useState<MinhaEscala | null>(null);
 
-  useEffect(() => {
+  async function carregarResumo() {
+    const today = new Date().toISOString().split("T")[0];
+
     supabase
       .from("aviso_fixado")
       .select()
@@ -51,12 +54,11 @@ export default function DashboardPage() {
       .then(({ data }) => {
         if (data && data.length > 0) {
           setAvisoFixado({ conteudo: data[0].conteudo, ativo: data[0].ativo });
+        } else {
+          setAvisoFixado(null);
         }
       });
-  }, []);
 
-  useEffect(() => {
-    const today = new Date().toISOString().split("T")[0];
     supabase
       .from("eventos")
       .select()
@@ -74,12 +76,13 @@ export default function DashboardPage() {
               recorrente: e.recorrente,
             }))
           );
+        } else {
+          setProximosEventos([]);
         }
       });
-  }, []);
 
-  useEffect(() => {
     if (!user) return;
+
     supabase
       .from("avisos")
       .select()
@@ -116,13 +119,11 @@ export default function DashboardPage() {
                 ministerios: a.ministerios, visivelHome: a.visivel_home,
               }))
           );
+        } else {
+          setAvisosFiltrados([]);
         }
       });
-  }, [user]);
 
-  useEffect(() => {
-    if (!user) return;
-    const today = new Date().toISOString().split("T")[0];
     supabase
       .from("escala_itens")
       .select("funcao, observacao, escalas(data, horario, culto, ministerio, locais(nome))")
@@ -147,9 +148,13 @@ export default function DashboardPage() {
               observacao: item.observacao ?? "",
             });
           }
+        } else {
+          setEscala(null);
         }
       });
-  }, [user]);
+  }
+
+  useAppRefresh(() => { void carregarResumo(); }, [user?.id, user?.role, user?.ministerios?.join(",")], { minIntervalMs: 2000 });
 
   if (!user) return null;
 

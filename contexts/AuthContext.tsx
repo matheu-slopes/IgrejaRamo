@@ -10,6 +10,7 @@ import {
 import { User, Permissao } from "@/types";
 import { supabase } from "@/lib/supabase";
 import { temPermissao as checkPermissao, temPermissaoNoMinisterio as checkPermissaoMin } from "@/lib/permissions";
+import { useAppRefresh } from "@/hooks/useAppRefresh";
 
 // Converte linha da tabela `perfis` para o tipo User do app
 function rowToUser(row: Record<string, unknown>): User {
@@ -149,6 +150,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useAppRefresh(async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) return;
+    await carregarPerfil(session.user.id).catch(() => {});
+    carregarTodosUsuarios();
+  }, [], { runOnMount: false, minIntervalMs: 3000 });
 
   async function login(email: string, password: string): Promise<false | { role: string }> {
     try {

@@ -6,6 +6,7 @@ import { Ministerio, Escala, FuncaoEscala, EscalaMusica } from "@/types";
 import { EscalasTab } from "@/components/dashboard/EscalasTab";
 import { EscalaModal } from "@/components/dashboard/EscalaModal";
 import { supabase } from "@/lib/supabase";
+import { useAppRefresh } from "@/hooks/useAppRefresh";
 import {
   ChevronLeft, ChevronRight, ChevronDown, ChevronUp,
   Music2, Users, Calendar, Star, Settings2, ClipboardCopy, Check,
@@ -648,7 +649,19 @@ export default function EscalasDashboardPage() {
     if (data) setTodasEscalas(data.map(parseEscala));
   }
 
-  useEffect(() => { carregarTodas(); }, []);
+  useAppRefresh(() => { void carregarTodas(); }, [], { minIntervalMs: 2000 });
+
+  useEffect(() => {
+    const channel = supabase
+      .channel("dashboard-escalas-refresh")
+      .on("postgres_changes", { event: "*", schema: "public", table: "escalas" }, () => carregarTodas())
+      .on("postgres_changes", { event: "*", schema: "public", table: "escala_itens" }, () => carregarTodas())
+      .on("postgres_changes", { event: "*", schema: "public", table: "escala_musicas" }, () => carregarTodas())
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const semanaFim = useMemo(() => {
     const f = new Date(semanaBase);

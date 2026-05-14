@@ -5,6 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { ArrowLeft, BookOpen, Calendar, ChevronLeft, ChevronRight, PlayCircle, Quote } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { useAppRefresh } from "@/hooks/useAppRefresh";
 
 type DevocionalBloco =
   | { id: string; tipo: "texto"; texto: string }
@@ -145,6 +146,8 @@ export default function DevocionalPage() {
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+
+  useAppRefresh(() => { setReloadKey((key) => key + 1); }, [], { runOnMount: false, minIntervalMs: 5000 });
 
   useEffect(() => {
     let ativo = true;

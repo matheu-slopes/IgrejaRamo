@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, ReactNode } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useChatUnread } from "@/contexts/ChatUnreadContext";
 import { supabase } from "@/lib/supabase";
+import { useAppRefresh } from "@/hooks/useAppRefresh";
 import { ConversaDireta, Grupo, MensagemConversa } from "@/types";
 import {
   MessageSquare, Users, Send, ArrowLeft, Search, Lock, Plus,
@@ -1561,6 +1562,12 @@ export default function ChatPage() {
     }
   }
 
+  useAppRefresh(() => {
+    void carregarConversas();
+    const activeId = activeChatRef.current?.id;
+    if (activeId) void carregarMensagens(activeId);
+  }, [user?.id], { runOnMount: false, minIntervalMs: 2000 });
+
   async function sincronizarMensagensRecentes() {
     if (!user?.id) return;
     if (syncRunningRef.current) return;
@@ -1830,33 +1837,46 @@ export default function ChatPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeChat?.id]);
 
-  // iOS PWA: 100dvh NÃO redimensiona quando o teclado abre em modo standalone.
-  // Solução: rastrear visualViewport.height e usar bottom:0 + height:vvh no container.
-  // Com bottom:0 o container fica ancorado acima do teclado; com height=vvh ele encolhe
-  // exatamente quando o teclado aparece, sem gap e sem faixa bege.
-  // Não usamos offsetTop no top (era o que causava o gap na versão anterior).
   useEffect(() => {
     const root = document.documentElement;
     const body = document.body;
+    let timer: ReturnType<typeof setTimeout> | null = null;
 
     function updateVvh() {
       const isMobile = window.innerWidth < 768;
       setIsMobileChatViewport(isMobile);
-      const vvh = window.visualViewport?.height ?? window.innerHeight;
+      const viewport = window.visualViewport;
+      const vvh = Math.round(viewport?.height ?? window.innerHeight);
+      const offsetTop = Math.round(viewport?.offsetTop ?? 0);
       root.style.setProperty("--chat-vvh", `${vvh}px`);
+      root.style.setProperty("--vv-offset-top", `${offsetTop}px`);
       if (activeChat && isMobile) body.classList.add("chat-conversation-open");
       else body.classList.remove("chat-conversation-open");
     }
 
+    function scheduleUpdate() {
+      updateVvh();
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(updateVvh, 250);
+    }
+
     updateVvh();
-    window.visualViewport?.addEventListener("resize", updateVvh);
-    window.addEventListener("orientationchange", updateVvh);
+    window.visualViewport?.addEventListener("resize", scheduleUpdate);
+    window.visualViewport?.addEventListener("scroll", scheduleUpdate);
+    window.addEventListener("resize", scheduleUpdate);
+    window.addEventListener("orientationchange", scheduleUpdate);
+    window.addEventListener("focusout", scheduleUpdate);
+    document.addEventListener("visibilitychange", scheduleUpdate);
 
     return () => {
-      window.visualViewport?.removeEventListener("resize", updateVvh);
-      window.removeEventListener("orientationchange", updateVvh);
+      if (timer) clearTimeout(timer);
+      window.visualViewport?.removeEventListener("resize", scheduleUpdate);
+      window.visualViewport?.removeEventListener("scroll", scheduleUpdate);
+      window.removeEventListener("resize", scheduleUpdate);
+      window.removeEventListener("orientationchange", scheduleUpdate);
+      window.removeEventListener("focusout", scheduleUpdate);
+      document.removeEventListener("visibilitychange", scheduleUpdate);
       body.classList.remove("chat-conversation-open");
-      root.style.removeProperty("--chat-vvh");
     };
   }, [activeChat?.id]);
 
@@ -2705,7 +2725,8 @@ export default function ChatPage() {
         )}
         style={activeChat && isMobileChatViewport
           ? {
-              bottom: 0,
+              top: "var(--vv-offset-top, 0px)",
+              bottom: "auto",
               height: "var(--chat-vvh, 100dvh)",
               minHeight: 0,
               zIndex: 60,

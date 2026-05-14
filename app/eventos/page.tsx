@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import Navbar from "@/components/Navbar";
 import { supabase } from "@/lib/supabase";
+import { useAppRefresh } from "@/hooks/useAppRefresh";
 import { Evento } from "@/types";
 import { CalendarDays, MapPin, Clock, Globe, Lock } from "lucide-react";
 
@@ -18,7 +19,7 @@ export default function EventosPage() {
     if (!isLoading && !user) router.push("/login");
   }, [user, isLoading, router]);
 
-  useEffect(() => {
+  function carregarEventos() {
     supabase
       .from("eventos")
       .select()
@@ -36,6 +37,18 @@ export default function EventosPage() {
           );
         }
       });
+  }
+
+  useAppRefresh(() => { carregarEventos(); }, [], { minIntervalMs: 2000 });
+
+  useEffect(() => {
+    const channel = supabase
+      .channel("eventos-page-refresh")
+      .on("postgres_changes", { event: "*", schema: "public", table: "eventos" }, () => carregarEventos())
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if (isLoading || !user) return null;
