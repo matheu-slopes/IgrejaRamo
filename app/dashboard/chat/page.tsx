@@ -27,6 +27,31 @@ async function getFreshToken(): Promise<string> {
   return session.access_token;
 }
 
+function delay(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function fetchWithRetry(input: RequestInfo | URL, init?: RequestInit, attempts = 3): Promise<Response> {
+  let lastError: unknown;
+  for (let i = 1; i <= attempts; i++) {
+    try {
+      const res = await fetch(input, init);
+      if (res.status >= 500 && i < attempts) {
+        await delay(i * 200);
+        continue;
+      }
+      return res;
+    } catch (e) {
+      lastError = e;
+      if (i < attempts) {
+        await delay(i * 200);
+        continue;
+      }
+    }
+  }
+  throw lastError ?? new Error("Falha de rede");
+}
+
 // --- AudioPlayer -------------------------------------------------
 // O MediaRecorder n�o escreve dura��o nos metadados do WebM.
 // O hack: seek para 1e101 for�a o browser a varrer o arquivo e calcular a dura��o real.
@@ -1470,27 +1495,41 @@ export default function ChatPage() {
     // cache salvo automaticamente pelo useEffect [dms, grupos]
   }
 
+  async function markConversaAsRead(conversaId: string) {
+    try {
+      const token = await getFreshToken();
+      if (!token) return;
+      await fetchWithRetry("/api/chat/ack", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ type: "read", conversaId }),
+      }, 2);
+    } catch (e) {
+      console.error("chat read ack error:", e);
+    }
+  }
+
   async function sincronizarMensagensRecentes() {
     if (!user?.id) return;
     if (syncRunningRef.current) return;
-    const ids = conversaIdsRef.current;
-    if (!ids.length) return;
 
     syncRunningRef.current = true;
     try {
       const since = lastBackfillRef.current;
-      const { data, error } = await supabase
-        .from("chat_mensagens")
-        .select("*")
-        .in("conversa_id", ids)
-        .gte("criado_em", since)
-        .order("criado_em", { ascending: true })
-        .limit(1200);
-
-      if (error || !data?.length) return;
-
+      const token = await getFreshToken();
+      if (!token) return;
+      const res = await fetchWithRetry(`/api/chat/sync?since=${encodeURIComponent(since)}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return;
+      const json = await res.json().catch(() => ({}));
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const rows = data as any[];
+      const rows = (json.mensagens ?? []) as any[];
+      if (!rows.length) return;
+
       const knownIds = new Set(conversaIdsRef.current);
       const unknownConversation = rows.some((r) => !knownIds.has(r.conversa_id));
       if (unknownConversation) {
@@ -1539,7 +1578,7 @@ export default function ChatPage() {
         return { ...g, mensagens: mergeMsgs(g.mensagens, incoming) };
       }));
 
-      const newest = rows[rows.length - 1]?.criado_em as string | undefined;
+      const newest = (json.max_criado_em as string | undefined) ?? (rows[rows.length - 1]?.criado_em as string | undefined);
       if (newest) lastBackfillRef.current = newest;
     } finally {
       syncRunningRef.current = false;
@@ -1684,6 +1723,7 @@ export default function ChatPage() {
   useEffect(() => {
     if (!activeChat) return;
     carregarMensagens(activeChat.id);
+    markConversaAsRead(activeChat.id);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeChat?.id]);
 
@@ -1871,7 +1911,7 @@ export default function ChatPage() {
     // Isso garante que todos os clientes ordenam mensagens pelo rel�gio do servidor.
     try {
       const token = await getFreshToken();
-      const r = await fetch("/api/chat/mensagem", {
+      const r = await fetchWithRetry("/api/chat/mensagem", {
         method: "POST", keepalive: true,
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
         body: JSON.stringify({
@@ -1926,7 +1966,7 @@ export default function ChatPage() {
     // 2) DB primeiro ? timestamp do servidor
     try {
       const token = await getFreshToken();
-      const r = await fetch("/api/chat/mensagem", {
+      const r = await fetchWithRetry("/api/chat/mensagem", {
         method: "POST", keepalive: true,
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
         body: JSON.stringify({
@@ -1995,7 +2035,7 @@ export default function ChatPage() {
       URL.revokeObjectURL(localUrl);
 
       // Persiste no banco antes do broadcast para garantir push em ambiente serverless.
-      const saveRes = await fetch("/api/chat/mensagem", {
+      const saveRes = await fetchWithRetry("/api/chat/mensagem", {
         method: "POST", keepalive: true,
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ id: msgId, conversa_id: conversaId, autor_id: u.id, autor_nome: u.nome, conteudo: "", tipo: "imagem", media_url: finalUrl }),
@@ -2059,7 +2099,7 @@ export default function ChatPage() {
       URL.revokeObjectURL(localUrl);
 
       // Persiste no banco antes do broadcast para garantir push em ambiente serverless.
-      const saveRes = await fetch("/api/chat/mensagem", {
+      const saveRes = await fetchWithRetry("/api/chat/mensagem", {
         method: "POST", keepalive: true,
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ id: msgId, conversa_id: conversaId, autor_id: u.id, autor_nome: u.nome, conteudo: tipoMsg === "documento" ? nomeArquivo : "", tipo: tipoMsg, media_url: finalUrl }),

@@ -56,7 +56,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Campos obrigatórios faltando" }, { status: 400 });
   }
 
-  const { data: inserted, error } = await admin.from("chat_mensagens").insert({
+  const insertPayload = {
     id,
     conversa_id,
     autor_id,
@@ -67,11 +67,42 @@ export async function POST(req: NextRequest) {
     resposta_a_id: resposta_a_id ?? null,
     resposta_a_autor_nome: resposta_a_autor_nome ?? null,
     resposta_a_conteudo: resposta_a_conteudo ?? null,
-  }).select("criado_em").single();
+  };
+
+  let criadoEm: string | null = null;
+  const { data: inserted, error } = await admin
+    .from("chat_mensagens")
+    .insert(insertPayload)
+    .select("criado_em")
+    .single();
 
   if (error) {
-    console.error("chat/mensagem insert error:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    // Reenvio da mesma mensagem (mesmo UUID) em rede instável: trata como idempotente.
+    if ((error as { code?: string }).code === "23505") {
+      const { data: existing, error: existingErr } = await admin
+        .from("chat_mensagens")
+        .select("criado_em")
+        .eq("id", id)
+        .single();
+
+      if (existingErr || !existing?.criado_em) {
+        console.error("chat/mensagem duplicate fetch error:", existingErr);
+        return NextResponse.json({ error: existingErr?.message ?? "Falha ao recuperar mensagem" }, { status: 500 });
+      }
+
+      criadoEm = existing.criado_em;
+    } else {
+      console.error("chat/mensagem insert error:", error);
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+  } else {
+    criadoEm = inserted.criado_em;
+  }
+
+  try {
+    await upsertMessageReceipts(id, conversa_id, autor_id);
+  } catch (e) {
+    console.error("chat receipt upsert error:", e);
   }
 
   // Retorna o criado_em atribuído pelo servidor (NOW()) para o cliente usar no broadcast
@@ -86,7 +117,7 @@ export async function POST(req: NextRequest) {
     // Não falha o envio da mensagem por erro de push.
   }
 
-  return NextResponse.json({ ok: true, criado_em: inserted.criado_em });
+  return NextResponse.json({ ok: true, criado_em: criadoEm });
 }
 
 /** Envia push para todos os participantes de uma conversa exceto o autor */
@@ -204,4 +235,31 @@ async function resolveRecipientIds(conversa_id: string, autor_id: string): Promi
   }
 
   return fallbackIds;
+}
+
+async function upsertMessageReceipts(mensagem_id: string, conversa_id: string, autor_id: string) {
+  const { data: participantes } = await admin
+    .from("chat_participantes")
+    .select("user_id")
+    .eq("conversa_id", conversa_id);
+
+  const participantIds = [...new Set((participantes ?? []).map((p: { user_id: string }) => p.user_id).filter(Boolean))];
+  const allUserIds = participantIds.length
+    ? participantIds
+    : [autor_id];
+
+  const now = new Date().toISOString();
+  const payload = allUserIds.map((uid) => ({
+    message_id: mensagem_id,
+    user_id: uid,
+    sent_at: now,
+    delivered_at: uid === autor_id ? now : null,
+    read_at: uid === autor_id ? now : null,
+  }));
+
+  const { error } = await admin
+    .from("chat_message_receipts")
+    .upsert(payload, { onConflict: "message_id,user_id" });
+
+  if (error) throw error;
 }
