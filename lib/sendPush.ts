@@ -111,9 +111,8 @@ async function dispatchToSubs(subs: SubRow[], payload: PushPayload): Promise<Pus
         const msg = message.toLowerCase();
         const invalidKey =
           msg.includes("p256dh") ||
-          msg.includes("auth") ||
-          msg.includes("must be") ||
-          msg.includes("base64url");
+          msg.includes("base64url") ||
+          (msg.includes("invalid") && msg.includes("public key"));
         if (invalidKey) {
           await admin
             .from("push_subscriptions")

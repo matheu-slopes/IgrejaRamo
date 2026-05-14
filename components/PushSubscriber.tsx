@@ -102,15 +102,26 @@ export default function PushSubscriber() {
       setMsg(null);
     }
 
+    const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+    if (!vapidKey) throw new Error("Chave VAPID ausente. Contate o administrador.");
+
     const registration = await getServiceWorkerRegistration();
     let sub = await registration.pushManager.getSubscription();
+    const expectedKey = urlBase64ToUint8Array(vapidKey);
+
+    if (sub && shouldRenewSubscription(sub, expectedKey, user?.id)) {
+      try {
+        await sub.unsubscribe();
+      } catch {
+        // segue para nova tentativa de subscribe
+      }
+      sub = null;
+    }
 
     if (!sub) {
-      const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-      if (!vapidKey) throw new Error("Chave VAPID ausente. Contate o administrador.");
       sub = await registration.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(vapidKey) as unknown as Uint8Array<ArrayBuffer>,
+        applicationServerKey: expectedKey as unknown as Uint8Array<ArrayBuffer>,
       });
     }
 
@@ -157,6 +168,14 @@ export default function PushSubscriber() {
     const jsonRes = await res.json().catch(() => ({}));
     if (!res.ok) {
       throw new Error(jsonRes.error ?? "Falha ao registrar notificação.");
+    }
+
+    if (user?.id) {
+      try {
+        localStorage.setItem(`push_registered_at_${user.id}`, String(Date.now()));
+      } catch {
+        // ignore localStorage failures
+      }
     }
 
     setStatus("sucesso");
@@ -301,5 +320,27 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
   const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
   const rawData = atob(base64);
   return Uint8Array.from([...rawData].map((c) => c.charCodeAt(0)));
+}
+
+function shouldRenewSubscription(sub: PushSubscription, expectedKey: Uint8Array, userId?: string): boolean {
+  // Renova quando a chave VAPID do app mudou em relação à subscription existente.
+  const currentKeyBuffer = sub.options?.applicationServerKey;
+  const currentKey = currentKeyBuffer ? new Uint8Array(currentKeyBuffer as ArrayBuffer) : null;
+  const keyMismatch =
+    !currentKey ||
+    currentKey.length !== expectedKey.length ||
+    currentKey.some((byte, i) => byte !== expectedKey[i]);
+  if (keyMismatch) return true;
+
+  // Renova periodicamente para evitar endpoint envelhecido no mobile.
+  if (!userId) return false;
+  try {
+    const raw = localStorage.getItem(`push_registered_at_${userId}`);
+    const lastTs = raw ? Number(raw) : 0;
+    const sevenDays = 7 * 24 * 60 * 60 * 1000;
+    return !lastTs || Date.now() - lastTs > sevenDays;
+  } catch {
+    return false;
+  }
 }
 
