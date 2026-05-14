@@ -135,6 +135,12 @@ async function dispatchChatNotification(job: ChatNotificationJob) {
     .upsert(notificacoes, { onConflict: "usuario_id,chat_mensagem_id" });
 
   if (notifError) {
+    const missingTable = notifError.code === "42P01" || String(notifError.message ?? "").includes("notificacoes");
+    if (missingTable) {
+      console.warn("chat notificacoes table missing; skipping in-app notification");
+      return;
+    }
+
     const missingColumn = notifError.code === "42703" || String(notifError.message ?? "").includes("chat_mensagem_id");
     if (!missingColumn) throw notifError;
 
@@ -146,7 +152,14 @@ async function dispatchChatNotification(job: ChatNotificationJob) {
       link: "/dashboard/chat",
     }));
     const { error: fallbackError } = await admin.from("notificacoes").insert(fallback);
-    if (fallbackError) throw fallbackError;
+    if (fallbackError) {
+      const fallbackMissingTable = fallbackError.code === "42P01" || String(fallbackError.message ?? "").includes("notificacoes");
+      if (fallbackMissingTable) {
+        console.warn("chat notificacoes table missing; skipping fallback in-app notification");
+        return;
+      }
+      throw fallbackError;
+    }
   }
 }
 

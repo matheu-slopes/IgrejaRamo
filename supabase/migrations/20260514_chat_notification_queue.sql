@@ -15,11 +15,37 @@ CREATE TABLE IF NOT EXISTS public.chat_notification_jobs (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_chat_notification_jobs_pending
-  ON public.chat_notification_jobs (status, created_at);
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_indexes
+    WHERE schemaname = 'public'
+      AND indexname = 'idx_chat_notification_jobs_pending'
+  ) THEN
+    EXECUTE 'CREATE INDEX idx_chat_notification_jobs_pending ON public.chat_notification_jobs (status, created_at)';
+  END IF;
 
-ALTER TABLE public.notificacoes
-  ADD chat_mensagem_id UUID;
+  IF to_regclass('public.notificacoes') IS NOT NULL THEN
+    IF NOT EXISTS (
+      SELECT 1
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = 'notificacoes'
+        AND column_name = 'chat_mensagem_id'
+    ) THEN
+      ALTER TABLE public.notificacoes ADD COLUMN chat_mensagem_id UUID;
+    END IF;
 
-CREATE UNIQUE INDEX IF NOT EXISTS uq_notificacoes_usuario_chat_mensagem
-  ON public.notificacoes (usuario_id, chat_mensagem_id);
+    IF NOT EXISTS (
+      SELECT 1
+      FROM pg_indexes
+      WHERE schemaname = 'public'
+        AND indexname = 'uq_notificacoes_usuario_chat_mensagem'
+    ) THEN
+      EXECUTE 'CREATE UNIQUE INDEX uq_notificacoes_usuario_chat_mensagem ON public.notificacoes (usuario_id, chat_mensagem_id)';
+    END IF;
+  ELSE
+    RAISE NOTICE 'public.notificacoes not found. Skipping chat notification dedupe column.';
+  END IF;
+END $$;
