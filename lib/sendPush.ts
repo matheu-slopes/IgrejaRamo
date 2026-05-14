@@ -97,8 +97,9 @@ async function dispatchToSubs(subs: SubRow[], payload: PushPayload): Promise<Pus
         const message = String((err as { message?: string })?.message ?? err ?? "erro desconhecido");
         result.errors.push({ status, message });
 
-        // Subscription expired — remove
-        if (status === 410 || status === 404) {
+        // Subscription expired / inválida — remove
+        // 403 normalmente indica VAPID mismatch (chave pública trocada) — também limpa
+        if (status === 410 || status === 404 || status === 403) {
           await admin
             .from("push_subscriptions")
             .delete()
