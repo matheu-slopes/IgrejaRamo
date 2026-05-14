@@ -38,6 +38,11 @@ export default function PushSubscriber() {
     setStatus("loading");
     setMsg(null);
     try {
+      const supportError = getPushSupportError();
+      if (supportError) {
+        throw new Error(supportError);
+      }
+
       const permission = await Notification.requestPermission();
       if (permission !== "granted") {
         setStatus("erro");
@@ -71,16 +76,28 @@ export default function PushSubscriber() {
     const authKey = json.keys?.auth ?? "";
     if (!p256dh || !authKey) throw new Error("Não foi possível obter as chaves da subscription.");
 
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error("Sessão expirada. Faça login novamente.");
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
+    if (!token) throw new Error("Sessão expirada. Faça login novamente.");
 
-    // Salva diretamente no Supabase (cliente autenticado, RLS aplica automaticamente)
-    const { error } = await supabase.from("push_subscriptions").upsert(
-      { user_id: user.id, endpoint: sub.endpoint, p256dh, auth: authKey },
-      { onConflict: "user_id,endpoint" }
-    );
+    // Salva no backend com service role para evitar falhas de RLS entre ambientes.
+    const res = await fetch("/api/push/subscribe", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        endpoint: sub.endpoint,
+        p256dh,
+        auth: authKey,
+      }),
+    });
 
-    if (error) throw new Error(`Erro ao salvar: ${error.message}`);
+    const jsonRes = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(jsonRes.error ?? "Falha ao registrar notificação.");
+    }
 
     setStatus("sucesso");
     setMsg(null);
@@ -183,6 +200,27 @@ async function getServiceWorkerRegistration(): Promise<ServiceWorkerRegistration
   ]);
 
   return (readyRegistration as ServiceWorkerRegistration) || registration;
+}
+
+function getPushSupportError(): string | null {
+  if (typeof window === "undefined") return "";
+  if (!window.isSecureContext) {
+    return "Notificações exigem conexão segura (HTTPS).";
+  }
+
+  if (!("Notification" in window)) {
+    return "Este navegador não suporta notificações.";
+  }
+
+  if (!("serviceWorker" in navigator)) {
+    return "Este navegador não suporta Service Worker.";
+  }
+
+  if (!("PushManager" in window)) {
+    return "Este navegador não suporta Push API.";
+  }
+
+  return null;
 }
 
 function urlBase64ToUint8Array(base64String: string): Uint8Array {

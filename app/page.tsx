@@ -3,6 +3,7 @@ import ImmersiveNav from "@/components/landing/ImmersiveNav";
 import FloatingCTA from "@/components/FloatingCTA";
 import ParticleHero from "@/components/landing/ParticleHero";
 import VerseMarquee from "@/components/landing/VerseMarquee";
+import PwaEntryRedirect from "@/components/PwaEntryRedirect";
 
 // Lazy load seções abaixo do fold
 const BentoGrid = dynamic(() => import("@/components/landing/BentoGrid"));
@@ -15,6 +16,7 @@ const ImmersiveFooter = dynamic(() => import("@/components/landing/ImmersiveFoot
 export default function HomePage() {
   return (
     <>
+      <PwaEntryRedirect />
       <ImmersiveNav />
       <main>
         {/* 1. Portal — partículas + hero */}

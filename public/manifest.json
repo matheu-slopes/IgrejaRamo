@@ -2,7 +2,7 @@
   "name": "Ramo da Vida",
   "short_name": "Ramo da Vida",
   "description": "Comunidade Igreja Ramo da Vida — Campinas, SP",
-  "start_url": "/",
+  "start_url": "/dashboard",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",

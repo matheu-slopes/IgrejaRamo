@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
   // Upsert — atualiza se já existe o mesmo endpoint
   const { error } = await admin.from("push_subscriptions").upsert(
     { user_id: user.id, endpoint, p256dh, auth },
-    { onConflict: "user_id, endpoint" }
+    { onConflict: "user_id,endpoint" }
   );
 
   if (error) {
