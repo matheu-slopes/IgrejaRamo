@@ -39,12 +39,27 @@ export async function GET(req: NextRequest) {
     .from("push_subscriptions")
     .select("id", { count: "exact", head: true });
 
+  const hosts = Array.from(
+    new Set(
+      (subs ?? [])
+        .map((s: { endpoint: string }) => {
+          try {
+            return new URL(s.endpoint).host;
+          } catch {
+            return "endpoint_invalido";
+          }
+        })
+        .filter(Boolean)
+    )
+  );
+
   return NextResponse.json({
     ...diagnostico,
     autenticado: true,
     user_id: user.id,
     suas_subscriptions: subs ?? [],
     suas_subscriptions_count: subs?.length ?? 0,
+    suas_subscriptions_hosts: hosts,
     total_subscriptions_sistema: count ?? 0,
     erro_subs: subsErr?.message ?? null,
   });

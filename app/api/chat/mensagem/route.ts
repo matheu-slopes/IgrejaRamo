@@ -1,6 +1,6 @@
 ﻿import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { sendPushToUsers } from "@/lib/sendPush";
+import { PushDispatchResult, sendPushToUsers } from "@/lib/sendPush";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -80,7 +80,7 @@ export async function POST(req: NextRequest) {
   // ── Push notification para os outros participantes ───────────────────────
   // Em ambiente serverless, fire-and-forget pode ser interrompido ao finalizar a request.
   try {
-    await sendPushParticipantes(conversa_id, autor_id, autor_nome, conteudo, tipo);
+    await sendPushParticipantes(id, conversa_id, autor_id, autor_nome, conteudo, tipo);
   } catch (e) {
     console.error("push chat error:", e);
     // Não falha o envio da mensagem por erro de push.
@@ -91,6 +91,7 @@ export async function POST(req: NextRequest) {
 
 /** Envia push para todos os participantes de uma conversa exceto o autor */
 async function sendPushParticipantes(
+  mensagem_id: string,
   conversa_id: string,
   autor_id: string,
   autor_nome: string,
@@ -113,12 +114,27 @@ async function sendPushParticipantes(
       ? `${nome} enviou um arquivo`
       : `${nome}: ${conteudo?.slice(0, 80) ?? ""}`;
 
-  await sendPushToUsers(userIds, {
-    title: "💬 Nova mensagem",
-    body,
-    url: "/dashboard/chat",
-    tag: `chat-${conversa_id}`,
-  });
+  let delivery: PushDispatchResult | null = null;
+  try {
+    delivery = await sendPushToUsers(userIds, {
+      title: "💬 Nova mensagem",
+      body,
+      url: "/dashboard/chat",
+      // Tag única por mensagem evita colapso/supressão de notificações em sequência.
+      tag: `chat-${conversa_id}-${mensagem_id}`,
+    });
+    if (delivery.sent === 0) {
+      console.warn("chat push zero sent:", {
+        conversa_id,
+        destinatarios: userIds.length,
+        attempted: delivery.attempted,
+        failed: delivery.failed,
+        sampleError: delivery.errors[0]?.message ?? null,
+      });
+    }
+  } catch (pushErr) {
+    console.error("chat push dispatch error:", pushErr);
+  }
 
   // Alimenta o sino de notificações no app (desktop/mobile) com a mesma mensagem.
   const notificacoes = userIds.map((uid) => ({

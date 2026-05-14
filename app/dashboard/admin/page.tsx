@@ -1077,7 +1077,21 @@ function TestePushPanel() {
         setResultado({ ok: false, msg: data.error ?? "Erro desconhecido" });
       } else {
         const destino = data.enviado === "broadcast" ? `${data.subscriptions} dispositivo(s)` : "seu dispositivo";
-        setResultado({ ok: true, msg: `Notificação "${tipo}" enviada para ${destino}!` });
+        const delivery = data.delivery as { attempted?: number; sent?: number; failed?: number; removed?: number; errors?: Array<{ status?: number | string; message?: string }> } | undefined;
+        const attempted = delivery?.attempted ?? 0;
+        const sent = delivery?.sent ?? 0;
+        const failed = delivery?.failed ?? 0;
+        const removed = delivery?.removed ?? 0;
+        const sampleErr = delivery?.errors?.[0]?.message;
+
+        if (sent > 0) {
+          setResultado({ ok: true, msg: `Notificação "${tipo}" enviada para ${destino}. Entregas: ${sent}/${attempted}.` });
+        } else {
+          setResultado({
+            ok: false,
+            msg: `Push não entregue (0/${attempted}). Falhas: ${failed}, removidas: ${removed}${sampleErr ? `, erro: ${sampleErr}` : ""}`,
+          });
+        }
       }
     } catch {
       setResultado({ ok: false, msg: "Falha na requisição" });

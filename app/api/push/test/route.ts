@@ -39,43 +39,43 @@ export async function POST(req: NextRequest) {
 
   try {
     if (tipo === "aviso") {
-      await sendPushToAll({
+      const delivery = await sendPushToAll({
         title: "📢 Teste — Novo Aviso",
         body: "Este é um aviso de teste do sistema de notificações.",
         url: "/dashboard/mural",
         tag: "teste-aviso",
       });
-      return NextResponse.json({ ok: true, enviado: "broadcast", subscriptions: count });
+      return NextResponse.json({ ok: delivery.sent > 0, enviado: "broadcast", subscriptions: count, delivery });
     }
 
     if (tipo === "evento") {
-      await sendPushToAll({
+      const delivery = await sendPushToAll({
         title: "📅 Teste — Novo Evento",
         body: "Culto de teste · Igreja Ramo da Videira",
         url: "/dashboard/eventos",
         tag: "teste-evento",
       });
-      return NextResponse.json({ ok: true, enviado: "broadcast", subscriptions: count });
+      return NextResponse.json({ ok: delivery.sent > 0, enviado: "broadcast", subscriptions: count, delivery });
     }
 
     if (tipo === "chat") {
-      await sendPushToUsers([user.id], {
+      const delivery = await sendPushToUsers([user.id], {
         title: "💬 Teste — Nova Mensagem",
         body: "Fulano: Esta é uma mensagem de teste no chat.",
         url: "/dashboard/chat",
         tag: "teste-chat",
       });
-      return NextResponse.json({ ok: true, enviado: "somente_voce", subscriptions: count });
+      return NextResponse.json({ ok: delivery.sent > 0, enviado: "somente_voce", subscriptions: count, delivery });
     }
 
     if (tipo === "escala") {
-      await sendPushToUsers([user.id], {
+      const delivery = await sendPushToUsers([user.id], {
         title: "🎸 Teste — Lembrete de Escala",
         body: "Você está escalado hoje às 18:00 — Culto da Família · Função: Guitarra",
         url: "/dashboard/escalas",
         tag: "teste-escala",
       });
-      return NextResponse.json({ ok: true, enviado: "somente_voce", subscriptions: count });
+      return NextResponse.json({ ok: delivery.sent > 0, enviado: "somente_voce", subscriptions: count, delivery });
     }
 
     return NextResponse.json({ error: "tipo inválido. Use: aviso, evento, chat, escala" }, { status: 400 });
