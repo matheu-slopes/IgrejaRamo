@@ -35,6 +35,9 @@ function conversaIdsFromCache(uid: string): string[] {
     ];
   } catch { return []; }
 }
+function uniqueIds(ids: string[]) {
+  return [...new Set(ids.filter(Boolean))];
+}
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function saveToLocalInbox(uid: string, cid: string, msg: any) {
   try {
@@ -59,8 +62,11 @@ export function ChatUnreadProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const pathname = usePathname();
   const [totalUnread, setTotalUnreadState] = useState(0);
+  const [conversaIds, setConversaIds] = useState<string[]>([]);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const channelsRef = useRef<Map<string, any>>(new Map());
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const updatesChannelRef = useRef<any>(null);
   const pathnameRef = useRef(pathname);
   const userIdRef = useRef<string | undefined>(undefined);
   const activeChatIdRef = useRef<string | null>(null);
@@ -85,6 +91,67 @@ export function ChatUnreadProvider({ children }: { children: ReactNode }) {
     setTotalUnreadState(persistedCount(user.id));
   }, [user?.id]);
 
+  // Carrega as conversas do usuário no layout, sem depender da página de chat.
+  // Antes, o badge do rodapé só passava a escutar mensagens depois que /dashboard/chat
+  // criava o cache local com os IDs das conversas.
+  useEffect(() => {
+    if (!user?.id) {
+      setConversaIds([]);
+      return;
+    }
+
+    let cancelled = false;
+    const uid = user.id;
+
+    const cachedIds = conversaIdsFromCache(uid);
+    if (cachedIds.length) setConversaIds(uniqueIds(cachedIds));
+
+    async function carregarIds() {
+      const { data, error } = await supabase
+        .from("chat_participantes")
+        .select("conversa_id")
+        .eq("user_id", uid);
+
+      if (cancelled || error) return;
+      const dbIds = ((data ?? []) as { conversa_id: string }[]).map((p) => p.conversa_id);
+      setConversaIds((prev) => uniqueIds([...prev, ...cachedIds, ...dbIds]));
+    }
+
+    carregarIds();
+
+    return () => { cancelled = true; };
+  }, [user?.id]);
+
+  // Detecta novas conversas/grupos adicionados enquanto o usuário está fora do chat.
+  useEffect(() => {
+    if (!user?.id) return;
+    if (updatesChannelRef.current) supabase.removeChannel(updatesChannelRef.current);
+
+    const uid = user.id;
+    const channel = supabase
+      .channel(`chat_unread_memberships_${uid}`)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .on("postgres_changes" as any, {
+        event: "INSERT",
+        schema: "public",
+        table: "chat_participantes",
+        filter: `user_id=eq.${uid}`,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      }, (payload: any) => {
+        const cid = payload.new?.conversa_id as string | undefined;
+        if (!cid) return;
+        setConversaIds((prev) => uniqueIds([...prev, cid]));
+      })
+      .subscribe();
+
+    updatesChannelRef.current = channel;
+
+    return () => {
+      if (updatesChannelRef.current) supabase.removeChannel(updatesChannelRef.current);
+      updatesChannelRef.current = null;
+    };
+  }, [user?.id]);
+
   // ── Gerencia canais de broadcast ─────────────────────────────────
   // ESTRATÉGIA:
   // - Quando no chat page → remove todos os canais do contexto.
@@ -104,7 +171,7 @@ export function ChatUnreadProvider({ children }: { children: ReactNode }) {
     // No chat page: sem canais no contexto (chat page gerencia tudo)
     if (pathname === "/dashboard/chat") return;
 
-    const ids = conversaIdsFromCache(uid);
+    const ids = conversaIds;
     for (const cid of ids) {
       const ch = supabase
         .channel(`room:${cid}`)
@@ -140,7 +207,7 @@ export function ChatUnreadProvider({ children }: { children: ReactNode }) {
       map.clear();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathname, user?.id]);
+  }, [pathname, user?.id, conversaIds.join(",")]);
 
   return (
     <ChatUnreadContext.Provider value={{ totalUnread, setTotalUnread, setActiveChatId }}>
