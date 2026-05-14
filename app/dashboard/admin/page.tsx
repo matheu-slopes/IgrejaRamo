@@ -17,6 +17,7 @@ import clsx from "clsx";
 import { User, Role, Ministerio, Permissao, CanalMinisterio, Local } from "@/types";
 import { supabase } from "@/lib/supabase";
 import { notificarBroadcast } from "@/lib/notificarBroadcast";
+import { DiagnosticoPush } from "@/components/DiagnosticoPush";
 
 const ROLES: Role[] = ["admin", "pastor", "lider", "voluntario", "membro"];
 const MINISTERIOS: Ministerio[] = ["Louvor","Mídias","Ensino","Infantil","Ação Social","Jovens","Cantina","Limpeza"];
@@ -96,7 +97,10 @@ export default function AdminPage() {
       )}
 
       {adminTab === "ministerios" && podeGerenciar && (
-        <TestePushPanel />
+        <>
+          <DiagnosticoPush />
+          <TestePushPanel />
+        </>
       )}
 
       {adminTab === "locais" && podeGerenciar && (
