@@ -255,11 +255,29 @@ async function getServiceWorkerRegistration(): Promise<ServiceWorkerRegistration
     throw new Error("Este navegador não suporta Service Worker.");
   }
 
-  let registration = await navigator.serviceWorker.getRegistration();
+  const expectedScript = "/sw.js";
+  let registration = await navigator.serviceWorker.getRegistration("/");
+
+  // Limpa service workers antigos/incompatíveis que podem capturar a subscription errada.
+  if (registration?.active?.scriptURL && !registration.active.scriptURL.endsWith(expectedScript)) {
+    try {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map((reg) => reg.unregister()));
+    } catch {
+      // continua para registrar o worker correto
+    }
+    registration = undefined;
+  }
 
   // Em alguns navegadores mobile a registration pode não existir ainda.
   if (!registration) {
-    registration = await navigator.serviceWorker.register("/sw.js");
+    registration = await navigator.serviceWorker.register(expectedScript, { scope: "/" });
+  }
+
+  try {
+    await registration.update();
+  } catch {
+    // update pode falhar offline; segue com o registro existente
   }
 
   const timeoutMs = 10000;

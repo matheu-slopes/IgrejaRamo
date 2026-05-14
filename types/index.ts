@@ -236,6 +236,7 @@ export interface MensagemConversa {
   conteudo: string;
   tipo?: TipoMensagem;    // default "texto"
   mediaUrl?: string;
+  sequenceId?: number;
   criadoEm: string;       // ISO datetime
   editadoEm?: string;     // ISO datetime — preenchido após edição
   lida?: boolean;

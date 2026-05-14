@@ -10,7 +10,7 @@ const admin = createClient(
 );
 
 /**
- * GET /api/chat/sync?since=<iso>
+ * GET /api/chat/sync?after_sequence=<n>
  * Sincroniza mensagens recentes das conversas do usuário autenticado.
  */
 export async function GET(req: NextRequest) {
@@ -32,6 +32,11 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Token inválido" }, { status: 401 });
   }
 
+  const afterSequenceParam = req.nextUrl.searchParams.get("after_sequence");
+  const parsedAfterSequence = afterSequenceParam ? Number(afterSequenceParam) : Number.NaN;
+  const afterSequence = Number.isFinite(parsedAfterSequence) && parsedAfterSequence > 0
+    ? parsedAfterSequence
+    : null;
   const since = req.nextUrl.searchParams.get("since");
 
   const { data: participacoes, error: partErr } = await admin
@@ -45,17 +50,20 @@ export async function GET(req: NextRequest) {
 
   const conversaIds = (participacoes ?? []).map((p: { conversa_id: string }) => p.conversa_id);
   if (!conversaIds.length) {
-    return NextResponse.json({ ok: true, conversa_ids: [], mensagens: [], max_criado_em: null });
+    return NextResponse.json({ ok: true, conversa_ids: [], mensagens: [], max_criado_em: null, max_sequence_id: null });
   }
 
   let query = admin
     .from("chat_mensagens")
     .select("*")
     .in("conversa_id", conversaIds)
+    .order("sequence_id", { ascending: true })
     .order("criado_em", { ascending: true })
     .limit(1500);
 
-  if (since) {
+  if (afterSequence !== null) {
+    query = query.gt("sequence_id", afterSequence);
+  } else if (since) {
     query = query.gte("criado_em", since);
   }
 
@@ -64,42 +72,129 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: msgErr.message }, { status: 500 });
   }
 
-  // Atualiza receipts de entrega para as mensagens recebidas por este usuário.
+  // Atualiza apenas o cursor de entrega por conversa.
   try {
-    const deliveredIds = (mensagens ?? [])
-      .filter((m: { id: string; autor_id: string | null }) => m.autor_id && m.autor_id !== user.id)
-      .map((m: { id: string }) => m.id);
+    const latestIncoming = pickLatestByConversation(
+      (mensagens ?? []).filter((m: { id: string; conversa_id: string; autor_id: string | null; criado_em: string | null; sequence_id: number | null }) =>
+        Boolean(m.autor_id) && m.autor_id !== user.id
+      )
+    );
 
-    if (deliveredIds.length) {
-      await admin
-        .from("chat_message_receipts")
-        .upsert(
-          deliveredIds.map((id) => ({
-            message_id: id,
-            user_id: user.id,
-            sent_at: new Date().toISOString(),
-            delivered_at: new Date().toISOString(),
-          })),
-          { onConflict: "message_id,user_id" }
-        );
-
-      await admin
-        .from("chat_message_receipts")
-        .update({ delivered_at: new Date().toISOString() })
+    if (latestIncoming.length) {
+      const { data: currentCursors, error: cursorErr } = await admin
+        .from("chat_participante_cursors")
+        .select("conversa_id, last_delivered_message_id")
         .eq("user_id", user.id)
-        .in("message_id", deliveredIds)
-        .is("delivered_at", null);
+        .in("conversa_id", latestIncoming.map((msg) => msg.conversa_id));
+
+      if (cursorErr) {
+        throw cursorErr;
+      }
+
+      const currentIds = (currentCursors ?? [])
+        .map((cursor: { last_delivered_message_id: string | null }) => cursor.last_delivered_message_id)
+        .filter(Boolean) as string[];
+
+      const currentMessageById = new Map<string, { id: string; criado_em: string | null; sequence_id: number | null }>();
+      if (currentIds.length) {
+        const { data: currentMessages, error: currentMsgErr } = await admin
+          .from("chat_mensagens")
+          .select("id, criado_em, sequence_id")
+          .in("id", [...new Set(currentIds)]);
+
+        if (currentMsgErr) {
+          throw currentMsgErr;
+        }
+
+        for (const message of currentMessages ?? []) {
+          currentMessageById.set(message.id, message);
+        }
+      }
+
+      const cursorByConversation = new Map(
+        (currentCursors ?? []).map((cursor: { conversa_id: string; last_delivered_message_id: string | null }) => [cursor.conversa_id, cursor])
+      );
+
+      const now = new Date().toISOString();
+      const upserts = latestIncoming.flatMap((message) => {
+        const currentCursor = cursorByConversation.get(message.conversa_id);
+        const currentMessage = currentCursor?.last_delivered_message_id
+          ? currentMessageById.get(currentCursor.last_delivered_message_id) ?? null
+          : null;
+
+        if (!isMessageNewer(message, currentMessage)) {
+          return [];
+        }
+
+        return [{
+          conversa_id: message.conversa_id,
+          user_id: user.id,
+          last_delivered_message_id: message.id,
+          last_delivered_at: now,
+          updated_at: now,
+        }];
+      });
+
+      if (upserts.length) {
+        const { error: upsertErr } = await admin
+          .from("chat_participante_cursors")
+          .upsert(upserts, { onConflict: "conversa_id,user_id" });
+
+        if (upsertErr) {
+          throw upsertErr;
+        }
+      }
     }
   } catch (receiptErr) {
-    console.error("chat/sync receipt update error:", receiptErr);
+    console.error("chat/sync cursor update error:", receiptErr);
   }
 
   const maxCriadoEm = mensagens?.length ? mensagens[mensagens.length - 1].criado_em : null;
+  const maxSequenceId = mensagens?.length ? mensagens[mensagens.length - 1].sequence_id ?? null : null;
 
   return NextResponse.json({
     ok: true,
     conversa_ids: conversaIds,
     mensagens: mensagens ?? [],
     max_criado_em: maxCriadoEm,
+    max_sequence_id: maxSequenceId,
   });
+}
+
+function pickLatestByConversation(
+  messages: Array<{ id: string; conversa_id: string; criado_em: string | null; sequence_id: number | null }>
+) {
+  const byConversation = new Map<string, { id: string; conversa_id: string; criado_em: string | null; sequence_id: number | null }>();
+
+  for (const message of messages) {
+    const current = byConversation.get(message.conversa_id);
+    if (!current || isMessageNewer(message, current)) {
+      byConversation.set(message.conversa_id, message);
+    }
+  }
+
+  return Array.from(byConversation.values());
+}
+
+function isMessageNewer(
+  candidate: { id: string; criado_em: string | null; sequence_id: number | null },
+  current: { id: string; criado_em: string | null; sequence_id: number | null } | null
+) {
+  if (!current) return true;
+
+  const candidateSequence = candidate.sequence_id ?? 0;
+  const currentSequence = current.sequence_id ?? 0;
+
+  if (candidateSequence !== currentSequence) {
+    return candidateSequence > currentSequence;
+  }
+
+  const candidateTime = candidate.criado_em ? new Date(candidate.criado_em).getTime() : 0;
+  const currentTime = current.criado_em ? new Date(current.criado_em).getTime() : 0;
+
+  if (candidateTime !== currentTime) {
+    return candidateTime > currentTime;
+  }
+
+  return candidate.id > current.id;
 }

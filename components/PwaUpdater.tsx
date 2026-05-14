@@ -22,7 +22,7 @@ export default function PwaUpdater() {
       });
     };
 
-    navigator.serviceWorker.getRegistration().then((reg) => {
+    navigator.serviceWorker.getRegistration("/").then((reg) => {
       if (!reg) return;
 
       // Verifica agora (pode já ter SW waiting)

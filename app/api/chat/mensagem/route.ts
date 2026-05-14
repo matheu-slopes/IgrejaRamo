@@ -70,10 +70,11 @@ export async function POST(req: NextRequest) {
   };
 
   let criadoEm: string | null = null;
+  let sequenceId: number | null = null;
   const { data: inserted, error } = await admin
     .from("chat_mensagens")
     .insert(insertPayload)
-    .select("criado_em")
+    .select("criado_em, sequence_id")
     .single();
 
   if (error) {
@@ -81,7 +82,7 @@ export async function POST(req: NextRequest) {
     if ((error as { code?: string }).code === "23505") {
       const { data: existing, error: existingErr } = await admin
         .from("chat_mensagens")
-        .select("criado_em")
+        .select("criado_em, sequence_id")
         .eq("id", id)
         .single();
 
@@ -91,18 +92,20 @@ export async function POST(req: NextRequest) {
       }
 
       criadoEm = existing.criado_em;
+      sequenceId = existing.sequence_id ?? null;
     } else {
       console.error("chat/mensagem insert error:", error);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
   } else {
     criadoEm = inserted.criado_em;
+    sequenceId = inserted.sequence_id ?? null;
   }
 
   try {
-    await upsertMessageReceipts(id, conversa_id, autor_id);
+    await touchAuthorCursor(id, conversa_id, autor_id, criadoEm);
   } catch (e) {
-    console.error("chat receipt upsert error:", e);
+    console.error("chat author cursor upsert error:", e);
   }
 
   // Retorna o criado_em atribuído pelo servidor (NOW()) para o cliente usar no broadcast
@@ -117,7 +120,7 @@ export async function POST(req: NextRequest) {
     // Não falha o envio da mensagem por erro de push.
   }
 
-  return NextResponse.json({ ok: true, criado_em: criadoEm });
+  return NextResponse.json({ ok: true, criado_em: criadoEm, sequence_id: sequenceId });
 }
 
 /** Envia push para todos os participantes de uma conversa exceto o autor */
@@ -237,29 +240,28 @@ async function resolveRecipientIds(conversa_id: string, autor_id: string): Promi
   return fallbackIds;
 }
 
-async function upsertMessageReceipts(mensagem_id: string, conversa_id: string, autor_id: string) {
-  const { data: participantes } = await admin
-    .from("chat_participantes")
-    .select("user_id")
-    .eq("conversa_id", conversa_id);
-
-  const participantIds = [...new Set((participantes ?? []).map((p: { user_id: string }) => p.user_id).filter(Boolean))];
-  const allUserIds = participantIds.length
-    ? participantIds
-    : [autor_id];
-
-  const now = new Date().toISOString();
-  const payload = allUserIds.map((uid) => ({
-    message_id: mensagem_id,
-    user_id: uid,
-    sent_at: now,
-    delivered_at: uid === autor_id ? now : null,
-    read_at: uid === autor_id ? now : null,
-  }));
+async function touchAuthorCursor(
+  mensagem_id: string,
+  conversa_id: string,
+  autor_id: string,
+  criadoEm: string | null
+) {
+  const now = criadoEm ?? new Date().toISOString();
 
   const { error } = await admin
-    .from("chat_message_receipts")
-    .upsert(payload, { onConflict: "message_id,user_id" });
+    .from("chat_participante_cursors")
+    .upsert(
+      {
+        conversa_id,
+        user_id: autor_id,
+        last_delivered_message_id: mensagem_id,
+        last_delivered_at: now,
+        last_read_message_id: mensagem_id,
+        last_read_at: now,
+        updated_at: now,
+      },
+      { onConflict: "conversa_id,user_id" }
+    );
 
   if (error) throw error;
 }

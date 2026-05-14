@@ -222,6 +222,20 @@ function formatDateHeader(iso: string) {
   return d.toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" });
 }
 
+function compareMensagemOrder(a: MensagemConversa, b: MensagemConversa) {
+  const seqA = a.sequenceId ?? 0;
+  const seqB = b.sequenceId ?? 0;
+
+  if (seqA !== seqB) return seqA - seqB;
+
+  const timeA = new Date(a.criadoEm).getTime();
+  const timeB = new Date(b.criadoEm).getTime();
+
+  if (timeA !== timeB) return timeA - timeB;
+
+  return a.id.localeCompare(b.id);
+}
+
 type ChatTab = "direto" | "grupos";
 type ActiveChat = { tipo: "direto"; id: string } | { tipo: "grupo"; id: string } | null;
 
@@ -1175,6 +1189,7 @@ export default function ChatPage() {
   const gruposRef = useRef<Grupo[]>([]);
   const conversaIdsRef = useRef<string[]>([]);
   const lastBackfillRef = useRef<string>(new Date(Date.now() - 5 * 60 * 1000).toISOString());
+  const lastSequenceRef = useRef<number>(0);
   const syncRunningRef = useRef(false);
   // Inbox de mensagens recebidas enquanto estava em outra p�gina
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1234,6 +1249,7 @@ export default function ChatPage() {
       conteudo: row.conteudo ?? "",
       tipo: row.tipo ?? "texto",
       mediaUrl: row.media_url ?? undefined,
+      sequenceId: typeof row.sequence_id === "number" ? row.sequence_id : undefined,
       criadoEm: row.criado_em,
       editadoEm: row.editado_em ?? undefined,
       reacoes: Array.isArray(row.reacoes) ? row.reacoes : (row.reacoes ? JSON.parse(row.reacoes) : undefined),
@@ -1291,9 +1307,7 @@ export default function ChatPage() {
           const existIds = new Set(conv.mensagens.map(m => m.id));
           const novas = arr.filter(im => !existIds.has(im.id)).map(buildInboxMsg);
           if (!novas.length) return conv;
-          const merged = [...conv.mensagens, ...novas].sort(
-            (a, b) => new Date(a.criadoEm).getTime() - new Date(b.criadoEm).getTime()
-          );
+          const merged = [...conv.mensagens, ...novas].sort(compareMensagemOrder);
           return { ...conv, mensagens: merged };
         });
 
@@ -1323,7 +1337,7 @@ export default function ChatPage() {
     const [{ data: conversas }, { data: todosParticipantes }, { data: ultimasMsgs }] = await Promise.all([
       supabase.from("chat_conversas").select("*").in("id", ids),
       supabase.from("chat_participantes").select("conversa_id, user_id").in("conversa_id", ids),
-      supabase.from("chat_mensagens").select("*").in("conversa_id", ids).order("criado_em", { ascending: false }).limit(ids.length * 3),
+      supabase.from("chat_mensagens").select("*").in("conversa_id", ids).order("sequence_id", { ascending: false }).order("criado_em", { ascending: false }).limit(ids.length * 3),
     ]);
 
     const participantesPorConversa: Record<string, string[]> = {};
@@ -1392,9 +1406,7 @@ export default function ChatPage() {
         if (!existing) return newDm;
         const existingIds = new Set(existing.mensagens.map(m => m.id));
         const apenasNovas = newDm.mensagens.filter(m => !existingIds.has(m.id));
-        const merged = [...existing.mensagens, ...apenasNovas].sort(
-          (a, b) => new Date(a.criadoEm).getTime() - new Date(b.criadoEm).getTime()
-        );
+        const merged = [...existing.mensagens, ...apenasNovas].sort(compareMensagemOrder);
         return { ...newDm, mensagens: merged };
       });
     });
@@ -1405,9 +1417,7 @@ export default function ChatPage() {
         if (!existing) return newG;
         const existingIds = new Set(existing.mensagens.map(m => m.id));
         const apenasNovas = newG.mensagens.filter(m => !existingIds.has(m.id));
-        const merged = [...existing.mensagens, ...apenasNovas].sort(
-          (a, b) => new Date(a.criadoEm).getTime() - new Date(b.criadoEm).getTime()
-        );
+        const merged = [...existing.mensagens, ...apenasNovas].sort(compareMensagemOrder);
         return { ...newG, mensagens: merged };
       });
     });
@@ -1420,11 +1430,13 @@ export default function ChatPage() {
     for (const dm of newDms) {
       for (const m of dm.mensagens) {
         if (!latest || new Date(m.criadoEm).getTime() > new Date(latest).getTime()) latest = m.criadoEm;
+        if ((m.sequenceId ?? 0) > lastSequenceRef.current) lastSequenceRef.current = m.sequenceId ?? 0;
       }
     }
     for (const g of newGrupos) {
       for (const m of g.mensagens) {
         if (!latest || new Date(m.criadoEm).getTime() > new Date(latest).getTime()) latest = m.criadoEm;
+        if ((m.sequenceId ?? 0) > lastSequenceRef.current) lastSequenceRef.current = m.sequenceId ?? 0;
       }
     }
     if (latest) lastBackfillRef.current = latest;
@@ -1435,6 +1447,7 @@ export default function ChatPage() {
     const { data } = await supabase
       .from("chat_mensagens").select("*")
       .eq("conversa_id", conversaId)
+      .order("sequence_id", { ascending: true })
       .order("criado_em", { ascending: true })
       .limit(500);
     if (!data) return;
@@ -1456,7 +1469,7 @@ export default function ChatPage() {
     // MIN(cacheTime, dbTime): cache tem o tempo do broadcast (envio real do cliente),
     // banco tem o tempo do INSERT no servidor. O menor reflete o envio real.
     const sortByTime = (arr: MensagemConversa[]) =>
-      arr.slice().sort((a, b) => new Date(a.criadoEm).getTime() - new Date(b.criadoEm).getTime());
+      arr.slice().sort(compareMensagemOrder);
 
     setDms(prev => prev.map(dm => {
       if (dm.id !== conversaId) return dm;
@@ -1519,9 +1532,13 @@ export default function ChatPage() {
     syncRunningRef.current = true;
     try {
       const since = lastBackfillRef.current;
+      const afterSequence = lastSequenceRef.current;
       const token = await getFreshToken();
       if (!token) return;
-      const res = await fetchWithRetry(`/api/chat/sync?since=${encodeURIComponent(since)}`, {
+      const query = afterSequence > 0
+        ? `/api/chat/sync?after_sequence=${encodeURIComponent(String(afterSequence))}`
+        : `/api/chat/sync?since=${encodeURIComponent(since)}`;
+      const res = await fetchWithRetry(query, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) return;
@@ -1562,7 +1579,7 @@ export default function ChatPage() {
           map.set(msg.id, { ...existing, ...msg, criadoEm: bestTime });
         }
         return Array.from(map.values()).sort(
-          (a, b) => new Date(a.criadoEm).getTime() - new Date(b.criadoEm).getTime()
+          compareMensagemOrder
         );
       };
 
@@ -1578,6 +1595,10 @@ export default function ChatPage() {
         return { ...g, mensagens: mergeMsgs(g.mensagens, incoming) };
       }));
 
+      const newestSequence = Number(json.max_sequence_id ?? rows[rows.length - 1]?.sequence_id ?? 0);
+      if (Number.isFinite(newestSequence) && newestSequence > lastSequenceRef.current) {
+        lastSequenceRef.current = newestSequence;
+      }
       const newest = (json.max_criado_em as string | undefined) ?? (rows[rows.length - 1]?.criado_em as string | undefined);
       if (newest) lastBackfillRef.current = newest;
     } finally {
