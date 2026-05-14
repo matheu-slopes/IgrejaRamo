@@ -76,9 +76,25 @@ export default function PushSubscriber() {
     const authKey = json.keys?.auth ?? "";
     if (!p256dh || !authKey) throw new Error("Não foi possível obter as chaves da subscription.");
 
-    const { data: { session } } = await supabase.auth.getSession();
-    const token = session?.access_token;
-    if (!token) throw new Error("Sessão expirada. Faça login novamente.");
+    let token = "";
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        throw new Error("Sessão expirada. Faça login novamente.");
+      }
+      
+      // Valida e renova o token se estiver próximo do vencimento
+      const expiresAt = session.expires_at ?? 0;
+      if (Date.now() / 1000 > expiresAt - 60) {
+        const { data } = await supabase.auth.refreshSession();
+        token = data.session?.access_token ?? "";
+        if (!token) throw new Error("Falha ao renovar sessão.");
+      } else {
+        token = session.access_token;
+      }
+    } catch (e) {
+      throw new Error(`Erro de autenticação: ${String(e).replace("Error: ", "")}`);
+    }
 
     // Salva no backend com service role para evitar falhas de RLS entre ambientes.
     const res = await fetch("/api/push/subscribe", {

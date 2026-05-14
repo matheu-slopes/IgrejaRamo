@@ -35,9 +35,20 @@ export function DiagnosticoPush() {
         return;
       }
 
+      // Valida e renova o token se estiver próximo do vencimento
+      const expiresAt = session.expires_at ?? 0;
+      if (Date.now() / 1000 > expiresAt - 60) {
+        const { data } = await supabase.auth.refreshSession();
+        if (!data.session?.access_token) {
+          setErro("Falha ao renovar sessão");
+          return;
+        }
+      }
+
+      const token = session.access_token;
       const res = await fetch("/api/push/status", {
         headers: {
-          Authorization: `Bearer ${session.access_token}`,
+          Authorization: `Bearer ${token}`,
         },
       });
 

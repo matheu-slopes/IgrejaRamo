@@ -964,6 +964,18 @@ function TestePushPanel() {
         return;
       }
 
+      // Valida e renova o token se estiver próximo do vencimento
+      const expiresAt = session.expires_at ?? 0;
+      let token = session.access_token;
+      if (Date.now() / 1000 > expiresAt - 60) {
+        const { data } = await supabase.auth.refreshSession();
+        token = data.session?.access_token ?? "";
+        if (!token) {
+          setResultadoRegistro({ ok: false, msg: "Falha ao renovar sessão." });
+          return;
+        }
+      }
+
       const key = sub.getKey("p256dh");
       const auth = sub.getKey("auth");
       if (!key || !auth) {
@@ -973,7 +985,7 @@ function TestePushPanel() {
 
       const res = await fetch("/api/push/subscribe", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({
           endpoint: sub.endpoint,
           p256dh: btoa(String.fromCharCode(...new Uint8Array(key))),
@@ -1001,8 +1013,25 @@ function TestePushPanel() {
     setLoadingStatus(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        setStatus({ erro: "Não autenticado" });
+        return;
+      }
+
+      // Valida e renova o token se estiver próximo do vencimento
+      const expiresAt = session.expires_at ?? 0;
+      let token = session.access_token;
+      if (Date.now() / 1000 > expiresAt - 60) {
+        const { data } = await supabase.auth.refreshSession();
+        token = data.session?.access_token ?? "";
+        if (!token) {
+          setStatus({ erro: "Falha ao renovar sessão" });
+          return;
+        }
+      }
+
       const res = await fetch("/api/push/status", {
-        headers: { Authorization: `Bearer ${session?.access_token ?? ""}` },
+        headers: { Authorization: `Bearer ${token}` },
       });
       setStatus(await res.json());
     } catch {
@@ -1017,11 +1046,28 @@ function TestePushPanel() {
     setResultado(null);
     try {
       const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        setResultado({ ok: false, msg: "Não autenticado" });
+        return;
+      }
+
+      // Valida e renova o token se estiver próximo do vencimento
+      const expiresAt = session.expires_at ?? 0;
+      let token = session.access_token;
+      if (Date.now() / 1000 > expiresAt - 60) {
+        const { data } = await supabase.auth.refreshSession();
+        token = data.session?.access_token ?? "";
+        if (!token) {
+          setResultado({ ok: false, msg: "Falha ao renovar sessão" });
+          return;
+        }
+      }
+
       const res = await fetch("/api/push/test", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${session?.access_token ?? ""}`,
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({ tipo }),
       });
