@@ -2322,7 +2322,29 @@ export default function ChatPage() {
     return [] as MensagemConversa[];
   }
 
+  function settleViewportAfterClosingChat() {
+    if (typeof window === "undefined" || window.innerWidth >= 768) return;
+
+    const focused = document.activeElement as HTMLElement | null;
+    focused?.blur?.();
+    document.body.classList.remove("chat-conversation-open");
+
+    const settle = () => {
+      const fullHeight = Math.round(window.innerHeight);
+      document.documentElement.style.setProperty("--app-vvh", `${fullHeight}px`);
+      document.documentElement.style.setProperty("--chat-vvh", `${fullHeight}px`);
+      document.documentElement.style.setProperty("--vv-offset-top", "0px");
+      window.scrollBy(0, 1);
+      window.scrollBy(0, -1);
+    };
+
+    requestAnimationFrame(settle);
+    setTimeout(settle, 120);
+    setTimeout(settle, 320);
+  }
+
   function openChat(chat: ActiveChat) {
+    if (!chat) settleViewportAfterClosingChat();
     setActiveChat(chat);
     activeChatRef.current = chat;
     setActiveChatId(chat?.id ?? null);
