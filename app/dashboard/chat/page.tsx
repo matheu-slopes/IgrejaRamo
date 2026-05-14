@@ -1715,7 +1715,7 @@ export default function ChatPage() {
         ? `${nome} enviou uma foto`
         : msg.tipo === "audio"
         ? `${nome} enviou um áudio`
-        : msg.tipo === "documento" || msg.tipo === "arquivo"
+        : msg.tipo === "documento"
         ? `${nome} enviou um arquivo`
         : `${nome}: ${msg.conteudo?.slice(0, 80) ?? ""}`;
 
