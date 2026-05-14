@@ -25,13 +25,23 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "tipo e titulo são obrigatórios" }, { status: 400 });
   }
 
+  const nowTag = Date.now().toString();
+
   try {
+    let delivery = {
+      attempted: 0,
+      sent: 0,
+      failed: 0,
+      removed: 0,
+      errors: [] as Array<{ status: number | "unknown"; message: string }>,
+    };
+
     if (tipo === "aviso") {
-      await sendPushToAll({
+      delivery = await sendPushToAll({
         title: `📢 Novo aviso`,
         body: titulo,
         url: "/dashboard/mural",
-        tag: "aviso-novo",
+        tag: `aviso-${nowTag}`,
       });
     } else if (tipo === "evento") {
       // Se o evento é de um ministério específico, notifica apenas membros do ministério
@@ -42,26 +52,31 @@ export async function POST(req: NextRequest) {
           .eq("ministerio", ministerio);
         const ids = (membros ?? []).map((m: { usuario_id: string }) => m.usuario_id);
         if (ids.length > 0) {
-          await sendPushToUsers(ids, {
+          delivery = await sendPushToUsers(ids, {
             title: `📅 Novo evento — ${ministerio}`,
             body: `${titulo}${conteudo ? ` · ${conteudo}` : ""}`,
             url: "/dashboard/eventos",
-            tag: "evento-novo",
+            tag: `evento-${nowTag}`,
           });
+        } else {
+          return NextResponse.json({ ok: false, error: "Nenhum membro encontrado para o ministério", delivery });
         }
       } else {
-        await sendPushToAll({
+        delivery = await sendPushToAll({
           title: `📅 Novo evento`,
           body: `${titulo}${conteudo ? ` · ${conteudo}` : ""}`,
           url: "/dashboard/eventos",
-          tag: "evento-novo",
+          tag: `evento-${nowTag}`,
         });
       }
+    } else {
+      return NextResponse.json({ ok: false, error: "tipo inválido" }, { status: 400 });
     }
+
+    const ok = delivery.sent > 0;
+    return NextResponse.json({ ok, delivery, error: ok ? null : "Push não entregue para nenhum dispositivo" });
   } catch (e) {
     console.error("push/broadcast error:", e);
-    // Não falha o request por causa do push
+    return NextResponse.json({ ok: false, error: "Falha interna no envio de push" }, { status: 500 });
   }
-
-  return NextResponse.json({ ok: true });
 }

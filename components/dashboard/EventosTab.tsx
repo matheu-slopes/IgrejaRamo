@@ -76,7 +76,12 @@ export function EventosTab({
     setForm({ titulo: "", descricao: "", data: "", horario: "", local: "", publico: false, ministerio });
     setShowForm(false);
     // Push para membros do ministério
-    notificarBroadcast({ tipo: "evento", titulo: form.titulo, conteudo: form.local, ministerio });
+    const pushResult = await notificarBroadcast({ tipo: "evento", titulo: form.titulo, conteudo: form.local, ministerio });
+    if (!pushResult.ok) {
+      const sent = pushResult.delivery?.sent ?? 0;
+      const attempted = pushResult.delivery?.attempted ?? 0;
+      setErroCriar(`Evento criado, mas push não entregue (${sent}/${attempted}). ${pushResult.error ?? ""}`.trim());
+    }
   }
 
   async function removerEvento(id: string) {

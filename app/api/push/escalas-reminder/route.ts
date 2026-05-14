@@ -41,6 +41,9 @@ export async function GET(req: NextRequest) {
   }
 
   let totalEnviados = 0;
+  let totalFalhas = 0;
+  let totalTentativas = 0;
+  const erros: string[] = [];
 
   for (const escala of escalas) {
     // Busca itens da escala com voluntário atribuído
@@ -66,15 +69,27 @@ export async function GET(req: NextRequest) {
 
     for (const [userId, funcoes] of porVoluntario) {
       const funcaoStr = funcoes.join(", ");
-      await sendPushToUsers([userId], {
+      const delivery = await sendPushToUsers([userId], {
         title: `🎶 Você está escalado hoje!`,
         body: `${escala.culto} às ${horario} — função: ${funcaoStr}`,
         url: "/dashboard/escalas",
-        tag: `escala-${escala.id}-${userId}`,
+        tag: `escala-${escala.id}-${userId}-${hoje}`,
       });
-      totalEnviados++;
+      totalTentativas += delivery.attempted;
+      totalEnviados += delivery.sent;
+      totalFalhas += delivery.failed;
+      if (delivery.errors[0]?.message) {
+        erros.push(delivery.errors[0].message);
+      }
     }
   }
 
-  return NextResponse.json({ ok: true, enviados: totalEnviados, data: hoje });
+  return NextResponse.json({
+    ok: totalEnviados > 0,
+    enviados: totalEnviados,
+    falhas: totalFalhas,
+    tentativas: totalTentativas,
+    data: hoje,
+    sample_error: erros[0] ?? null,
+  });
 }

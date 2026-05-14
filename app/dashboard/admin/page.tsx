@@ -1718,7 +1718,12 @@ function ConteudoTab({ initSecao }: { initSecao?: string }) {
         setNovoAviso(novoAvisoInicial());
         setAdicionandoAviso(false);
         // Push para todos os membros — aguarda para garantir envio
-        await notificarBroadcast({ tipo: "aviso", titulo: novoAviso.titulo.trim() });
+        const pushResult = await notificarBroadcast({ tipo: "aviso", titulo: novoAviso.titulo.trim() });
+        if (!pushResult.ok) {
+          const sent = pushResult.delivery?.sent ?? 0;
+          const attempted = pushResult.delivery?.attempted ?? 0;
+          setErroAviso(`Aviso criado, mas push não entregue (${sent}/${attempted}). ${pushResult.error ?? ""}`.trim());
+        }
       }
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
