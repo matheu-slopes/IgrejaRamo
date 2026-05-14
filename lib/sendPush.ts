@@ -28,7 +28,12 @@ async function dispatchToSubs(subs: SubRow[], payload: PushPayload) {
       webpush
         .sendNotification(
           { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
-          JSON.stringify(payload)
+          JSON.stringify(payload),
+          {
+            TTL: 60,
+            urgency: "high",
+            topic: payload.tag?.slice(0, 32),
+          }
         )
         .catch((err) => {
           // Subscription expired — remove
@@ -39,6 +44,21 @@ async function dispatchToSubs(subs: SubRow[], payload: PushPayload) {
               .eq("endpoint", sub.endpoint)
               .then(() => {});
             return;
+          }
+
+          // Remove subscriptions com chaves inválidas para evitar falha recorrente.
+          const msg = String(err?.message ?? "").toLowerCase();
+          const invalidKey =
+            msg.includes("p256dh") ||
+            msg.includes("auth") ||
+            msg.includes("must be") ||
+            msg.includes("base64url");
+          if (err?.statusCode === 400 || invalidKey) {
+            admin
+              .from("push_subscriptions")
+              .delete()
+              .eq("endpoint", sub.endpoint)
+              .then(() => {});
           }
 
           console.error("push send error:", err?.statusCode ?? "unknown", err?.message ?? err);

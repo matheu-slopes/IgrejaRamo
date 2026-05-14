@@ -6,6 +6,11 @@ const admin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+function normalizeBase64Url(value: string) {
+  // Aceita base64 comum (+,/=) e converte para base64url (-,_ sem padding).
+  return value.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "").trim();
+}
+
 export async function POST(req: NextRequest) {
   // Requer usuário autenticado
   const token = req.headers.get("authorization")?.replace("Bearer ", "").trim();
@@ -21,9 +26,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Campos obrigatórios faltando" }, { status: 400 });
   }
 
+  const normalizedP256dh = normalizeBase64Url(String(p256dh));
+  const normalizedAuth = normalizeBase64Url(String(auth));
+
   // Upsert — atualiza se já existe o mesmo endpoint
   const { error } = await admin.from("push_subscriptions").upsert(
-    { user_id: user.id, endpoint, p256dh, auth },
+    { user_id: user.id, endpoint, p256dh: normalizedP256dh, auth: normalizedAuth },
     { onConflict: "user_id,endpoint" }
   );
 

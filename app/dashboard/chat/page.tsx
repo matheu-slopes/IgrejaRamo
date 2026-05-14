@@ -1950,16 +1950,28 @@ export default function ChatPage() {
       else setGrupos(prev => prev.map(g => g.id === conversaId ? { ...g, mensagens: g.mensagens.map(updater) } : g));
       URL.revokeObjectURL(localUrl);
 
-      // Broadcast s� agora, com URL definitiva (outros usu�rios podem exibir)
-      const finalMsg = { ...msg, mediaUrl: finalUrl };
-      broadcastChannelsRef.current.get(conversaId)?.send({ type: "broadcast", event: "msg", payload: finalMsg });
-
-      // Persiste no banco
-      fetch("/api/chat/mensagem", {
+      // Persiste no banco antes do broadcast para garantir push em ambiente serverless.
+      const saveRes = await fetch("/api/chat/mensagem", {
         method: "POST", keepalive: true,
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ id: msgId, conversa_id: conversaId, autor_id: u.id, autor_nome: u.nome, conteudo: "", tipo: "imagem", media_url: finalUrl }),
       });
+      if (!saveRes.ok) {
+        const j = await saveRes.json().catch(() => ({}));
+        throw new Error(j.error ?? "Erro ao salvar imagem");
+      }
+      const saveJson = await saveRes.json().catch(() => ({}));
+      const serverTime = saveJson.criado_em ?? msg.criadoEm;
+
+      // Atualiza horário com o timestamp do servidor e só então faz broadcast.
+      const finalMsg = { ...msg, mediaUrl: finalUrl, criadoEm: serverTime };
+      const updaterFinal = (m: MensagemConversa) => m.id === msgId ? finalMsg : m;
+      if (tipo === "direto") {
+        setDms(prev => prev.map(dm => dm.id === conversaId ? { ...dm, mensagens: dm.mensagens.map(updaterFinal) } : dm));
+      } else {
+        setGrupos(prev => prev.map(g => g.id === conversaId ? { ...g, mensagens: g.mensagens.map(updaterFinal) } : g));
+      }
+      broadcastChannelsRef.current.get(conversaId)?.send({ type: "broadcast", event: "msg", payload: finalMsg });
     } catch (err: unknown) {
       const msg2 = err instanceof Error ? err.message : "Erro ao enviar imagem";
       showToast(msg2);
@@ -2002,24 +2014,28 @@ export default function ChatPage() {
       else setGrupos(prev => prev.map(g => g.id === conversaId ? { ...g, mensagens: g.mensagens.map(updater) } : g));
       URL.revokeObjectURL(localUrl);
 
-      // Broadcast s� agora, com URL definitiva
-      const finalMsg = { ...msg, mediaUrl: finalUrl };
-      broadcastChannelsRef.current.get(conversaId)?.send({ type: "broadcast", event: "msg", payload: finalMsg });
-
-      // Persiste no banco � tratamento de erro igual ao sendDm
-      fetch("/api/chat/mensagem", {
+      // Persiste no banco antes do broadcast para garantir push em ambiente serverless.
+      const saveRes = await fetch("/api/chat/mensagem", {
         method: "POST", keepalive: true,
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ id: msgId, conversa_id: conversaId, autor_id: u.id, autor_nome: u.nome, conteudo: tipoMsg === "documento" ? nomeArquivo : "", tipo: tipoMsg, media_url: finalUrl }),
-      }).then(async (r) => {
-        if (!r.ok) {
-          const j = await r.json().catch(() => ({}));
-          console.error("sendArquivo DB error:", j.error ?? r.status);
-          showToast("Arquivo enviado, mas erro ao salvar: " + (j.error ?? r.statusText));
-        }
-      }).catch((e) => {
-        console.error("sendArquivo DB fetch error:", e);
       });
+      if (!saveRes.ok) {
+        const j = await saveRes.json().catch(() => ({}));
+        throw new Error(j.error ?? "Erro ao salvar arquivo");
+      }
+      const saveJson = await saveRes.json().catch(() => ({}));
+      const serverTime = saveJson.criado_em ?? msg.criadoEm;
+
+      // Atualiza horário com o timestamp do servidor e só então faz broadcast.
+      const finalMsg = { ...msg, mediaUrl: finalUrl, criadoEm: serverTime };
+      const updaterFinal = (m: MensagemConversa) => m.id === msgId ? finalMsg : m;
+      if (tipo === "direto") {
+        setDms(prev => prev.map(dm => dm.id === conversaId ? { ...dm, mensagens: dm.mensagens.map(updaterFinal) } : dm));
+      } else {
+        setGrupos(prev => prev.map(g => g.id === conversaId ? { ...g, mensagens: g.mensagens.map(updaterFinal) } : g));
+      }
+      broadcastChannelsRef.current.get(conversaId)?.send({ type: "broadcast", event: "msg", payload: finalMsg });
     } catch (err: unknown) {
       const errMsg = err instanceof Error ? err.message : "Erro ao enviar arquivo";
       showToast(errMsg);

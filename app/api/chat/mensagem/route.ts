@@ -122,4 +122,18 @@ async function sendPushParticipantes(
     url: "/dashboard/chat",
     tag: `chat-${conversa_id}`,
   });
+
+  // Alimenta o sino de notificações no app (desktop/mobile) com a mesma mensagem.
+  const notificacoes = userIds.map((uid) => ({
+    usuario_id: uid,
+    titulo: "💬 Nova mensagem",
+    corpo: body,
+    tipo: "ministerio",
+    link: "/dashboard/chat",
+  }));
+
+  const { error: notifError } = await admin.from("notificacoes").insert(notificacoes);
+  if (notifError) {
+    console.error("chat notificacoes insert error:", notifError);
+  }
 }

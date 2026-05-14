@@ -976,9 +976,10 @@ function TestePushPanel() {
         }
       }
 
-      const key = sub.getKey("p256dh");
-      const auth = sub.getKey("auth");
-      if (!key || !auth) {
+      const subJson = sub.toJSON();
+      const p256dh = subJson.keys?.p256dh ?? "";
+      const auth = subJson.keys?.auth ?? "";
+      if (!p256dh || !auth) {
         setResultadoRegistro({ ok: false, msg: "Erro ao obter chaves da subscription." });
         return;
       }
@@ -988,8 +989,8 @@ function TestePushPanel() {
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({
           endpoint: sub.endpoint,
-          p256dh: btoa(String.fromCharCode(...new Uint8Array(key))),
-          auth: btoa(String.fromCharCode(...new Uint8Array(auth))),
+          p256dh,
+          auth,
         }),
       });
 
