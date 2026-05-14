@@ -17,7 +17,6 @@ import clsx from "clsx";
 import { User, Role, Ministerio, Permissao, CanalMinisterio, Local } from "@/types";
 import { supabase } from "@/lib/supabase";
 import { notificarBroadcast } from "@/lib/notificarBroadcast";
-import { DiagnosticoPush } from "@/components/DiagnosticoPush";
 
 const ROLES: Role[] = ["admin", "pastor", "lider", "voluntario", "membro"];
 const MINISTERIOS: Ministerio[] = ["Louvor","Mídias","Ensino","Infantil","Ação Social","Jovens","Cantina","Limpeza"];
@@ -96,13 +95,6 @@ export default function AdminPage() {
         <MinisteriosTab usuarios={usuarios} temPermissao={temPermissao} />
       )}
 
-      {adminTab === "ministerios" && podeGerenciar && (
-        <>
-          <DiagnosticoPush />
-          <TestePushPanel />
-        </>
-      )}
-
       {adminTab === "locais" && podeGerenciar && (
         <LocaisTab />
       )}
@@ -112,154 +104,145 @@ export default function AdminPage() {
       )}
 
       {adminTab === "usuarios" && podeGerenciar && <>
-      <div className="flex items-center justify-between">
-        <div>
-          <div className="flex items-center gap-2 mb-0.5">
-            <Shield className="w-5 h-5 text-gray-900" />
-            <h1 className="text-2xl font-sans font-semibold text-black">Painel Admin</h1>
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="flex items-center gap-2 mb-0.5">
+              <Shield className="w-5 h-5 text-gray-900" />
+              <h1 className="text-2xl font-sans font-semibold text-black">Painel Admin</h1>
+            </div>
+            <p className="text-sm text-gray-500">
+              Gerencie usuários, roles e permissões individuais sem editar código.
+            </p>
           </div>
-          <p className="text-sm text-gray-500">
-            Gerencie usuários, roles e permissões individuais sem editar código.
-          </p>
+          <button
+            onClick={() => { setPainel("novo"); setEditando(null); }}
+            className="flex items-center gap-1.5 bg-gray-900 text-white text-sm font-semibold px-4 py-2.5 rounded-xl hover:bg-black transition shadow-sm"
+          >
+            <UserPlus className="w-4 h-4" /> Novo usuário
+          </button>
         </div>
-        <button
-          onClick={() => { setPainel("novo"); setEditando(null); }}
-          className="flex items-center gap-1.5 bg-gray-900 text-white text-sm font-semibold px-4 py-2.5 rounded-xl hover:bg-black transition shadow-sm"
-        >
-          <UserPlus className="w-4 h-4" /> Novo usuário
-        </button>
-      </div>
 
-      <div className="flex gap-6 items-start">
-        {/* ── Lista de usuários ── */}
-        <div className="flex-1 space-y-4 min-w-0">
-          {/* Busca */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input
-              value={busca}
-              onChange={(e) => setBusca(e.target.value)}
-              placeholder="Buscar por nome ou e-mail..."
-              className="w-full pl-9 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl outline-none focus:border-gray-400 focus:ring-1 focus:ring-gray-300"
-            />
-          </div>
+        <div className="flex gap-6 items-start">
+          <div className="flex-1 space-y-4 min-w-0">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                value={busca}
+                onChange={(e) => setBusca(e.target.value)}
+                placeholder="Buscar por nome ou e-mail..."
+                className="w-full pl-9 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl outline-none focus:border-gray-400 focus:ring-1 focus:ring-gray-300"
+              />
+            </div>
 
-          {/* Stats */}
-          <div className="grid grid-cols-3 gap-3">
-            {([
-              { label: "Total",     valor: usuarios.length,                       cor: "text-gray-800"  },
-              { label: "Ativos",    valor: usuarios.filter((u) => u.ativo).length, cor: "text-green-700" },
-              { label: "Inativos",  valor: usuarios.filter((u) => !u.ativo).length,cor: "text-red-600"   },
-            ]).map((s) => (
-              <div key={s.label} className="bg-white rounded-xl border border-gray-100 px-4 py-3 text-center">
-                <p className={clsx("text-2xl font-bold font-sans", s.cor)}>{s.valor}</p>
-                <p className="text-xs text-gray-400 mt-0.5">{s.label}</p>
-              </div>
-            ))}
-          </div>
+            <div className="grid grid-cols-3 gap-3">
+              {([
+                { label: "Total",    valor: usuarios.length,                      cor: "text-gray-800" },
+                { label: "Ativos",   valor: usuarios.filter((u) => u.ativo).length,  cor: "text-green-700" },
+                { label: "Inativos", valor: usuarios.filter((u) => !u.ativo).length, cor: "text-red-600" },
+              ]).map((s) => (
+                <div key={s.label} className="bg-white rounded-xl border border-gray-100 px-4 py-3 text-center">
+                  <p className={clsx("text-2xl font-bold font-sans", s.cor)}>{s.valor}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">{s.label}</p>
+                </div>
+              ))}
+            </div>
 
-          {/* Tabela */}
-          <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-100 bg-gray-50 text-xs uppercase tracking-wider text-gray-400">
-                  <th className="text-left px-4 py-3">Usuário</th>
-                  <th className="text-left px-4 py-3">Role</th>
-                  <th className="text-left px-4 py-3 hidden sm:table-cell">Ministérios</th>
-                  <th className="text-left px-4 py-3">Status</th>
-                  <th className="px-4 py-3" />
-                </tr>
-              </thead>
-              <tbody>
-                {filtrados.map((u) => {
-                  const temCustom = !!u.permissoes;
-                  return (
-                    <tr
-                      key={u.id}
-                      className={clsx(
-                        "border-b border-gray-50 hover:bg-gray-50 transition cursor-pointer",
-                        editando?.id === u.id && "bg-gray-50 hover:bg-gray-50",
-                        !u.ativo && "opacity-50"
-                      )}
-                      onClick={() => setEditando(u)}
-                    >
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-8 h-8 bg-gray-100 text-gray-900 rounded-full flex items-center justify-center font-bold text-xs shrink-0">
-                            {u.nome.charAt(0)}
+            <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-100 bg-gray-50 text-xs uppercase tracking-wider text-gray-400">
+                    <th className="text-left px-4 py-3">Usuário</th>
+                    <th className="text-left px-4 py-3">Role</th>
+                    <th className="text-left px-4 py-3 hidden sm:table-cell">Ministérios</th>
+                    <th className="text-left px-4 py-3">Status</th>
+                    <th className="px-4 py-3" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtrados.map((u) => {
+                    const temCustom = !!u.permissoes;
+                    return (
+                      <tr
+                        key={u.id}
+                        className={clsx(
+                          "border-b border-gray-50 hover:bg-gray-50 transition cursor-pointer",
+                          editando?.id === u.id && "bg-gray-50 hover:bg-gray-50",
+                          !u.ativo && "opacity-50"
+                        )}
+                        onClick={() => setEditando(u)}
+                      >
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-8 h-8 bg-gray-100 text-gray-900 rounded-full flex items-center justify-center font-bold text-xs shrink-0">
+                              {u.nome.charAt(0)}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="font-medium text-gray-800 truncate">{u.nome}</p>
+                              <p className="text-xs text-gray-400 truncate">{u.email}</p>
+                            </div>
                           </div>
-                          <div className="min-w-0">
-                            <p className="font-medium text-gray-800 truncate">{u.nome}</p>
-                            <p className="text-xs text-gray-400 truncate">{u.email}</p>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-1.5">
+                            <span className={clsx("text-[11px] font-semibold px-2 py-0.5 rounded-full border", ROLE_COR[u.role])}>
+                              {ROLE_LABEL[u.role]}
+                            </span>
+                            {temCustom && <span title="Permissões customizadas" className="w-1.5 h-1.5 rounded-full bg-amber-400" />}
                           </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-1.5">
-                          <span className={clsx("text-[11px] font-semibold px-2 py-0.5 rounded-full border", ROLE_COR[u.role])}>
-                            {ROLE_LABEL[u.role]}
+                        </td>
+                        <td className="px-4 py-3 hidden sm:table-cell">
+                          <span className="text-xs text-gray-500">{u.ministerios.join(", ") || "-"}</span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={clsx("text-xs font-medium", u.ativo ? "text-green-600" : "text-red-400")}>
+                            {u.ativo ? "Ativo" : "Inativo"}
                           </span>
-                          {temCustom && (
-                            <span title="Permissões customizadas" className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 hidden sm:table-cell">
-                        <span className="text-xs text-gray-500">{u.ministerios.join(", ") || "—"}</span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={clsx("text-xs font-medium", u.ativo ? "text-green-600" : "text-red-400")}>
-                          {u.ativo ? "Ativo" : "Inativo"}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <ChevronRight className="w-4 h-4 text-gray-300" />
-                      </td>
-                    </tr>
-                  );
-                })}
-                {filtrados.length === 0 && (
-                  <tr><td colSpan={5} className="py-12 text-center text-sm text-gray-400">Nenhum usuário encontrado.</td></tr>
-                )}
-              </tbody>
-            </table>
+                        </td>
+                        <td className="px-4 py-3">
+                          <ChevronRight className="w-4 h-4 text-gray-300" />
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {filtrados.length === 0 && (
+                    <tr><td colSpan={5} className="py-12 text-center text-sm text-gray-400">Nenhum usuário encontrado.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
 
-        {/* ── Painel lateral ── */}
-        {(editando || painel === "novo") && (
-          <div className="w-96 shrink-0">
-            {painel === "novo" && !editando ? (
-              <NovoUsuarioForm
-                onCriar={async (dados, senha) => {
-                  const result = await criarUsuario(dados, senha);
-                  if ("error" in result) return { error: result.error };
-                  return { ok: true };
-                }}
-                onCancelar={() => setPainel("lista")}
-              />
-            ) : editando ? (
-              <EditarUsuarioPanel
-                usuario={editando}
-                euSouEle={eu?.id === editando.id}
-                podeatribuir={temPermissao("atribuir_permissoes")}
-                onChange={(dados) => {
-                  atualizarUsuario(editando.id, dados);
-                  setEditando({ ...editando, ...dados });
-                }}
-                onRemover={() => { removerUsuario(editando.id); setEditando(null); }}
-                onFechar={() => setEditando(null)}
-              />
-            ) : null}
-          </div>
-        )}
-      </div>
-      </> }
+          {(editando || painel === "novo") && (
+            <div className="w-96 shrink-0">
+              {painel === "novo" && !editando ? (
+                <NovoUsuarioForm
+                  onCriar={async (dados, senha) => {
+                    const result = await criarUsuario(dados, senha);
+                    if ("error" in result) return { error: result.error };
+                    return { ok: true };
+                  }}
+                  onCancelar={() => setPainel("lista")}
+                />
+              ) : editando ? (
+                <EditarUsuarioPanel
+                  usuario={editando}
+                  euSouEle={eu?.id === editando.id}
+                  podeatribuir={temPermissao("atribuir_permissoes")}
+                  onChange={(dados) => {
+                    atualizarUsuario(editando.id, dados);
+                    setEditando({ ...editando, ...dados });
+                  }}
+                  onRemover={() => { removerUsuario(editando.id); setEditando(null); }}
+                  onFechar={() => setEditando(null)}
+                />
+              ) : null}
+            </div>
+          )}
+        </div>
+      </>}
     </div>
   );
 }
-
-// ─── Aba de Ministérios ───────────────────────────────────────────
 
 function MinisteriosTab({
   usuarios,
@@ -279,7 +262,6 @@ function MinisteriosTab({
     setSalvando(true);
     await supabase.from("perfis").update({ ministerios: novos }).eq("id", usuario.id);
     setSalvando(false);
-    // Atualiza localmente sem recarregar a lista inteira
     usuario.ministerios = novos;
   }
 
@@ -358,8 +340,6 @@ function MinisteriosTab({
   );
 }
 
-// ─── Painel de edição de usuário ──────────────────────────────────
-
 function EditarUsuarioPanel({
   usuario, euSouEle, podeatribuir, onChange, onRemover, onFechar,
 }: {
@@ -395,7 +375,7 @@ function EditarUsuarioPanel({
 
   function togglePermissao(p: Permissao) {
     const base = permissoesEfetivas(usuario);
-    const nova  = base.includes(p) ? base.filter((x) => x !== p) : [...base, p];
+    const nova = base.includes(p) ? base.filter((x) => x !== p) : [...base, p];
     onChange({ permissoes: nova });
   }
 
@@ -408,13 +388,11 @@ function EditarUsuarioPanel({
   }
 
   function mudarRole(role: Role) {
-    // Ao mudar o role, reseta as permissões custom para herdar o novo default
     onChange({ role, permissoes: undefined });
   }
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden sticky top-4">
-      {/* Header */}
       <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
         <div className="flex items-center gap-2.5">
           <div className="w-9 h-9 bg-gray-100 text-gray-900 rounded-full flex items-center justify-center font-bold text-sm">
@@ -886,314 +864,6 @@ function NovoUsuarioForm({
     </div>
   );
 }
-
-
-// ─── TestePushPanel ───────────────────────────────────────────────────────────
-
-function urlBase64ToUint8Array(base64String: string): Uint8Array {
-  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
-  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
-  const rawData = atob(base64);
-  return Uint8Array.from([...rawData].map((c) => c.charCodeAt(0)));
-}
-
-const TIPOS_PUSH = [
-  { tipo: "aviso",  label: "📢 Aviso",        desc: "Broadcast para todos os usuários" },
-  { tipo: "evento", label: "📅 Evento",       desc: "Broadcast para todos os usuários" },
-  { tipo: "chat",   label: "💬 Chat",         desc: "Somente para você (logado)" },
-  { tipo: "escala", label: "🎸 Escala",       desc: "Somente para você (logado)" },
-] as const;
-
-function TestePushPanel() {
-  const [loading, setLoading] = useState<string | null>(null);
-  const [resultado, setResultado] = useState<{ ok: boolean; msg: string } | null>(null);
-  const [status, setStatus] = useState<Record<string, unknown> | null>(null);
-  const [loadingStatus, setLoadingStatus] = useState(false);
-  const [registrando, setRegistrando] = useState(false);
-  const [resultadoRegistro, setResultadoRegistro] = useState<{ ok: boolean; msg: string } | null>(null);
-
-  async function registrarEsteDispositivo() {
-    setRegistrando(true);
-    setResultadoRegistro(null);
-    try {
-      if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
-        setResultadoRegistro({ ok: false, msg: "Este navegador não suporta Push. Use o PWA instalado no celular." });
-        return;
-      }
-      if (!("Notification" in window)) {
-        setResultadoRegistro({ ok: false, msg: "Notificações não disponíveis neste navegador." });
-        return;
-      }
-
-      let permission = Notification.permission;
-      if (permission === "denied") {
-        setResultadoRegistro({ ok: false, msg: "Permissão bloqueada. Vá em Configurações do navegador → Notificações e desbloqueie este site." });
-        return;
-      }
-      if (permission === "default") {
-        permission = await Notification.requestPermission();
-      }
-      if (permission !== "granted") {
-        setResultadoRegistro({ ok: false, msg: "Permissão negada pelo usuário." });
-        return;
-      }
-
-      const registration = await Promise.race([
-        navigator.serviceWorker.ready,
-        new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error("Service Worker demorou demais. Tente fechar e reabrir o PWA.")), 30000)
-        ),
-      ]);
-      let sub = await registration.pushManager.getSubscription();
-      if (!sub) {
-        const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-        if (!vapidKey) {
-          setResultadoRegistro({ ok: false, msg: "NEXT_PUBLIC_VAPID_PUBLIC_KEY não disponível. Verifique as variáveis do Vercel e faça um novo deploy." });
-          return;
-        }
-        // Passa Uint8Array diretamente (não .buffer) — exigido pela spec do Web Push
-        sub = await registration.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: urlBase64ToUint8Array(vapidKey) as unknown as Uint8Array<ArrayBuffer>,
-        });
-      }
-
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        setResultadoRegistro({ ok: false, msg: "Sessão expirada. Faça login novamente." });
-        return;
-      }
-
-      // Valida e renova o token se estiver próximo do vencimento
-      const expiresAt = session.expires_at ?? 0;
-      let token = session.access_token;
-      if (Date.now() / 1000 > expiresAt - 60) {
-        const { data } = await supabase.auth.refreshSession();
-        token = data.session?.access_token ?? "";
-        if (!token) {
-          setResultadoRegistro({ ok: false, msg: "Falha ao renovar sessão." });
-          return;
-        }
-      }
-
-      const subJson = sub.toJSON();
-      const p256dh = subJson.keys?.p256dh ?? "";
-      const auth = subJson.keys?.auth ?? "";
-      if (!p256dh || !auth) {
-        setResultadoRegistro({ ok: false, msg: "Erro ao obter chaves da subscription." });
-        return;
-      }
-
-      const res = await fetch("/api/push/subscribe", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({
-          endpoint: sub.endpoint,
-          p256dh,
-          auth,
-        }),
-      });
-
-      if (!res.ok) {
-        const d = await res.json().catch(() => ({}));
-        setResultadoRegistro({ ok: false, msg: `Erro ${res.status}: ${d.error ?? "desconhecido"}` });
-        return;
-      }
-
-      setResultadoRegistro({ ok: true, msg: "Dispositivo registrado com sucesso! Agora você pode testar." });
-      // Atualiza o diagnóstico automaticamente
-      verStatus();
-    } catch (e) {
-      setResultadoRegistro({ ok: false, msg: String(e).replace("Error: ", "") });
-    } finally {
-      setRegistrando(false);
-    }
-  }
-
-  async function verStatus() {
-    setLoadingStatus(true);
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.access_token) {
-        setStatus({ erro: "Não autenticado" });
-        return;
-      }
-
-      // Valida e renova o token se estiver próximo do vencimento
-      const expiresAt = session.expires_at ?? 0;
-      let token = session.access_token;
-      if (Date.now() / 1000 > expiresAt - 60) {
-        const { data } = await supabase.auth.refreshSession();
-        token = data.session?.access_token ?? "";
-        if (!token) {
-          setStatus({ erro: "Falha ao renovar sessão" });
-          return;
-        }
-      }
-
-      const res = await fetch("/api/push/status", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setStatus(await res.json());
-    } catch {
-      setStatus({ erro: "Falha ao buscar status" });
-    } finally {
-      setLoadingStatus(false);
-    }
-  }
-
-  async function testar(tipo: string) {
-    setLoading(tipo);
-    setResultado(null);
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.access_token) {
-        setResultado({ ok: false, msg: "Não autenticado" });
-        return;
-      }
-
-      // Valida e renova o token se estiver próximo do vencimento
-      const expiresAt = session.expires_at ?? 0;
-      let token = session.access_token;
-      if (Date.now() / 1000 > expiresAt - 60) {
-        const { data } = await supabase.auth.refreshSession();
-        token = data.session?.access_token ?? "";
-        if (!token) {
-          setResultado({ ok: false, msg: "Falha ao renovar sessão" });
-          return;
-        }
-      }
-
-      const res = await fetch("/api/push/test", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ tipo }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setResultado({ ok: false, msg: data.error ?? "Erro desconhecido" });
-      } else {
-        const destino = data.enviado === "broadcast" ? `${data.subscriptions} dispositivo(s)` : "seu dispositivo";
-        const delivery = data.delivery as { attempted?: number; sent?: number; failed?: number; removed?: number; errors?: Array<{ status?: number | string; message?: string }> } | undefined;
-        const attempted = delivery?.attempted ?? 0;
-        const sent = delivery?.sent ?? 0;
-        const failed = delivery?.failed ?? 0;
-        const removed = delivery?.removed ?? 0;
-        const sampleErr = delivery?.errors?.[0]?.message;
-
-        if (sent > 0) {
-          setResultado({ ok: true, msg: `Notificação "${tipo}" enviada para ${destino}. Entregas: ${sent}/${attempted}.` });
-        } else {
-          setResultado({
-            ok: false,
-            msg: `Push não entregue (0/${attempted}). Falhas: ${failed}, removidas: ${removed}${sampleErr ? `, erro: ${sampleErr}` : ""}`,
-          });
-        }
-      }
-    } catch {
-      setResultado({ ok: false, msg: "Falha na requisição" });
-    } finally {
-      setLoading(null);
-    }
-  }
-
-  return (
-    <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
-      <div className="flex items-center gap-2 mb-1">
-        <Bell className="w-4 h-4 text-vine-700" />
-        <h2 className="font-semibold text-gray-900 text-sm">Testar Notificações Push</h2>
-      </div>
-
-      {/* Passo 1: registrar */}
-      <div className="mb-4 p-3 bg-gray-50 border border-gray-200 rounded-xl">
-        <p className="text-xs font-semibold text-gray-700 mb-1">Passo 1 (opcional) — Registrar este dispositivo</p>
-        <p className="text-[11px] text-gray-400 mb-2 leading-snug">
-          O app já tenta registrar automaticamente. Use este botão apenas para diagnóstico rápido neste aparelho.
-        </p>
-        <button
-          onClick={registrarEsteDispositivo}
-          disabled={registrando}
-          className="flex items-center gap-1.5 bg-vine-700 hover:bg-vine-800 text-white text-xs font-semibold px-3 py-2 rounded-lg transition disabled:opacity-50"
-        >
-          <Bell className="w-3.5 h-3.5" />
-          {registrando ? "Registrando…" : "Registrar este dispositivo"}
-        </button>
-        {resultadoRegistro && (
-          <div className={clsx(
-            "mt-2 text-[11px] px-2.5 py-1.5 rounded-lg flex items-start gap-1.5",
-            resultadoRegistro.ok
-              ? "bg-green-50 text-green-700 border border-green-200"
-              : "bg-red-50 text-red-700 border border-red-200"
-          )}>
-            {resultadoRegistro.ok ? <Check className="w-3 h-3 mt-0.5 shrink-0" /> : <AlertCircle className="w-3 h-3 mt-0.5 shrink-0" />}
-            {resultadoRegistro.msg}
-          </div>
-        )}
-      </div>
-
-      {/* Passo 2: testar */}
-      <p className="text-xs font-semibold text-gray-700 mb-2">Passo 2 — Disparar notificação de teste</p>
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-        {TIPOS_PUSH.map(({ tipo, label, desc }) => (
-          <button
-            key={tipo}
-            onClick={() => testar(tipo)}
-            disabled={loading !== null}
-            className="flex flex-col items-start gap-1 px-3 py-2.5 rounded-xl border border-gray-200 bg-gray-50 hover:bg-vine-50 hover:border-vine-300 transition text-left disabled:opacity-50"
-          >
-            <span className="text-sm font-medium text-gray-800">{label}</span>
-            <span className="text-[11px] text-gray-400 leading-tight">{desc}</span>
-            {loading === tipo && (
-              <span className="text-[11px] text-vine-600 font-medium">Enviando…</span>
-            )}
-          </button>
-        ))}
-      </div>
-
-      {resultado && (
-        <div className={clsx(
-          "mt-3 text-xs px-3 py-2 rounded-lg flex items-center gap-2",
-          resultado.ok
-            ? "bg-green-50 text-green-700 border border-green-200"
-            : "bg-red-50 text-red-700 border border-red-200"
-        )}>
-          {resultado.ok ? <Check className="w-3.5 h-3.5 flex-shrink-0" /> : <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />}
-          {resultado.msg}
-        </div>
-      )}
-
-      {/* Diagnóstico */}
-      <div className="mt-4 border-t border-gray-100 pt-3">
-        <button
-          onClick={verStatus}
-          disabled={loadingStatus}
-          className="text-xs text-vine-700 underline underline-offset-2 hover:text-vine-900 disabled:opacity-50"
-        >
-          {loadingStatus ? "Verificando…" : "🔍 Ver diagnóstico do sistema"}
-        </button>
-
-        {status && (
-          <div className="mt-2 bg-gray-50 border border-gray-200 rounded-xl p-3 text-[11px] text-gray-700 font-mono space-y-0.5">
-            {Object.entries(status).map(([k, v]) => (
-              <div key={k} className="flex gap-2">
-                <span className="text-gray-400 shrink-0">{k}:</span>
-                <span className={clsx(
-                  v === true ? "text-green-600" : v === false ? "text-red-500" : v === 0 ? "text-amber-600" : "text-gray-700"
-                )}>
-                  {JSON.stringify(v)}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
 // ─── LocaisTab ────────────────────────────────────────────────────────────────
 
 function LocaisTab() {
