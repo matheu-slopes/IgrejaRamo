@@ -39,6 +39,7 @@ const navAdmin = [
   { href: "/dashboard/admin?tab=locais",               label: "Locais",      icon: CalendarDays },
   { href: "/dashboard/admin?tab=conteudo&secao=avisos",     label: "Avisos",      icon: Bell     },
   { href: "/dashboard/admin?tab=conteudo&secao=devocional", label: "Devocional",  icon: BookOpen },
+  { href: "/dashboard/push-diag",                       label: "Diagnóstico Push", icon: Bell },
 ];
 
 const ministerios = [
