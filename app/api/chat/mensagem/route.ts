@@ -97,15 +97,12 @@ async function sendPushParticipantes(
   conteudo: string,
   tipo: string
 ) {
-  const { data: participantes } = await admin
-    .from("chat_participantes")
-    .select("user_id")
-    .eq("conversa_id", conversa_id)
-    .neq("user_id", autor_id);
+  const userIds = await resolveRecipientIds(conversa_id, autor_id);
+  if (!userIds.length) {
+    console.warn("chat push sem destinatario:", { conversa_id, autor_id });
+    return;
+  }
 
-  if (!participantes?.length) return;
-
-  const userIds = participantes.map((p: { user_id: string }) => p.user_id);
   const nome = autor_nome?.split(" ")[0] ?? "Alguém";
   const body =
     tipo === "imagem"
@@ -136,4 +133,59 @@ async function sendPushParticipantes(
   if (notifError) {
     console.error("chat notificacoes insert error:", notifError);
   }
+}
+
+async function resolveRecipientIds(conversa_id: string, autor_id: string): Promise<string[]> {
+  // Caminho principal: participantes da conversa.
+  const { data: participantes, error: partErr } = await admin
+    .from("chat_participantes")
+    .select("user_id")
+    .eq("conversa_id", conversa_id)
+    .neq("user_id", autor_id);
+
+  if (partErr) {
+    console.error("chat_participantes select error:", partErr);
+  }
+
+  const directIds = [...new Set((participantes ?? []).map((p: { user_id: string }) => p.user_id).filter(Boolean))];
+  if (directIds.length) return directIds;
+
+  // Fallback: usa autores recentes da conversa (auto-recuperação quando participantes está incompleto).
+  const { data: historico, error: histErr } = await admin
+    .from("chat_mensagens")
+    .select("autor_id")
+    .eq("conversa_id", conversa_id)
+    .neq("autor_id", autor_id)
+    .order("criado_em", { ascending: false })
+    .limit(20);
+
+  if (histErr) {
+    console.error("chat_mensagens fallback error:", histErr);
+    return [];
+  }
+
+  const fallbackIds = [...new Set((historico ?? []).map((m: { autor_id: string }) => m.autor_id).filter(Boolean))];
+  if (!fallbackIds.length) return [];
+
+  // Tenta autocorrigir chat_participantes para próximos envios.
+  try {
+    const { data: existentes } = await admin
+      .from("chat_participantes")
+      .select("user_id")
+      .eq("conversa_id", conversa_id)
+      .in("user_id", fallbackIds);
+
+    const existingSet = new Set((existentes ?? []).map((p: { user_id: string }) => p.user_id));
+    const faltantes = fallbackIds.filter((id) => !existingSet.has(id));
+
+    if (faltantes.length) {
+      await admin.from("chat_participantes").insert(
+        faltantes.map((uid) => ({ conversa_id, user_id: uid }))
+      );
+    }
+  } catch (e) {
+    console.error("chat_participantes heal error:", e);
+  }
+
+  return fallbackIds;
 }

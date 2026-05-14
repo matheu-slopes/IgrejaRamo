@@ -7,30 +7,68 @@ import { Bell, Check, X } from "lucide-react";
 
 export default function PushSubscriber() {
   const { user } = useAuth();
-  const checkedRef = useRef(false);
+  const lastAttemptRef = useRef(0);
   const [mostrarBanner, setMostrarBanner] = useState(false);
   const [status, setStatus] = useState<"idle" | "loading" | "sucesso" | "erro">("idle");
   const [msg, setMsg] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!user || checkedRef.current) return;
+    if (!user) return;
     if (typeof window === "undefined") return;
     if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
     if (!("Notification" in window)) return;
-    checkedRef.current = true;
+
+    const podeTentar = () => {
+      const now = Date.now();
+      // Evita spam de tentativas em background.
+      if (now - lastAttemptRef.current < 30_000) return false;
+      lastAttemptRef.current = now;
+      return true;
+    };
+
+    const registrarSilencioso = async (mostrarErroNoBanner = false) => {
+      if (!podeTentar()) return;
+      try {
+        await registrarSubscription({ silent: true });
+      } catch (e) {
+        console.error("PushSubscriber (background):", e);
+        if (mostrarErroNoBanner) {
+          setMsg(String(e).replace("Error: ", ""));
+          setStatus("erro");
+          setMostrarBanner(true);
+        }
+      }
+    };
 
     if (Notification.permission === "default") {
       setTimeout(() => setMostrarBanner(true), 3000);
     } else if (Notification.permission === "granted") {
-      // Já permitiu — tenta registrar silenciosamente
-      registrarSubscription().catch((e) => {
-        console.error("PushSubscriber (background):", e);
-        // Só mostra banner se falhou (ex: subscription ainda não está salva)
-        setMsg(String(e).replace("Error: ", ""));
-        setStatus("erro");
-        setMostrarBanner(true);
-      });
+      // Já permitiu: registra automaticamente sem exigir clique manual.
+      registrarSilencioso(true);
     }
+
+    const onFocus = () => {
+      if (Notification.permission === "granted") registrarSilencioso(false);
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === "visible" && Notification.permission === "granted") {
+        registrarSilencioso(false);
+      }
+    };
+
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisibility);
+    const interval = window.setInterval(() => {
+      if (Notification.permission === "granted") {
+        registrarSilencioso(false);
+      }
+    }, 120_000);
+
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.clearInterval(interval);
+    };
   }, [user]);
 
   async function ativar() {
@@ -57,7 +95,13 @@ export default function PushSubscriber() {
     }
   }
 
-  async function registrarSubscription() {
+  async function registrarSubscription(opts?: { silent?: boolean }) {
+    const silent = opts?.silent ?? false;
+    if (!silent) {
+      setStatus("loading");
+      setMsg(null);
+    }
+
     const registration = await getServiceWorkerRegistration();
     let sub = await registration.pushManager.getSubscription();
 

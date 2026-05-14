@@ -1095,9 +1095,9 @@ function TestePushPanel() {
 
       {/* Passo 1: registrar */}
       <div className="mb-4 p-3 bg-gray-50 border border-gray-200 rounded-xl">
-        <p className="text-xs font-semibold text-gray-700 mb-1">Passo 1 — Registrar este dispositivo</p>
+        <p className="text-xs font-semibold text-gray-700 mb-1">Passo 1 (opcional) — Registrar este dispositivo</p>
         <p className="text-[11px] text-gray-400 mb-2 leading-snug">
-          Clique abaixo para registrar o dispositivo atual (celular/PC). Repita em cada aparelho que quiser receber notificações.
+          O app já tenta registrar automaticamente. Use este botão apenas para diagnóstico rápido neste aparelho.
         </p>
         <button
           onClick={registrarEsteDispositivo}

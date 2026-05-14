@@ -1149,6 +1149,7 @@ export default function ChatPage() {
   const dmsRef = useRef<ConversaDireta[]>([]);
   const gruposRef = useRef<Grupo[]>([]);
   const conversaIdsRef = useRef<string[]>([]);
+  const nativeNotifiedRef = useRef<Set<string>>(new Set());
   // Inbox de mensagens recebidas enquanto estava em outra p�gina
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const inboxRef = useRef<Record<string, any[]>>({});
@@ -1467,6 +1468,7 @@ export default function ChatPage() {
           const isActive = activeChatRef.current?.id === cid;
           const isMine = raw.autorId === user?.id;
           const msg: MensagemConversa = { ...raw, lida: isMine || isActive };
+          maybeShowNativeChatNotification(msg, cid, isMine, isActive);
           const insertSorted = (msgs: MensagemConversa[]) => {
             if (msgs.some(m => m.id === msg.id)) return msgs;
             return [...msgs, msg].sort((a, b) => new Date(a.criadoEm).getTime() - new Date(b.criadoEm).getTime());
@@ -1555,6 +1557,7 @@ export default function ChatPage() {
           ...rowToMensagem(row),
           lida: row.autor_id === user.id || activeChatRef.current?.id === cid,
         };
+        maybeShowNativeChatNotification(msg, cid, row.autor_id === user.id, activeChatRef.current?.id === cid);
         // MIN(broadcastTime, serverTime): mant�m o timestamp mais antigo entre os dois
         const upsertSorted = (msgs: MensagemConversa[]) => {
           const existing = msgs.find(m => m.id === msg.id);
@@ -1690,6 +1693,46 @@ export default function ChatPage() {
   function showToast(msg: string) {
     setToast(msg);
     setTimeout(() => setToast(null), 2500);
+  }
+
+  function maybeShowNativeChatNotification(msg: MensagemConversa, cid: string, isMine: boolean, isActive: boolean) {
+    if (typeof window === "undefined") return;
+    if (!("Notification" in window)) return;
+    if (Notification.permission !== "granted") return;
+    if (isMine || isActive) return;
+
+    const id = msg.id;
+    if (nativeNotifiedRef.current.has(id)) return;
+    nativeNotifiedRef.current.add(id);
+    if (nativeNotifiedRef.current.size > 300) {
+      nativeNotifiedRef.current.clear();
+      nativeNotifiedRef.current.add(id);
+    }
+
+    const nome = msg.autorNome?.split(" ")[0] ?? "Alguém";
+    const body =
+      msg.tipo === "imagem"
+        ? `${nome} enviou uma foto`
+        : msg.tipo === "audio"
+        ? `${nome} enviou um áudio`
+        : msg.tipo === "documento" || msg.tipo === "arquivo"
+        ? `${nome} enviou um arquivo`
+        : `${nome}: ${msg.conteudo?.slice(0, 80) ?? ""}`;
+
+    try {
+      const n = new Notification("💬 Nova mensagem", {
+        body,
+        tag: `chat-local-${cid}`,
+        icon: "/icons/icon-192x192.png",
+        badge: "/icons/icon-72x72.png",
+      });
+      n.onclick = () => {
+        window.focus();
+        window.location.href = "/dashboard/chat";
+      };
+    } catch (e) {
+      console.error("native notification error:", e);
+    }
   }
 
   if (!user) return null;
