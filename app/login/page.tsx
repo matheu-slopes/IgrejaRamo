@@ -88,7 +88,7 @@ export default function LoginPage() {
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="��������"
+                  placeholder="Senha"
                   className={inputCls + " pr-10"}
                 />
                 <button
