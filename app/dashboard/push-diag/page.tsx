@@ -55,6 +55,33 @@ function urlBase64ToUint8Array(base64String: string) {
   return arr;
 }
 
+async function getReadyPushRegistration() {
+  if (!("serviceWorker" in navigator)) {
+    throw new Error("Este aparelho não suporta Service Worker.");
+  }
+
+  const expectedScript = "/sw.js";
+  const regs = await navigator.serviceWorker.getRegistrations();
+  for (const reg of regs) {
+    const script = reg.active?.scriptURL ?? reg.waiting?.scriptURL ?? reg.installing?.scriptURL ?? "";
+    if (script && !script.endsWith(expectedScript)) {
+      await reg.unregister().catch(() => undefined);
+    }
+  }
+
+  let registration = await navigator.serviceWorker.getRegistration("/");
+  if (!registration || !registration.active?.scriptURL.endsWith(expectedScript)) {
+    registration = await navigator.serviceWorker.register(expectedScript, { scope: "/" });
+  }
+
+  await registration.update().catch(() => undefined);
+  const ready = await navigator.serviceWorker.ready;
+  if (!ready.active) {
+    throw new Error("O Service Worker ainda não ficou ativo. Feche e abra o app e tente de novo.");
+  }
+  return ready;
+}
+
 export default function PushDiagPage() {
   const { user } = useAuth();
   const [server, setServer] = useState<ServerDiag | null>(null);
@@ -151,7 +178,8 @@ export default function PushDiagPage() {
     setActionErr(null);
     setTestResult(null);
     try {
-      // 1. Desregistra todos os SW
+      // 1. Remove apenas subscriptions antigas do aparelho. Não desregistra o /sw.js ativo,
+      // porque no iOS isso cria a janela de erro: InvalidStateError: active service worker.
       if ("serviceWorker" in navigator) {
         const regs = await navigator.serviceWorker.getRegistrations();
         for (const r of regs) {
@@ -159,7 +187,10 @@ export default function PushDiagPage() {
             const sub = await r.pushManager.getSubscription();
             if (sub) await sub.unsubscribe();
           } catch { /* ignore */ }
-          await r.unregister();
+          const script = r.active?.scriptURL ?? r.waiting?.scriptURL ?? r.installing?.scriptURL ?? "";
+          if (script && !script.endsWith("/sw.js")) {
+            await r.unregister().catch(() => undefined);
+          }
         }
       }
 
@@ -177,8 +208,7 @@ export default function PushDiagPage() {
         if (p !== "granted") throw new Error("Permissão negada pelo SO. Vá em Ajustes → Notificações.");
       }
 
-      const reg = await navigator.serviceWorker.register("/sw.js", { scope: "/" });
-      await navigator.serviceWorker.ready;
+      const reg = await getReadyPushRegistration();
 
       const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
       if (!vapidKey) throw new Error("VAPID público ausente no build.");

@@ -90,6 +90,33 @@ async function getDeviceStatus(): Promise<DeviceStatus> {
   };
 }
 
+async function getReadyPushRegistration() {
+  if (!("serviceWorker" in navigator)) {
+    throw new Error("Este aparelho não suporta Service Worker.");
+  }
+
+  const expectedScript = "/sw.js";
+  const registrations = await navigator.serviceWorker.getRegistrations();
+  for (const registration of registrations) {
+    const script = registration.active?.scriptURL ?? registration.waiting?.scriptURL ?? registration.installing?.scriptURL ?? "";
+    if (script && !script.endsWith(expectedScript)) {
+      await registration.unregister().catch(() => undefined);
+    }
+  }
+
+  let registration = await navigator.serviceWorker.getRegistration("/");
+  if (!registration || !registration.active?.scriptURL.endsWith(expectedScript)) {
+    registration = await navigator.serviceWorker.register(expectedScript, { scope: "/" });
+  }
+
+  await registration.update().catch(() => undefined);
+  const ready = await navigator.serviceWorker.ready;
+  if (!ready.active) {
+    throw new Error("O Service Worker ainda não ficou ativo. Feche e abra o app e tente de novo.");
+  }
+  return ready;
+}
+
 export function DiagnosticoPush() {
   const { user } = useAuth();
   const [status, setStatus] = useState<StatusPush | null>(null);
@@ -145,7 +172,10 @@ export function DiagnosticoPush() {
         for (const registration of registrations) {
           const subscription = await registration.pushManager.getSubscription().catch(() => null);
           if (subscription) await subscription.unsubscribe().catch(() => undefined);
-          await registration.unregister();
+          const script = registration.active?.scriptURL ?? registration.waiting?.scriptURL ?? registration.installing?.scriptURL ?? "";
+          if (script && !script.endsWith("/sw.js")) {
+            await registration.unregister().catch(() => undefined);
+          }
         }
       }
 
@@ -162,8 +192,7 @@ export function DiagnosticoPush() {
       const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
       if (!vapidKey) throw new Error("Chave VAPID pública ausente no build.");
 
-      const registration = await navigator.serviceWorker.register("/sw.js", { scope: "/" });
-      await navigator.serviceWorker.ready;
+      const registration = await getReadyPushRegistration();
       const subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(vapidKey) as unknown as Uint8Array<ArrayBuffer>,

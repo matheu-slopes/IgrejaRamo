@@ -296,7 +296,12 @@ async function getServiceWorkerRegistration(): Promise<ServiceWorkerRegistration
     timeoutPromise,
   ]);
 
-  return (readyRegistration as ServiceWorkerRegistration) || registration;
+  const activeRegistration = (readyRegistration as ServiceWorkerRegistration) || registration;
+  if (!activeRegistration.active) {
+    throw new Error("Service Worker ainda não está ativo. Feche e abra o app e tente novamente.");
+  }
+
+  return activeRegistration;
 }
 
 function getPushSupportError(): string | null {
