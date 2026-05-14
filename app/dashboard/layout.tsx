@@ -397,7 +397,7 @@ export default function DashboardLayout({
 
       <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
         {/* Top bar */}
-        <header className="sticky top-0 z-20 bg-white border-b border-gray-100 shadow-sm"
+        <header className="sticky top-0 z-20 bg-white border-b border-gray-100 shadow-sm dashboard-header"
           style={{ paddingTop: "env(safe-area-inset-top)" }}
         >
           <div className="h-14 px-4 md:px-6 flex items-center justify-between">

@@ -41,8 +41,10 @@
     user-select: auto;
   }
 
-  body.chat-conversation-open {
-    overflow: hidden;
+  /* Quando a conversa está aberta no mobile, esconde o header e o bottom nav do dashboard.
+   * O chat panel cobre a tela inteira (z-60) com seu próprio header + safe-area. */
+  body.chat-conversation-open .dashboard-header {
+    display: none;
   }
 
   body.chat-conversation-open .bottom-nav {

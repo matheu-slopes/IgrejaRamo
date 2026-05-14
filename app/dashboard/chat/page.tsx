@@ -1830,35 +1830,28 @@ export default function ChatPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeChat?.id]);
 
-  // iOS/PWA: o teclado reduz o visualViewport. Rastreamos só a altura (vvh) para
-  // encolher o container sem usar offsetTop no top (que causava o gap).
-  // overflow:hidden no body impede o iOS de rolar window.scrollY, evitando
-  // a barra bege persistente ao navegar para outra página.
+  // Detecta mobile e aplica classe no body para esconder o header/bottom-nav do dashboard.
+  // O layout do chat em mobile usa position:fixed cobrindo a tela inteira com height:100dvh —
+  // essa unit CSS shrinks automaticamente quando o teclado iOS abre (suporte iOS 15.4+),
+  // eliminando a necessidade de qualquer listener de visualViewport.
   useEffect(() => {
-    const root = document.documentElement;
     const body = document.body;
 
-    function updateViewportVars() {
-      const vvh = window.visualViewport?.height ?? window.innerHeight;
+    function checkMobile() {
       const isMobile = window.innerWidth < 768;
       setIsMobileChatViewport(isMobile);
-      root.style.setProperty("--chat-vvh", `${vvh}px`);
       if (activeChat && isMobile) body.classList.add("chat-conversation-open");
       else body.classList.remove("chat-conversation-open");
     }
 
-    updateViewportVars();
-
-    window.visualViewport?.addEventListener("resize", updateViewportVars);
-    window.addEventListener("orientationchange", updateViewportVars);
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    window.addEventListener("orientationchange", checkMobile);
 
     return () => {
-      window.visualViewport?.removeEventListener("resize", updateViewportVars);
-      window.removeEventListener("orientationchange", updateViewportVars);
+      window.removeEventListener("resize", checkMobile);
+      window.removeEventListener("orientationchange", checkMobile);
       body.classList.remove("chat-conversation-open");
-      root.style.removeProperty("--chat-vvh");
-      // Garante que qualquer scrollY que o iOS tenha aplicado seja zerado
-      window.scrollTo(0, 0);
     };
   }, [activeChat?.id]);
 
@@ -2327,7 +2320,10 @@ export default function ChatPage() {
 
   function renderChatHeader(name: string, subtitle: string, avatarEl: ReactNode) {
     return (
-      <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-100 bg-white shrink-0">
+      <div
+        className="flex items-center gap-2 px-4 py-3 border-b border-gray-100 bg-white shrink-0"
+        style={isMobileChatViewport ? { paddingTop: "calc(0.75rem + env(safe-area-inset-top))" } : undefined}
+      >
         <button
           onClick={() => openChat(null)}
           className="lg:hidden text-gray-400 hover:text-gray-800 transition"
@@ -2704,9 +2700,10 @@ export default function ChatPage() {
         )}
         style={activeChat && isMobileChatViewport
           ? {
-              top: "calc(3.5rem + env(safe-area-inset-top))",
-              height: "calc(var(--chat-vvh, 100dvh) - 3.5rem - env(safe-area-inset-top))",
+              top: 0,
+              height: "100dvh",
               minHeight: 0,
+              zIndex: 60,
             }
           : { height: "calc(100dvh - 180px)", minHeight: 400 }
         }
