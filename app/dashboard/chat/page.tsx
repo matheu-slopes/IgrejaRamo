@@ -236,6 +236,12 @@ function compareMensagemOrder(a: MensagemConversa, b: MensagemConversa) {
   return a.id.localeCompare(b.id);
 }
 
+function isMissingSequenceColumn(error: unknown) {
+  const err = error as { code?: string; message?: string } | null;
+  const msg = String(err?.message ?? "").toLowerCase();
+  return err?.code === "42703" && msg.includes("sequence_id");
+}
+
 type ChatTab = "direto" | "grupos";
 type ActiveChat = { tipo: "direto"; id: string } | { tipo: "grupo"; id: string } | null;
 
@@ -1334,11 +1340,22 @@ export default function ChatPage() {
 
     const ids = (participacoes as { conversa_id: string }[]).map(p => p.conversa_id);
 
-    const [{ data: conversas }, { data: todosParticipantes }, { data: ultimasMsgs }] = await Promise.all([
+    const [{ data: conversas }, { data: todosParticipantes }, mensagensResult] = await Promise.all([
       supabase.from("chat_conversas").select("*").in("id", ids),
       supabase.from("chat_participantes").select("conversa_id, user_id").in("conversa_id", ids),
       supabase.from("chat_mensagens").select("*").in("conversa_id", ids).order("sequence_id", { ascending: false }).order("criado_em", { ascending: false }).limit(ids.length * 3),
     ]);
+
+    let ultimasMsgs = mensagensResult.data;
+    if (mensagensResult.error && isMissingSequenceColumn(mensagensResult.error)) {
+      const fallbackMensagens = await supabase
+        .from("chat_mensagens")
+        .select("*")
+        .in("conversa_id", ids)
+        .order("criado_em", { ascending: false })
+        .limit(ids.length * 3);
+      ultimasMsgs = fallbackMensagens.data;
+    }
 
     const participantesPorConversa: Record<string, string[]> = {};
     for (const p of (todosParticipantes ?? []) as { conversa_id: string; user_id: string }[]) {
@@ -1444,12 +1461,27 @@ export default function ChatPage() {
   }
 
   async function carregarMensagens(conversaId: string) {
-    const { data } = await supabase
+    let { data, error } = await supabase
       .from("chat_mensagens").select("*")
       .eq("conversa_id", conversaId)
       .order("sequence_id", { ascending: true })
       .order("criado_em", { ascending: true })
       .limit(500);
+
+    if (error && isMissingSequenceColumn(error)) {
+      const fallback = await supabase
+        .from("chat_mensagens").select("*")
+        .eq("conversa_id", conversaId)
+        .order("criado_em", { ascending: true })
+        .limit(500);
+      data = fallback.data;
+      error = fallback.error;
+    }
+
+    if (error) {
+      console.error("chat load mensagens error:", error);
+      return;
+    }
     if (!data) return;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const dbMsgs = (data as any[]).map(row => ({ ...rowToMensagem(row), lida: true }));

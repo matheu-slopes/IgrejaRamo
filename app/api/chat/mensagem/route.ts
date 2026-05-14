@@ -10,6 +10,12 @@ const admin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+function isMissingSequenceColumn(error: unknown) {
+  const err = error as { code?: string; message?: string } | null;
+  const msg = String(err?.message ?? "").toLowerCase();
+  return err?.code === "42703" && msg.includes("sequence_id");
+}
+
 export async function POST(req: NextRequest) {
   // Verifica autenticação via Bearer token
   const authHeader = req.headers.get("authorization");
@@ -71,20 +77,42 @@ export async function POST(req: NextRequest) {
 
   let criadoEm: string | null = null;
   let sequenceId: number | null = null;
-  const { data: inserted, error } = await admin
+  let { data: inserted, error } = await admin
     .from("chat_mensagens")
     .insert(insertPayload)
     .select("criado_em, sequence_id")
     .single();
 
+  if (error && isMissingSequenceColumn(error)) {
+    const fallback = await admin
+      .from("chat_mensagens")
+      .insert(insertPayload)
+      .select("criado_em")
+      .single();
+
+    inserted = fallback.data ? { ...fallback.data, sequence_id: null } : null;
+    error = fallback.error;
+  }
+
   if (error) {
     // Reenvio da mesma mensagem (mesmo UUID) em rede instável: trata como idempotente.
     if ((error as { code?: string }).code === "23505") {
-      const { data: existing, error: existingErr } = await admin
+      let { data: existing, error: existingErr } = await admin
         .from("chat_mensagens")
         .select("criado_em, sequence_id")
         .eq("id", id)
         .single();
+
+      if (existingErr && isMissingSequenceColumn(existingErr)) {
+        const fallbackExisting = await admin
+          .from("chat_mensagens")
+          .select("criado_em")
+          .eq("id", id)
+          .single();
+
+        existing = fallbackExisting.data ? { ...fallbackExisting.data, sequence_id: null } : null;
+        existingErr = fallbackExisting.error;
+      }
 
       if (existingErr || !existing?.criado_em) {
         console.error("chat/mensagem duplicate fetch error:", existingErr);
@@ -98,6 +126,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
   } else {
+    if (!inserted?.criado_em) {
+      return NextResponse.json({ error: "Falha ao recuperar mensagem enviada" }, { status: 500 });
+    }
     criadoEm = inserted.criado_em;
     sequenceId = inserted.sequence_id ?? null;
   }

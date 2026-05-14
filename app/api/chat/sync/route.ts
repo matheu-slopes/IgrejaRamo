@@ -9,6 +9,12 @@ const admin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+function isMissingSequenceColumn(error: unknown) {
+  const err = error as { code?: string; message?: string } | null;
+  const msg = String(err?.message ?? "").toLowerCase();
+  return err?.code === "42703" && msg.includes("sequence_id");
+}
+
 /**
  * GET /api/chat/sync?after_sequence=<n>
  * Sincroniza mensagens recentes das conversas do usuário autenticado.
@@ -53,6 +59,8 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: true, conversa_ids: [], mensagens: [], max_criado_em: null, max_sequence_id: null });
   }
 
+  const hasSequence = { value: true };
+
   let query = admin
     .from("chat_mensagens")
     .select("*")
@@ -67,7 +75,25 @@ export async function GET(req: NextRequest) {
     query = query.gte("criado_em", since);
   }
 
-  const { data: mensagens, error: msgErr } = await query;
+  let { data: mensagens, error: msgErr } = await query;
+  if (msgErr && isMissingSequenceColumn(msgErr)) {
+    hasSequence.value = false;
+    let fallbackQuery = admin
+      .from("chat_mensagens")
+      .select("*")
+      .in("conversa_id", conversaIds)
+      .order("criado_em", { ascending: true })
+      .limit(1500);
+
+    if (since) {
+      fallbackQuery = fallbackQuery.gte("criado_em", since);
+    }
+
+    const fallback = await fallbackQuery;
+    mensagens = fallback.data ?? [];
+    msgErr = fallback.error;
+  }
+
   if (msgErr) {
     return NextResponse.json({ error: msgErr.message }, { status: 500 });
   }
@@ -97,10 +123,19 @@ export async function GET(req: NextRequest) {
 
       const currentMessageById = new Map<string, { id: string; criado_em: string | null; sequence_id: number | null }>();
       if (currentIds.length) {
-        const { data: currentMessages, error: currentMsgErr } = await admin
+        let { data: currentMessages, error: currentMsgErr } = await admin
           .from("chat_mensagens")
           .select("id, criado_em, sequence_id")
           .in("id", [...new Set(currentIds)]);
+
+        if (currentMsgErr && isMissingSequenceColumn(currentMsgErr)) {
+          const fallbackCurrent = await admin
+            .from("chat_mensagens")
+            .select("id, criado_em")
+            .in("id", [...new Set(currentIds)]);
+          currentMessages = (fallbackCurrent.data ?? []).map((m: { id: string; criado_em: string | null }) => ({ ...m, sequence_id: null }));
+          currentMsgErr = fallbackCurrent.error;
+        }
 
         if (currentMsgErr) {
           throw currentMsgErr;
@@ -150,7 +185,7 @@ export async function GET(req: NextRequest) {
   }
 
   const maxCriadoEm = mensagens?.length ? mensagens[mensagens.length - 1].criado_em : null;
-  const maxSequenceId = mensagens?.length ? mensagens[mensagens.length - 1].sequence_id ?? null : null;
+  const maxSequenceId = hasSequence.value && mensagens?.length ? mensagens[mensagens.length - 1].sequence_id ?? null : null;
 
   return NextResponse.json({
     ok: true,

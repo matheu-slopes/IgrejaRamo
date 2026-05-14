@@ -9,6 +9,12 @@ const admin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+function isMissingSequenceColumn(error: unknown) {
+  const err = error as { code?: string; message?: string } | null;
+  const msg = String(err?.message ?? "").toLowerCase();
+  return err?.code === "42703" && msg.includes("sequence_id");
+}
+
 /**
  * POST /api/chat/ack
  * Body:
@@ -59,7 +65,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Conversa não encontrada" }, { status: 404 });
     }
 
-    const { data: latest, error: latestErr } = await admin
+    let { data: latest, error: latestErr } = await admin
       .from("chat_mensagens")
       .select("id, conversa_id, criado_em, sequence_id")
       .eq("conversa_id", conversaId)
@@ -67,6 +73,18 @@ export async function POST(req: NextRequest) {
       .order("criado_em", { ascending: false })
       .order("id", { ascending: false })
       .limit(1);
+
+    if (latestErr && isMissingSequenceColumn(latestErr)) {
+      const fallbackLatest = await admin
+        .from("chat_mensagens")
+        .select("id, conversa_id, criado_em")
+        .eq("conversa_id", conversaId)
+        .order("criado_em", { ascending: false })
+        .order("id", { ascending: false })
+        .limit(1);
+      latest = (fallbackLatest.data ?? []).map((m: { id: string; conversa_id: string; criado_em: string | null }) => ({ ...m, sequence_id: null }));
+      latestErr = fallbackLatest.error;
+    }
 
     if (latestErr) {
       return NextResponse.json({ error: latestErr.message }, { status: 500 });
@@ -79,10 +97,19 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true, updated: 0 });
     }
 
-    const { data: msgs, error: msgErr } = await admin
+    let { data: msgs, error: msgErr } = await admin
       .from("chat_mensagens")
       .select("id, conversa_id, criado_em, sequence_id")
       .in("id", targetIds);
+
+    if (msgErr && isMissingSequenceColumn(msgErr)) {
+      const fallbackMsgs = await admin
+        .from("chat_mensagens")
+        .select("id, conversa_id, criado_em")
+        .in("id", targetIds);
+      msgs = (fallbackMsgs.data ?? []).map((m: { id: string; conversa_id: string; criado_em: string | null }) => ({ ...m, sequence_id: null }));
+      msgErr = fallbackMsgs.error;
+    }
 
     if (msgErr) {
       return NextResponse.json({ error: msgErr.message }, { status: 500 });
@@ -132,10 +159,19 @@ export async function POST(req: NextRequest) {
 
   const currentMessageById = new Map<string, { id: string; criado_em: string | null; sequence_id: number | null }>();
   if (currentIds.length) {
-    const { data: currentMessages, error: currentMsgErr } = await admin
+    let { data: currentMessages, error: currentMsgErr } = await admin
       .from("chat_mensagens")
       .select("id, criado_em, sequence_id")
       .in("id", [...new Set(currentIds)]);
+
+    if (currentMsgErr && isMissingSequenceColumn(currentMsgErr)) {
+      const fallbackCurrent = await admin
+        .from("chat_mensagens")
+        .select("id, criado_em")
+        .in("id", [...new Set(currentIds)]);
+      currentMessages = (fallbackCurrent.data ?? []).map((m: { id: string; criado_em: string | null }) => ({ ...m, sequence_id: null }));
+      currentMsgErr = fallbackCurrent.error;
+    }
 
     if (currentMsgErr) {
       return NextResponse.json({ error: currentMsgErr.message }, { status: 500 });
