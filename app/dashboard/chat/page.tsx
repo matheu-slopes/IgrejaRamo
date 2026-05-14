@@ -1830,27 +1830,35 @@ export default function ChatPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeChat?.id]);
 
-  // Detecta mobile e esconde a navegação inferior quando uma conversa está aberta.
-  // Usamos position:fixed + top + bottom:0 (sem height JS) para que o iOS PWA
-  // mova naturalmente o painel acima do teclado sem gap.
+  // iOS/PWA: o teclado reduz o visualViewport. Rastreamos só a altura (vvh) para
+  // encolher o container sem usar offsetTop no top (que causava o gap).
+  // overflow:hidden no body impede o iOS de rolar window.scrollY, evitando
+  // a barra bege persistente ao navegar para outra página.
   useEffect(() => {
+    const root = document.documentElement;
     const body = document.body;
 
-    function checkMobile() {
+    function updateViewportVars() {
+      const vvh = window.visualViewport?.height ?? window.innerHeight;
       const isMobile = window.innerWidth < 768;
       setIsMobileChatViewport(isMobile);
+      root.style.setProperty("--chat-vvh", `${vvh}px`);
       if (activeChat && isMobile) body.classList.add("chat-conversation-open");
       else body.classList.remove("chat-conversation-open");
     }
 
-    checkMobile();
-    window.addEventListener("resize", checkMobile);
-    window.addEventListener("orientationchange", checkMobile);
+    updateViewportVars();
+
+    window.visualViewport?.addEventListener("resize", updateViewportVars);
+    window.addEventListener("orientationchange", updateViewportVars);
 
     return () => {
-      window.removeEventListener("resize", checkMobile);
-      window.removeEventListener("orientationchange", checkMobile);
+      window.visualViewport?.removeEventListener("resize", updateViewportVars);
+      window.removeEventListener("orientationchange", updateViewportVars);
       body.classList.remove("chat-conversation-open");
+      root.style.removeProperty("--chat-vvh");
+      // Garante que qualquer scrollY que o iOS tenha aplicado seja zerado
+      window.scrollTo(0, 0);
     };
   }, [activeChat?.id]);
 
@@ -2697,7 +2705,7 @@ export default function ChatPage() {
         style={activeChat && isMobileChatViewport
           ? {
               top: "calc(3.5rem + env(safe-area-inset-top))",
-              bottom: 0,
+              height: "calc(var(--chat-vvh, 100dvh) - 3.5rem - env(safe-area-inset-top))",
               minHeight: 0,
             }
           : { height: "calc(100dvh - 180px)", minHeight: 400 }
