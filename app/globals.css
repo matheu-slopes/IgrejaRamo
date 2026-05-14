@@ -41,10 +41,6 @@
     user-select: auto;
   }
 
-  body.chat-conversation-open {
-    overflow: hidden;
-  }
-
   body.chat-conversation-open .bottom-nav {
     display: none;
   }

@@ -1692,6 +1692,8 @@ export default function ChatPage() {
           };
           setDms(prev => prev.map(dm => dm.id === cid ? { ...dm, mensagens: insertSorted(dm.mensagens) } : dm));
           setGrupos(prev => prev.map(g => g.id === cid ? { ...g, mensagens: insertSorted(g.mensagens) } : g));
+          // Atualiza o cursor do servidor se o usuário está visualizando a conversa agora
+          if (isActive && !isMine) markConversaAsRead(cid);
         })
         .subscribe();
       map.set(cid, ch);
@@ -1828,33 +1830,26 @@ export default function ChatPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeChat?.id]);
 
-  // iOS/PWA: o teclado altera a visual viewport, mas nem sempre recalcula 100dvh.
-  // Mantemos uma variável CSS com a altura real visível e escondemos a navegação inferior
-  // quando a conversa está aberta no mobile, imitando o comportamento de apps nativos.
+  // Detecta mobile e esconde a navegação inferior quando uma conversa está aberta.
+  // Usamos position:fixed + top + bottom:0 (sem height JS) para que o iOS PWA
+  // mova naturalmente o painel acima do teclado sem gap.
   useEffect(() => {
-    const root = document.documentElement;
     const body = document.body;
 
-    function updateViewportVars() {
-      const visualViewport = window.visualViewport;
+    function checkMobile() {
       const isMobile = window.innerWidth < 768;
       setIsMobileChatViewport(isMobile);
-      root.style.setProperty("--chat-vvh", `${visualViewport?.height ?? window.innerHeight}px`);
-      root.style.setProperty("--chat-vv-offset-top", `${visualViewport?.offsetTop ?? 0}px`);
       if (activeChat && isMobile) body.classList.add("chat-conversation-open");
       else body.classList.remove("chat-conversation-open");
     }
 
-    updateViewportVars();
-
-    window.visualViewport?.addEventListener("resize", updateViewportVars);
-    window.visualViewport?.addEventListener("scroll", updateViewportVars);
-    window.addEventListener("orientationchange", updateViewportVars);
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    window.addEventListener("orientationchange", checkMobile);
 
     return () => {
-      window.visualViewport?.removeEventListener("resize", updateViewportVars);
-      window.visualViewport?.removeEventListener("scroll", updateViewportVars);
-      window.removeEventListener("orientationchange", updateViewportVars);
+      window.removeEventListener("resize", checkMobile);
+      window.removeEventListener("orientationchange", checkMobile);
       body.classList.remove("chat-conversation-open");
     };
   }, [activeChat?.id]);
@@ -2701,8 +2696,8 @@ export default function ChatPage() {
         )}
         style={activeChat && isMobileChatViewport
           ? {
-              top: "calc(var(--chat-vv-offset-top, 0px) + 3.5rem + env(safe-area-inset-top))",
-              height: "calc(var(--chat-vvh, 100dvh) - 3.5rem - env(safe-area-inset-top))",
+              top: "calc(3.5rem + env(safe-area-inset-top))",
+              bottom: 0,
               minHeight: 0,
             }
           : { height: "calc(100dvh - 180px)", minHeight: 400 }
