@@ -157,6 +157,35 @@ export default function CanalMinisterioPage() {
 
 // ─── TAB: CHAT ────────────────────────────────────────────────────────────────
 
+// Helpers de rede (mesmo padrão do chat de conversas)
+async function getMuralToken(): Promise<string> {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) return "";
+  const expiresAt = session.expires_at ?? 0;
+  if (Date.now() / 1000 > expiresAt - 60) {
+    const { data } = await supabase.auth.refreshSession();
+    return data.session?.access_token ?? "";
+  }
+  return session.access_token;
+}
+
+async function muralFetchWithRetry(input: RequestInfo | URL, init?: RequestInit, attempts = 3): Promise<Response> {
+  let lastError: unknown;
+  for (let i = 1; i <= attempts; i++) {
+    try {
+      const res = await fetch(input, init);
+      if (res.status >= 500 && i < attempts) { await new Promise(r => setTimeout(r, i * 200)); continue; }
+      return res;
+    } catch (e) {
+      lastError = e;
+      if (i < attempts) { await new Promise(r => setTimeout(r, i * 200)); continue; }
+    }
+  }
+  throw lastError ?? new Error("Falha de rede");
+}
+
+function muralCacheKey(ministerio: string) { return `mural_cache_v1_${ministerio}`; }
+
 type InfoPanel = "midia" | "links" | "favoritos" | null;
 
 function detectarLinks(texto: string): string[] {
@@ -198,7 +227,17 @@ function ChatTab({
   podeFixar: boolean;
   user: { id?: string; nome: string; role: string } | null;
 }) {
-  const [msgs, setMsgs] = useState<MuralMensagem[]>([]);
+  // Carrega cache instantâneo antes do fetch do servidor
+  const [msgs, setMsgs] = useState<MuralMensagem[]>(() => {
+    if (typeof window === "undefined") return [];
+    try {
+      const raw = localStorage.getItem(muralCacheKey(ministerio));
+      if (!raw) return [];
+      return JSON.parse(raw) as MuralMensagem[];
+    } catch { return []; }
+  });
+
+  const broadcastChRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   function rowToMsg(m: Record<string, unknown>): MuralMensagem {
     return {
@@ -217,67 +256,102 @@ function ChatTab({
     };
   }
 
-  useEffect(() => {
-    supabase
+  function saveCache(list: MuralMensagem[]) {
+    try { localStorage.setItem(muralCacheKey(ministerio), JSON.stringify(list.slice(-200))); } catch { /* ignore */ }
+  }
+
+  async function fetchAndSync() {
+    const { data } = await supabase
       .from("mural_mensagens")
       .select()
       .eq("ministerio", ministerio)
       .order("criado_em", { ascending: true })
-      .limit(200)
-      .then(({ data }) => {
-        if (data) setMsgs(data.map(rowToMsg));
-      });
+      .limit(200);
+    if (!data) return;
+    const fresh = data.map(rowToMsg);
+    setMsgs((prev) => {
+      // Merge: mantém mensagens locais (temp) e merge com as do servidor
+      const serverIds = new Set(fresh.map(m => m.id));
+      const onlyLocal = prev.filter(m => m.id.startsWith("temp-") || !serverIds.has(m.id));
+      const merged = [...fresh, ...onlyLocal].sort((a, b) =>
+        new Date(a.criadoEm).getTime() - new Date(b.criadoEm).getTime()
+      );
+      saveCache(merged.filter(m => !m.id.startsWith("temp-")));
+      return merged;
+    });
+  }
+
+  useEffect(() => {
+    fetchAndSync();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ministerio]);
 
-  // Realtime: mensagens em tempo real para todos os membros do ministério
+  // Realtime: broadcast (WebSocket puro, baixa latência) para INSERTs +
+  //           postgres_changes para UPDATE e DELETE.
   useEffect(() => {
-    const ch = supabase
-      .channel(`mural_${ministerio}`)
-      .on("postgres_changes", {
-        event: "INSERT", schema: "public",
-        table: "mural_mensagens",
-        filter: `ministerio=eq.${ministerio}`,
-      }, ({ new: raw }) => {
-        const nova = rowToMsg(raw as Record<string, unknown>);
+    // Canal de broadcast — o remetente envia o payload depois de confirmar com o servidor.
+    // Isso garante timestamp autoritativo e entrega sem latência de Realtime DB.
+    const bcCh = supabase
+      .channel(`mural:${ministerio}`)
+      .on("broadcast", { event: "msg" }, ({ payload }: { payload: MuralMensagem }) => {
         setMsgs((prev) => {
-          // substitui mensagem temporária (otimista) pela confirmada do banco
-          const tempIdx = prev.findIndex(
-            (m) => m.id.startsWith("temp-") &&
-              m.autorId === nova.autorId &&
-              m.conteudo === nova.conteudo &&
-              Math.abs(new Date(m.criadoEm).getTime() - new Date(nova.criadoEm).getTime()) < 15000
+          if (prev.some(m => m.id === payload.id)) return prev; // deduplicar
+          const next = [...prev, payload].sort((a, b) =>
+            new Date(a.criadoEm).getTime() - new Date(b.criadoEm).getTime()
           );
-          if (tempIdx >= 0) {
-            const next = [...prev];
-            next[tempIdx] = { ...next[tempIdx], id: nova.id, criadoEm: nova.criadoEm, mediaUrl: nova.mediaUrl ?? next[tempIdx].mediaUrl };
-            return next;
-          }
-          return prev.some((x) => x.id === nova.id) ? prev : [...prev, nova];
+          saveCache(next.filter(m => !m.id.startsWith("temp-")));
+          return next;
         });
       })
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .on("system" as any, { event: "CLOSED" }, () => {
+        // Reconexão: busca mensagens que chegaram enquanto offline
+        fetchAndSync();
+      })
+      .subscribe();
+    broadcastChRef.current = bcCh;
+
+    // postgres_changes apenas para UPDATE (edições) e DELETE
+    const pgCh = supabase
+      .channel(`mural_pg_${ministerio}`)
       .on("postgres_changes", {
         event: "UPDATE", schema: "public",
         table: "mural_mensagens",
         filter: `ministerio=eq.${ministerio}`,
       }, ({ new: raw }) => {
         const row = raw as Record<string, unknown>;
-        setMsgs((prev) => prev.map((msg) => msg.id !== row.id ? msg : {
-          ...msg,
-          conteudo: (row.conteudo as string) ?? msg.conteudo,
-          fixada: !!(row.fixada),
-          editadoEm: (row.editado_em as string) ?? undefined,
-          reacoes: Array.isArray(row.reacoes) ? row.reacoes : [],
-        }));
+        setMsgs((prev) => {
+          const next = prev.map((msg) => msg.id !== row.id ? msg : {
+            ...msg,
+            conteudo: (row.conteudo as string) ?? msg.conteudo,
+            fixada: !!(row.fixada),
+            editadoEm: (row.editado_em as string) ?? undefined,
+            reacoes: Array.isArray(row.reacoes) ? row.reacoes : [],
+          });
+          saveCache(next.filter(m => !m.id.startsWith("temp-")));
+          return next;
+        });
       })
       .on("postgres_changes", {
         event: "DELETE", schema: "public",
         table: "mural_mensagens",
       }, ({ old: raw }) => {
         const row = raw as Record<string, unknown>;
-        if (row.id) setMsgs((prev) => prev.filter((m) => m.id !== row.id));
+        if (row.id) {
+          setMsgs((prev) => {
+            const next = prev.filter((m) => m.id !== row.id);
+            saveCache(next);
+            return next;
+          });
+        }
       })
       .subscribe();
-    return () => { supabase.removeChannel(ch); };
+
+    return () => {
+      supabase.removeChannel(bcCh);
+      supabase.removeChannel(pgCh);
+      broadcastChRef.current = null;
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ministerio]);
   const [texto, setTexto] = useState("");
@@ -330,77 +404,102 @@ function ChatTab({
     if (!user) return;
     if (tipo === "texto" && !texto.trim()) return;
 
-    const tempId = `temp-${Date.now()}`;
+    // UUID gerado pelo cliente — permite idempotência e deduplicação exata
+    const msgId = crypto.randomUUID();
     const agora = new Date().toISOString();
     const conteudo = tipo === "texto" ? texto.trim() : tipo === "imagem" ? "📷 Imagem" : "🎙️ Áudio";
     const respostaCapturada = respostaA;
 
-    // 1. Feedback imediato (otimista)
+    // 1. Feedback imediato (otimista) — usa o UUID real desde o início
     const localUrl = tipo === "imagem" ? imagemPreview : tipo === "audio" ? audioUrl : undefined;
-    setMsgs((prev) => [...prev, {
-      id: tempId, ministerio, autorId: user.id ?? "", autorNome: user.nome,
+    const tempMsg: MuralMensagem = {
+      id: msgId, ministerio, autorId: user.id ?? "", autorNome: user.nome,
       autorRole: user.role as MuralMensagem["autorRole"],
       conteudo, criadoEm: agora, fixada: false, tipo,
       mediaUrl: localUrl ?? undefined, reacoes: [],
       respostaA: respostaCapturada ?? undefined,
-    }]);
+    };
+    setMsgs((prev) => [...prev, tempMsg].sort((a, b) =>
+      new Date(a.criadoEm).getTime() - new Date(b.criadoEm).getTime()
+    ));
     setTexto(""); setImagemPreview(null); setAudioUrl(null); setRespostaA(null); setImagemFile(null); setAudioBlob(null);
 
-    // Captura o blob antes do estado ser limpo
     const blobParaUpload = audioBlob;
 
-    // 2. Upload de mídia via API (service role — evita problema de permissão do bucket)
+    // 2. Upload de mídia via API
     let uploadedUrl: string | null = null;
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token;
+      const token = await getMuralToken();
       if (!token) throw new Error("Sem sessão");
 
       if (tipo === "imagem" && imagemFile) {
         const fd = new FormData();
         fd.append("file", imagemFile);
         fd.append("conversa_id", `ministerio_${ministerio}`);
-        const res = await fetch("/api/chat/upload-imagem", {
-          method: "POST",
-          headers: { authorization: `Bearer ${token}` },
-          body: fd,
+        const res = await muralFetchWithRetry("/api/chat/upload-imagem", {
+          method: "POST", headers: { authorization: `Bearer ${token}` }, body: fd,
         });
         const json = await res.json();
         if (!res.ok) throw new Error(json.error ?? "Upload falhou");
         uploadedUrl = json.url;
-        setMsgs((prev) => prev.map((m) => m.id === tempId ? { ...m, mediaUrl: uploadedUrl ?? undefined } : m));
+        setMsgs((prev) => prev.map((m) => m.id === msgId ? { ...m, mediaUrl: uploadedUrl ?? undefined } : m));
       } else if (tipo === "audio" && blobParaUpload) {
         const audioFile = new File([blobParaUpload], "audio.webm", { type: "audio/webm" });
         const fd = new FormData();
         fd.append("file", audioFile);
         fd.append("conversa_id", `ministerio_${ministerio}`);
         fd.append("file_type", "audio");
-        const res = await fetch("/api/chat/upload-arquivo", {
-          method: "POST",
-          headers: { authorization: `Bearer ${token}` },
-          body: fd,
+        const res = await muralFetchWithRetry("/api/chat/upload-arquivo", {
+          method: "POST", headers: { authorization: `Bearer ${token}` }, body: fd,
         });
         const json = await res.json();
         if (!res.ok) throw new Error(json.error ?? "Upload falhou");
         uploadedUrl = json.url;
-        setMsgs((prev) => prev.map((m) => m.id === tempId ? { ...m, mediaUrl: uploadedUrl ?? undefined } : m));
+        setMsgs((prev) => prev.map((m) => m.id === msgId ? { ...m, mediaUrl: uploadedUrl ?? undefined } : m));
       }
     } catch (err) {
-      setMsgs((prev) => prev.filter((m) => m.id !== tempId));
+      setMsgs((prev) => prev.filter((m) => m.id !== msgId));
       alert("Erro ao enviar mídia. Tente novamente.");
       console.error(err);
       return;
     }
 
-    // 3. Persiste no banco (Realtime trará o ID real e substituirá o temp)
-    supabase.from("mural_mensagens").insert({
-      ministerio, autor_id: user.id, autor_nome: user.nome,
-      autor_role: user.role, conteudo, tipo,
-      media_url: uploadedUrl ?? null,
-      fixada: false, resposta_a: respostaCapturada ?? null,
-    }).then(({ error }) => {
-      if (error) setMsgs((prev) => prev.filter((m) => m.id !== tempId));
-    });
+    // 3. Persiste via API (que dispara push + sininho) com retry automático
+    try {
+      const token = await getMuralToken();
+      const r = await muralFetchWithRetry("/api/ministerio/mensagem", {
+        method: "POST", keepalive: true,
+        headers: { "Content-Type": "application/json", authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          id: msgId, ministerio, autor_id: user.id, autor_nome: user.nome,
+          autor_role: user.role, conteudo, tipo,
+          media_url: uploadedUrl ?? null,
+          resposta_a: respostaCapturada ?? null,
+        }),
+      });
+      if (!r.ok) {
+        const j = await r.json().catch(() => ({}));
+        throw new Error(j.error ?? r.statusText);
+      }
+      const j = await r.json().catch(() => ({}));
+      const serverTime: string = j.criado_em ?? agora;
+
+      // 4. Atualiza com timestamp do servidor e reordena
+      const finalMsg: MuralMensagem = { ...tempMsg, criadoEm: serverTime, mediaUrl: uploadedUrl ?? tempMsg.mediaUrl };
+      setMsgs((prev) => {
+        const next = prev
+          .map((m) => m.id === msgId ? finalMsg : m)
+          .sort((a, b) => new Date(a.criadoEm).getTime() - new Date(b.criadoEm).getTime());
+        saveCache(next.filter(m => !m.id.startsWith("temp-")));
+        return next;
+      });
+
+      // 5. Broadcast para outros clientes — usam o timestamp do servidor para ordenar corretamente
+      broadcastChRef.current?.send({ type: "broadcast", event: "msg", payload: finalMsg });
+    } catch (err) {
+      console.error("ministerio enviar error:", err);
+      setMsgs((prev) => prev.filter((m) => m.id !== msgId));
+    }
   }
 
   function handleImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
