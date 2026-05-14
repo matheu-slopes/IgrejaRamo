@@ -187,13 +187,13 @@ function AudioPlayer({ src, isMe }: { src: string; isMe: boolean }) {
 // --- Constants ----------------------------------------------------
 
 const EMOJIS = [
-  "??","??","??","??","??","??","??","??",
-  "??","??","??","?","??","??","??","??",
-  "?","???","??","??","??","??","??","??",
-  "??","??","??","??","??","??","??","??",
+  "😀","😂","😍","🥰","😊","😎","🤗","😭",
+  "😅","🤣","😇","😏","🙄","😤","🥺","🤩",
+  "👍","👎","🙏","👏","❤️","🔥","✨","🎉",
+  "😢","😡","🤔","😴","🤯","😬","🫡","🙌",
 ];
 
-const QUICK_REACTIONS = ["??", "??", "??", "??", "??", "??"];
+const QUICK_REACTIONS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
 
 // --- Helpers ------------------------------------------------------
 
@@ -1830,28 +1830,33 @@ export default function ChatPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeChat?.id]);
 
-  // Detecta mobile e aplica classe no body para esconder o header/bottom-nav do dashboard.
-  // O layout do chat em mobile usa position:fixed cobrindo a tela inteira com height:100dvh —
-  // essa unit CSS shrinks automaticamente quando o teclado iOS abre (suporte iOS 15.4+),
-  // eliminando a necessidade de qualquer listener de visualViewport.
+  // iOS PWA: 100dvh NÃO redimensiona quando o teclado abre em modo standalone.
+  // Solução: rastrear visualViewport.height e usar bottom:0 + height:vvh no container.
+  // Com bottom:0 o container fica ancorado acima do teclado; com height=vvh ele encolhe
+  // exatamente quando o teclado aparece, sem gap e sem faixa bege.
+  // Não usamos offsetTop no top (era o que causava o gap na versão anterior).
   useEffect(() => {
+    const root = document.documentElement;
     const body = document.body;
 
-    function checkMobile() {
+    function updateVvh() {
       const isMobile = window.innerWidth < 768;
       setIsMobileChatViewport(isMobile);
+      const vvh = window.visualViewport?.height ?? window.innerHeight;
+      root.style.setProperty("--chat-vvh", `${vvh}px`);
       if (activeChat && isMobile) body.classList.add("chat-conversation-open");
       else body.classList.remove("chat-conversation-open");
     }
 
-    checkMobile();
-    window.addEventListener("resize", checkMobile);
-    window.addEventListener("orientationchange", checkMobile);
+    updateVvh();
+    window.visualViewport?.addEventListener("resize", updateVvh);
+    window.addEventListener("orientationchange", updateVvh);
 
     return () => {
-      window.removeEventListener("resize", checkMobile);
-      window.removeEventListener("orientationchange", checkMobile);
+      window.visualViewport?.removeEventListener("resize", updateVvh);
+      window.removeEventListener("orientationchange", updateVvh);
       body.classList.remove("chat-conversation-open");
+      root.style.removeProperty("--chat-vvh");
     };
   }, [activeChat?.id]);
 
@@ -2700,8 +2705,8 @@ export default function ChatPage() {
         )}
         style={activeChat && isMobileChatViewport
           ? {
-              top: 0,
-              height: "100dvh",
+              bottom: 0,
+              height: "var(--chat-vvh, 100dvh)",
               minHeight: 0,
               zIndex: 60,
             }
