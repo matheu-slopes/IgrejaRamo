@@ -34,6 +34,7 @@ export default function PushSubscriber() {
   }, [user]);
 
   async function ativar() {
+    if (status === "loading") return;
     setStatus("loading");
     setMsg(null);
     try {
@@ -52,7 +53,7 @@ export default function PushSubscriber() {
   }
 
   async function registrarSubscription() {
-    const registration = await navigator.serviceWorker.ready;
+    const registration = await getServiceWorkerRegistration();
     let sub = await registration.pushManager.getSubscription();
 
     if (!sub) {
@@ -151,6 +152,37 @@ export default function PushSubscriber() {
       </div>
     </div>
   );
+}
+
+async function getServiceWorkerRegistration(): Promise<ServiceWorkerRegistration> {
+  if (!("serviceWorker" in navigator)) {
+    throw new Error("Este navegador não suporta Service Worker.");
+  }
+
+  let registration = await navigator.serviceWorker.getRegistration();
+
+  // Em alguns navegadores mobile a registration pode não existir ainda.
+  if (!registration) {
+    registration = await navigator.serviceWorker.register("/sw.js");
+  }
+
+  const timeoutMs = 10000;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    window.setTimeout(() => {
+      reject(
+        new Error(
+          "Tempo esgotado ao iniciar notificações. Atualize a página e tente novamente."
+        )
+      );
+    }, timeoutMs);
+  });
+
+  const readyRegistration = await Promise.race([
+    navigator.serviceWorker.ready,
+    timeoutPromise,
+  ]);
+
+  return (readyRegistration as ServiceWorkerRegistration) || registration;
 }
 
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
