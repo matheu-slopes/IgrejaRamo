@@ -1,8 +1,13 @@
 import webpush from "web-push";
 import { createClient } from "@supabase/supabase-js";
 
+const vapidSubject =
+  process.env.VAPID_SUBJECT ||
+  process.env.NEXT_PUBLIC_SITE_URL ||
+  "https://igreja-ramo.vercel.app";
+
 webpush.setVapidDetails(
-  "mailto:admin@ramoda.vida",
+  vapidSubject,
   process.env.VAPID_PUBLIC_KEY!,
   process.env.VAPID_PRIVATE_KEY!
 );
@@ -26,7 +31,7 @@ export type PushDispatchResult = {
   sent: number;
   failed: number;
   removed: number;
-  errors: Array<{ status: number | "unknown"; message: string }>;
+  errors: Array<{ status: number | "unknown"; message: string; endpointHost?: string }>;
 };
 
 function wait(ms: number) {
@@ -94,12 +99,21 @@ async function dispatchToSubs(subs: SubRow[], payload: PushPayload): Promise<Pus
       } catch (err) {
         result.failed += 1;
         const status = (err as { statusCode?: number })?.statusCode ?? "unknown";
-        const message = String((err as { message?: string })?.message ?? err ?? "erro desconhecido");
-        result.errors.push({ status, message });
+        const rawMessage = String((err as { message?: string })?.message ?? err ?? "erro desconhecido");
+        const body = String((err as { body?: string })?.body ?? "").trim();
+        const message = body ? `${rawMessage}: ${body.slice(0, 500)}` : rawMessage;
+        let endpointHost: string | undefined;
+        try {
+          endpointHost = new URL(sub.endpoint).host;
+        } catch {
+          endpointHost = "endpoint_invalido";
+        }
+        result.errors.push({ status, message, endpointHost });
 
         // Subscription expired / inválida — remove
-        // 403 normalmente indica VAPID mismatch (chave pública trocada) — também limpa
-        if (status === 410 || status === 404 || status === 403) {
+        // 403 costuma ser VAPID/subject recusado pelo push service. Não removemos
+        // automaticamente para não apagar uma subscription válida durante diagnóstico.
+        if (status === 410 || status === 404) {
           await admin
             .from("push_subscriptions")
             .delete()

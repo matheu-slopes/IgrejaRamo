@@ -31,12 +31,14 @@ export async function GET(req: NextRequest) {
   const serverPub = process.env.VAPID_PUBLIC_KEY ?? null;
   const clientPub = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? null;
   const vapidMatch = !!serverPub && !!clientPub && serverPub.trim() === clientPub.trim();
+  const vapidSubject = process.env.VAPID_SUBJECT || process.env.NEXT_PUBLIC_SITE_URL || "https://igreja-ramo.vercel.app";
 
   const base = {
     vapid: {
       server_set: !!serverPub,
       client_set: !!clientPub,
       private_set: !!process.env.VAPID_PRIVATE_KEY,
+      subject: vapidSubject,
       server_fingerprint: fingerprint(serverPub),
       client_fingerprint: fingerprint(clientPub),
       match: vapidMatch,
