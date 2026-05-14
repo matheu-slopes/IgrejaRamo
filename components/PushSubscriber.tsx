@@ -264,6 +264,19 @@ async function getServiceWorkerRegistration(): Promise<ServiceWorkerRegistration
 
 function getPushSupportError(): string | null {
   if (typeof window === "undefined") return "";
+
+  const ua = window.navigator.userAgent.toLowerCase();
+  const isIOS = /iphone|ipad|ipod/.test(ua);
+  const isStandalone =
+    window.matchMedia?.("(display-mode: standalone)")?.matches ||
+    // Safari iOS legado
+    (window.navigator as Navigator & { standalone?: boolean }).standalone === true;
+
+  // No iOS, Web Push só funciona no app instalado na Tela de Início.
+  if (isIOS && !isStandalone) {
+    return "No iPhone, ative no app instalado: Compartilhar → Adicionar à Tela de Início.";
+  }
+
   if (!window.isSecureContext) {
     return "Notificações exigem conexão segura (HTTPS).";
   }

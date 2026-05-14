@@ -1149,7 +1149,8 @@ export default function ChatPage() {
   const dmsRef = useRef<ConversaDireta[]>([]);
   const gruposRef = useRef<Grupo[]>([]);
   const conversaIdsRef = useRef<string[]>([]);
-  const nativeNotifiedRef = useRef<Set<string>>(new Set());
+  const lastBackfillRef = useRef<string>(new Date(Date.now() - 5 * 60 * 1000).toISOString());
+  const syncRunningRef = useRef(false);
   // Inbox de mensagens recebidas enquanto estava em outra p�gina
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const inboxRef = useRef<Record<string, any[]>>({});
@@ -1388,6 +1389,20 @@ export default function ChatPage() {
     const allIds = [...newDms.map(d => d.id), ...newGrupos.map(g => g.id)];
     setConversaIds(allIds);
     conversaIdsRef.current = allIds;
+
+    // Atualiza cursor de backfill para buscar apenas novidades daqui pra frente.
+    let latest = "";
+    for (const dm of newDms) {
+      for (const m of dm.mensagens) {
+        if (!latest || new Date(m.criadoEm).getTime() > new Date(latest).getTime()) latest = m.criadoEm;
+      }
+    }
+    for (const g of newGrupos) {
+      for (const m of g.mensagens) {
+        if (!latest || new Date(m.criadoEm).getTime() > new Date(latest).getTime()) latest = m.criadoEm;
+      }
+    }
+    if (latest) lastBackfillRef.current = latest;
     // Cache: o auto-save useEffect[dms,grupos] salva os dados MESCLADOS
   }
 
@@ -1455,6 +1470,113 @@ export default function ChatPage() {
     // cache salvo automaticamente pelo useEffect [dms, grupos]
   }
 
+  async function sincronizarMensagensRecentes() {
+    if (!user?.id) return;
+    if (syncRunningRef.current) return;
+    const ids = conversaIdsRef.current;
+    if (!ids.length) return;
+
+    syncRunningRef.current = true;
+    try {
+      const since = lastBackfillRef.current;
+      const { data, error } = await supabase
+        .from("chat_mensagens")
+        .select("*")
+        .in("conversa_id", ids)
+        .gte("criado_em", since)
+        .order("criado_em", { ascending: true })
+        .limit(1200);
+
+      if (error || !data?.length) return;
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const rows = data as any[];
+      const knownIds = new Set(conversaIdsRef.current);
+      const unknownConversation = rows.some((r) => !knownIds.has(r.conversa_id));
+      if (unknownConversation) {
+        await carregarConversas();
+      }
+
+      // Agrupa por conversa para reduzir custo de atualizações de estado.
+      const byCid = new Map<string, MensagemConversa[]>();
+      for (const row of rows) {
+        const cid = row.conversa_id as string;
+        const list = byCid.get(cid) ?? [];
+        list.push({
+          ...rowToMensagem(row),
+          lida: row.autor_id === user.id || activeChatRef.current?.id === cid,
+        });
+        byCid.set(cid, list);
+      }
+
+      const mergeMsgs = (current: MensagemConversa[], incoming: MensagemConversa[]) => {
+        const map = new Map(current.map((m) => [m.id, m]));
+        for (const msg of incoming) {
+          const existing = map.get(msg.id);
+          if (!existing) {
+            map.set(msg.id, msg);
+            continue;
+          }
+          const bestTime = new Date(existing.criadoEm).getTime() < new Date(msg.criadoEm).getTime()
+            ? existing.criadoEm
+            : msg.criadoEm;
+          map.set(msg.id, { ...existing, ...msg, criadoEm: bestTime });
+        }
+        return Array.from(map.values()).sort(
+          (a, b) => new Date(a.criadoEm).getTime() - new Date(b.criadoEm).getTime()
+        );
+      };
+
+      setDms((prev) => prev.map((dm) => {
+        const incoming = byCid.get(dm.id);
+        if (!incoming?.length) return dm;
+        return { ...dm, mensagens: mergeMsgs(dm.mensagens, incoming) };
+      }));
+
+      setGrupos((prev) => prev.map((g) => {
+        const incoming = byCid.get(g.id);
+        if (!incoming?.length) return g;
+        return { ...g, mensagens: mergeMsgs(g.mensagens, incoming) };
+      }));
+
+      const newest = rows[rows.length - 1]?.criado_em as string | undefined;
+      if (newest) lastBackfillRef.current = newest;
+    } finally {
+      syncRunningRef.current = false;
+    }
+  }
+
+  // Backfill contínuo: garante consistência mesmo quando Realtime perde eventos.
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const onFocus = () => {
+      carregarConversas();
+      sincronizarMensagensRecentes();
+    };
+
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") {
+        carregarConversas();
+        sincronizarMensagensRecentes();
+      }
+    };
+
+    sincronizarMensagensRecentes();
+    const interval = window.setInterval(() => {
+      sincronizarMensagensRecentes();
+    }, 1000);
+
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
+
   // -- broadcast: subscribe a cada conversa (WebSocket puro, sem banco) --
   useEffect(() => {
     if (!user?.id || conversaIds.length === 0) return;
@@ -1468,7 +1590,6 @@ export default function ChatPage() {
           const isActive = activeChatRef.current?.id === cid;
           const isMine = raw.autorId === user?.id;
           const msg: MensagemConversa = { ...raw, lida: isMine || isActive };
-          maybeShowNativeChatNotification(msg, cid, isMine, isActive);
           const insertSorted = (msgs: MensagemConversa[]) => {
             if (msgs.some(m => m.id === msg.id)) return msgs;
             return [...msgs, msg].sort((a, b) => new Date(a.criadoEm).getTime() - new Date(b.criadoEm).getTime());
@@ -1496,86 +1617,6 @@ export default function ChatPage() {
     if (!user?.id) return;
     if (updatesChannelRef.current) supabase.removeChannel(updatesChannelRef.current);
     const ch = supabase.channel(`chat_updates_${user.id}`)
-      // -- INSERT: fallback + corre��o de clock skew ------------------
-      // Usa MIN(broadcastTime, serverTime) para ordena��o:
-      //  - Se rel�gio do remetente estava ADIANTADO: broadcast > server ? usa serverTime (correto)
-      //  - Se INSERT chegou ao banco com DELAY de rede: server > broadcast ? usa broadcastTime (correto)
-      // Tamb�m serve de fallback caso o broadcast WebSocket tenha sido perdido.
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .on("postgres_changes" as any, {
-        event: "INSERT", schema: "public", table: "chat_mensagens",
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      }, async (payload: any) => {
-        const row = payload.new;
-        const cid = row.conversa_id as string;
-        if (!conversaIdsRef.current.includes(cid)) {
-          // Conversa ainda não carregada localmente: hidrata a conversa agora
-          // para não perder a primeira mensagem por condição de corrida.
-          const [{ data: conv }, { data: parts }] = await Promise.all([
-            supabase.from("chat_conversas").select("*").eq("id", cid).single(),
-            supabase.from("chat_participantes").select("user_id").eq("conversa_id", cid),
-          ]);
-
-          if (!conv) {
-            // fallback: tenta sincronizar lista inteira caso a conversa ainda não esteja visível
-            carregarConversas();
-            return;
-          }
-
-          const membrosIds = ((parts ?? []) as { user_id: string }[]).map(p => p.user_id);
-          const outrosIds = membrosIds.filter(id => id !== user.id);
-          const nomePorId: Record<string, string> = {};
-          if (outrosIds.length) {
-            const { data: perfisData } = await supabase.from("perfis").select("id, nome").in("id", outrosIds);
-            for (const p of (perfisData ?? []) as { id: string; nome: string }[]) nomePorId[p.id] = p.nome;
-          }
-
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const c = conv as any;
-          if (c.tipo === "direto") {
-            const otherId = membrosIds.find(id => id !== user.id) ?? "";
-            const otherNome = nomePorId[otherId] ?? usuarios.find(mu => mu.id === otherId)?.nome ?? "Usuário";
-            setDms(prev => prev.some(d => d.id === cid) ? prev : [...prev, {
-              id: cid,
-              participantes: [user.id, otherId] as [string, string],
-              participantesNomes: [user.nome, otherNome] as [string, string],
-              mensagens: [],
-            }]);
-          } else {
-            setGrupos(prev => prev.some(g => g.id === cid) ? prev : [...prev, {
-              id: cid, nome: c.nome ?? "Grupo", tipo: "geral",
-              emoji: c.emoji ?? "", cor: c.cor ?? "bg-slate-700",
-              descricao: c.descricao ?? undefined, adminId: c.admin_id ?? undefined,
-              somenteAdmin: c.somente_admin ?? false, institucional: c.institucional ?? false,
-              membros: membrosIds, mensagens: [],
-            }]);
-          }
-          setConversaIds(prev => prev.includes(cid) ? prev : [...prev, cid]);
-        }
-        const serverTime = row.criado_em as string;
-        const msg: MensagemConversa = {
-          ...rowToMensagem(row),
-          lida: row.autor_id === user.id || activeChatRef.current?.id === cid,
-        };
-        maybeShowNativeChatNotification(msg, cid, row.autor_id === user.id, activeChatRef.current?.id === cid);
-        // MIN(broadcastTime, serverTime): mant�m o timestamp mais antigo entre os dois
-        const upsertSorted = (msgs: MensagemConversa[]) => {
-          const existing = msgs.find(m => m.id === msg.id);
-          let bestTime = serverTime;
-          if (existing) {
-            // Mant�m o menor timestamp: broadcast pode refletir envio real antes do DB INSERT
-            bestTime = new Date(existing.criadoEm).getTime() < new Date(serverTime).getTime()
-              ? existing.criadoEm
-              : serverTime;
-          }
-          const updated = existing
-            ? msgs.map(m => m.id === msg.id ? { ...m, criadoEm: bestTime } : m)
-            : [...msgs, { ...msg, criadoEm: bestTime }];
-          return updated.sort((a, b) => new Date(a.criadoEm).getTime() - new Date(b.criadoEm).getTime());
-        };
-        setDms(prev => prev.map(dm => dm.id === cid ? { ...dm, mensagens: upsertSorted(dm.mensagens) } : dm));
-        setGrupos(prev => prev.map(g => g.id === cid ? { ...g, mensagens: upsertSorted(g.mensagens) } : g));
-      })
       // -- UPDATE: edi��es de mensagens --------------------------------
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .on("postgres_changes" as any, {
@@ -1693,46 +1734,6 @@ export default function ChatPage() {
   function showToast(msg: string) {
     setToast(msg);
     setTimeout(() => setToast(null), 2500);
-  }
-
-  function maybeShowNativeChatNotification(msg: MensagemConversa, cid: string, isMine: boolean, isActive: boolean) {
-    if (typeof window === "undefined") return;
-    if (!("Notification" in window)) return;
-    if (Notification.permission !== "granted") return;
-    if (isMine || isActive) return;
-
-    const id = msg.id;
-    if (nativeNotifiedRef.current.has(id)) return;
-    nativeNotifiedRef.current.add(id);
-    if (nativeNotifiedRef.current.size > 300) {
-      nativeNotifiedRef.current.clear();
-      nativeNotifiedRef.current.add(id);
-    }
-
-    const nome = msg.autorNome?.split(" ")[0] ?? "Alguém";
-    const body =
-      msg.tipo === "imagem"
-        ? `${nome} enviou uma foto`
-        : msg.tipo === "audio"
-        ? `${nome} enviou um áudio`
-        : msg.tipo === "documento"
-        ? `${nome} enviou um arquivo`
-        : `${nome}: ${msg.conteudo?.slice(0, 80) ?? ""}`;
-
-    try {
-      const n = new Notification("💬 Nova mensagem", {
-        body,
-        tag: `chat-local-${cid}`,
-        icon: "/icons/icon-192x192.png",
-        badge: "/icons/icon-72x72.png",
-      });
-      n.onclick = () => {
-        window.focus();
-        window.location.href = "/dashboard/chat";
-      };
-    } catch (e) {
-      console.error("native notification error:", e);
-    }
   }
 
   if (!user) return null;

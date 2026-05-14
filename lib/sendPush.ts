@@ -29,6 +29,18 @@ export type PushDispatchResult = {
   errors: Array<{ status: number | "unknown"; message: string }>;
 };
 
+function wait(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isTransientPushError(status: number | "unknown", message: string) {
+  if (status === "unknown") return true;
+  if (status === 408 || status === 425 || status === 429) return true;
+  if (status >= 500 && status <= 599) return true;
+  const m = message.toLowerCase();
+  return m.includes("timeout") || m.includes("econnreset") || m.includes("temporar");
+}
+
 async function dispatchToSubs(subs: SubRow[], payload: PushPayload): Promise<PushDispatchResult> {
   const result: PushDispatchResult = {
     attempted: subs.length,
@@ -43,18 +55,41 @@ async function dispatchToSubs(subs: SubRow[], payload: PushPayload): Promise<Pus
   await Promise.allSettled(
     subs.map(async (sub) => {
       try {
-        await webpush.sendNotification(
-          { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
-          JSON.stringify(payload),
-          {
-            // Mantém a notificação em fila por mais tempo para cenários com
-            // celular bloqueado/offline temporário.
-            TTL: 60 * 60 * 24,
-            urgency: "high",
-            // Evita travar envio indefinidamente para endpoints instáveis.
-            timeout: 15000,
+        let delivered = false;
+        let lastStatus: number | "unknown" = "unknown";
+        let lastMessage = "";
+
+        for (let attempt = 1; attempt <= 3; attempt++) {
+          try {
+            await webpush.sendNotification(
+              { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+              JSON.stringify(payload),
+              {
+                // Mantém a notificação em fila por mais tempo para cenários com
+                // celular bloqueado/offline temporário.
+                TTL: 60 * 60 * 24,
+                urgency: "high",
+                // Evita travar envio indefinidamente para endpoints instáveis.
+                timeout: 15000,
+              }
+            );
+            delivered = true;
+            break;
+          } catch (err) {
+            lastStatus = (err as { statusCode?: number })?.statusCode ?? "unknown";
+            lastMessage = String((err as { message?: string })?.message ?? err ?? "erro desconhecido");
+            if (attempt < 3 && isTransientPushError(lastStatus, lastMessage)) {
+              await wait(attempt * 250);
+              continue;
+            }
+            throw err;
           }
-        );
+        }
+
+        if (!delivered) {
+          throw new Error(`push não entregue: ${lastStatus} ${lastMessage}`);
+        }
+
         result.sent += 1;
       } catch (err) {
         result.failed += 1;
