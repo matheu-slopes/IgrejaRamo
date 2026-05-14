@@ -485,7 +485,10 @@ function ComposeBar({
   }
 
   return (
-    <div className="border-t border-gray-100 bg-white px-3 py-3 shrink-0">
+    <div
+      className="border-t border-gray-100 bg-white px-3 pt-3 shrink-0"
+      style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}
+    >
       {/* Preview da imagem */}
       {imgPreview && (
         <div className="relative mb-2 inline-block">
@@ -879,7 +882,7 @@ function ConversationMessages({
   }
 
   return (
-    <div className="flex-1 overflow-y-auto px-2 py-4 space-y-1 bg-gray-50">
+    <div className="flex-1 min-h-0 overflow-y-auto px-2 py-4 space-y-1 bg-gray-50 overscroll-contain">
       {searchQuery && filtered.length > 0 && (
         <p className="text-center text-xs text-gray-400 mb-3">
           {filtered.length} resultado{filtered.length !== 1 ? "s" : ""} encontrado{filtered.length !== 1 ? "s" : ""}
@@ -1158,6 +1161,7 @@ export default function ChatPage() {
   const { setTotalUnread, setActiveChatId } = useChatUnread();
   const [tab, setTab] = useState<ChatTab>("direto");
   const [activeChat, setActiveChat] = useState<ActiveChat>(null);
+  const [isMobileChatViewport, setIsMobileChatViewport] = useState(false);
   const [search, setSearch] = useState("");
   const [chatSearchQuery, setChatSearchQuery] = useState("");
   const [chatSearchOpen, setChatSearchOpen] = useState(false);
@@ -1824,6 +1828,37 @@ export default function ChatPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeChat?.id]);
 
+  // iOS/PWA: o teclado altera a visual viewport, mas nem sempre recalcula 100dvh.
+  // Mantemos uma variável CSS com a altura real visível e escondemos a navegação inferior
+  // quando a conversa está aberta no mobile, imitando o comportamento de apps nativos.
+  useEffect(() => {
+    const root = document.documentElement;
+    const body = document.body;
+
+    function updateViewportVars() {
+      const visualViewport = window.visualViewport;
+      const isMobile = window.innerWidth < 768;
+      setIsMobileChatViewport(isMobile);
+      root.style.setProperty("--chat-vvh", `${visualViewport?.height ?? window.innerHeight}px`);
+      root.style.setProperty("--chat-vv-offset-top", `${visualViewport?.offsetTop ?? 0}px`);
+      if (activeChat && isMobile) body.classList.add("chat-conversation-open");
+      else body.classList.remove("chat-conversation-open");
+    }
+
+    updateViewportVars();
+
+    window.visualViewport?.addEventListener("resize", updateViewportVars);
+    window.visualViewport?.addEventListener("scroll", updateViewportVars);
+    window.addEventListener("orientationchange", updateViewportVars);
+
+    return () => {
+      window.visualViewport?.removeEventListener("resize", updateViewportVars);
+      window.visualViewport?.removeEventListener("scroll", updateViewportVars);
+      window.removeEventListener("orientationchange", updateViewportVars);
+      body.classList.remove("chat-conversation-open");
+    };
+  }, [activeChat?.id]);
+
   function showToast(msg: string) {
     setToast(msg);
     setTimeout(() => setToast(null), 2500);
@@ -2363,9 +2398,9 @@ export default function ChatPage() {
     }
 
     return (
-      <div className="flex flex-1 h-full min-w-0">
+      <div className="flex flex-1 h-full min-h-0 min-w-0">
         {/* Chat column */}
-        <div className="flex flex-col flex-1 h-full min-w-0">
+        <div className="flex flex-col flex-1 h-full min-h-0 min-w-0">
           {headerEl}
 
           {/* In-chat search bar */}
@@ -2659,15 +2694,28 @@ export default function ChatPage() {
         </p>
       </div>
 
-      <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden" style={{ height: "calc(100dvh - 180px)", minHeight: 400 }}>
-        <div className="flex h-full">
+      <div
+        className={clsx(
+          "bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden",
+          activeChat && isMobileChatViewport && "fixed inset-x-0 z-50 rounded-none border-0 shadow-none"
+        )}
+        style={activeChat && isMobileChatViewport
+          ? {
+              top: "calc(var(--chat-vv-offset-top, 0px) + 3.5rem + env(safe-area-inset-top))",
+              height: "calc(var(--chat-vvh, 100dvh) - 3.5rem - env(safe-area-inset-top))",
+              minHeight: 0,
+            }
+          : { height: "calc(100dvh - 180px)", minHeight: 400 }
+        }
+      >
+        <div className="flex h-full min-h-0">
           {/* Left list */}
           <div className={clsx("flex flex-col border-r border-gray-100 shrink-0 w-full md:w-72 lg:w-80", activeChat !== null ? "hidden md:flex" : "flex")}>
             {renderList()}
           </div>
 
           {/* Right chat area */}
-          <div className={clsx("flex-1 flex min-w-0", activeChat === null ? "hidden md:flex" : "flex")}>
+          <div className={clsx("flex-1 flex min-h-0 min-w-0", activeChat === null ? "hidden md:flex" : "flex")}>
             {activeChat ? renderChatPanel() : (
               <div className="flex flex-col items-center justify-center w-full text-gray-300 gap-3">
                 <MessageSquare className="w-12 h-12 opacity-30" />

@@ -41,6 +41,14 @@
     user-select: auto;
   }
 
+  body.chat-conversation-open {
+    overflow: hidden;
+  }
+
+  body.chat-conversation-open .bottom-nav {
+    display: none;
+  }
+
   /* Granulado sutil para dar profundidade ao fundo cream */
   body::before {
     content: "";
