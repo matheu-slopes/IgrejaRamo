@@ -38,7 +38,10 @@ async function dispatchToSubs(subs: SubRow[], payload: PushPayload) {
               .delete()
               .eq("endpoint", sub.endpoint)
               .then(() => {});
+            return;
           }
+
+          console.error("push send error:", err?.statusCode ?? "unknown", err?.message ?? err);
         })
     )
   );
@@ -47,10 +50,11 @@ async function dispatchToSubs(subs: SubRow[], payload: PushPayload) {
 /** Envia push para usuários específicos (por ID) */
 export async function sendPushToUsers(userIds: string[], payload: PushPayload) {
   if (!userIds.length) return;
+  const uniqueUserIds = [...new Set(userIds)];
   const { data: subs } = await admin
     .from("push_subscriptions")
     .select("endpoint, p256dh, auth")
-    .in("user_id", userIds);
+    .in("user_id", uniqueUserIds);
   await dispatchToSubs((subs as SubRow[]) ?? [], payload);
 }
 

@@ -78,9 +78,13 @@ export async function POST(req: NextRequest) {
   // Garante que a ordem das mensagens usa sempre o relógio do servidor, não do cliente
 
   // ── Push notification para os outros participantes ───────────────────────
-  sendPushParticipantes(conversa_id, autor_id, autor_nome, conteudo, tipo).catch(
-    (e) => console.error("push chat error:", e)
-  );
+  // Em ambiente serverless, fire-and-forget pode ser interrompido ao finalizar a request.
+  try {
+    await sendPushParticipantes(conversa_id, autor_id, autor_nome, conteudo, tipo);
+  } catch (e) {
+    console.error("push chat error:", e);
+    // Não falha o envio da mensagem por erro de push.
+  }
 
   return NextResponse.json({ ok: true, criado_em: inserted.criado_em });
 }

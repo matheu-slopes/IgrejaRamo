@@ -1,0 +1,17 @@
+name: Push Escalas - 18:00 Brasília
+
+on:
+  schedule:
+    # 18:00 Brasília (UTC-3) = 21:00 UTC
+    - cron: '0 21 * * *'
+  workflow_dispatch:
+
+jobs:
+  send-escalas-reminder:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger escalas reminder (18h)
+        run: |
+          curl -X GET "${{ secrets.DEPLOY_URL }}/api/push/escalas-reminder" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json"

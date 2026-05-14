@@ -1652,8 +1652,8 @@ function ConteudoTab({ initSecao }: { initSecao?: string }) {
         if (lista) setAvisos(lista as Aviso[]);
         setNovoAviso(novoAvisoInicial());
         setAdicionandoAviso(false);
-        // Push para todos os membros
-        notificarBroadcast({ tipo: "aviso", titulo: novoAviso.titulo.trim() });
+        // Push para todos os membros — aguarda para garantir envio
+        await notificarBroadcast({ tipo: "aviso", titulo: novoAviso.titulo.trim() });
       }
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
