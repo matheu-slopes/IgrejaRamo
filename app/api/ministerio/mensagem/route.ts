@@ -81,9 +81,9 @@ async function sendPushMembros(
   // Busca todos os membros do ministério exceto o autor
   const { data: membros, error: membrosErr } = await admin
     .from("membros_ministerio")
-    .select("user_id")
+    .select("usuario_id")
     .eq("ministerio", ministerio)
-    .neq("user_id", autor_id);
+    .neq("usuario_id", autor_id);
 
   if (membrosErr) {
     console.error("membros_ministerio select error:", membrosErr);
@@ -92,13 +92,13 @@ async function sendPushMembros(
 
   // Inclui também admins/pastores que não são membros explícitos do ministério
   const { data: admins } = await admin
-    .from("usuarios")
+    .from("perfis")
     .select("id")
     .in("role", ["admin", "pastor"])
     .neq("id", autor_id);
 
   const membroIds = [...new Set([
-    ...(membros ?? []).map((m: { user_id: string }) => m.user_id),
+    ...(membros ?? []).map((m: { usuario_id: string }) => m.usuario_id),
     ...(admins ?? []).map((a: { id: string }) => a.id),
   ].filter(Boolean))];
 
