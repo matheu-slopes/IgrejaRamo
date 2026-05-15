@@ -32,8 +32,12 @@ function forceViewportReset() {
   document.documentElement.style.setProperty("--vv-offset-top", "0px");
   document.body.classList.remove("keyboard-open");
 
-  // Força o browser a recalcular o layout (necessário para iOS Safari/PWA)
+  // Força o browser a recalcular o layout e snap viewport pro topo
+  document.body.style.height = "101vh";
   window.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior });
+  setTimeout(() => {
+    document.body.style.height = "";
+  }, 10);
 }
 
 export default function AppLifecycleSync() {
