@@ -209,7 +209,7 @@ export default function BottomNav() {
       <nav
         className="bottom-nav fixed bottom-0 inset-x-0 z-40 md:hidden bg-white border-t border-gray-100 flex items-stretch"
         style={{
-          paddingBottom: "env(safe-area-inset-bottom)",
+          paddingBottom: "max(4px, calc(env(safe-area-inset-bottom) - 16px))",
           paddingLeft:   "env(safe-area-inset-left)",
           paddingRight:  "env(safe-area-inset-right)",
         }}
