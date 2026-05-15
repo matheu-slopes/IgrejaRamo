@@ -389,8 +389,7 @@ export default function DashboardLayout({
     // Skeleton em vez de spinner — mesma estrutura do layout real
     return (
       <div
-        className="flex bg-gray-50"
-        style={{ height: "var(--app-vvh, 100dvh)" }}
+        className="fixed inset-0 flex bg-gray-50"
       >
         {/* Sidebar skeleton — desktop only */}
         <div className="hidden md:flex w-60 shrink-0 bg-vine-900" />
@@ -419,10 +418,8 @@ export default function DashboardLayout({
   return (
     <ChatUnreadProvider>
     <PushSubscriber />
-    {/* CRITÍCO: height via CSS var (AppLifecycleSync) — correto para iOS PWA */}
     <div
-      className="flex overflow-hidden bg-gray-50"
-      style={{ height: "var(--app-vvh, 100dvh)" }}
+      className="fixed inset-0 flex overflow-hidden bg-gray-50"
     >
       {/* Sidebar — apenas desktop */}
       <Sidebar />

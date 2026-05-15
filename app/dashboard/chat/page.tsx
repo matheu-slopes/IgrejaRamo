@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useRef, useEffect, ReactNode } from "react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -1864,6 +1864,11 @@ export default function ChatPage() {
     function updateVvh() {
       const isMobile = window.innerWidth < 768;
       setIsMobileChatViewport(isMobile);
+      const viewport = window.visualViewport;
+      const vvh = Math.round(viewport?.height ?? window.innerHeight);
+      const offsetTop = Math.round(viewport?.offsetTop ?? 0);
+      root.style.setProperty("--chat-vvh", `${vvh}px`);
+      root.style.setProperty("--vv-offset-top", `${offsetTop}px`);
       if (activeChat && isMobile) body.classList.add("chat-conversation-open");
       else body.classList.remove("chat-conversation-open");
     }
@@ -2367,6 +2372,10 @@ export default function ChatPage() {
     document.body.classList.remove("chat-conversation-open");
 
     const settle = () => {
+      const fullHeight = Math.round(window.innerHeight);
+      document.documentElement.style.setProperty("--app-vvh", `${fullHeight}px`);
+      document.documentElement.style.setProperty("--chat-vvh", `${fullHeight}px`);
+      document.documentElement.style.setProperty("--vv-offset-top", "0px");
       window.scrollBy(0, 1);
       window.scrollBy(0, -1);
     };
@@ -2776,10 +2785,16 @@ export default function ChatPage() {
       <div
         className={clsx(
           "bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden",
-          activeChat && isMobileChatViewport && "fixed inset-0 z-50 rounded-none border-0 shadow-none"
+          activeChat && isMobileChatViewport && "fixed inset-x-0 z-50 rounded-none border-0 shadow-none"
         )}
         style={activeChat && isMobileChatViewport
-          ? { zIndex: 60 }
+          ? {
+              top: "var(--vv-offset-top, 0px)",
+              bottom: "auto",
+              height: "var(--chat-vvh, 100dvh)",
+              minHeight: 0,
+              zIndex: 60,
+            }
           : { height: "calc(100dvh - 180px)", minHeight: 400 }
         }
       >
