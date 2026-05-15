@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import {
   createContext,
@@ -34,6 +34,22 @@ function rowToUser(row: Record<string, unknown>): User {
   };
 }
 
+// ── Persistência de sessão ──────────────────────────────────────────────────
+const SESSION_KEY = "ramo_user_cache_v2";
+
+function saveUserCache(u: User) {
+  try { sessionStorage.setItem(SESSION_KEY, JSON.stringify(u)); } catch {}
+}
+function loadUserCache(): User | null {
+  try {
+    const raw = typeof window !== "undefined" ? sessionStorage.getItem(SESSION_KEY) : null;
+    return raw ? (JSON.parse(raw) as User) : null;
+  } catch { return null; }
+}
+function clearUserCache() {
+  try { sessionStorage.removeItem(SESSION_KEY); } catch {}
+}
+
 interface AuthContextType {
   user: User | null;
   login: (email: string, password: string) => Promise<false | { role: string }>;
@@ -56,15 +72,19 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  // Hidrata instantaneamente do cache — elimina o spinner ao voltar pro app
+  const cached = typeof window !== "undefined" ? loadUserCache() : null;
+  const [user, setUser] = useState<User | null>(cached);
   const [usuarios, setUsuarios] = useState<User[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  // Se temos cache, não mostramos loading (dados já estão disponíveis)
+  const [isLoading, setIsLoading] = useState(!cached);
 
   async function carregarPerfil(uid: string): Promise<User | null> {
     const { data, error } = await supabase.from("perfis").select("*").eq("id", uid).single();
     if (data) {
       const u = rowToUser(data);
       setUser(u);
+      saveUserCache(u);
       return u;
     }
     // Se a tabela não existir ainda (schema não rodou), não quebra
@@ -82,6 +102,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (novo) {
           const u = rowToUser(novo);
           setUser(u);
+          saveUserCache(u);
           return u;
         }
       }
@@ -102,6 +123,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             ativo: true,
           };
           setUser(u);
+          saveUserCache(u);
           return u;
         }
       } catch {
@@ -130,6 +152,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } catch {
           // timeout ou erro — libera o loading mesmo assim
         }
+      } else {
+        // Sem sessão — limpa cache
+        clearUserCache();
+        setUser(null);
       }
       initialLoadDone = true;
       setIsLoading(false);
@@ -142,6 +168,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await carregarPerfil(session.user.id).catch(() => {});
         carregarTodosUsuarios();
       } else {
+        clearUserCache();
         setUser(null);
         setUsuarios([]);
       }
@@ -150,6 +177,60 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // ── Realtime: atualiza perfil automaticamente quando muda no banco ──────────
+  useEffect(() => {
+    if (!user?.id) return;
+    const uid = user.id;
+
+    const channel = supabase
+      .channel(`perfil_realtime:${uid}`)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .on("postgres_changes" as any, {
+        event: "UPDATE",
+        schema: "public",
+        table: "perfis",
+        filter: `id=eq.${uid}`,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      }, (payload: any) => {
+        if (payload.new) {
+          const u = rowToUser(payload.new);
+          setUser(u);
+          saveUserCache(u);
+        }
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
+
+  // ── Realtime: atualiza lista de usuários para admins ────────────────────────
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const channel = supabase
+      .channel("perfis_admin_realtime")
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .on("postgres_changes" as any, {
+        event: "*",
+        schema: "public",
+        table: "perfis",
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      }, (payload: any) => {
+        if (payload.eventType === "INSERT") {
+          setUsuarios((prev) => [...prev, rowToUser(payload.new)]);
+        } else if (payload.eventType === "UPDATE") {
+          setUsuarios((prev) => prev.map((u) => u.id === payload.new.id ? rowToUser(payload.new) : u));
+        } else if (payload.eventType === "DELETE") {
+          setUsuarios((prev) => prev.filter((u) => u.id !== payload.old?.id));
+        }
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
 
   useAppRefresh(async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -180,6 +261,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   function logout() {
+    clearUserCache();
     supabase.auth.signOut();
   }
 
@@ -198,7 +280,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       body: JSON.stringify({ id, ...dados }),
     });
     setUsuarios((prev) => prev.map((u) => u.id === id ? { ...u, ...dados } : u));
-    if (user?.id === id) setUser((prev) => prev ? { ...prev, ...dados } : prev);
+    if (user?.id === id) {
+      const updated = { ...user, ...dados };
+      setUser(updated);
+      saveUserCache(updated);
+    }
   }
 
   async function criarUsuario(dados: Omit<User, "id">, senha: string): Promise<{ user: User } | { error: string }> {

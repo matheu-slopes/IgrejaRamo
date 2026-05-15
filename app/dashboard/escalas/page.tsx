@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import React, { useState, useEffect, useMemo } from "react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -6,6 +6,7 @@ import { Ministerio, Escala, FuncaoEscala, EscalaMusica } from "@/types";
 import { EscalasTab } from "@/components/dashboard/EscalasTab";
 import { EscalaModal } from "@/components/dashboard/EscalaModal";
 import { supabase } from "@/lib/supabase";
+import { store, STORE_KEYS } from "@/lib/dataStore";
 import { useAppRefresh } from "@/hooks/useAppRefresh";
 import {
   ChevronLeft, ChevronRight, ChevronDown, ChevronUp,
@@ -632,7 +633,10 @@ export default function EscalasDashboardPage() {
   const meus = (user?.ministerios ?? []) as Ministerio[];
   const lista = isAdmin ? TODOS : meus;
 
-  const [todasEscalas, setTodasEscalas] = useState<Escala[]>([]);
+  // Hidrata instantaneamente do cache — sem tela em branco ao navegar
+  const [todasEscalas, setTodasEscalas] = useState<Escala[]>(
+    store.get<Escala[]>(STORE_KEYS.ESCALAS_TODAS) ?? []
+  );
   const [editing, setEditing] = useState<Ministerio | null>(null);
   const [modalEscala, setModalEscala] = useState<Escala | null>(null);
   const [aba, setAba] = useState<"minhas" | "culto">("culto");
@@ -646,17 +650,25 @@ export default function EscalasDashboardPage() {
       .from("escalas")
       .select("*, escala_itens(*), escala_musicas(*)")
       .order("data", { ascending: true });
-    if (data) setTodasEscalas(data.map(parseEscala));
+    if (data) {
+      const parsed = data.map(parseEscala);
+      setTodasEscalas(parsed);
+      store.set(STORE_KEYS.ESCALAS_TODAS, parsed);
+    }
   }
 
   useAppRefresh(() => { void carregarTodas(); }, [], { minIntervalMs: 2000 });
 
   useEffect(() => {
     const channel = supabase
-      .channel("dashboard-escalas-refresh")
-      .on("postgres_changes", { event: "*", schema: "public", table: "escalas" }, () => carregarTodas())
-      .on("postgres_changes", { event: "*", schema: "public", table: "escala_itens" }, () => carregarTodas())
-      .on("postgres_changes", { event: "*", schema: "public", table: "escala_musicas" }, () => carregarTodas())
+      // Nome único para não conflitar com o canal do dashboard
+      .channel("escalas-page-realtime")
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .on("postgres_changes" as any, { event: "*", schema: "public", table: "escalas" }, () => void carregarTodas())
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .on("postgres_changes" as any, { event: "*", schema: "public", table: "escala_itens" }, () => void carregarTodas())
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .on("postgres_changes" as any, { event: "*", schema: "public", table: "escala_musicas" }, () => void carregarTodas())
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };

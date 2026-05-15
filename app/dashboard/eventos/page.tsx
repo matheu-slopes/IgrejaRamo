@@ -1,10 +1,11 @@
-﻿"use client";
+"use client";
 
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Ministerio, Evento } from "@/types";
 import { EventosTab } from "@/components/dashboard/EventosTab";
 import { supabase } from "@/lib/supabase";
+import { store, STORE_KEYS } from "@/lib/dataStore";
 import { useAppRefresh } from "@/hooks/useAppRefresh";
 import { Plus, ChevronRight, MapPin } from "lucide-react";
 import clsx from "clsx";
@@ -54,47 +55,17 @@ function EventoMiniCard({ ev }: { ev: Evento }) {
   );
 }
 
+// ── Linha de ministério usando dados do store central ─────────────────────────
+
 function MinistryEventRow({
-  ministerio, isLider, podeEditar, onOpen, reloadKey,
+  ministerio, isLider, podeEditar, onOpen, allEventos,
 }: {
   ministerio: Ministerio; isLider: boolean; podeEditar: boolean;
-  onOpen: (m: Ministerio) => void; reloadKey: number;
+  onOpen: (m: Ministerio) => void;
+  allEventos: Evento[];
 }) {
-  const [eventos, setEventos] = useState<Evento[]>([]);
   const hojeStr = new Date().toISOString().split("T")[0];
-
-  function carregarEventos() {
-    supabase
-      .from("eventos")
-      .select()
-      .eq("ministerio", ministerio)
-      .order("data", { ascending: true })
-      .then(({ data }) => {
-        if (data) setEventos(data.map((e: Record<string, unknown>) => ({
-          id: e.id as string,
-          titulo: e.titulo as string,
-          descricao: (e.descricao as string) ?? undefined,
-          data: e.data as string,
-          horario: e.horario as string,
-          local: e.local as string,
-          publico: e.publico as boolean,
-          ministerio: e.ministerio as Ministerio,
-          criadoPor: (e.criado_por as string) ?? "",
-        })));
-      });
-  }
-
-  useAppRefresh(() => { carregarEventos(); }, [ministerio, reloadKey], { minIntervalMs: 2000 });
-
-  useEffect(() => {
-    const channel = supabase
-      .channel(`eventos-row-refresh:${ministerio}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "eventos", filter: `ministerio=eq.${ministerio}` }, () => carregarEventos())
-      .subscribe();
-
-    return () => { supabase.removeChannel(channel); };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ministerio, reloadKey]);
+  const eventos = allEventos.filter((e) => e.ministerio === ministerio);
   const proximos = eventos.filter((e) => e.data && e.data >= hojeStr);
   const passados = eventos.filter((e) => e.data && e.data < hojeStr).reverse();
 
@@ -204,7 +175,72 @@ export default function EventosDashboardPage() {
   const meus = (user?.ministerios ?? []) as Ministerio[];
   const lista = isAdmin ? TODOS : meus;
   const [editing, setEditing] = useState<Ministerio | null>(null);
-  const [reloadKey, setReloadKey] = useState(0);
+
+  // Hidrata do cache instantaneamente — sem tela em branco
+  const [allEventos, setAllEventos] = useState<Evento[]>(
+    store.get<Evento[]>(STORE_KEYS.EVENTOS_TODOS) ?? []
+  );
+
+  function parseEvento(e: Record<string, unknown>): Evento {
+    return {
+      id: e.id as string,
+      titulo: e.titulo as string,
+      descricao: (e.descricao as string) ?? undefined,
+      data: e.data as string,
+      horario: e.horario as string,
+      local: e.local as string,
+      publico: e.publico as boolean,
+      ministerio: e.ministerio as Ministerio,
+      criadoPor: (e.criado_por as string) ?? "",
+    };
+  }
+
+  async function carregarTodos() {
+    const { data } = await supabase
+      .from("eventos")
+      .select()
+      .order("data", { ascending: true });
+    if (data) {
+      const parsed = data.map(parseEvento);
+      setAllEventos(parsed);
+      store.set(STORE_KEYS.EVENTOS_TODOS, parsed);
+    }
+  }
+
+  useAppRefresh(() => { void carregarTodos(); }, [], { minIntervalMs: 2000 });
+
+  // ── Realtime: 1 canal para todos os eventos ────────────────────────────────
+  useEffect(() => {
+    const channel = supabase
+      .channel("eventos-page-realtime")
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .on("postgres_changes" as any, { event: "*", schema: "public", table: "eventos" }, (payload: any) => {
+        if (payload.eventType === "INSERT") {
+          setAllEventos((prev) => {
+            const novo = parseEvento(payload.new);
+            const next = [...prev, novo].sort((a, b) => a.data.localeCompare(b.data));
+            store.set(STORE_KEYS.EVENTOS_TODOS, next);
+            return next;
+          });
+        } else if (payload.eventType === "UPDATE") {
+          setAllEventos((prev) => {
+            const next = prev.map((e) => e.id === payload.new.id ? parseEvento(payload.new) : e);
+            store.set(STORE_KEYS.EVENTOS_TODOS, next);
+            return next;
+          });
+        } else if (payload.eventType === "DELETE") {
+          setAllEventos((prev) => {
+            const next = prev.filter((e) => e.id !== payload.old?.id);
+            store.set(STORE_KEYS.EVENTOS_TODOS, next);
+            return next;
+          });
+        }
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   if (lista.length === 0)
     return (
@@ -218,7 +254,7 @@ export default function EventosDashboardPage() {
       <div className="flex flex-col gap-4">
         <div className="flex items-center gap-3">
           <button
-            onClick={() => { setEditing(null); setReloadKey((k) => k + 1); }}
+            onClick={() => { setEditing(null); void carregarTodos(); }}
             className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 font-semibold transition"
           >
             ← Voltar
@@ -252,7 +288,7 @@ export default function EventosDashboardPage() {
             isLider={temPermissao("criar_evento")}
             podeEditar={temPermissao("editar_evento")}
             onOpen={setEditing}
-            reloadKey={reloadKey}
+            allEventos={allEventos}
           />
         ))}
       </div>

@@ -1,8 +1,9 @@
-﻿"use client";
+"use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
+import { store, STORE_KEYS } from "@/lib/dataStore";
 import { useAppRefresh } from "@/hooks/useAppRefresh";
 import { Evento, Aviso } from "@/types";
 import {
@@ -36,125 +37,185 @@ type MinhaEscala = {
   observacao: string;
 };
 
+type DashboardData = {
+  avisoFixado: { conteudo: string; ativo: boolean } | null;
+  proximosEventos: Evento[];
+  avisosFiltrados: Aviso[];
+  escala: MinhaEscala | null;
+};
+
 export default function DashboardPage() {
   const { user } = useAuth();
-  const [avisoFixado, setAvisoFixado] = useState<{ conteudo: string; ativo: boolean } | null>(null);
-  const [proximosEventos, setProximosEventos] = useState<Evento[]>([]);
-  const [avisosFiltrados, setAvisosFiltrados] = useState<Aviso[]>([]);
-  const [escala, setEscala] = useState<MinhaEscala | null>(null);
+
+  // Carrega dados do cache instantaneamente (sem tela em branco)
+  const cacheKey = user?.id ? STORE_KEYS.MINHA_ESCALA(user.id) : null;
+  const cachedData = cacheKey ? store.get<DashboardData>(cacheKey) : undefined;
+
+  const [avisoFixado, setAvisoFixado] = useState<{ conteudo: string; ativo: boolean } | null>(
+    cachedData?.avisoFixado ?? null
+  );
+  const [proximosEventos, setProximosEventos] = useState<Evento[]>(
+    cachedData?.proximosEventos ?? []
+  );
+  const [avisosFiltrados, setAvisosFiltrados] = useState<Aviso[]>(
+    cachedData?.avisosFiltrados ?? []
+  );
+  const [escala, setEscala] = useState<MinhaEscala | null>(
+    cachedData?.escala ?? null
+  );
+
+  // Refs para montar snapshot no store
+  const avisoFixadoRef = useRef(avisoFixado);
+  const proximosEventosRef = useRef(proximosEventos);
+  const avisosFiltradosRef = useRef(avisosFiltrados);
+  const escalaRef = useRef(escala);
+  avisoFixadoRef.current = avisoFixado;
+  proximosEventosRef.current = proximosEventos;
+  avisosFiltradosRef.current = avisosFiltrados;
+  escalaRef.current = escala;
+
+  function persistCache() {
+    if (!cacheKey) return;
+    store.set<DashboardData>(cacheKey, {
+      avisoFixado: avisoFixadoRef.current,
+      proximosEventos: proximosEventosRef.current,
+      avisosFiltrados: avisosFiltradosRef.current,
+      escala: escalaRef.current,
+    });
+  }
 
   async function carregarResumo() {
     const today = new Date().toISOString().split("T")[0];
 
-    supabase
-      .from("aviso_fixado")
-      .select()
-      .eq("ativo", true)
-      .limit(1)
-      .then(({ data }) => {
-        if (data && data.length > 0) {
-          setAvisoFixado({ conteudo: data[0].conteudo, ativo: data[0].ativo });
-        } else {
-          setAvisoFixado(null);
+    // Todas as queries disparam em paralelo
+    const [avisoRes, eventosRes, avisosRes, escalaRes] = await Promise.allSettled([
+      supabase.from("aviso_fixado").select().eq("ativo", true).limit(1),
+      supabase.from("eventos").select().gte("data", today).order("data", { ascending: true }).limit(4),
+      user ? supabase.from("avisos").select().order("criado_em", { ascending: false }).limit(5) : Promise.resolve({ data: null }),
+      user ? supabase.from("escala_itens")
+        .select("funcao, observacao, escalas(data, horario, culto, ministerio, locais(nome))")
+        .eq("voluntario_id", user.id)
+        .gte("escalas.data", today)
+        .order("escalas.data", { ascending: true })
+        .limit(1) : Promise.resolve({ data: null }),
+    ]);
+
+    // Aviso fixado
+    if (avisoRes.status === "fulfilled") {
+      const { data } = avisoRes.value;
+      const novo = data && data.length > 0
+        ? { conteudo: data[0].conteudo, ativo: data[0].ativo }
+        : null;
+      setAvisoFixado(novo);
+      avisoFixadoRef.current = novo;
+    }
+
+    // Próximos eventos
+    if (eventosRes.status === "fulfilled") {
+      const { data } = eventosRes.value;
+      const novos = data ? data.map((e) => ({
+        id: e.id, titulo: e.titulo, descricao: e.descricao ?? "",
+        data: e.data, horario: e.horario, local: e.local,
+        publico: e.publico, ministerio: e.ministerio,
+        imagemUrl: e.imagem_url, criadoPor: e.criado_por,
+        recorrente: e.recorrente,
+      })) : [];
+      setProximosEventos(novos);
+      proximosEventosRef.current = novos;
+    }
+
+    // Avisos filtrados
+    if (avisosRes.status === "fulfilled" && user) {
+      const { data } = avisosRes.value;
+      if (data) {
+        const filtrados = data
+          .filter((a) => {
+            if (user.role === "admin" || user.role === "pastor") return true;
+            const destMatch =
+              a.destinatarios === "todos" ||
+              (Array.isArray(a.destinatarios) &&
+                a.destinatarios.length > 0 &&
+                a.destinatarios.includes(user.role));
+            if (!destMatch) return false;
+            if (a.ministerios?.length) {
+              return (a.ministerios as string[]).some((m) => user.ministerios?.includes(m as import("@/types").Ministerio));
+            }
+            return true;
+          })
+          .slice(0, 3)
+          .map((a) => ({
+            id: a.id, titulo: a.titulo, conteudo: a.conteudo,
+            criadoEm: a.criado_em, destinatarios: a.destinatarios,
+            ministerios: a.ministerios, visivelHome: a.visivel_home,
+          }));
+        setAvisosFiltrados(filtrados);
+        avisosFiltradosRef.current = filtrados;
+      }
+    }
+
+    // Minha escala
+    if (escalaRes.status === "fulfilled" && user) {
+      const { data } = escalaRes.value;
+      if (data && data.length > 0) {
+        const item = data[0] as any;
+        const esc = item.escalas;
+        if (esc) {
+          const novaEscala: MinhaEscala = {
+            data: new Date(esc.data + "T00:00:00").toLocaleDateString("pt-BR", {
+              weekday: "long", day: "2-digit", month: "long",
+            }),
+            horario: esc.horario,
+            culto: esc.culto,
+            ministerio: esc.ministerio,
+            funcao: item.funcao,
+            local: esc.locais?.nome ?? "",
+            observacao: item.observacao ?? "",
+          };
+          setEscala(novaEscala);
+          escalaRef.current = novaEscala;
         }
-      });
+      } else {
+        setEscala(null);
+        escalaRef.current = null;
+      }
+    }
 
-    supabase
-      .from("eventos")
-      .select()
-      .gte("data", today)
-      .order("data", { ascending: true })
-      .limit(4)
-      .then(({ data }) => {
-        if (data) {
-          setProximosEventos(
-            data.map((e) => ({
-              id: e.id, titulo: e.titulo, descricao: e.descricao ?? "",
-              data: e.data, horario: e.horario, local: e.local,
-              publico: e.publico, ministerio: e.ministerio,
-              imagemUrl: e.imagem_url, criadoPor: e.criado_por,
-              recorrente: e.recorrente,
-            }))
-          );
-        } else {
-          setProximosEventos([]);
-        }
-      });
-
-    if (!user) return;
-
-    supabase
-      .from("avisos")
-      .select()
-      .order("criado_em", { ascending: false })
-      .limit(5)
-      .then(({ data }) => {
-        if (data) {
-          setAvisosFiltrados(
-            data
-              .filter((a) => {
-                // Admin e pastor veem todos os avisos, sem exceção
-                if (user.role === "admin" || user.role === "pastor") return true;
-
-                // Verifica se o destinatário bate com o role do usuário
-                const destMatch =
-                  a.destinatarios === "todos" ||
-                  (Array.isArray(a.destinatarios) &&
-                    a.destinatarios.length > 0 &&
-                    a.destinatarios.includes(user.role));
-                if (!destMatch) return false;
-
-                // Se o aviso é vinculado a um ministério específico,
-                // só aparece para quem pertence àquele ministério
-                if (a.ministerios?.length) {
-                  return (a.ministerios as string[]).some((m) => user.ministerios?.includes(m as import("@/types").Ministerio));
-                }
-
-                return true;
-              })
-              .slice(0, 3)
-              .map((a) => ({
-                id: a.id, titulo: a.titulo, conteudo: a.conteudo,
-                criadoEm: a.criado_em, destinatarios: a.destinatarios,
-                ministerios: a.ministerios, visivelHome: a.visivel_home,
-              }))
-          );
-        } else {
-          setAvisosFiltrados([]);
-        }
-      });
-
-    supabase
-      .from("escala_itens")
-      .select("funcao, observacao, escalas(data, horario, culto, ministerio, locais(nome))")
-      .eq("voluntario_id", user.id)
-      .gte("escalas.data", today)
-      .order("escalas.data", { ascending: true })
-      .limit(1)
-      .then(({ data }) => {
-        if (data && data.length > 0) {
-          const item = data[0] as any;
-          const esc = item.escalas;
-          if (esc) {
-            setEscala({
-              data: new Date(esc.data + "T00:00:00").toLocaleDateString("pt-BR", {
-                weekday: "long", day: "2-digit", month: "long",
-              }),
-              horario: esc.horario,
-              culto: esc.culto,
-              ministerio: esc.ministerio,
-              funcao: item.funcao,
-              local: esc.locais?.nome ?? "",
-              observacao: item.observacao ?? "",
-            });
-          }
-        } else {
-          setEscala(null);
-        }
-      });
+    persistCache();
   }
 
   useAppRefresh(() => { void carregarResumo(); }, [user?.id, user?.role, user?.ministerios?.join(",")], { minIntervalMs: 2000 });
+
+  // ── Realtime: atualiza cada seção automaticamente ──────────────────────────
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const channel = supabase
+      .channel("dashboard-realtime-all")
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .on("postgres_changes" as any, { event: "*", schema: "public", table: "aviso_fixado" }, () => {
+        void carregarResumo();
+      })
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .on("postgres_changes" as any, { event: "*", schema: "public", table: "avisos" }, () => {
+        void carregarResumo();
+      })
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .on("postgres_changes" as any, { event: "*", schema: "public", table: "eventos" }, () => {
+        void carregarResumo();
+      })
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .on("postgres_changes" as any, { event: "*", schema: "public", table: "escala_itens" }, () => {
+        void carregarResumo();
+      })
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .on("postgres_changes" as any, { event: "*", schema: "public", table: "escalas" }, () => {
+        void carregarResumo();
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
 
   if (!user) return null;
 
