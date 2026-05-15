@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -386,9 +386,32 @@ export default function DashboardLayout({
   }
 
   if (isLoading || !user) {
+    // Skeleton em vez de spinner — sem flash de tela escura
     return (
-      <div className="flex items-center justify-center h-screen bg-vine-900">
-        <div className="w-8 h-8 border-4 border-gray-400 border-t-transparent rounded-full animate-spin" />
+      <div
+        className="flex bg-gray-50"
+        style={{ height: "var(--app-vvh, 100dvh)" }}
+      >
+        {/* Sidebar skeleton — desktop only */}
+        <div className="hidden md:flex w-60 shrink-0 bg-vine-900" />
+        <div className="flex-1 flex flex-col min-h-0">
+          {/* Header skeleton */}
+          <div
+            className="h-14 bg-white border-b border-gray-100 px-4 flex items-center gap-3"
+            style={{ paddingTop: "env(safe-area-inset-top)" }}
+          >
+            <div className="skeleton h-7 w-7 rounded-full" />
+            <div className="skeleton h-4 w-28 rounded-full" />
+            <div className="ml-auto skeleton h-7 w-7 rounded-full" />
+          </div>
+          {/* Content skeleton */}
+          <div className="flex-1 p-4 md:p-6 space-y-4">
+            <div className="skeleton h-8 w-48 rounded-xl" />
+            <div className="skeleton h-32 w-full rounded-2xl" />
+            <div className="skeleton h-24 w-full rounded-2xl" />
+            <div className="skeleton h-24 w-full rounded-2xl" />
+          </div>
+        </div>
       </div>
     );
   }
@@ -396,14 +419,23 @@ export default function DashboardLayout({
   return (
     <ChatUnreadProvider>
     <PushSubscriber />
-    <div className="flex h-dvh overflow-hidden bg-gray-50">
+    {/* CRITÍCO: height via CSS var (AppLifecycleSync) — correto para iOS PWA */}
+    <div
+      className="flex overflow-hidden bg-gray-50"
+      style={{ height: "var(--app-vvh, 100dvh)" }}
+    >
       {/* Sidebar — apenas desktop */}
       <Sidebar />
 
       <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
         {/* Top bar */}
-        <header className="sticky top-0 z-20 bg-white border-b border-gray-100 shadow-sm dashboard-header"
-          style={{ paddingTop: "env(safe-area-inset-top)" }}
+        <header
+          className="sticky top-0 z-20 bg-white border-b border-gray-100 shadow-sm dashboard-header shrink-0"
+          style={{
+            paddingTop: "env(safe-area-inset-top)",
+            paddingLeft: "env(safe-area-inset-left)",
+            paddingRight: "env(safe-area-inset-right)",
+          }}
         >
           <div className="h-14 px-4 md:px-6 flex items-center justify-between">
             {/* Mobile: logo + nome da igreja */}
@@ -424,9 +456,14 @@ export default function DashboardLayout({
           </div>
         </header>
 
-        {/* Conteúdo principal */}
-        <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-6 pb-[calc(4.5rem+env(safe-area-inset-bottom))] md:pb-6">
-          {children}
+        {/* Conteúdo principal — scroll com overscroll containment para iOS */}
+        <main
+          className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-6 pb-[calc(4.5rem+env(safe-area-inset-bottom))] md:pb-6 scroll-container"
+          style={{ overscrollBehaviorY: "contain" }}
+        >
+          <div className="page-enter">
+            {children}
+          </div>
         </main>
       </div>
 

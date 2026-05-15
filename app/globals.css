@@ -12,7 +12,10 @@
     /* height para cobrir a tela inteira no PWA */
     height: 100%;
     min-height: 100%;
+    /* CRÍTICO iOS PWA: height dinâmico via JS (AppLifecycleSync) */
+    height: var(--app-vvh, 100dvh);
   }
+
   body {
     font-feature-settings: "kern" 1, "liga" 1, "calt" 1;
     background-color: #F7F2EA;
@@ -23,24 +26,30 @@
     /* Sem seleção acidental de texto */
     -webkit-user-select: none;
     user-select: none;
-    /* Ocupa toda a altura no standalone */
+    /* Ocupa toda a altura disponível */
     min-height: 100%;
     min-height: var(--app-vvh, 100dvh);
-    /* CRÍTICO iOS PWA: evita que o body fique maior que a tela após fechar o teclado */
-    max-height: 100dvh;
     overflow-x: hidden;
+    /* CRÍTICO: NÃO usar max-height no body — quebra position:fixed (bottom nav) */
+  }
 
+  /* Remover tap highlight em TODOS os elementos interativos */
+  a, button, [role="button"], input, textarea, select, label {
+    -webkit-tap-highlight-color: transparent;
+    tap-highlight-color: transparent;
   }
 
   body.chat-conversation-open {
     overflow: hidden;
     background-color: #f9fafb;
   }
+
   /* Permitir seleção somente em textos legíveis */
   p, h1, h2, h3, h4, h5, h6, span, a, li, td, th, label {
     -webkit-user-select: text;
     user-select: text;
   }
+
   /*
    * CRÍTICO para iOS PWA: inputs com font-size < 16px fazem o Safari
    * dar zoom automático ao focar o campo. Forçar 16px previne isso.
@@ -99,6 +108,23 @@
   border-radius: 9999px;
 }
 
+/* ─── Scrollable containers: sem overscroll bounce no iOS ─────────── */
+.scroll-container {
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ─── Tap feedback para itens de navegação ───────────────────────── */
+.nav-item {
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 100ms ease, opacity 100ms ease;
+}
+.nav-item:active {
+  transform: scale(0.92);
+  opacity: 0.75;
+}
+
 /* ─── Marquee de versículos — loop infinito real ─────────────────── */
 @keyframes marquee-scroll {
   from { transform: translate3d(0, 0, 0); }
@@ -153,4 +179,25 @@
 @keyframes heroUp {
   from { opacity: 0; transform: translateY(18px); }
   to   { opacity: 1; transform: translateY(0);     }
+}
+
+/* ─── Skeleton shimmer ──────────────────────────────────────────────── */
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position:  200% 0; }
+}
+.skeleton {
+  background: linear-gradient(90deg, #e5e7eb 25%, #f3f4f6 50%, #e5e7eb 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+  border-radius: 0.5rem;
+}
+
+/* ─── Page transitions ──────────────────────────────────────────────── */
+@keyframes fadeSlideIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0);   }
+}
+.page-enter {
+  animation: fadeSlideIn 200ms ease forwards;
 }

@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import Image from "next/image";
@@ -78,9 +78,13 @@ export default function Sidebar() {
   return (
     <aside
       className={clsx(
-        "relative hidden md:flex flex-col h-screen bg-vine-900 text-white transition-all duration-300 shrink-0",
+        "relative hidden md:flex flex-col h-full bg-vine-900 text-white transition-all duration-300 shrink-0",
         collapsed ? "w-16" : "w-60"
       )}
+      style={{
+        paddingTop: "env(safe-area-inset-top)",
+        paddingLeft: "env(safe-area-inset-left)",
+      }}
     >
       {/* Collapse toggle */}
       <button
@@ -262,7 +266,10 @@ export default function Sidebar() {
       </nav>
 
       {/* User info + logout */}
-      <div className="border-t border-vine-700 p-3">
+      <div
+        className="border-t border-vine-700 p-3"
+        style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
+      >
         {user && !collapsed && (
           <div className="mb-2 px-1">
             <p className="text-xs font-semibold text-white truncate">

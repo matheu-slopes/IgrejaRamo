@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -10,7 +10,7 @@ import {
   Baby, HeartHandshake, CalendarDays as CalDays, Layers,
 } from "lucide-react";
 import clsx from "clsx";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 
 const navItems = [
   { href: "/dashboard",         label: "Início",  icon: LayoutDashboard },
@@ -41,6 +41,8 @@ export default function BottomNav() {
   const { user } = useAuth();
   const { totalUnread } = useChatUnread();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const drawerRef = useRef<HTMLDivElement>(null);
+  const touchStartY = useRef<number>(0);
 
   const isAdmin = user?.role === "admin" || user?.role === "pastor";
   const meusMinisterios = isAdmin
@@ -48,6 +50,59 @@ export default function BottomNav() {
     : (user?.ministerios ?? []).filter((m) => ministeriosMap[m]);
 
   const hasExtras = meusMinisterios.length > 0 || isAdmin;
+
+  // Scroll-lock no body quando o drawer está aberto
+  useEffect(() => {
+    if (drawerOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => { document.body.style.overflow = ""; };
+  }, [drawerOpen]);
+
+  // Fecha o drawer ao navegar para outra rota
+  useEffect(() => {
+    setDrawerOpen(false);
+  }, [pathname]);
+
+  // Swipe-to-close: arrastar o drawer pra baixo fecha
+  function onTouchStart(e: React.TouchEvent) {
+    touchStartY.current = e.touches[0].clientY;
+  }
+  function onTouchEnd(e: React.TouchEvent) {
+    const dy = e.changedTouches[0].clientY - touchStartY.current;
+    if (dy > 60) setDrawerOpen(false); // swipe down 60px+ fecha
+  }
+
+  function NavItem({
+    href, label, icon: Icon, active, badge,
+  }: { href: string; label: string; icon: React.ElementType; active: boolean; badge?: number }) {
+    return (
+      <Link
+        href={href}
+        className={clsx(
+          "nav-item flex-1 flex flex-col items-center justify-center gap-0.5 py-2 relative select-none",
+          active ? "text-vine-600" : "text-gray-400"
+        )}
+      >
+        <div className="relative">
+          <Icon className={clsx("w-5 h-5 transition-transform duration-150", active && "scale-110")} />
+          {!!badge && badge > 0 && (
+            <span className="absolute -top-1.5 -right-1.5 min-w-[14px] h-[14px] rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center px-0.5">
+              {badge > 99 ? "99+" : badge}
+            </span>
+          )}
+        </div>
+        <span className={clsx("text-[10px] font-semibold leading-none", active ? "text-vine-600" : "text-gray-400")}>
+          {label}
+        </span>
+        {active && (
+          <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-vine-600 rounded-full" />
+        )}
+      </Link>
+    );
+  }
 
   return (
     <>
@@ -59,13 +114,16 @@ export default function BottomNav() {
         />
       )}
 
-      {/* Drawer sheet */}
+      {/* Drawer sheet com swipe-to-close */}
       <div
+        ref={drawerRef}
         className={clsx(
-          "fixed bottom-0 inset-x-0 z-50 md:hidden bg-white rounded-t-2xl shadow-2xl transition-transform duration-300",
+          "fixed bottom-0 inset-x-0 z-50 md:hidden bg-white rounded-t-2xl shadow-2xl transition-transform duration-300 ease-out",
           drawerOpen ? "translate-y-0" : "translate-y-full"
         )}
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+        onTouchStart={onTouchStart}
+        onTouchEnd={onTouchEnd}
       >
         {/* Handle */}
         <div className="flex justify-center pt-3 pb-2">
@@ -75,7 +133,10 @@ export default function BottomNav() {
         {/* Header */}
         <div className="flex items-center justify-between px-5 pb-3 border-b border-gray-100">
           <span className="text-sm font-bold text-gray-800">Menu</span>
-          <button onClick={() => setDrawerOpen(false)} className="p-1 rounded-full hover:bg-gray-100 transition">
+          <button
+            onClick={() => setDrawerOpen(false)}
+            className="nav-item p-1 rounded-full hover:bg-gray-100 transition"
+          >
             <X className="w-4 h-4 text-gray-500" />
           </button>
         </div>
@@ -99,8 +160,8 @@ export default function BottomNav() {
                       href={m.href}
                       onClick={() => setDrawerOpen(false)}
                       className={clsx(
-                        "flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-semibold transition",
-                        active ? "bg-gray-50 text-gray-900" : "bg-gray-50 text-gray-700 hover:bg-gray-100"
+                        "nav-item flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-semibold",
+                        active ? "bg-gray-50 text-gray-900" : "bg-gray-50 text-gray-700"
                       )}
                     >
                       <Icon className="w-4 h-4 shrink-0" />
@@ -127,8 +188,8 @@ export default function BottomNav() {
                       href={href}
                       onClick={() => setDrawerOpen(false)}
                       className={clsx(
-                        "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition",
-                        active ? "bg-gray-50 text-gray-900" : "text-gray-700 hover:bg-gray-50"
+                        "nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold",
+                        active ? "bg-gray-50 text-gray-900" : "text-gray-700"
                       )}
                     >
                       <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center shrink-0">
@@ -141,8 +202,6 @@ export default function BottomNav() {
               </div>
             </div>
           )}
-
-
         </div>
       </div>
 
@@ -151,76 +210,50 @@ export default function BottomNav() {
         className="bottom-nav fixed bottom-0 inset-x-0 z-40 md:hidden bg-white border-t border-gray-100 flex items-stretch"
         style={{
           paddingBottom: "env(safe-area-inset-bottom)",
-          paddingLeft: "env(safe-area-inset-left)",
-          paddingRight: "env(safe-area-inset-right)",
+          paddingLeft:   "env(safe-area-inset-left)",
+          paddingRight:  "env(safe-area-inset-right)",
         }}
       >
         {navItems.map(({ href, label, icon: Icon }) => {
           const isChat = href === "/dashboard/chat";
           const active = pathname === href || (href !== "/dashboard" && pathname.startsWith(href));
           return (
-            <Link
+            <NavItem
               key={href}
               href={href}
-              className={clsx(
-                "flex-1 flex flex-col items-center justify-center gap-0.5 py-2 transition-colors relative",
-                active ? "text-vine-600" : "text-gray-400"
-              )}
-            >
-              <div className="relative">
-                <Icon className={clsx("w-5 h-5 transition-transform", active && "scale-110")} />
-                {isChat && totalUnread > 0 && (
-                  <span className="absolute -top-1.5 -right-1.5 min-w-[14px] h-[14px] rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center px-0.5">
-                    {totalUnread > 99 ? "99+" : totalUnread}
-                  </span>
-                )}
-              </div>
-              <span className={clsx("text-[10px] font-semibold leading-none", active ? "text-vine-600" : "text-gray-400")}>
-                {label}
-              </span>
-              {active && (
-                <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-vine-600 rounded-full" />
-              )}
-            </Link>
+              label={label}
+              icon={Icon}
+              active={active}
+              badge={isChat ? totalUnread : undefined}
+            />
           );
         })}
 
-        {/* Botão Ministérios (ou Mais para admin sem ministério) */}
+        {/* Botão Ministérios / Mais */}
         {meusMinisterios.length === 1 && !isAdmin ? (
-          // Um único ministério → link direto
           (() => {
             const nome = meusMinisterios[0];
             const m = ministeriosMap[nome];
             const active = m ? (pathname.includes("/ministerio/") && decodeURIComponent(pathname).includes(nome)) : false;
             return (
-              <Link
+              <NavItem
                 href={m?.href ?? "/dashboard"}
-                className={clsx(
-                  "flex-1 flex flex-col items-center justify-center gap-0.5 py-2 transition-colors relative",
-                  active ? "text-vine-600" : "text-gray-400"
-                )}
-              >
-                <Layers className={clsx("w-5 h-5 transition-transform", active && "scale-110")} />
-                <span className={clsx("text-[10px] font-semibold leading-none", active ? "text-vine-600" : "text-gray-400")}>
-                  {nome}
-                </span>
-                {active && (
-                  <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-vine-600 rounded-full" />
-                )}
-              </Link>
+                label={nome}
+                icon={Layers}
+                active={active}
+              />
             );
           })()
         ) : meusMinisterios.length > 1 ? (
-          // Múltiplos ministérios → abre drawer
           <button
             onClick={() => setDrawerOpen(true)}
             className={clsx(
-              "flex-1 flex flex-col items-center justify-center gap-0.5 py-2 transition-colors relative",
+              "nav-item flex-1 flex flex-col items-center justify-center gap-0.5 py-2 relative select-none",
               drawerOpen ? "text-vine-600" : "text-gray-400"
             )}
           >
             <div className="relative">
-              <Layers className={clsx("w-5 h-5 transition-transform", drawerOpen && "scale-110")} />
+              <Layers className={clsx("w-5 h-5 transition-transform duration-150", drawerOpen && "scale-110")} />
             </div>
             <span className={clsx("text-[10px] font-semibold leading-none", drawerOpen ? "text-vine-600" : "text-gray-400")}>
               Ministérios
@@ -230,16 +263,15 @@ export default function BottomNav() {
             )}
           </button>
         ) : (
-          // Admin ou sem ministério → Mais genérico
           <button
             onClick={() => setDrawerOpen(true)}
             className={clsx(
-              "flex-1 flex flex-col items-center justify-center gap-0.5 py-2 transition-colors relative",
+              "nav-item flex-1 flex flex-col items-center justify-center gap-0.5 py-2 relative select-none",
               drawerOpen ? "text-gray-900" : "text-gray-400"
             )}
           >
             <div className="relative">
-              <MoreHorizontal className={clsx("w-5 h-5 transition-transform", drawerOpen && "scale-110")} />
+              <MoreHorizontal className={clsx("w-5 h-5 transition-transform duration-150", drawerOpen && "scale-110")} />
               {hasExtras && (
                 <span className="absolute -top-1 -right-1.5 w-2 h-2 rounded-full bg-gray-500" />
               )}
