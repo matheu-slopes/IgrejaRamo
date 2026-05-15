@@ -18,17 +18,84 @@ function updateViewportVars() {
   document.body.classList.toggle("keyboard-open", keyboardOpen);
 }
 
+/**
+ * iOS PWA: quando o teclado fecha, o visualViewport pode demorar a reportar
+ * a altura correta, deixando uma barra em branco. Este fix força o reset
+ * em múltiplos momentos após o teclado fechar.
+ */
+function forceViewportReset() {
+  if (typeof window === "undefined") return;
+
+  const fullHeight = window.innerHeight;
+  document.documentElement.style.setProperty("--app-vvh", `${fullHeight}px`);
+  document.documentElement.style.setProperty("--chat-vvh", `${fullHeight}px`);
+  document.documentElement.style.setProperty("--vv-offset-top", "0px");
+  document.body.classList.remove("keyboard-open");
+
+  // Força o scroll para garantir que o browser recalcule o layout
+  // (hack necessário para iOS Safari/PWA)
+  window.scrollTo({ top: 0, behavior: "instant" });
+}
+
 export default function AppLifecycleSync() {
   const router = useRouter();
 
   useEffect(() => {
     let refreshTimer: ReturnType<typeof setTimeout> | null = null;
     let viewportTimer: ReturnType<typeof setTimeout> | null = null;
+    let resetTimer1: ReturnType<typeof setTimeout> | null = null;
+    let resetTimer2: ReturnType<typeof setTimeout> | null = null;
+    let resetTimer3: ReturnType<typeof setTimeout> | null = null;
+    let wasKeyboardOpen = false;
 
     function scheduleViewportUpdate() {
       updateViewportVars();
       if (viewportTimer) clearTimeout(viewportTimer);
       viewportTimer = setTimeout(updateViewportVars, 250);
+    }
+
+    function onViewportResize() {
+      const visualViewport = window.visualViewport;
+      const height = Math.round(visualViewport?.height ?? window.innerHeight);
+      const keyboardNowOpen = visualViewport ? height < window.innerHeight - 80 : false;
+
+      // Detecta o momento em que o teclado fecha
+      if (wasKeyboardOpen && !keyboardNowOpen) {
+        // Limpa timers anteriores de reset
+        if (resetTimer1) clearTimeout(resetTimer1);
+        if (resetTimer2) clearTimeout(resetTimer2);
+        if (resetTimer3) clearTimeout(resetTimer3);
+
+        // Dispara o reset em 3 momentos diferentes:
+        // iOS pode ser lento em diferentes versões
+        forceViewportReset();
+        resetTimer1 = setTimeout(forceViewportReset, 100);
+        resetTimer2 = setTimeout(forceViewportReset, 300);
+        resetTimer3 = setTimeout(forceViewportReset, 600);
+      }
+
+      wasKeyboardOpen = keyboardNowOpen;
+      scheduleViewportUpdate();
+    }
+
+    function onFocusOut(e: FocusEvent) {
+      // Se o elemento que perdeu o foco era um input/textarea (teclado vai fechar)
+      const target = e.target as HTMLElement;
+      if (
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target?.getAttribute("contenteditable") === "true"
+      ) {
+        // Aguarda o iOS processar o fechamento do teclado
+        if (resetTimer1) clearTimeout(resetTimer1);
+        if (resetTimer2) clearTimeout(resetTimer2);
+        if (resetTimer3) clearTimeout(resetTimer3);
+
+        resetTimer1 = setTimeout(forceViewportReset, 100);
+        resetTimer2 = setTimeout(forceViewportReset, 350);
+        resetTimer3 = setTimeout(forceViewportReset, 700);
+      }
+      scheduleViewportUpdate();
     }
 
     function scheduleRefresh(reason: Parameters<typeof emitAppRefresh>[0]) {
@@ -41,11 +108,17 @@ export default function AppLifecycleSync() {
     }
 
     function onVisibilityChange() {
-      if (document.visibilityState === "visible") scheduleRefresh("visible");
+      if (document.visibilityState === "visible") {
+        forceViewportReset();
+        scheduleRefresh("visible");
+      }
     }
     function onFocus() { scheduleRefresh("focus"); }
     function onOnline() { scheduleRefresh("online"); }
-    function onPageShow() { scheduleRefresh("pageshow"); }
+    function onPageShow() {
+      forceViewportReset();
+      scheduleRefresh("pageshow");
+    }
 
     updateViewportVars();
 
@@ -54,22 +127,25 @@ export default function AppLifecycleSync() {
     window.addEventListener("pageshow", onPageShow);
     window.addEventListener("resize", scheduleViewportUpdate);
     window.addEventListener("orientationchange", scheduleViewportUpdate);
-    window.addEventListener("focusout", scheduleViewportUpdate);
+    window.addEventListener("focusout", onFocusOut);
     document.addEventListener("visibilitychange", onVisibilityChange);
-    window.visualViewport?.addEventListener("resize", scheduleViewportUpdate);
+    window.visualViewport?.addEventListener("resize", onViewportResize);
     window.visualViewport?.addEventListener("scroll", scheduleViewportUpdate);
 
     return () => {
       if (refreshTimer) clearTimeout(refreshTimer);
       if (viewportTimer) clearTimeout(viewportTimer);
+      if (resetTimer1) clearTimeout(resetTimer1);
+      if (resetTimer2) clearTimeout(resetTimer2);
+      if (resetTimer3) clearTimeout(resetTimer3);
       window.removeEventListener("focus", onFocus);
       window.removeEventListener("online", onOnline);
       window.removeEventListener("pageshow", onPageShow);
       window.removeEventListener("resize", scheduleViewportUpdate);
       window.removeEventListener("orientationchange", scheduleViewportUpdate);
-      window.removeEventListener("focusout", scheduleViewportUpdate);
+      window.removeEventListener("focusout", onFocusOut);
       document.removeEventListener("visibilitychange", onVisibilityChange);
-      window.visualViewport?.removeEventListener("resize", scheduleViewportUpdate);
+      window.visualViewport?.removeEventListener("resize", onViewportResize);
       window.visualViewport?.removeEventListener("scroll", scheduleViewportUpdate);
     };
   }, [router]);
