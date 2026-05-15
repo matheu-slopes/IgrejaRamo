@@ -42,13 +42,14 @@ const navAdmin = [
 ];
 
 const ministerios = [
-  { label: "Louvor",      icon: Music,          href: "/dashboard/ministerio/Louvor"                          },
-  { label: "Mídias",      icon: Video,          href: "/dashboard/ministerio/M%C3%ADdias"                     },
-  { label: "Ensino",      icon: BookOpen,       href: "/dashboard/ministerio/Ensino"                           },
-  { label: "Infantil",    icon: Baby,           href: "/dashboard/ministerio/Infantil"                         },
-  { label: "Ação Social", icon: HeartHandshake, href: "/dashboard/ministerio/A%C3%A7%C3%A3o%20Social"          },
-  { label: "Jovens",      icon: Users,          href: "/dashboard/ministerio/Jovens"                           },
-  { label: "Limpeza",     icon: Sparkles,       href: "/dashboard/ministerio/Limpeza"                          },
+  { value: "Louvor", label: "Louvor", icon: Music },
+  { value: "Mídias", label: "Mídias", icon: Video },
+  { value: "Ensino", label: "Ensino", icon: BookOpen },
+  { value: "Infantil", label: "Infantil", icon: Baby },
+  { value: "Ação Social", label: "Ação Social", icon: HeartHandshake },
+  { value: "Jovens", label: "Jovens", icon: Users },
+  { value: "Cantina", label: "Recepcionamento", icon: Users },
+  { value: "Limpeza", label: "Limpeza", icon: Sparkles },
 ];
 
 export default function Sidebar() {
@@ -152,11 +153,11 @@ export default function Sidebar() {
             if (user?.role === "admin" || user?.role === "pastor") return true;
             // pertence ao ministério (membro/voluntário/líder)
             const pertence = user?.ministerios?.some(
-              (um) => um.toLowerCase() === m.label.toLowerCase()
+              (um) => um.toLowerCase() === m.value.toLowerCase()
             );
             // ou é líder nomeado desse ministério
             const eLider = user?.liderMinisterios?.some(
-              (um) => um.toLowerCase() === m.label.toLowerCase()
+              (um) => um.toLowerCase() === m.value.toLowerCase()
             );
             return pertence || eLider;
           });
@@ -169,15 +170,15 @@ export default function Sidebar() {
                 </p>
               )}
               {collapsed && <div className="border-t border-vine-700 my-3 mx-1" />}
-              {meusItens.map(({ label, icon: Icon, href }) => {
+              {meusItens.map(({ value, label, icon: Icon }) => {
                 const eLider = user?.liderMinisterios?.some(
-                  (um) => um.toLowerCase() === label.toLowerCase()
+                  (um) => um.toLowerCase() === value.toLowerCase()
                 );
-                const isAtivo = pathname.includes("/ministerio/") && decodeURIComponent(pathname).includes(label);
+                const isAtivo = pathname.includes("/ministerio/") && decodeURIComponent(pathname).includes(value);
                 return (
                   <Link
-                    key={label}
-                    href={href}
+                    key={value}
+                    href={`/dashboard/ministerio/${encodeURIComponent(value)}`}
                     className={clsx(
                       "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition",
                       isAtivo

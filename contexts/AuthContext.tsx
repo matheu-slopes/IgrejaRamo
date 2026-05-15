@@ -226,7 +226,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function removerUsuario(id: string) {
-    await supabase.from("perfis").delete().eq("id", id);
+    const res = await fetch("/api/remover-usuario", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: id }),
+    });
+    if (!res.ok) {
+      const json = await res.json().catch(() => ({}));
+      throw new Error(json.error ?? "Erro ao remover usuário.");
+    }
     setUsuarios((prev) => prev.filter((u) => u.id !== id));
   }
 

@@ -20,6 +20,24 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "ID do usuário ausente." }, { status: 400 });
   }
 
+  if (dados.email !== undefined) {
+    const email = String(dados.email || "").trim().toLowerCase();
+    if (!email) {
+      return NextResponse.json({ error: "Email inválido." }, { status: 400 });
+    }
+
+    const { error: authEmailError } = await admin.auth.admin.updateUserById(id, {
+      email,
+      email_confirm: true,
+    });
+
+    if (authEmailError) {
+      return NextResponse.json({ error: authEmailError.message }, { status: 400 });
+    }
+
+    dados.email = email;
+  }
+
   const payload: Record<string, unknown> = {};
   if (dados.nome        !== undefined) payload.nome          = dados.nome;
   if (dados.email       !== undefined) payload.email         = dados.email;

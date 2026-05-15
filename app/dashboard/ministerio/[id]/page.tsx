@@ -91,6 +91,7 @@ export default function CanalMinisterioPage() {
   }
 
   const corBg = corMap[slug] ?? corMap[canalBase.cor] ?? "bg-gray-900";
+  const nomeCanal = slug === "Cantina" ? "Recepcionamento" : slug;
 
   return (
     <div className="space-y-0">
@@ -98,7 +99,7 @@ export default function CanalMinisterioPage() {
       <div className={clsx("rounded-2xl px-4 py-4 md:px-6 md:py-5 mb-6 text-white overflow-hidden", corBg)}>
         {/* Título e descrição */}
         <p className="text-xs uppercase tracking-widest opacity-60 mb-0.5">Canal</p>
-        <h1 className="text-2xl font-sans font-semibold">{slug}</h1>
+        <h1 className="text-2xl font-sans font-semibold">{nomeCanal}</h1>
         {canalBase.descricao && (
           <p className="text-sm opacity-70 mt-1">{canalBase.descricao}</p>
         )}
