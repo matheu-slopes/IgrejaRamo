@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useRef, useEffect, ReactNode } from "react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -452,31 +452,17 @@ function ComposeBar({
 
   if (disabled) {
     return (
-      <div
-        className="border-t border-gray-100 bg-gray-50 px-4 py-3 flex items-center gap-2 text-gray-400 shrink-0"
-        style={{
-          transform: "translateY(calc(-1 * var(--keyboard-height, 0px)))",
-          willChange: "transform",
-          paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))",
-        }}
-      >
+      <div className="border-t border-gray-100 bg-gray-50 px-4 py-3 flex items-center gap-2 text-gray-400 shrink-0">
         <Lock className="w-4 h-4 shrink-0" />
         <span className="text-xs">Somente pastores e lideres podem enviar mensagens aqui.</span>
       </div>
     );
   }
 
-  // -- UI de gravação ativo --
+  // -- UI de grava��o ativo --
   if (recording) {
     return (
-      <div
-        className="border-t border-gray-100 bg-white px-3 py-3 shrink-0"
-        style={{
-          transform: "translateY(calc(-1 * var(--keyboard-height, 0px)))",
-          willChange: "transform",
-          paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))",
-        }}
-      >
+      <div className="border-t border-gray-100 bg-white px-3 py-3 shrink-0">
         <div className="flex items-center gap-3 bg-red-50 rounded-2xl border border-red-200 px-4 py-2.5">
           <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse shrink-0" />
           <span className="text-sm text-red-600 font-medium tabular-nums flex-1">{formatSecs(recSeconds)}</span>
@@ -490,7 +476,7 @@ function ComposeBar({
           <button
             onClick={stopRecording}
             className="w-9 h-9 rounded-full bg-red-500 text-white flex items-center justify-center hover:bg-red-600 transition"
-            title="Parar gravação"
+            title="Parar grava��o"
           >
             <Square className="w-4 h-4 fill-white" />
           </button>
@@ -502,13 +488,7 @@ function ComposeBar({
   return (
     <div
       className="border-t border-gray-100 bg-white px-3 pt-3 shrink-0"
-      style={{
-        // Técnica WhatsApp: sobe junto com o teclado via GPU transform
-        transform: "translateY(calc(-1 * var(--keyboard-height, 0px)))",
-        willChange: "transform",
-        // Safe area quando teclado está fechado
-        paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))",
-      }}
+      style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}
     >
       {/* Preview da imagem */}
       {imgPreview && (
@@ -903,10 +883,7 @@ function ConversationMessages({
   }
 
   return (
-    <div
-      className="flex-1 min-h-0 overflow-y-auto px-2 py-4 space-y-1 bg-gray-50 overscroll-contain"
-      style={{ paddingBottom: "calc(1rem + var(--keyboard-height, 0px))" }}
-    >
+    <div className="flex-1 min-h-0 overflow-y-auto px-2 py-4 space-y-1 bg-gray-50 overscroll-contain">
       {searchQuery && filtered.length > 0 && (
         <p className="text-center text-xs text-gray-400 mb-3">
           {filtered.length} resultado{filtered.length !== 1 ? "s" : ""} encontrado{filtered.length !== 1 ? "s" : ""}
@@ -1887,20 +1864,11 @@ export default function ChatPage() {
     function updateVvh() {
       const isMobile = window.innerWidth < 768;
       setIsMobileChatViewport(isMobile);
-
       const viewport = window.visualViewport;
-      const innerH = window.innerHeight;
-      const vvh    = Math.round(viewport?.height    ?? innerH);
+      const vvh = Math.round(viewport?.height ?? window.innerHeight);
       const offsetTop = Math.round(viewport?.offsetTop ?? 0);
-
-      // Técnica WhatsApp: calcula altura do teclado e move só o input
-      // O container fica SEMPRE em full-height (sem encolher)
-      const keyboardHeight = Math.max(0, innerH - vvh - offsetTop);
-
-      root.style.setProperty("--chat-vvh",       `${innerH}px`);   // sempre full height
-      root.style.setProperty("--vv-offset-top",  `${offsetTop}px`);
-      root.style.setProperty("--keyboard-height", `${keyboardHeight}px`);
-
+      root.style.setProperty("--chat-vvh", `${vvh}px`);
+      root.style.setProperty("--vv-offset-top", `${offsetTop}px`);
       if (activeChat && isMobile) body.classList.add("chat-conversation-open");
       else body.classList.remove("chat-conversation-open");
     }
@@ -1908,25 +1876,24 @@ export default function ChatPage() {
     function scheduleUpdate() {
       updateVvh();
       if (timer) clearTimeout(timer);
-      timer = setTimeout(updateVvh, 150);
+      timer = setTimeout(updateVvh, 250);
     }
 
     updateVvh();
     window.visualViewport?.addEventListener("resize", scheduleUpdate);
     window.visualViewport?.addEventListener("scroll", scheduleUpdate);
-    window.addEventListener("resize",            scheduleUpdate);
+    window.addEventListener("resize", scheduleUpdate);
     window.addEventListener("orientationchange", scheduleUpdate);
-    window.addEventListener("focusout",          scheduleUpdate);
+    window.addEventListener("focusout", scheduleUpdate);
     document.addEventListener("visibilitychange", scheduleUpdate);
 
     return () => {
       if (timer) clearTimeout(timer);
-      root.style.setProperty("--keyboard-height", "0px");
       window.visualViewport?.removeEventListener("resize", scheduleUpdate);
       window.visualViewport?.removeEventListener("scroll", scheduleUpdate);
-      window.removeEventListener("resize",            scheduleUpdate);
+      window.removeEventListener("resize", scheduleUpdate);
       window.removeEventListener("orientationchange", scheduleUpdate);
-      window.removeEventListener("focusout",          scheduleUpdate);
+      window.removeEventListener("focusout", scheduleUpdate);
       document.removeEventListener("visibilitychange", scheduleUpdate);
       body.classList.remove("chat-conversation-open");
     };
@@ -2406,10 +2373,9 @@ export default function ChatPage() {
 
     const settle = () => {
       const fullHeight = Math.round(window.innerHeight);
-      document.documentElement.style.setProperty("--app-vvh",        `${fullHeight}px`);
-      document.documentElement.style.setProperty("--chat-vvh",       `${fullHeight}px`);
-      document.documentElement.style.setProperty("--vv-offset-top",  "0px");
-      document.documentElement.style.setProperty("--keyboard-height", "0px");
+      document.documentElement.style.setProperty("--app-vvh", `${fullHeight}px`);
+      document.documentElement.style.setProperty("--chat-vvh", `${fullHeight}px`);
+      document.documentElement.style.setProperty("--vv-offset-top", "0px");
       window.scrollBy(0, 1);
       window.scrollBy(0, -1);
     };
