@@ -325,6 +325,12 @@ export function EscalaModal({ escala, podeEditar, onClose, onUpdate, onDelete }:
           <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/95 rounded-2xl">
             <div className="text-center space-y-4 px-8">
               <p className="text-base font-bold text-gray-800">Excluir esta escala?</p>
+              <div className="text-left text-sm text-gray-600 bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 space-y-1">
+                <p><span className="font-semibold">Culto:</span> {escala.culto}</p>
+                <p><span className="font-semibold">Ministério:</span> {escala.ministerio}</p>
+                <p><span className="font-semibold">Data:</span> {formatDateSimples(escala.data)}</p>
+                <p><span className="font-semibold">Horário:</span> {escala.horario}</p>
+              </div>
               <p className="text-sm text-gray-500">Esta ação não pode ser desfeita.</p>
               <div className="flex justify-center gap-3">
                 <button

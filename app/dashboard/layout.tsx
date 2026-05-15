@@ -335,6 +335,7 @@ export default function DashboardLayout({
   const [senhaModal, setSenhaModal] = useState(false);
   const [novaSenhaPrimeiro, setNovaSenhaPrimeiro] = useState("");
   const [nomeForm, setNomeForm] = useState("");
+  const [emailForm, setEmailForm] = useState("");
   const [telefoneForm, setTelefoneForm] = useState("");
   const [showSenhaPrimeiro, setShowSenhaPrimeiro] = useState(false);
   const [salvandoPrimeiro, setSalvandoPrimeiro] = useState(false);
@@ -354,6 +355,7 @@ export default function DashboardLayout({
   useEffect(() => {
     if (!isLoading && user?.primeiroAcesso) {
       setNomeForm(user.nome ?? "");
+      setEmailForm(user.email ?? "");
       setTelefoneForm(user.telefone ?? "");
       setSenhaModal(true);
     }
@@ -362,8 +364,11 @@ export default function DashboardLayout({
   async function salvarPrimeiraSenha() {
     if (!user) return;
     const nomeTrimmed = nomeForm.trim();
+    const emailTrimmed = emailForm.trim().toLowerCase();
     const telTrimmed = telefoneForm.trim();
     if (!nomeTrimmed) { setErroPrimeiro("Digite seu nome completo."); return; }
+    if (!emailTrimmed) { setErroPrimeiro("Digite seu email."); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailTrimmed)) { setErroPrimeiro("Digite um email válido."); return; }
     if (!telTrimmed) { setErroPrimeiro("Digite seu telefone."); return; }
     if (novaSenhaPrimeiro.length < 6) { setErroPrimeiro("A nova senha deve ter no mínimo 6 caracteres."); return; }
     setSalvandoPrimeiro(true); setErroPrimeiro("");
@@ -374,7 +379,7 @@ export default function DashboardLayout({
     });
     const json = await res.json().catch(() => ({}));
     if (!res.ok) { setErroPrimeiro(json.error ?? "Erro ao alterar senha."); setSalvandoPrimeiro(false); return; }
-    await atualizarUsuario(user.id, { primeiroAcesso: false, nome: nomeTrimmed, telefone: telTrimmed });
+    await atualizarUsuario(user.id, { primeiroAcesso: false, nome: nomeTrimmed, email: emailTrimmed, telefone: telTrimmed });
     setSenhaModal(false);
     setNovaSenhaPrimeiro("");
     setSalvandoPrimeiro(false);
@@ -456,6 +461,18 @@ export default function DashboardLayout({
 
               {/* Telefone */}
               <div>
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Email</label>
+                <input
+                  type="email"
+                  value={emailForm}
+                  onChange={(e) => { setEmailForm(e.target.value); setErroPrimeiro(""); }}
+                  placeholder="seuemail@exemplo.com"
+                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-gray-400 focus:ring-1 focus:ring-gray-100"
+                />
+              </div>
+
+              {/* Telefone */}
+              <div>
                 <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Telefone / WhatsApp</label>
                 <input
                   type="tel"
@@ -488,7 +505,7 @@ export default function DashboardLayout({
             {erroPrimeiro && <p className="text-xs text-red-500 -mt-2">{erroPrimeiro}</p>}
             <button
               onClick={salvarPrimeiraSenha}
-              disabled={salvandoPrimeiro || !nomeForm || !telefoneForm || !novaSenhaPrimeiro}
+              disabled={salvandoPrimeiro || !nomeForm || !emailForm || !telefoneForm || !novaSenhaPrimeiro}
               className="w-full py-3 bg-[#0a0a0a] text-white rounded-xl text-sm font-semibold hover:bg-[#111] transition disabled:opacity-50"
             >
               {salvandoPrimeiro ? "Salvando..." : "Confirmar e entrar"}

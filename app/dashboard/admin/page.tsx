@@ -19,7 +19,7 @@ import { supabase } from "@/lib/supabase";
 import { notificarBroadcast } from "@/lib/notificarBroadcast";
 
 const ROLES: Role[] = ["admin", "pastor", "lider", "voluntario", "membro"];
-const MINISTERIOS: Ministerio[] = ["Louvor","Mídias","Ensino","Infantil","Ação Social","Jovens","Cantina","Limpeza"];
+const MINISTERIOS: Ministerio[] = ["Louvor","Mídias","Ensino","Infantil","Ação Social","Jovens","Limpeza"];
 
 const ROLE_COR: Record<Role, string> = {
   admin:      "bg-red-100 text-red-700 border-red-200",
@@ -232,7 +232,7 @@ export default function AdminPage() {
                     atualizarUsuario(editando.id, dados);
                     setEditando({ ...editando, ...dados });
                   }}
-                  onRemover={() => { removerUsuario(editando.id); setEditando(null); }}
+                  onRemover={async () => { await removerUsuario(editando.id); setEditando(null); }}
                   onFechar={() => setEditando(null)}
                 />
               ) : null}
@@ -250,7 +250,7 @@ function MinisteriosTab({
   usuarios: User[];
   temPermissao: (p: Permissao) => boolean;
 }) {
-  const MINISTERIOS_LISTA: Ministerio[] = ["Louvor","Mídias","Ensino","Infantil","Ação Social","Jovens","Cantina"];
+  const MINISTERIOS_LISTA: Ministerio[] = ["Louvor","Mídias","Ensino","Infantil","Ação Social","Jovens","Limpeza"];
   const [editandoMin, setEditandoMin] = useState<Ministerio | null>(null);
   const [salvando, setSalvando] = useState(false);
 
@@ -280,7 +280,7 @@ function MinisteriosTab({
               <div className="flex items-center justify-between px-5 py-3 bg-black">
                 <span className="font-semibold text-white">{min}</span>
                 <div className="flex items-center gap-2">
-                  <a
+                    <a
                     href={`/dashboard/ministerio/${encodeURIComponent(min)}`}
                     className="text-white/80 hover:text-white text-xs bg-white/10 hover:bg-white/20 px-2.5 py-1 rounded-lg transition flex items-center gap-1"
                   >
@@ -358,6 +358,9 @@ function EditarUsuarioPanel({
   const [salvandoSenha, setSalvandoSenha]   = useState(false);
   const [erroSenha, setErroSenha]           = useState("");
   const [okSenha, setOkSenha]               = useState(false);
+  const [confirmExcluir, setConfirmExcluir] = useState(false);
+  const [excluindo, setExcluindo]           = useState(false);
+  const [erroExcluir, setErroExcluir]       = useState("");
 
   async function trocarSenha() {
     if (novaSenha.length < 6) { setErroSenha("Mínimo 6 caracteres."); return; }
@@ -449,7 +452,7 @@ function EditarUsuarioPanel({
             {MINISTERIOS.map((m) => {
               const ativo = usuario.ministerios.includes(m);
               return (
-                <button
+                  <button
                   key={m}
                   onClick={() => onChange({
                     ministerios: ativo
@@ -611,19 +614,67 @@ function EditarUsuarioPanel({
         </div>
 
         {/* Ações */}
-        <div className="border-t border-gray-100 pt-4 flex gap-2">
-          <button
-            onClick={toggleAtivo}
-            className={clsx(
-              "flex-1 flex items-center justify-center gap-1.5 text-sm font-medium py-2 rounded-xl border transition",
-              usuario.ativo
-                ? "border-red-200 text-red-500 hover:bg-red-50"
-                : "border-green-200 text-green-600 hover:bg-green-50"
+        <div className="border-t border-gray-100 pt-4 space-y-2">
+          <div className="flex gap-2">
+            <button
+              onClick={toggleAtivo}
+              className={clsx(
+                "flex-1 flex items-center justify-center gap-1.5 text-sm font-medium py-2 rounded-xl border transition",
+                usuario.ativo
+                  ? "border-red-200 text-red-500 hover:bg-red-50"
+                  : "border-green-200 text-green-600 hover:bg-green-50"
+              )}
+            >
+              <Power className="w-3.5 h-3.5" />
+              {usuario.ativo ? "Desativar" : "Ativar"}
+            </button>
+            {!euSouEle && (
+              <button
+                onClick={() => { setConfirmExcluir(true); setErroExcluir(""); }}
+                className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border border-red-200 text-red-500 hover:bg-red-50 transition text-sm font-medium"
+                title="Excluir permanentemente"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
             )}
-          >
-            <Power className="w-3.5 h-3.5" />
-            {usuario.ativo ? "Desativar" : "Ativar"}
-          </button>
+          </div>
+
+          {confirmExcluir && (
+            <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 space-y-3">
+              <p className="text-sm font-semibold text-red-700">Excluir permanentemente?</p>
+              <div className="text-xs text-red-600 space-y-0.5">
+                <p><span className="font-semibold">Nome:</span> {usuario.nome}</p>
+                <p><span className="font-semibold">E-mail:</span> {usuario.email}</p>
+              </div>
+              <p className="text-xs text-red-500">Isso remove o acesso ao app e apaga todos os dados do usuário. Não pode ser desfeito.</p>
+              {erroExcluir && <p className="text-xs text-red-600 font-medium">{erroExcluir}</p>}
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setConfirmExcluir(false)}
+                  disabled={excluindo}
+                  className="flex-1 py-1.5 text-xs font-semibold rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 transition"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={async () => {
+                    setExcluindo(true);
+                    setErroExcluir("");
+                    try {
+                      await onRemover();
+                    } catch (e) {
+                      setErroExcluir(e instanceof Error ? e.message : "Erro ao excluir.");
+                      setExcluindo(false);
+                    }
+                  }}
+                  disabled={excluindo}
+                  className="flex-1 py-1.5 text-xs font-semibold rounded-lg bg-red-600 text-white hover:bg-red-700 transition disabled:opacity-60"
+                >
+                  {excluindo ? "Excluindo..." : "Excluir"}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
