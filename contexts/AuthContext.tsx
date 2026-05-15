@@ -72,12 +72,21 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  // Hidrata instantaneamente do cache — elimina o spinner ao voltar pro app
-  const cached = typeof window !== "undefined" ? loadUserCache() : null;
-  const [user, setUser] = useState<User | null>(cached);
+  // Inicia igual no servidor e no cliente (evita hydration mismatch).
+  // O cache do sessionStorage é lido no useEffect abaixo, apenas no cliente.
+  const [user, setUser] = useState<User | null>(null);
   const [usuarios, setUsuarios] = useState<User[]>([]);
-  // Se temos cache, não mostramos loading (dados já estão disponíveis)
-  const [isLoading, setIsLoading] = useState(!cached);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Hidrata instantaneamente do cache — roda só no cliente, após a hidratação
+  useEffect(() => {
+    const cached = loadUserCache();
+    if (cached) {
+      setUser(cached);
+      setIsLoading(false); // dados em cache → sem spinner
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function carregarPerfil(uid: string): Promise<User | null> {
     const { data, error } = await supabase.from("perfis").select("*").eq("id", uid).single();
