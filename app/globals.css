@@ -9,11 +9,9 @@
     /* Evita que iOS ajuste tamanho de texto automaticamente */
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
-    /* height para cobrir a tela inteira no PWA */
+    /* height padrão — NÃO usar var() aqui, quebra position:fixed no iOS */
     height: 100%;
     min-height: 100%;
-    /* CRÍTICO iOS PWA: height dinâmico via JS (AppLifecycleSync) */
-    height: var(--app-vvh, 100dvh);
   }
 
   body {

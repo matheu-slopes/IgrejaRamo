@@ -386,7 +386,7 @@ export default function DashboardLayout({
   }
 
   if (isLoading || !user) {
-    // Skeleton em vez de spinner — sem flash de tela escura
+    // Skeleton em vez de spinner — mesma estrutura do layout real
     return (
       <div
         className="flex bg-gray-50"
@@ -395,9 +395,9 @@ export default function DashboardLayout({
         {/* Sidebar skeleton — desktop only */}
         <div className="hidden md:flex w-60 shrink-0 bg-vine-900" />
         <div className="flex-1 flex flex-col min-h-0">
-          {/* Header skeleton */}
+          {/* Header skeleton — mesma altura do header real */}
           <div
-            className="h-14 bg-white border-b border-gray-100 px-4 flex items-center gap-3"
+            className="h-14 shrink-0 bg-white border-b border-gray-100 px-4 flex items-center gap-3"
             style={{ paddingTop: "env(safe-area-inset-top)" }}
           >
             <div className="skeleton h-7 w-7 rounded-full" />
@@ -461,9 +461,7 @@ export default function DashboardLayout({
           className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-6 pb-[calc(4.5rem+env(safe-area-inset-bottom))] md:pb-6 scroll-container"
           style={{ overscrollBehaviorY: "contain" }}
         >
-          <div className="page-enter">
-            {children}
-          </div>
+          {children}
         </main>
       </div>
 
