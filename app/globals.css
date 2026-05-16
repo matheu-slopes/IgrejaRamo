@@ -27,9 +27,9 @@
     /* Ocupa toda a altura disponível */
     min-height: 100%;
     min-height: var(--app-vvh, 100dvh);
-    /* CRÍTICO iOS PWA: evita que o body fique maior que a tela após fechar o teclado */
-    max-height: 100dvh;
-    overflow: hidden;
+    /* Permite scroll vertical normal do site; evita corte na home */
+    overflow-x: hidden;
+    overflow-y: auto;
   }
 
   /* Remover tap highlight em TODOS os elementos interativos */

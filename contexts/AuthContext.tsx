@@ -37,6 +37,12 @@ function rowToUser(row: Record<string, unknown>): User {
 // ── Persistência de sessão ──────────────────────────────────────────────────
 const SESSION_KEY = "ramo_user_cache_v2";
 
+function isInvalidRefreshTokenError(message?: string): boolean {
+  if (!message) return false;
+  const normalized = message.toLowerCase();
+  return normalized.includes("invalid refresh token") || normalized.includes("refresh token not found");
+}
+
 function saveUserCache(u: User) {
   try { sessionStorage.setItem(SESSION_KEY, JSON.stringify(u)); } catch {}
 }
@@ -150,7 +156,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let initialLoadDone = false;
 
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
+    (async () => {
+      const { data: { session }, error } = await supabase.auth.getSession();
+
+      if (isInvalidRefreshTokenError(error?.message)) {
+        // Sessão local ficou inválida (token revogado/expirado no servidor).
+        // Limpa somente do cliente para evitar loop de erro no console.
+        await supabase.auth.signOut({ scope: "local" });
+        clearUserCache();
+        setUser(null);
+        setUsuarios([]);
+        initialLoadDone = true;
+        setIsLoading(false);
+        return;
+      }
+
       if (session?.user) {
         try {
           await Promise.race([
@@ -168,7 +188,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       initialLoadDone = true;
       setIsLoading(false);
-    });
+    })();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       // Ignora o disparo inicial que ocorre junto com getSession

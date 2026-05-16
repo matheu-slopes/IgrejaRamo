@@ -29,6 +29,23 @@ const ROLE_COR: Record<string, string> = {
   membro: "bg-gray-100 text-gray-600",
 };
 
+function AvatarDisplay({
+  user,
+  initials,
+  size = "sm",
+}: {
+  user: User;
+  initials: string;
+  size?: "sm" | "lg";
+}) {
+  const cls = size === "lg"
+    ? "w-16 h-16 text-2xl ring-4 ring-white/20"
+    : "w-8 h-8 text-sm ring-2 ring-[#0a0a0a] ring-offset-1";
+  return user.foto
+    ? <img src={user.foto} alt={user.nome} className={clsx("rounded-full object-cover", cls)} />
+    : <div className={clsx("rounded-full bg-[#0a0a0a] flex items-center justify-center text-white font-bold", cls)}>{initials}</div>;
+}
+
 function ProfileDropdown({
   user, onLogout, onUpdate,
 }: {
@@ -68,19 +85,10 @@ function ProfileDropdown({
 
   const initials = user.nome.split(" ").filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase();
 
-  const Avatar = ({ size = "sm" }: { size?: "sm" | "lg" }) => {
-    const cls = size === "lg"
-      ? "w-16 h-16 text-2xl ring-4 ring-white/20"
-      : "w-8 h-8 text-sm ring-2 ring-[#0a0a0a] ring-offset-1";
-    return user.foto
-      ? <img src={user.foto} alt={user.nome} className={clsx("rounded-full object-cover", cls)} />
-      : <div className={clsx("rounded-full bg-[#0a0a0a] flex items-center justify-center text-white font-bold", cls)}>{initials}</div>;
-  };
-
   return (
     <div className="relative">
       <button onClick={() => { setOpen(!open); setView("menu"); }} className="focus:outline-none" title="Perfil">
-        <Avatar />
+        <AvatarDisplay user={user} initials={initials} />
       </button>
 
       {open && (
@@ -94,7 +102,7 @@ function ProfileDropdown({
                 {/* Cabeçalho */}
                 <div className="px-4 pt-4 pb-3 flex items-center gap-3 border-b border-gray-100">
                   <div className="relative shrink-0">
-                    <Avatar size="sm" />
+                    <AvatarDisplay user={user} initials={initials} size="sm" />
                     <button
                       onClick={() => photoRef.current?.click()}
                       className="absolute -bottom-0.5 -right-0.5 w-5 h-5 bg-[#1a1a1a] rounded-full flex items-center justify-center shadow hover:bg-gray-600 transition"
@@ -224,7 +232,7 @@ function ProfileDropdown({
                 {/* Avatar grande + editar foto */}
                 <div className="flex flex-col items-center gap-2 py-5 bg-gray-50">
                   <div className="relative">
-                    <Avatar size="lg" />
+                    <AvatarDisplay user={user} initials={initials} size="lg" />
                     <button
                       onClick={() => photoRef.current?.click()}
                       className="absolute -bottom-1 -right-1 w-7 h-7 bg-[#0a0a0a] rounded-full flex items-center justify-center shadow-lg hover:bg-[#1a1a1a] transition"
