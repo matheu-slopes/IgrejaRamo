@@ -2058,6 +2058,11 @@ export default function ChatPage() {
     // Isso garante que todos os clientes ordenam mensagens pelo rel�gio do servidor.
     try {
       const token = await getFreshToken();
+      if (!token) {
+        setDms((prev) => prev.map((dm) => dm.id === dmId ? { ...dm, mensagens: dm.mensagens.filter((m) => m.id !== msgId) } : dm));
+        showToast("Sessao expirada. Entre novamente para enviar mensagens.");
+        return;
+      }
       const r = await fetchWithRetry("/api/chat/mensagem", {
         method: "POST", keepalive: true,
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
@@ -2072,6 +2077,10 @@ export default function ChatPage() {
         const j = await r.json().catch(() => ({}));
         console.error("sendDm error:", j.error);
         setDms((prev) => prev.map((dm) => dm.id === dmId ? { ...dm, mensagens: dm.mensagens.filter((m) => m.id !== msgId) } : dm));
+        if (r.status === 401) {
+          showToast("Sessao expirada. Entre novamente para enviar mensagens.");
+          return;
+        }
         showToast("Erro ao enviar: " + (j.error ?? r.statusText));
         return;
       }
@@ -2114,6 +2123,11 @@ export default function ChatPage() {
     // 2) DB primeiro ? timestamp do servidor
     try {
       const token = await getFreshToken();
+      if (!token) {
+        setGrupos((prev) => prev.map((g) => g.id === grupoId ? { ...g, mensagens: g.mensagens.filter((m) => m.id !== msgId) } : g));
+        showToast("Sessao expirada. Entre novamente para enviar mensagens.");
+        return;
+      }
       const r = await fetchWithRetry("/api/chat/mensagem", {
         method: "POST", keepalive: true,
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
@@ -2128,6 +2142,10 @@ export default function ChatPage() {
         const j = await r.json().catch(() => ({}));
         console.error("sendGrupo error:", j.error);
         setGrupos((prev) => prev.map((g) => g.id === grupoId ? { ...g, mensagens: g.mensagens.filter((m) => m.id !== msgId) } : g));
+        if (r.status === 401) {
+          showToast("Sessao expirada. Entre novamente para enviar mensagens.");
+          return;
+        }
         showToast("Erro ao enviar: " + (j.error ?? r.statusText));
         return;
       }

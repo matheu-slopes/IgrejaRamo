@@ -38,7 +38,7 @@ const A_CRIAR = [
   { chave: "Viviane",  nome: "Viviane",  email: "viviane@recepcionamento.ramodavida.com" },
   { chave: "Luciene",  nome: "Luciene",  email: "luciene@recepcionamento.ramodavida.com" },
   { chave: "Cleuber",  nome: "Cleuber",  email: "cleuber@recepcionamento.ramodavida.com" },
-  { chave: "Alisson",  nome: "Alisson",  email: "alisson@recepcionamento.ramodavida.com" },
+  { chave: "Alisson",  nome: "Alisson",  email: "alissonpierce@gmail.com" },
   { chave: "Marcos",   nome: "Marcos",   email: "marcos@recepcionamento.ramodavida.com"  },
   { chave: "Ana",      nome: "Ana",      email: "ana@recepcionamento.ramodavida.com"     },
   { chave: "Juliano",  nome: "Juliano",  email: "juliano@recepcionamento.ramodavida.com" },

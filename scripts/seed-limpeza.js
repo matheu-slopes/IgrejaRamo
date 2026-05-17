@@ -65,12 +65,12 @@ const EXISTENTES = {
 
 // Membros a criar
 const CRIAR = [
-  { nome: "Thaís",        email: "thais.limpeza@ramodavida.com" },
+  { nome: "Thaís",        email: "thaisadv.garcia@gmail.com" },
   { nome: "Pra Bruna",    email: "prabruna.limpeza@ramodavida.com" },
   { nome: "Luan",         email: "luan.limpeza@ramodavida.com" },
   { nome: "Julia",        email: "julia.limpeza@ramodavida.com" },
   { nome: "Beatriz",      email: "beatriz.limpeza@ramodavida.com" },
-  { nome: "Line",         email: "line.limpeza@ramodavida.com" },
+  { nome: "Aline Fernandes", email: "alinerfb1982@gmail.com" },
   { nome: "Matheusão",    email: "matheusao.limpeza@ramodavida.com" },
   { nome: "Tudes",        email: "tudes.limpeza@ramodavida.com" },
   { nome: "Maria",        email: "maria.limpeza@ramodavida.com" },
@@ -78,7 +78,7 @@ const CRIAR = [
   { nome: "Kauan",        email: "kauan.limpeza@ramodavida.com" },
   { nome: "Wesley",       email: "wesley.limpeza@ramodavida.com" },
   { nome: "Gabriel Pedro",email: "gabrielpedro.limpeza@ramodavida.com" },
-  { nome: "Patricia",     email: "patricia.limpeza@ramodavida.com" },
+  { nome: "Patricia",     email: "patriciazanni83@gmail.com" },
   { nome: "Fernanda",     email: "fernanda.limpeza@ramodavida.com" },
 ];
 
@@ -103,7 +103,7 @@ const SCHEDULE = [
   { data: "2026-05-07", dia: "Quinta-Feira", vs: ["Thaís", "Mel"] },
   { data: "2026-05-10", dia: "Domingo",      vs: ["Pra Bruna", "Thaíná Victoria", "Luan"] },
   { data: "2026-05-14", dia: "Quinta-Feira", vs: ["Julia", "Beatriz", "Larissa Pedro"] },
-  { data: "2026-05-17", dia: "Domingo",      vs: ["Line", "Isadora Fernandes", "Ricardo Bortot"] },
+  { data: "2026-05-17", dia: "Domingo",      vs: ["Aline Fernandes", "Isadora Fernandes", "Ricardo Bortot"] },
   { data: "2026-05-21", dia: "Quinta-Feira", vs: ["Lívia Martins", "Matheusão"] },
   { data: "2026-05-24", dia: "Domingo",      vs: ["Tudes", "Maria", "Maria Eduarda"] },
   { data: "2026-05-28", dia: "Quinta-Feira", vs: ["Kauan", "Wesley", "Gabriel Pedro"] },
@@ -112,7 +112,7 @@ const SCHEDULE = [
   { data: "2026-06-04", dia: "Quinta-Feira", vs: ["Thaís", "Mel"] },
   { data: "2026-06-07", dia: "Domingo",      vs: ["Pra Bruna", "Thaíná Victoria", "Luan"] },
   { data: "2026-06-11", dia: "Quinta-Feira", vs: ["Julia", "Beatriz", "Larissa Pedro"] },
-  { data: "2026-06-14", dia: "Domingo",      vs: ["Line", "Isadora Fernandes", "Ricardo Bortot"] },
+  { data: "2026-06-14", dia: "Domingo",      vs: ["Aline Fernandes", "Isadora Fernandes", "Ricardo Bortot"] },
   { data: "2026-06-18", dia: "Quinta-Feira", vs: ["Matheus Lopes", "Luisa Lopes", "Fernanda"] },
   { data: "2026-06-21", dia: "Domingo",      vs: ["Tudes", "Maria", "Maria Eduarda"] },
   { data: "2026-06-25", dia: "Quinta-Feira", vs: ["Kauan", "Wesley", "Gabriel Pedro"] },

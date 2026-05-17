@@ -86,8 +86,8 @@ const ESCALAS = [
   // 1. Criar novos membros
   const novos = [
     { key: "Wallace",  nome: "Wallace",  email: "wallace.midias@ramodavida.com" },
-    { key: "Vitoria",  nome: "Vitória",  email: "vitoria.midias@ramodavida.com" },
-    { key: "Mauricio", nome: "Mauricio", email: "mauricio.midias@ramodavida.com" },
+    { key: "Vitoria",  nome: "Vitória Mauricio",  email: "steinlevitoria0@gmail.com" },
+    { key: "Mauricio", nome: "Mauricio Steinle", email: "msteinlecdm@icloud.com" },
   ];
   for (const m of novos) {
     const r = await criarUsuario(m.nome, m.email, "ramo123", "Mídias");
