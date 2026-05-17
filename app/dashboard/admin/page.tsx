@@ -19,7 +19,9 @@ import { supabase } from "@/lib/supabase";
 import { notificarBroadcast } from "@/lib/notificarBroadcast";
 
 const ROLES: Role[] = ["admin", "pastor", "lider", "voluntario", "membro"];
-const MINISTERIOS: Ministerio[] = ["Louvor","Mídias","Ensino","Infantil","Ação Social","Jovens","Limpeza"];
+const MINISTERIOS: Ministerio[] = ["Louvor","Mídias","Ensino","Infantil","Ação Social","Jovens","Limpeza","Cantina"];
+
+const displayMinisterio = (m: string) => (m === "Cantina" ? "Recepcionamento" : m);
 
 const ROLE_COR: Record<Role, string> = {
   admin:      "bg-red-100 text-red-700 border-red-200",
@@ -191,7 +193,7 @@ export default function AdminPage() {
                           </div>
                         </td>
                         <td className="px-4 py-3 hidden sm:table-cell">
-                          <span className="text-xs text-gray-500">{u.ministerios.join(", ") || "-"}</span>
+                          <span className="text-xs text-gray-500">{u.ministerios.map(displayMinisterio).join(", ") || "-"}</span>
                         </td>
                         <td className="px-4 py-3">
                           <span className={clsx("text-xs font-medium", u.ativo ? "text-green-600" : "text-red-400")}>
@@ -250,15 +252,16 @@ function MinisteriosTab({
   usuarios: User[];
   temPermissao: (p: Permissao) => boolean;
 }) {
-  const MINISTERIOS_LISTA: Ministerio[] = ["Louvor","Mídias","Ensino","Infantil","Ação Social","Jovens","Limpeza"];
+  const MINISTERIOS_LISTA: Ministerio[] = ["Louvor","Mídias","Ensino","Infantil","Ação Social","Jovens","Limpeza","Cantina"];
   const [editandoMin, setEditandoMin] = useState<Ministerio | null>(null);
   const [salvando, setSalvando] = useState(false);
 
   async function toggleMembro(usuario: User, ministerio: Ministerio) {
-    const jaEsta = usuario.ministerios?.includes(ministerio);
+    const ministerioDb = ministerio;
+    const jaEsta = (usuario.ministerios ?? []).some((m) => displayMinisterio(m) === displayMinisterio(ministerioDb));
     const novos = jaEsta
-      ? (usuario.ministerios ?? []).filter((m) => m !== ministerio)
-      : [...(usuario.ministerios ?? []), ministerio];
+      ? (usuario.ministerios ?? []).filter((m) => displayMinisterio(m) !== displayMinisterio(ministerioDb))
+      : [...(usuario.ministerios ?? []), ministerioDb];
     setSalvando(true);
     await supabase.from("perfis").update({ ministerios: novos }).eq("id", usuario.id);
     setSalvando(false);
@@ -273,7 +276,7 @@ function MinisteriosTab({
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {MINISTERIOS_LISTA.map((min) => {
-          const membros = usuarios.filter((u) => u.ministerios?.includes(min));
+          const membros = usuarios.filter((u) => u.ministerios?.some((m) => displayMinisterio(m) === displayMinisterio(min)));
           const isEditing = editandoMin === min;
           return (
             <div key={min} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
@@ -314,7 +317,7 @@ function MinisteriosTab({
                   <div className="space-y-1.5 max-h-48 overflow-y-auto">
                     <p className="text-xs text-gray-500 mb-2">Selecione os membros deste ministério:</p>
                     {usuarios.map((u) => {
-                      const jaEsta = u.ministerios?.includes(min);
+                      const jaEsta = u.ministerios?.some((m) => displayMinisterio(m) === displayMinisterio(min));
                       return (
                         <label key={u.id} className="flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-gray-50 cursor-pointer">
                           <input

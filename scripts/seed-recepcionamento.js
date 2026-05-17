@@ -1,6 +1,6 @@
 /**
  * seed-recepcionamento.js
- * Cria escalas do Ministério Cantina (Recepcionamento) de Maio–Junho/2026.
+ * Cria escalas do Ministério Recepcionamento de Maio–Junho/2026.
  * 
  * Regras de armazenamento (não muda o ENUM):
  *   Abertura → funcao="Abertura/Oferta", observacao="Abertura"
@@ -100,7 +100,7 @@ async function main() {
     console.log(`  ✓ Criado ${p.nome} <${p.email}> → ${newId}`);
   }
 
-  // 2. Adicionar Cantina aos membros já existentes
+  // 2. Adicionar Recepcionamento aos membros já existentes
   console.log("\n=== Atualizando ministérios ===");
   const todosIds = [...new Set(Object.values(pessoas).map((p) => p.id))];
   for (const id of todosIds) {
@@ -114,14 +114,14 @@ async function main() {
     }
   }
 
-  // 3. Apagar escalas antigas do Cantina (para não duplicar)
+  // 3. Apagar escalas antigas do Recepcionamento (para não duplicar)
   const { data: antigas } = await supabase.from("escalas").select("id").eq("ministerio", "Cantina");
   if (antigas?.length) {
     for (const e of antigas) {
       await supabase.from("escala_itens").delete().eq("escala_id", e.id);
       await supabase.from("escalas").delete().eq("id", e.id);
     }
-    console.log(`\n  Removidas ${antigas.length} escalas antigas do Cantina.`);
+    console.log(`\n  Removidas ${antigas.length} escalas antigas do Recepcionamento.`);
   }
 
   // 4. Criar escalas

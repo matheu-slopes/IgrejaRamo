@@ -423,7 +423,7 @@ export const mockCanais: CanalMinisterio[] = [
   { ministerio: "Infantil",    descricao: "Ministério de crianças e adolescentes.",              chatBloqueado: false, cor: "gold"   },
   { ministerio: "Ação Social", descricao: "Ações de solidariedade e alcance comunitário.",      chatBloqueado: false, cor: "vine"   },
   { ministerio: "Jovens",      descricao: "Movimento jovem da Igreja Ramo da Vida.",            chatBloqueado: false, cor: "grape"  },
-  { ministerio: "Cantina",     descricao: "Organização de lanches e eventos da cantina.",       chatBloqueado: false, cor: "bark"   },
+  { ministerio: "Cantina", descricao: "Acolhimento, abertura, oferta e recepção no culto.", chatBloqueado: false, cor: "bark"   },
 ];
 
 // ─── Membros por ministério ───────────────────────────────────────
@@ -446,7 +446,7 @@ export const mockMembrosMinisterio: MembroMinisterio[] = [
   // Ação Social
   { id: "5c", nome: "Lucas Ferreira",    email: "lucas@ramo.church",                               funcao: "Líder",      ministerio: "Ação Social", ativo: true,  dataEntrada: "2022-02-14" },
   { id: "4b", nome: "Ana Rodrigues",     email: "ana@ramo.church",                                funcao: "Membro",     ministerio: "Ação Social", ativo: true,  dataEntrada: "2021-07-05" },
-  // Cantina
+  // Recepcionamento
   { id: "4c", nome: "Ana Rodrigues",     email: "ana@ramo.church",                                funcao: "Líder",      ministerio: "Cantina",     ativo: true,  dataEntrada: "2021-07-05" },
   // Ensino
   { id: "1b", nome: "Pastor João Silva", email: "pastor@ramo.church", telefone: "(11) 99999-0001", funcao: "Líder",      ministerio: "Ensino",      ativo: true,  dataEntrada: "2018-03-10" },
@@ -547,7 +547,7 @@ export const mockConversasDiretas: ConversaDireta[] = [
         id: "dm2m1",
         autorId: "2",
         autorNome: "Admin",
-        conteudo: "Ana, preciso confirmar: você vai conseguir estar na cantina E no infantil no domingo?",
+        conteudo: "Ana, preciso confirmar: você vai conseguir estar no recepcionamento E no infantil no domingo?",
         criadoEm: "2026-04-15T09:00:00",
         lida: true,
       },
@@ -555,7 +555,7 @@ export const mockConversasDiretas: ConversaDireta[] = [
         id: "dm2m2",
         autorId: "4",
         autorNome: "Ana Rodrigues",
-        conteudo: "Oi Maria! Sim, consigo. Na cantina fico na abertura antes do culto e depois vou pro infantil durante a pregação.",
+        conteudo: "Oi Maria! Sim, consigo. No recepcionamento fico na abertura antes do culto e depois vou pro infantil durante a pregação.",
         criadoEm: "2026-04-15T09:30:00",
         lida: false,
       },
@@ -609,7 +609,7 @@ export const mockChatsCulto: ChatCulto[] = [
         id: "cc1m3",
         autorId: "4",
         autorNome: "Ana Rodrigues",
-        conteudo: "Cantina aberta às 08h! Café e pão de queijo pra galera 😄",
+        conteudo: "Recepcionamento aberto às 08h! Café e pão de queijo pra galera 😄",
         criadoEm: "2026-04-19T08:10:00",
         lida: true,
       },
@@ -862,13 +862,13 @@ export const mockGrupos: Grupo[] = [
     ],
   },
   {
-    id: "g_cantina",
-    nome: "Cantina",
+    id: "g_recepcionamento",
+    nome: "Recepcionamento",
     tipo: "ministerio",
     emoji: "🍞",
     cor: "bg-amber-700",
     ministerio: "Cantina",
-    descricao: "Organização de lanches e cantina",
+    descricao: "Acolhimento, abertura, oferta e recepção",
     adminId: "4",
     membros: ["4"],
     institucional: true,

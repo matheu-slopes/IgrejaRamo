@@ -42,7 +42,7 @@ export default function SobrePage() {
           <InfoCard
             icon={<Users className="w-6 h-6 text-green-500" />}
             title="Ministérios"
-            text="Louvor, Ensino, Jovens, Infantil, Ação Social, Mídias e Cantina — cada um com seu propósito único."
+            text="Louvor, Ensino, Jovens, Infantil, Ação Social, Mídias e Recepcionamento — cada um com seu propósito único."
           />
         </div>
 

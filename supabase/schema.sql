@@ -283,7 +283,7 @@ INSERT INTO canais_ministerio (ministerio, descricao, cor) VALUES
   ('Ação Social', 'Canal de ação social e evangelismo',          'olive'),
   ('Infantil',    'Canal do ministério infantil',                'amber'),
   ('Mídias',      'Canal do ministério de mídias e transmissão', 'cyan'),
-  ('Cantina',     'Canal da cantina e hospitalidade',            'orange'),
+  ('Cantina',     'Canal de abertura, oferta e recepção',        'orange'),
   ('Jovens',      'Canal do ministério de jovens',               'vine');
 
 -- ──────────────────────────────────────────────────────────────

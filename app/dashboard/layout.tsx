@@ -312,7 +312,7 @@ function ProfileDropdown({
                   {user.ministerios.length === 0 ? (
                     <p className="text-sm text-gray-400 text-center py-4">Nenhum ministério atribuído.</p>
                   ) : user.ministerios.map((m) => {
-                    const MIN_LABEL: Record<string, string> = { Cantina: "Recepcionamento", Ensino: "Pregação" };
+                    const MIN_LABEL: Record<string, string> = { Recepcionamento: "Recepcionamento", Ensino: "Pregação" };
                     return (
                       <div key={m} className="flex items-center gap-2.5 bg-gray-50 border border-gray-100 rounded-xl px-3 py-2">
                         <Layers className="w-4 h-4 text-gray-600 shrink-0" />
