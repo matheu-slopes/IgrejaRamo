@@ -1582,6 +1582,12 @@ export default function ChatPage() {
   }
 
   async function markConversaAsRead(conversaId: string) {
+    // Atualiza estado local imediatamente para o badge sumir sem esperar o sync.
+    const markRead = (msgs: MensagemConversa[]) =>
+      msgs.map(m => m.lida ? m : { ...m, lida: true });
+    setDms(prev => prev.map(dm => dm.id === conversaId ? { ...dm, mensagens: markRead(dm.mensagens) } : dm));
+    setGrupos(prev => prev.map(g => g.id === conversaId ? { ...g, mensagens: markRead(g.mensagens) } : g));
+
     try {
       const token = await getFreshToken();
       if (!token) return;
@@ -1655,7 +1661,8 @@ export default function ChatPage() {
           const bestTime = new Date(existing.criadoEm).getTime() < new Date(msg.criadoEm).getTime()
             ? existing.criadoEm
             : msg.criadoEm;
-          map.set(msg.id, { ...existing, ...msg, criadoEm: bestTime });
+          // lida nunca regride de true → false: se o usuário já leu, permanece lido.
+          map.set(msg.id, { ...existing, ...msg, criadoEm: bestTime, lida: existing.lida || msg.lida });
         }
         return Array.from(map.values()).sort(
           compareMensagemOrder
