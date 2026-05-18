@@ -196,17 +196,19 @@ export default function PushSubscriber() {
   }
 
   if (!mostrarBanner) return null;
+  // Enquanto o prompt nativo de permissão do OS pode estar visível, oculta o
+  // banner para evitar sobreposição e o efeito de "empurrar a nav".
+  if (status === "loading") return null;
 
   return (
-    <div className="fixed bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-2rem)] max-w-sm">
+    <div
+      className="fixed left-1/2 -translate-x-1/2 z-50 w-[calc(100%-2rem)] max-w-sm md:bottom-6"
+      style={{
+        // mobile: flutua acima da BottomNav (altura ~3.5rem) + safe-area-inset-bottom
+        bottom: "clamp(5rem, calc(3.5rem + env(safe-area-inset-bottom) + 0.75rem), 12rem)",
+      }}
+    >
       <div className="bg-vine-900 text-white rounded-2xl shadow-2xl overflow-hidden">
-        {/* Linha de progresso durante loading */}
-        {status === "loading" && (
-          <div className="h-0.5 bg-vine-700">
-            <div className="h-full bg-white animate-pulse w-full" />
-          </div>
-        )}
-
         <div className="px-4 py-3 flex items-center gap-3">
           <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${
             status === "sucesso" ? "bg-green-600" : status === "erro" ? "bg-red-600" : "bg-vine-700"
@@ -221,12 +223,6 @@ export default function PushSubscriber() {
                 <p className="text-xs text-vine-200 leading-tight mt-0.5">Receba avisos, mensagens e lembretes de escala</p>
               </>
             )}
-            {status === "loading" && (
-              <>
-                <p className="text-sm font-semibold leading-tight">Ativando…</p>
-                <p className="text-xs text-vine-200 leading-tight mt-0.5">Aguarde, pode demorar alguns segundos</p>
-              </>
-            )}
             {status === "sucesso" && (
               <p className="text-sm font-semibold leading-tight">Notificações ativadas! ✓</p>
             )}
@@ -239,7 +235,7 @@ export default function PushSubscriber() {
           </div>
 
           <div className="flex items-center gap-1 shrink-0">
-            {status !== "loading" && status !== "sucesso" && (
+            {status !== "sucesso" && (
               <button
                 onClick={ativar}
                 className="bg-white text-vine-900 text-xs font-bold px-3 py-1.5 rounded-xl hover:bg-vine-100 transition"
@@ -247,14 +243,12 @@ export default function PushSubscriber() {
                 {status === "erro" ? "Tentar novamente" : "Ativar"}
               </button>
             )}
-            {status !== "loading" && (
-              <button
-                onClick={() => setMostrarBanner(false)}
-                className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-vine-800 transition"
-              >
-                <X className="w-3.5 h-3.5 text-vine-300" />
-              </button>
-            )}
+            <button
+              onClick={() => setMostrarBanner(false)}
+              className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-vine-800 transition"
+            >
+              <X className="w-3.5 h-3.5 text-vine-300" />
+            </button>
           </div>
         </div>
       </div>
