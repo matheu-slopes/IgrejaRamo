@@ -1216,6 +1216,8 @@ export default function ChatPage() {
   const lastSequenceRef = useRef<number>(0);
   const syncRunningRef = useRef(false);
   const notificationDispatchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Timer para debounciar sync quando vários canais reconectam ao mesmo tempo
+  const reconnectSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Inbox de mensagens recebidas enquanto estava em outra p�gina
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const inboxRef = useRef<Record<string, any[]>>({});
@@ -1700,12 +1702,12 @@ export default function ChatPage() {
     };
 
     sincronizarMensagensRecentes();
-    // Supabase Realtime (WebSocket) é o canal principal de entrega em tempo real.
-    // O polling HTTP é apenas fallback para mensagens perdidas por queda momentânea do canal.
-    // 30 s é suficiente — focus/visibilidade já disparam sync imediato.
+    // Supabase Realtime é o canal principal; poll HTTP é fallback para quedas do canal.
+    // 8 s: recupera rápido mensagens perdidas sem gerar carga excessiva.
+    // (reconexão do canal já dispara sync imediato via SUBSCRIBED handler)
     const interval = window.setInterval(() => {
       sincronizarMensagensRecentes();
-    }, 30_000);
+    }, 8_000);
 
     window.addEventListener("focus", onFocus);
     document.addEventListener("visibilitychange", onVisibility);
@@ -1759,7 +1761,15 @@ export default function ChatPage() {
           }, 3000);
         })
         .subscribe((status: string) => {
-          if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+          if (status === "SUBSCRIBED") {
+            // Canal (re)conectado — busca mensagens perdidas durante a desconexão.
+            // Debounce de 600 ms para N canais reconectando ao mesmo tempo = 1 sync.
+            if (reconnectSyncTimerRef.current) clearTimeout(reconnectSyncTimerRef.current);
+            reconnectSyncTimerRef.current = setTimeout(() => {
+              reconnectSyncTimerRef.current = null;
+              sincronizarMensagensRecentes();
+            }, 600);
+          } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
             if (map.get(cid) === ch) {
               supabase.removeChannel(ch);
               map.delete(cid);
@@ -2229,7 +2239,8 @@ export default function ChatPage() {
           .sort((a, b) => new Date(a.criadoEm).getTime() - new Date(b.criadoEm).getTime()),
       } : g));
       // 4) Broadcast com timestamp do servidor
-      broadcastChannelsRef.current.get(grupoId)?.send({ type: "broadcast", event: "msg", payload: finalMsg });
+      broadcastChannelsRef.current.get(grupoId)?.send({ type: "broadcast", event: "msg", payload: finalMsg })
+        .then((s: string) => { if (s !== "ok") console.warn("broadcast sendGrupo:", s); });
       scheduleNotificationDispatch();
     } catch (err) {
       console.error("sendGrupo network error:", err);
@@ -2291,7 +2302,8 @@ export default function ChatPage() {
       } else {
         setGrupos(prev => prev.map(g => g.id === conversaId ? { ...g, mensagens: g.mensagens.map(updaterFinal) } : g));
       }
-      broadcastChannelsRef.current.get(conversaId)?.send({ type: "broadcast", event: "msg", payload: finalMsg });
+      broadcastChannelsRef.current.get(conversaId)?.send({ type: "broadcast", event: "msg", payload: finalMsg })
+        .then((s: string) => { if (s !== "ok") console.warn("broadcast sendImage:", s); });
       scheduleNotificationDispatch();
     } catch (err: unknown) {
       const msg2 = err instanceof Error ? err.message : "Erro ao enviar imagem";
@@ -2356,7 +2368,8 @@ export default function ChatPage() {
       } else {
         setGrupos(prev => prev.map(g => g.id === conversaId ? { ...g, mensagens: g.mensagens.map(updaterFinal) } : g));
       }
-      broadcastChannelsRef.current.get(conversaId)?.send({ type: "broadcast", event: "msg", payload: finalMsg });
+      broadcastChannelsRef.current.get(conversaId)?.send({ type: "broadcast", event: "msg", payload: finalMsg })
+        .then((s: string) => { if (s !== "ok") console.warn("broadcast sendArquivo:", s); });
       scheduleNotificationDispatch();
     } catch (err: unknown) {
       const errMsg = err instanceof Error ? err.message : "Erro ao enviar arquivo";

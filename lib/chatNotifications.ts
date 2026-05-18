@@ -78,11 +78,14 @@ export async function processChatNotificationJobs(limit = 25) {
 }
 
 async function lockJob(messageId: string) {
+  // Para jobs presos em "processing" (serverless timeout), usamos o mesmo
+  // staleThreshold do select para evitar race com outra instância ativa.
+  const staleThreshold = new Date(Date.now() - 5 * 60 * 1000).toISOString();
   const { data, error } = await admin
     .from("chat_notification_jobs")
     .update({ status: "processing", locked_at: new Date().toISOString(), updated_at: new Date().toISOString() })
     .eq("message_id", messageId)
-    .in("status", ["pending", "failed"])
+    .or(`status.in.(pending,failed),and(status.eq.processing,locked_at.lt.${staleThreshold})`)
     .select("message_id")
     .maybeSingle();
 

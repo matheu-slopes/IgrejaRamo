@@ -61,11 +61,20 @@ export async function GET(req: NextRequest) {
     return { host, criado_em: s.criado_em, endpoint_tail: s.endpoint.slice(-12) };
   });
 
+  const { data: jobs, error: jobsErr } = await admin
+    .from("chat_notification_jobs")
+    .select("message_id, status, attempts, last_error, created_at, updated_at")
+    .order("created_at", { ascending: false })
+    .limit(10);
+
   return NextResponse.json({
     ...base,
     user_id: user.id,
     minhas_subs_count: list.length,
     minhas_subs: detailed,
+    fila: jobsErr
+      ? { erro: jobsErr.message, dica: "Migration chat_notification_jobs provavelmente não aplicada" }
+      : (jobs ?? []),
   });
 }
 

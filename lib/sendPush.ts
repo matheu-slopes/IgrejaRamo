@@ -6,7 +6,7 @@ const vapidSubject =
   process.env.NEXT_PUBLIC_SITE_URL ||
   "https://igreja-ramo.vercel.app";
 
-const vapidPublicKey = process.env.VAPID_PUBLIC_KEY;
+const vapidPublicKey  = process.env.VAPID_PUBLIC_KEY  ?? process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
 const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY;
 const hasVapidKeys = Boolean(vapidPublicKey && vapidPrivateKey);
 
