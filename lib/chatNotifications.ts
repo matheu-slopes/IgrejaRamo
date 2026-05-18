@@ -127,21 +127,25 @@ async function dispatchChatNotification(job: ChatNotificationJob) {
     throw new Error("chat sem destinatarios para notificar");
   }
 
+  const conversa = await resolveConversationInfo(job.conversa_id);
   const nome = job.autor_nome?.split(" ")[0] ?? "Alguém";
   const tipo = job.tipo ?? "texto";
-  const body =
+  const preview =
     tipo === "imagem"
-      ? `${nome} enviou uma foto`
+      ? "enviou uma foto"
       : tipo === "audio"
-      ? `${nome} enviou um áudio`
+      ? "enviou um áudio"
       : tipo === "arquivo" || tipo === "documento"
-      ? `${nome} enviou um arquivo`
-      : `${nome}: ${job.conteudo?.slice(0, 80) ?? ""}`;
+      ? "enviou um arquivo"
+      : job.conteudo?.slice(0, 120) ?? "";
+  const isGrupo = conversa?.tipo && conversa.tipo !== "direto";
+  const title = isGrupo ? conversa?.nome || "Grupo" : nome;
+  const body = isGrupo ? `${nome}: ${preview}` : preview;
 
   let delivery: PushDispatchResult | null = null;
   try {
     delivery = await sendPushToUsers(userIds, {
-      title: "Nova mensagem",
+      title,
       body,
       url: "/dashboard/chat",
       tag: `chat-${job.conversa_id}-${job.message_id}`,
@@ -166,7 +170,7 @@ async function dispatchChatNotification(job: ChatNotificationJob) {
 
   const notificacoes = userIds.map((uid) => ({
     usuario_id: uid,
-    titulo: "Nova mensagem",
+    titulo: title,
     corpo: body,
     tipo: "ministerio",
     link: "/dashboard/chat",
@@ -189,7 +193,7 @@ async function dispatchChatNotification(job: ChatNotificationJob) {
 
     const fallback = userIds.map((uid) => ({
       usuario_id: uid,
-      titulo: "Nova mensagem",
+      titulo: title,
       corpo: body,
       tipo: "ministerio",
       link: "/dashboard/chat",
@@ -204,6 +208,21 @@ async function dispatchChatNotification(job: ChatNotificationJob) {
       throw fallbackError;
     }
   }
+}
+
+async function resolveConversationInfo(conversaId: string): Promise<{ tipo: string | null; nome: string | null } | null> {
+  const { data, error } = await admin
+    .from("chat_conversas")
+    .select("tipo, nome")
+    .eq("id", conversaId)
+    .maybeSingle();
+
+  if (error) {
+    console.error("chat_conversas notification info error:", error);
+    return null;
+  }
+
+  return data as { tipo: string | null; nome: string | null } | null;
 }
 
 async function resolveRecipientIds(conversaId: string, autorId: string): Promise<string[]> {
