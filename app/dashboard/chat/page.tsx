@@ -2548,8 +2548,6 @@ export default function ChatPage() {
       document.documentElement.style.setProperty("--app-vvh", `${fullHeight}px`);
       document.documentElement.style.setProperty("--chat-vvh", `${fullHeight}px`);
       document.documentElement.style.setProperty("--vv-offset-top", "0px");
-      window.scrollBy(0, 1);
-      window.scrollBy(0, -1);
     };
 
     requestAnimationFrame(settle);

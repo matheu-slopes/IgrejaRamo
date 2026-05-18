@@ -47,22 +47,33 @@ export default function BottomNav() {
 
   // Mantém o nav pregado na base da tela física no iOS PWA.
   // position:fixed segue o visual viewport; quando ele encolhe (teclado, prompts, sheets)
-  // o nav subiria. Contrabalançamos ajustando `bottom` para o inverso do encolhimento.
+  // o nav subiria. Usamos translateY para compensar sem causar reflow.
+  // Também ouvimos focusout porque o iOS às vezes não dispara 'resize' ao fechar o teclado.
   useEffect(() => {
+    const el = navRef.current;
+    if (!el) return;
+
     function pin() {
-      const el = navRef.current;
-      if (!el) return;
       const vv = window.visualViewport;
-      if (!vv) return;
-      const shrink = Math.max(0, window.innerHeight - vv.offsetTop - vv.height);
-      el.style.bottom = `${-shrink}px`;
+      const drop = vv ? Math.max(0, window.innerHeight - vv.height) : 0;
+      el!.style.transform = drop > 0 ? `translateY(${drop}px) translateZ(0)` : "";
     }
+
+    function pinAfterDelay() {
+      // Pequeno delay para deixar a animação do teclado terminar antes de reposicionar
+      setTimeout(pin, 120);
+    }
+
     pin();
     window.visualViewport?.addEventListener("resize", pin);
     window.visualViewport?.addEventListener("scroll", pin);
+    // Garante restauração quando o teclado fecha (iOS às vezes não dispara 'resize')
+    document.addEventListener("focusout", pinAfterDelay);
+
     return () => {
       window.visualViewport?.removeEventListener("resize", pin);
       window.visualViewport?.removeEventListener("scroll", pin);
+      document.removeEventListener("focusout", pinAfterDelay);
     };
   }, []);
 
