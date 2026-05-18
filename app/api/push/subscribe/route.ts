@@ -29,21 +29,16 @@ export async function POST(req: NextRequest) {
   const normalizedP256dh = normalizeBase64Url(String(p256dh));
   const normalizedAuth = normalizeBase64Url(String(auth));
 
-  // O mesmo endpoint representa o mesmo navegador/dispositivo. Se ele ficou
-  // associado a outra conta por troca de login, push para aquela conta aparece
-  // neste aparelho como se fosse notificação da própria mensagem.
+  // O mesmo endpoint representa o mesmo navegador/dispositivo. Remove qualquer
+  // linha prévia com este endpoint (de outro usuário ou do próprio) para evitar
+  // duplicatas e troca cruzada de notificações, sem depender de ON CONFLICT.
   await admin
     .from("push_subscriptions")
     .delete()
-    .eq("endpoint", endpoint)
-    .neq("user_id", user.id);
+    .eq("endpoint", endpoint);
 
-  // Upsert — atualiza se já existe o mesmo endpoint.
-  // Usa onConflict:"endpoint" (índice único criado em 20260514_push_unique_endpoint)
-  // para cobrir qualquer violação residual de unicidade após o DELETE acima.
-  const { error } = await admin.from("push_subscriptions").upsert(
-    { user_id: user.id, endpoint, p256dh: normalizedP256dh, auth: normalizedAuth },
-    { onConflict: "endpoint" }
+  const { error } = await admin.from("push_subscriptions").insert(
+    { user_id: user.id, endpoint, p256dh: normalizedP256dh, auth: normalizedAuth }
   );
 
   if (error) {

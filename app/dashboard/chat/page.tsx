@@ -303,7 +303,7 @@ function AttachMenu({ onAction, onClose }: { onAction: (label: string) => void; 
 // --- ComposeBar ---------------------------------------------------
 
 function ComposeBar({
-  onSend, onSendImage, onSendAudio, onSendDoc, disabled, onToast,
+  onSend, onSendImage, onSendAudio, onSendDoc, disabled, onToast, onTyping,
 }: {
   onSend: (t: string) => void;
   onSendImage: (file: File) => void;
@@ -311,6 +311,7 @@ function ComposeBar({
   onSendDoc: (file: File) => void;
   disabled?: boolean;
   onToast: (msg: string) => void;
+  onTyping?: () => void;
 }) {
   const [text, setText] = useState("");
   const [showEmoji, setShowEmoji] = useState(false);
@@ -327,6 +328,8 @@ function ComposeBar({
 
   const fileInputRef    = useRef<HTMLInputElement>(null);
   const docInputRef     = useRef<HTMLInputElement>(null);
+  // Throttle: envia evento "typing" no máximo 1x a cada 2 s
+  const lastTypingRef   = useRef<number>(0);
 
   function handleSend() {
     if (imgPreview) {
@@ -580,7 +583,16 @@ function ComposeBar({
         <div className="flex-1 relative flex items-end">
           <textarea
             value={text}
-            onChange={(e) => setText(e.target.value)}
+            onChange={(e) => {
+              setText(e.target.value);
+              if (e.target.value.trim() && onTyping) {
+                const now = Date.now();
+                if (now - lastTypingRef.current > 2000) {
+                  lastTypingRef.current = now;
+                  onTyping();
+                }
+              }
+            }}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
             }}
@@ -1207,6 +1219,9 @@ export default function ChatPage() {
   // Inbox de mensagens recebidas enquanto estava em outra p�gina
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const inboxRef = useRef<Record<string, any[]>>({});
+  // Indicador "digitando...": nomes por conversa + timers de expiração (3 s)
+  const [typingUsers, setTypingUsers] = useState<Record<string, string[]>>({});
+  const typingTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({}); 
 
   useEffect(() => {
     if (!ctxMenu) return;
@@ -1685,9 +1700,12 @@ export default function ChatPage() {
     };
 
     sincronizarMensagensRecentes();
+    // Supabase Realtime (WebSocket) é o canal principal de entrega em tempo real.
+    // O polling HTTP é apenas fallback para mensagens perdidas por queda momentânea do canal.
+    // 30 s é suficiente — focus/visibilidade já disparam sync imediato.
     const interval = window.setInterval(() => {
       sincronizarMensagensRecentes();
-    }, 2000);
+    }, 30_000);
 
     window.addEventListener("focus", onFocus);
     document.addEventListener("visibilitychange", onVisibility);
@@ -1714,12 +1732,31 @@ export default function ChatPage() {
           const msg: MensagemConversa = { ...raw, lida: isMine || isActive };
           const insertSorted = (msgs: MensagemConversa[]) => {
             if (msgs.some(m => m.id === msg.id)) return msgs;
-            return [...msgs, msg].sort((a, b) => new Date(a.criadoEm).getTime() - new Date(b.criadoEm).getTime());
+            // usa compareMensagemOrder (sequence_id first) igual ao resto do sistema
+            return [...msgs, msg].sort(compareMensagemOrder);
           };
           setDms(prev => prev.map(dm => dm.id === cid ? { ...dm, mensagens: insertSorted(dm.mensagens) } : dm));
           setGrupos(prev => prev.map(g => g.id === cid ? { ...g, mensagens: insertSorted(g.mensagens) } : g));
           // Atualiza o cursor do servidor se o usuário está visualizando a conversa agora
           if (isActive && !isMine) markConversaAsRead(cid);
+        })
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .on("broadcast", { event: "typing" }, ({ payload }: { payload: any }) => {
+          if (payload.autorId === user?.id) return;
+          const nome = (payload.autorNome as string)?.split(" ")[0] ?? "Alguém";
+          const key = `${cid}:${payload.autorId}`;
+          setTypingUsers(prev => {
+            const names = prev[cid] ?? [];
+            if (names.includes(nome)) return prev;
+            return { ...prev, [cid]: [...names, nome] };
+          });
+          if (typingTimersRef.current[key]) clearTimeout(typingTimersRef.current[key]);
+          typingTimersRef.current[key] = setTimeout(() => {
+            setTypingUsers(prev => ({
+              ...prev,
+              [cid]: (prev[cid] ?? []).filter(n => n !== nome),
+            }));
+          }, 3000);
         })
         .subscribe((status: string) => {
           if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
@@ -2587,6 +2624,13 @@ export default function ChatPage() {
             </div>
           )}
 
+          {/* Indicador "digitando..." — sem escrita no banco, via Realtime broadcast */}
+          {(typingUsers[activeChat.id] ?? []).length > 0 && !locked && (
+            <div className="px-4 py-1.5 text-xs text-gray-400 italic shrink-0 border-t border-gray-50 bg-white">
+              {typingUsers[activeChat.id].join(", ")} está digitando...
+            </div>
+          )}
+
           <ComposeBar
             onSend={(t) => activeChat.tipo === "direto" ? sendDm(activeChat.id, t) : sendGrupo(activeChat.id, t)}
             onSendImage={(f) => sendImage(activeChat.id, activeChat.tipo, f)}
@@ -2594,6 +2638,11 @@ export default function ChatPage() {
             onSendDoc={(f) => sendArquivo(activeChat.id, activeChat.tipo, f, "documento", f.name)}
             disabled={locked}
             onToast={showToast}
+            onTyping={() => broadcastChannelsRef.current.get(activeChat.id)?.send({
+              type: "broadcast",
+              event: "typing",
+              payload: { autorId: u.id, autorNome: u.nome },
+            })}
           />
         </div>
 
