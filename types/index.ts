@@ -239,6 +239,7 @@ export interface MensagemConversa {
   sequenceId?: number;
   criadoEm: string;       // ISO datetime
   editadoEm?: string;     // ISO datetime — preenchido após edição
+  status?: "pending" | "sent" | "failed";
   lida?: boolean;
   reacoes?: { emoji: string; count: number }[];
   respostaA?: { id: string; autorNome: string; conteudo: string };

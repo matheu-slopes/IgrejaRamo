@@ -144,6 +144,7 @@ function AudioPlayer({ src, isMe }: { src: string; isMe: boolean }) {
         : "bg-white border border-gray-100 text-gray-800 shadow-sm rounded-bl-sm"
     )}>
       {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+    const pendingOutbox = lerOutbox(uid);
       <audio ref={audioRef} src={src} preload="metadata" className="hidden" />
       {loadError ? (
         <>
@@ -242,6 +243,16 @@ function isMissingSequenceColumn(error: unknown) {
   const msg = String(err?.message ?? "").toLowerCase();
   return err?.code === "42703" && msg.includes("sequence_id");
 }
+
+type PendingChatMessage = {
+  id: string;
+  conversaId: string;
+  tipo: "direto" | "grupo";
+  message: MensagemConversa;
+  attempts: number;
+  updatedAt: string;
+  lastError?: string;
+};
 
 type ChatTab = "direto" | "grupos";
 type ActiveChat = { tipo: "direto"; id: string } | { tipo: "grupo"; id: string } | null;
@@ -791,6 +802,8 @@ function MessageBubble({
           {isStarred && <Star className="w-2.5 h-2.5 text-gold-500 fill-gold-500" />}
           {msg.editadoEm && <span className="text-[10px] text-gray-400 italic">editado</span>}
           <span className="text-[10px] text-gray-400">{formatTime(msg.criadoEm)}</span>
+          {isMe && msg.status === "pending" && <span className="text-[10px] text-gray-400">enviando</span>}
+          {isMe && msg.status === "failed" && <span className="text-[10px] text-amber-600">na fila</span>}
         </div>
 
         {/* Bot�es de a��o � absolutamente posicionados (sem impacto no layout) */}
@@ -1215,6 +1228,7 @@ export default function ChatPage() {
   const lastBackfillRef = useRef<string>(new Date(Date.now() - 5 * 60 * 1000).toISOString());
   const lastSequenceRef = useRef<number>(0);
   const syncRunningRef = useRef(false);
+  const outboxFlushRunningRef = useRef(false);
   const notificationDispatchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Timer para debounciar sync quando vários canais reconectam ao mesmo tempo
   const reconnectSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1286,6 +1300,114 @@ export default function ChatPage() {
     } catch { return null; }
   }
 
+  function outboxKey(uid: string) { return `chat_outbox_v1_${uid}`; }
+
+  function lerOutbox(uid: string): PendingChatMessage[] {
+    try {
+      const raw = localStorage.getItem(outboxKey(uid));
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function salvarOutbox(uid: string, items: PendingChatMessage[]) {
+    try {
+      localStorage.setItem(outboxKey(uid), JSON.stringify(items.slice(-100)));
+    } catch { /* storage indisponivel */ }
+  }
+
+  function upsertOutbox(uid: string, item: PendingChatMessage) {
+    const items = lerOutbox(uid).filter((queued) => queued.id !== item.id);
+    salvarOutbox(uid, [...items, item]);
+  }
+
+  function removeOutbox(uid: string, id: string) {
+    salvarOutbox(uid, lerOutbox(uid).filter((queued) => queued.id !== id));
+  }
+
+  function setMensagemLocal(tipo: "direto" | "grupo", conversaId: string, msg: MensagemConversa) {
+    const merge = (msgs: MensagemConversa[]) => {
+      const exists = msgs.some((m) => m.id === msg.id);
+      const next = exists ? msgs.map((m) => m.id === msg.id ? { ...m, ...msg } : m) : [...msgs, msg];
+      return next.sort(compareMensagemOrder);
+    };
+    if (tipo === "direto") {
+      setDms((prev) => prev.map((dm) => dm.id === conversaId ? { ...dm, mensagens: merge(dm.mensagens) } : dm));
+    } else {
+      setGrupos((prev) => prev.map((g) => g.id === conversaId ? { ...g, mensagens: merge(g.mensagens) } : g));
+    }
+  }
+
+  async function persistirMensagemPendente(item: PendingChatMessage) {
+    const token = await getFreshToken();
+    if (!token) throw new Error("Sessao expirada");
+
+    const r = await fetchWithRetry("/api/chat/mensagem", {
+      method: "POST",
+      keepalive: true,
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+      body: JSON.stringify({
+        id: item.message.id,
+        conversa_id: item.conversaId,
+        autor_id: item.message.autorId,
+        autor_nome: item.message.autorNome,
+        conteudo: item.message.conteudo,
+        tipo: item.message.tipo ?? "texto",
+        media_url: item.message.mediaUrl ?? null,
+        resposta_a_id: item.message.respostaA?.id ?? null,
+        resposta_a_autor_nome: item.message.respostaA?.autorNome ?? null,
+        resposta_a_conteudo: item.message.respostaA?.conteudo ?? null,
+      }),
+    });
+
+    if (!r.ok) {
+      const j = await r.json().catch(() => ({}));
+      throw new Error(j.error ?? r.statusText);
+    }
+
+    return r.json().catch(() => ({})) as Promise<{ criado_em?: string; sequence_id?: number | null }>;
+  }
+
+  async function flushOutbox(showFailureToast = false) {
+    if (!user?.id || outboxFlushRunningRef.current) return;
+    outboxFlushRunningRef.current = true;
+    try {
+      const items = lerOutbox(user.id).filter((item) => item.message.autorId === user.id);
+      for (const item of items) {
+        try {
+          const ack = await persistirMensagemPendente(item);
+          const finalMsg: MensagemConversa = {
+            ...item.message,
+            criadoEm: ack.criado_em ?? item.message.criadoEm,
+            sequenceId: typeof ack.sequence_id === "number" ? ack.sequence_id : item.message.sequenceId,
+            status: "sent",
+          };
+          setMensagemLocal(item.tipo, item.conversaId, finalMsg);
+          removeOutbox(user.id, item.id);
+          broadcastChannelsRef.current.get(item.conversaId)?.send({ type: "broadcast", event: "msg", payload: finalMsg })
+            .then((s: string) => { if (s !== "ok") console.warn("broadcast outbox:", s); });
+          scheduleNotificationDispatch();
+        } catch (err) {
+          const failed: PendingChatMessage = {
+            ...item,
+            attempts: item.attempts + 1,
+            updatedAt: new Date().toISOString(),
+            lastError: String((err as Error)?.message ?? err),
+            message: { ...item.message, status: "failed" },
+          };
+          upsertOutbox(user.id, failed);
+          setMensagemLocal(item.tipo, item.conversaId, failed.message);
+          if (showFailureToast) showToast("Mensagem na fila. Vou tentar enviar novamente quando a conexao estabilizar.");
+        }
+      }
+    } finally {
+      outboxFlushRunningRef.current = false;
+    }
+  }
+
   // -- helpers Supabase ---------------------------------------------
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   function rowToMensagem(row: any): MensagemConversa {
@@ -1334,6 +1456,7 @@ export default function ChatPage() {
         }
       } catch { /* localStorage indispon�vel */ }
       inboxRef.current = inbox; // mant�m para uso em carregarMensagens tamb�m
+      const pendingOutbox: PendingChatMessage[] = lerOutbox(uid);
 
       // -- Mescla inbox no cache antes de setar estado -----------------
       const cached = lerCache(uid);
@@ -1358,8 +1481,20 @@ export default function ChatPage() {
           return { ...conv, mensagens: merged };
         });
 
-      const mergedDms    = mergeInboxInto(baseDms);
-      const mergedGrupos = mergeInboxInto(baseGrupos);
+      const mergeOutboxInto = <T extends { id: string; mensagens: MensagemConversa[] }>(list: T[], tipo: "direto" | "grupo"): T[] =>
+        list.map(conv => {
+          const pendentes = pendingOutbox.filter((item: PendingChatMessage) => item.tipo === tipo && item.conversaId === conv.id);
+          if (!pendentes.length) return conv;
+          const existIds = new Set(conv.mensagens.map(m => m.id));
+          const novas = pendentes
+            .filter((item: PendingChatMessage) => !existIds.has(item.message.id))
+            .map((item: PendingChatMessage) => ({ ...item.message, status: item.message.status ?? "pending" }));
+          if (!novas.length) return conv;
+          return { ...conv, mensagens: [...conv.mensagens, ...novas].sort(compareMensagemOrder) };
+        });
+
+      const mergedDms    = mergeOutboxInto(mergeInboxInto(baseDms), "direto");
+      const mergedGrupos = mergeOutboxInto(mergeInboxInto(baseGrupos), "grupo");
 
       setDms(mergedDms);
       setGrupos(mergedGrupos);
@@ -1370,6 +1505,28 @@ export default function ChatPage() {
 
     // 2) Busca do servidor em background (mescla, nunca substitui)
     carregarConversas();
+    flushOutbox(false);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    const retry = () => flushOutbox(false);
+    const retryVisible = () => {
+      if (document.visibilityState === "visible") retry();
+    };
+
+    window.addEventListener("online", retry);
+    window.addEventListener("focus", retry);
+    document.addEventListener("visibilitychange", retryVisible);
+    const interval = window.setInterval(retry, 10_000);
+
+    return () => {
+      window.removeEventListener("online", retry);
+      window.removeEventListener("focus", retry);
+      document.removeEventListener("visibilitychange", retryVisible);
+      window.clearInterval(interval);
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 
@@ -1452,6 +1609,22 @@ export default function ChatPage() {
       }
     }
 
+    const pendingOutbox = lerOutbox(user.id);
+    const mergeOutbox = <T extends { id: string; mensagens: MensagemConversa[] }>(list: T[], tipo: "direto" | "grupo"): T[] =>
+      list.map(conv => {
+        const pendentes = pendingOutbox.filter(item => item.tipo === tipo && item.conversaId === conv.id);
+        if (!pendentes.length) return conv;
+        const idsExistentes = new Set(conv.mensagens.map(m => m.id));
+        const novas = pendentes
+          .filter(item => !idsExistentes.has(item.message.id))
+          .map(item => ({ ...item.message, status: item.message.status ?? "pending" }));
+        if (!novas.length) return conv;
+        return { ...conv, mensagens: [...conv.mensagens, ...novas].sort(compareMensagemOrder) };
+      });
+
+    const dmsComPendentes = mergeOutbox(newDms, "direto");
+    const gruposComPendentes = mergeOutbox(newGrupos, "grupo");
+
     // -- MERGE: nunca substituir mensagens existentes -----------------
     // Mant�m todas as mensagens j� no estado (cache + broadcasts recebidos).
     // Adiciona apenas as que vieram do banco e ainda n�o existem no estado.
@@ -1459,7 +1632,7 @@ export default function ChatPage() {
     // do cache e a conclus�o desta query ass�ncrona.
     setDms(prev => {
       const prevMap = new Map(prev.map(d => [d.id, d]));
-      return newDms.map(newDm => {
+      return dmsComPendentes.map(newDm => {
         const existing = prevMap.get(newDm.id);
         if (!existing) return newDm;
         const existingIds = new Set(existing.mensagens.map(m => m.id));
@@ -1470,7 +1643,7 @@ export default function ChatPage() {
     });
     setGrupos(prev => {
       const prevMap = new Map(prev.map(g => [g.id, g]));
-      return newGrupos.map(newG => {
+      return gruposComPendentes.map(newG => {
         const existing = prevMap.get(newG.id);
         if (!existing) return newG;
         const existingIds = new Set(existing.mensagens.map(m => m.id));
@@ -1479,7 +1652,7 @@ export default function ChatPage() {
         return { ...newG, mensagens: merged };
       });
     });
-    const allIds = [...newDms.map(d => d.id), ...newGrupos.map(g => g.id)];
+    const allIds = [...dmsComPendentes.map(d => d.id), ...gruposComPendentes.map(g => g.id)];
     setConversaIds(allIds);
     conversaIdsRef.current = allIds;
 
@@ -2129,65 +2302,20 @@ export default function ChatPage() {
     const clientTime = new Date().toISOString();
     const msg: MensagemConversa = {
       id: msgId, autorId: u.id, autorNome: u.nome,
-      conteudo: text, criadoEm: clientTime, lida: true,
+      conteudo: text, criadoEm: clientTime, lida: true, status: "pending",
       respostaA: replySnapshot ? { id: replySnapshot.id, autorNome: replySnapshot.autorNome, conteudo: replySnapshot.conteudo } : undefined,
     };
-    // 1) Optimistic: voc� v� sua mensagem imediatamente
-    setDms((prev) => prev.map((dm) => dm.id === dmId ? {
-      ...dm,
-      mensagens: [...dm.mensagens, msg].sort((a, b) => new Date(a.criadoEm).getTime() - new Date(b.criadoEm).getTime()),
-    } : dm));
+    setMensagemLocal("direto", dmId, msg);
+    upsertOutbox(u.id, {
+      id: msgId,
+      conversaId: dmId,
+      tipo: "direto",
+      message: msg,
+      attempts: 0,
+      updatedAt: clientTime,
+    });
     setReplyTo(null);
-
-    // 2) Persiste no DB primeiro � o servidor retorna o criado_em autoritativo (NOW())
-    // O broadcast S� acontece depois, carregando o timestamp do servidor.
-    // Isso garante que todos os clientes ordenam mensagens pelo rel�gio do servidor.
-    try {
-      const token = await getFreshToken();
-      if (!token) {
-        setDms((prev) => prev.map((dm) => dm.id === dmId ? { ...dm, mensagens: dm.mensagens.filter((m) => m.id !== msgId) } : dm));
-        showToast("Sessao expirada. Entre novamente para enviar mensagens.");
-        return;
-      }
-      const r = await fetchWithRetry("/api/chat/mensagem", {
-        method: "POST", keepalive: true,
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-        body: JSON.stringify({
-          id: msgId, conversa_id: dmId, autor_id: u.id, autor_nome: u.nome, conteudo: text,
-          resposta_a_id: replySnapshot?.id ?? null,
-          resposta_a_autor_nome: replySnapshot?.autorNome ?? null,
-          resposta_a_conteudo: replySnapshot?.conteudo ?? null,
-        }),
-      });
-      if (!r.ok) {
-        const j = await r.json().catch(() => ({}));
-        console.error("sendDm error:", j.error);
-        setDms((prev) => prev.map((dm) => dm.id === dmId ? { ...dm, mensagens: dm.mensagens.filter((m) => m.id !== msgId) } : dm));
-        if (r.status === 401) {
-          showToast("Sessao expirada. Entre novamente para enviar mensagens.");
-          return;
-        }
-        showToast("Erro ao enviar: " + (j.error ?? r.statusText));
-        return;
-      }
-      const j = await r.json().catch(() => ({}));
-      const serverTime: string = j.criado_em ?? clientTime;
-      // 3) Atualiza seu estado local com o tempo do servidor + re-ordena
-      const finalMsg = { ...msg, criadoEm: serverTime };
-      setDms((prev) => prev.map((dm) => dm.id === dmId ? {
-        ...dm,
-        mensagens: dm.mensagens
-          .map((m) => m.id === msgId ? finalMsg : m)
-          .sort((a, b) => new Date(a.criadoEm).getTime() - new Date(b.criadoEm).getTime()),
-      } : dm));
-      // 4) Broadcast com timestamp do servidor � amigo recebe na ordem correta
-      broadcastChannelsRef.current.get(dmId)?.send({ type: "broadcast", event: "msg", payload: finalMsg });
-      scheduleNotificationDispatch();
-    } catch (err) {
-      console.error("sendDm network error:", err);
-      setDms((prev) => prev.map((dm) => dm.id === dmId ? { ...dm, mensagens: dm.mensagens.filter((m) => m.id !== msgId) } : dm));
-      showToast("Sem conex�o � mensagem n�o enviada");
-    }
+    void flushOutbox(true);
   }
 
   async function sendGrupo(grupoId: string, text: string) {
@@ -2196,64 +2324,20 @@ export default function ChatPage() {
     const clientTime = new Date().toISOString();
     const msg: MensagemConversa = {
       id: msgId, autorId: u.id, autorNome: u.nome,
-      conteudo: text, criadoEm: clientTime, lida: true,
+      conteudo: text, criadoEm: clientTime, lida: true, status: "pending",
       respostaA: replySnapshot ? { id: replySnapshot.id, autorNome: replySnapshot.autorNome, conteudo: replySnapshot.conteudo } : undefined,
     };
-    // 1) Optimistic local
-    setGrupos((prev) => prev.map((g) => g.id === grupoId ? {
-      ...g,
-      mensagens: [...g.mensagens, msg].sort((a, b) => new Date(a.criadoEm).getTime() - new Date(b.criadoEm).getTime()),
-    } : g));
+    setMensagemLocal("grupo", grupoId, msg);
+    upsertOutbox(u.id, {
+      id: msgId,
+      conversaId: grupoId,
+      tipo: "grupo",
+      message: msg,
+      attempts: 0,
+      updatedAt: clientTime,
+    });
     setReplyTo(null);
-
-    // 2) DB primeiro ? timestamp do servidor
-    try {
-      const token = await getFreshToken();
-      if (!token) {
-        setGrupos((prev) => prev.map((g) => g.id === grupoId ? { ...g, mensagens: g.mensagens.filter((m) => m.id !== msgId) } : g));
-        showToast("Sessao expirada. Entre novamente para enviar mensagens.");
-        return;
-      }
-      const r = await fetchWithRetry("/api/chat/mensagem", {
-        method: "POST", keepalive: true,
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-        body: JSON.stringify({
-          id: msgId, conversa_id: grupoId, autor_id: u.id, autor_nome: u.nome, conteudo: text,
-          resposta_a_id: replySnapshot?.id ?? null,
-          resposta_a_autor_nome: replySnapshot?.autorNome ?? null,
-          resposta_a_conteudo: replySnapshot?.conteudo ?? null,
-        }),
-      });
-      if (!r.ok) {
-        const j = await r.json().catch(() => ({}));
-        console.error("sendGrupo error:", j.error);
-        setGrupos((prev) => prev.map((g) => g.id === grupoId ? { ...g, mensagens: g.mensagens.filter((m) => m.id !== msgId) } : g));
-        if (r.status === 401) {
-          showToast("Sessao expirada. Entre novamente para enviar mensagens.");
-          return;
-        }
-        showToast("Erro ao enviar: " + (j.error ?? r.statusText));
-        return;
-      }
-      const j = await r.json().catch(() => ({}));
-      const serverTime: string = j.criado_em ?? clientTime;
-      // 3) Atualiza estado local com tempo do servidor
-      const finalMsg = { ...msg, criadoEm: serverTime };
-      setGrupos((prev) => prev.map((g) => g.id === grupoId ? {
-        ...g,
-        mensagens: g.mensagens
-          .map((m) => m.id === msgId ? finalMsg : m)
-          .sort((a, b) => new Date(a.criadoEm).getTime() - new Date(b.criadoEm).getTime()),
-      } : g));
-      // 4) Broadcast com timestamp do servidor
-      broadcastChannelsRef.current.get(grupoId)?.send({ type: "broadcast", event: "msg", payload: finalMsg })
-        .then((s: string) => { if (s !== "ok") console.warn("broadcast sendGrupo:", s); });
-      scheduleNotificationDispatch();
-    } catch (err) {
-      console.error("sendGrupo network error:", err);
-      setGrupos((prev) => prev.map((g) => g.id === grupoId ? { ...g, mensagens: g.mensagens.filter((m) => m.id !== msgId) } : g));
-      showToast("Sem conex�o � mensagem n�o enviada");
-    }
+    void flushOutbox(true);
   }
 
   async function sendImage(conversaId: string, tipo: "direto" | "grupo", file: File) {
