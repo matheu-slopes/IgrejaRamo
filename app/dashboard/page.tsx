@@ -20,7 +20,9 @@ import {
 import Link from "next/link";
 
 function formatDate(iso: string) {
-  return new Date(iso + "T00:00:00").toLocaleDateString("pt-BR", {
+  // iso pode ser só data ("2024-01-15") ou timestamp completo ("2024-01-15T12:30:00+00:00")
+  const d = iso.includes("T") ? new Date(iso) : new Date(iso + "T00:00:00");
+  return d.toLocaleDateString("pt-BR", {
     weekday: "short",
     day: "2-digit",
     month: "short",
@@ -313,7 +315,7 @@ export default function DashboardPage() {
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-gray-800 text-sm truncate">{e.titulo}</p>
                   <p className="text-gray-500 text-xs mt-0.5">
-                    {e.horario} · {e.local}
+                    {e.horario?.slice(0, 5)} · {e.local}
                   </p>
                 </div>
                 {e.ministerio && (

@@ -225,7 +225,7 @@ export default function BottomNav() {
       <nav
         className="bottom-nav fixed inset-x-0 z-40 md:hidden bg-white border-t border-gray-100 flex items-stretch"
         style={{
-          bottom: "calc(-1 * env(safe-area-inset-bottom))",
+          bottom: 0,
           height: "calc(4rem + env(safe-area-inset-bottom))",
           paddingBottom: "env(safe-area-inset-bottom)",
           paddingLeft:   "env(safe-area-inset-left)",
