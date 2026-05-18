@@ -28,19 +28,22 @@ async function authUser(req: NextRequest) {
  */
 export async function GET(req: NextRequest) {
   const user = await authUser(req);
-  const serverPub = process.env.VAPID_PUBLIC_KEY ?? null;
-  const clientPub = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? null;
-  const vapidMatch = !!serverPub && !!clientPub && serverPub.trim() === clientPub.trim();
-  const vapidSubject = process.env.VAPID_SUBJECT || process.env.NEXT_PUBLIC_SITE_URL || "https://igreja-ramo.vercel.app";
+  const serverPub = process.env.VAPID_PUBLIC_KEY?.trim() ?? null;
+  const clientPub = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY?.trim() ?? null;
+  const runtimePub = serverPub ?? clientPub;
+  const vapidMatch = !!runtimePub && (!clientPub || runtimePub === clientPub);
+  const vapidSubject = (process.env.VAPID_SUBJECT || process.env.NEXT_PUBLIC_SITE_URL || "https://igreja-ramo.vercel.app").trim();
 
   const base = {
     vapid: {
       server_set: !!serverPub,
       client_set: !!clientPub,
+      runtime_public_key_set: !!runtimePub,
       private_set: !!process.env.VAPID_PRIVATE_KEY,
       subject: vapidSubject,
       server_fingerprint: fingerprint(serverPub),
       client_fingerprint: fingerprint(clientPub),
+      runtime_fingerprint: fingerprint(runtimePub),
       match: vapidMatch,
     },
     service_role_set: !!process.env.SUPABASE_SERVICE_ROLE_KEY,

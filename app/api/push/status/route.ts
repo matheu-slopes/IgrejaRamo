@@ -13,12 +13,14 @@ const admin = createClient(
  */
 export async function GET(req: NextRequest) {
   const token = req.headers.get("authorization")?.replace("Bearer ", "").trim();
+  const runtimePublicKey = (process.env.VAPID_PUBLIC_KEY ?? process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY)?.trim();
 
   const diagnostico: Record<string, unknown> = {
     vapid_public_key_set: !!process.env.VAPID_PUBLIC_KEY,
     vapid_private_key_set: !!process.env.VAPID_PRIVATE_KEY,
     next_public_vapid_key_set: !!process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
-    vapid_subject: process.env.VAPID_SUBJECT || process.env.NEXT_PUBLIC_SITE_URL || "https://igreja-ramo.vercel.app",
+    runtime_vapid_public_key_set: !!runtimePublicKey,
+    vapid_subject: (process.env.VAPID_SUBJECT || process.env.NEXT_PUBLIC_SITE_URL || "https://igreja-ramo.vercel.app").trim(),
     service_role_key_set: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
   };
 

@@ -7,12 +7,33 @@ import { Bell, Check, X } from "lucide-react";
 
 export default function PushSubscriber() {
   const { user } = useAuth();
-  const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+  const buildVapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY?.trim();
+  const [runtimeVapidPublicKey, setRuntimeVapidPublicKey] = useState<string | null>(null);
+  const vapidPublicKey = buildVapidPublicKey || runtimeVapidPublicKey || "";
   const pushConfigured = Boolean(vapidPublicKey);
   const lastAttemptRef = useRef(0);
   const [mostrarBanner, setMostrarBanner] = useState(false);
   const [status, setStatus] = useState<"idle" | "loading" | "sucesso" | "erro">("idle");
   const [msg, setMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (buildVapidPublicKey) return;
+    let cancelled = false;
+
+    async function loadRuntimeVapidKey() {
+      try {
+        const res = await fetch("/api/push/public-key", { cache: "no-store" });
+        const json = await res.json().catch(() => ({}));
+        const key = typeof json.publicKey === "string" ? json.publicKey.trim() : "";
+        if (!cancelled && key) setRuntimeVapidPublicKey(key);
+      } catch (e) {
+        console.error("PushSubscriber public key:", e);
+      }
+    }
+
+    loadRuntimeVapidKey();
+    return () => { cancelled = true; };
+  }, [buildVapidPublicKey]);
 
   useEffect(() => {
     if (!user) return;

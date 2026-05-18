@@ -2,12 +2,12 @@ import webpush from "web-push";
 import { createClient } from "@supabase/supabase-js";
 
 const vapidSubject =
-  process.env.VAPID_SUBJECT ||
+  (process.env.VAPID_SUBJECT ||
   process.env.NEXT_PUBLIC_SITE_URL ||
-  "https://igreja-ramo.vercel.app";
+  "https://igreja-ramo.vercel.app").trim();
 
-const vapidPublicKey  = process.env.VAPID_PUBLIC_KEY  ?? process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY;
+const vapidPublicKey  = (process.env.VAPID_PUBLIC_KEY ?? process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY)?.trim();
+const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY?.trim();
 const hasVapidKeys = Boolean(vapidPublicKey && vapidPrivateKey);
 
 if (hasVapidKeys) {
