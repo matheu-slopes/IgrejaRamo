@@ -201,10 +201,10 @@ export default function PushSubscriber() {
 
   return (
     <div
-      className="fixed left-1/2 -translate-x-1/2 z-50 w-[calc(100%-2rem)] max-w-sm md:bottom-6"
+      className="fixed left-1/2 bottom-3 z-50 w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 md:bottom-6"
       style={{
-        // mobile: flutua acima da BottomNav (altura ~3.5rem) + safe-area-inset-bottom
-        bottom: "clamp(5rem, calc(3.5rem + env(safe-area-inset-bottom) + 0.75rem), 12rem)",
+        // Overlay acima da BottomNav sem depender de bottom + env() dinâmico do iOS.
+        transform: "translateX(-50%) translateY(calc(-4.25rem - max(0px, env(safe-area-inset-bottom))))",
       }}
     >
       <div className="bg-vine-900 text-white rounded-2xl shadow-2xl overflow-hidden">
