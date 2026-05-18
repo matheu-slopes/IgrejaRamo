@@ -8,13 +8,16 @@ function updateViewportVars() {
   if (typeof window === "undefined") return;
 
   const visualViewport = window.visualViewport;
-  const height = Math.round(visualViewport?.height ?? window.innerHeight);
   const offsetTop = Math.round(visualViewport?.offsetTop ?? 0);
-  const keyboardOpen = visualViewport ? height < window.innerHeight - 80 : false;
+  const visualHeight = Math.round(visualViewport?.height ?? window.innerHeight);
+  const keyboardOpen = visualViewport ? visualHeight < window.innerHeight - 160 : false;
+  // Prompts nativos do iOS (notificação, permissões) também disparam visualViewport.resize.
+  // Só usamos visualViewport.height quando a diferença é grande o bastante para ser teclado.
+  const height = keyboardOpen ? visualHeight : window.innerHeight;
 
   document.documentElement.style.setProperty("--app-vvh", `${height}px`);
   document.documentElement.style.setProperty("--chat-vvh", `${height}px`);
-  document.documentElement.style.setProperty("--vv-offset-top", `${offsetTop}px`);
+  document.documentElement.style.setProperty("--vv-offset-top", keyboardOpen ? `${offsetTop}px` : "0px");
   document.body.classList.toggle("keyboard-open", keyboardOpen);
 }
 
@@ -66,7 +69,7 @@ export default function AppLifecycleSync() {
     function onViewportResize() {
       const visualViewport = window.visualViewport;
       const height = Math.round(visualViewport?.height ?? window.innerHeight);
-      const keyboardNowOpen = visualViewport ? height < window.innerHeight - 80 : false;
+      const keyboardNowOpen = visualViewport ? height < window.innerHeight - 160 : false;
 
       // Detecta o momento exato em que o teclado fecha
       if (wasKeyboardOpen && !keyboardNowOpen) {
