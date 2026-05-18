@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { Bell, RefreshCw, Send, Trash2 } from "lucide-react";
+import { Bell, RefreshCw, Send, Smartphone, Trash2 } from "lucide-react";
 
 type DiagResponse = {
   vapid?: {
@@ -43,6 +43,67 @@ export default function PushDiagPage() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<DiagResponse | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+
+  async function registerDevice() {
+    setLoading(true);
+    setMessage(null);
+    try {
+      const supportError = getPushSupportError();
+      if (supportError) throw new Error(supportError);
+
+      const permission = await Notification.requestPermission();
+      if (permission !== "granted") {
+        throw new Error("Permissao de notificacao nao concedida neste aparelho.");
+      }
+
+      const token = await getToken();
+      if (!token) throw new Error("Sessao expirada");
+
+      const keyRes = await fetch("/api/push/public-key", { cache: "no-store" });
+      const keyJson = await keyRes.json().catch(() => ({}));
+      const publicKey = typeof keyJson.publicKey === "string" ? keyJson.publicKey.trim() : "";
+      if (!publicKey) throw new Error("Chave publica VAPID nao encontrada.");
+
+      const registration = await getServiceWorkerRegistration();
+      let sub = await registration.pushManager.getSubscription();
+      const expectedKey = urlBase64ToUint8Array(publicKey);
+
+      if (sub && shouldRenewSubscription(sub, expectedKey)) {
+        await sub.unsubscribe().catch(() => undefined);
+        sub = null;
+      }
+
+      if (!sub) {
+        sub = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: expectedKey as unknown as Uint8Array<ArrayBuffer>,
+        });
+      }
+
+      const json = sub.toJSON();
+      const p256dh = json.keys?.p256dh ?? "";
+      const auth = json.keys?.auth ?? "";
+      if (!p256dh || !auth) throw new Error("Subscription criada sem chaves.");
+
+      const res = await fetch("/api/push/subscribe", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ endpoint: sub.endpoint, p256dh, auth }),
+      });
+      const response = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(response.error ?? "Falha ao registrar aparelho.");
+
+      setMessage("Aparelho registrado. Agora toque em Testar.");
+      await callDiag("GET");
+    } catch (e) {
+      setMessage(String((e as Error)?.message ?? e));
+    } finally {
+      setLoading(false);
+    }
+  }
 
   async function callDiag(method: "GET" | "POST" | "DELETE") {
     setLoading(true);
@@ -94,7 +155,7 @@ export default function PushDiagPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           <button
             onClick={() => callDiag("GET")}
             disabled={loading}
@@ -102,6 +163,14 @@ export default function PushDiagPage() {
           >
             <RefreshCw className="h-4 w-4" />
             Status
+          </button>
+          <button
+            onClick={registerDevice}
+            disabled={loading}
+            className="flex items-center justify-center gap-2 rounded-lg bg-white border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-700 disabled:opacity-60"
+          >
+            <Smartphone className="h-4 w-4" />
+            Registrar
           </button>
           <button
             onClick={() => callDiag("POST")}
@@ -148,6 +217,11 @@ export default function PushDiagPage() {
             <span className="text-sm text-gray-600">Subscriptions</span>
             <span className="text-sm font-bold text-gray-900">{result?.minhas_subs_count ?? 0}</span>
           </div>
+          {(result?.minhas_subs_count ?? 0) === 0 && (
+            <p className="rounded-md bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
+              Este aparelho ainda nao esta registrado para receber push. Toque em Registrar.
+            </p>
+          )}
           <div className="space-y-2">
             {(result?.minhas_subs ?? []).map((sub) => (
               <div key={`${sub.host}-${sub.endpoint_tail}`} className="rounded-md border border-gray-100 px-3 py-2 text-xs text-gray-600">
@@ -185,6 +259,70 @@ export default function PushDiagPage() {
         </section>
       </div>
     </main>
+  );
+}
+
+async function getServiceWorkerRegistration(): Promise<ServiceWorkerRegistration> {
+  if (!("serviceWorker" in navigator)) {
+    throw new Error("Este navegador nao suporta Service Worker.");
+  }
+
+  const expectedScript = "/sw.js";
+  let registration = await navigator.serviceWorker.getRegistration("/");
+
+  if (registration?.active?.scriptURL && !registration.active.scriptURL.endsWith(expectedScript)) {
+    const regs = await navigator.serviceWorker.getRegistrations();
+    await Promise.all(regs.map((reg) => reg.unregister()));
+    registration = undefined;
+  }
+
+  if (!registration) {
+    registration = await navigator.serviceWorker.register(expectedScript, { scope: "/" });
+  }
+
+  await registration.update().catch(() => undefined);
+
+  const timeout = new Promise<never>((_, reject) => {
+    window.setTimeout(() => reject(new Error("Tempo esgotado ao iniciar notificacoes.")), 10000);
+  });
+
+  return Promise.race([navigator.serviceWorker.ready, timeout]);
+}
+
+function getPushSupportError(): string | null {
+  if (typeof window === "undefined") return "";
+
+  const ua = window.navigator.userAgent.toLowerCase();
+  const isIOS = /iphone|ipad|ipod/.test(ua);
+  const isStandalone =
+    window.matchMedia?.("(display-mode: standalone)")?.matches ||
+    (window.navigator as Navigator & { standalone?: boolean }).standalone === true;
+
+  if (isIOS && !isStandalone) {
+    return "No iPhone, use o app instalado na Tela de Inicio.";
+  }
+
+  if (!window.isSecureContext) return "Notificacoes exigem HTTPS.";
+  if (!("Notification" in window)) return "Este navegador nao suporta notificacoes.";
+  if (!("serviceWorker" in navigator)) return "Este navegador nao suporta Service Worker.";
+  if (!("PushManager" in window)) return "Este navegador nao suporta Push API.";
+  return null;
+}
+
+function urlBase64ToUint8Array(base64String: string): Uint8Array {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const rawData = atob(base64);
+  return Uint8Array.from([...rawData].map((char) => char.charCodeAt(0)));
+}
+
+function shouldRenewSubscription(sub: PushSubscription, expectedKey: Uint8Array): boolean {
+  const currentKeyBuffer = sub.options?.applicationServerKey;
+  const currentKey = currentKeyBuffer ? new Uint8Array(currentKeyBuffer as ArrayBuffer) : null;
+  return (
+    !currentKey ||
+    currentKey.length !== expectedKey.length ||
+    currentKey.some((byte, index) => byte !== expectedKey[index])
   );
 }
 
