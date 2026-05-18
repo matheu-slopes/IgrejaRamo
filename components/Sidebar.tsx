@@ -31,6 +31,7 @@ const navMain = [
   { href: "/dashboard/escalas",  label: "Escalas",     icon: CalendarCheck   },
   { href: "/dashboard/chat",     label: "Conversas",  icon: MessageSquare   },
   { href: "/dashboard/eventos",  label: "Eventos",    icon: CalendarDays    },
+  { href: "/dashboard/push-diag", label: "Push",       icon: Bell            },
 ];
 
 const navAdmin = [

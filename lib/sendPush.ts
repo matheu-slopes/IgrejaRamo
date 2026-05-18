@@ -164,17 +164,20 @@ export async function sendPushToUsers(userIds: string[], payload: PushPayload): 
     return { attempted: 0, sent: 0, failed: 0, removed: 0, errors: [] };
   }
   const uniqueUserIds = [...new Set(userIds)];
-  const { data: subs } = await admin
+  const { data: subs, error } = await admin
     .from("push_subscriptions")
     .select("endpoint, p256dh, auth")
     .in("user_id", uniqueUserIds);
+
+  if (error) throw error;
   return dispatchToSubs((subs as SubRow[]) ?? [], payload);
 }
 
 /** Envia push para todos os usuários cadastrados */
 export async function sendPushToAll(payload: PushPayload): Promise<PushDispatchResult> {
-  const { data: subs } = await admin
+  const { data: subs, error } = await admin
     .from("push_subscriptions")
     .select("endpoint, p256dh, auth");
+  if (error) throw error;
   return dispatchToSubs((subs as SubRow[]) ?? [], payload);
 }

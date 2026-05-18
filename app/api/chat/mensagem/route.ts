@@ -1,6 +1,6 @@
 ﻿import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { enqueueChatNotificationJob, processChatNotificationJobs } from "@/lib/chatNotifications";
+import { dispatchChatNotificationNow, enqueueChatNotificationJob, processChatNotificationJob } from "@/lib/chatNotifications";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -143,22 +143,36 @@ export async function POST(req: NextRequest) {
   // Garante que a ordem das mensagens usa sempre o relógio do servidor, não do cliente
 
   // Push/sino ficam fora do caminho crítico para a mensagem aparecer rápido.
+  const notificationJob = {
+    message_id: id,
+    conversa_id,
+    autor_id,
+    autor_nome,
+    conteudo: conteudo ?? "",
+    tipo: tipo ?? "texto",
+  };
+
   try {
-    await enqueueChatNotificationJob({
-      message_id: id,
-      conversa_id,
-      autor_id,
-      autor_nome,
-      conteudo: conteudo ?? "",
-      tipo: tipo ?? "texto",
-    });
-    await processChatNotificationJobs(10);
+    await enqueueChatNotificationJob(notificationJob);
+    await processChatNotificationJob(id);
   } catch (e) {
     console.error("chat notification enqueue/dispatch error:", e);
+    if (isMissingQueueTable(e)) {
+      try {
+        await dispatchChatNotificationNow(notificationJob);
+      } catch (fallbackErr) {
+        console.error("chat notification direct fallback error:", fallbackErr);
+      }
+    }
     // Não falha o envio da mensagem por erro de fila/notificação.
   }
 
   return NextResponse.json({ ok: true, criado_em: criadoEm, sequence_id: sequenceId });
+}
+
+function isMissingQueueTable(error: unknown) {
+  const err = error as { code?: string; message?: string } | null;
+  return err?.code === "42P01" || String(err?.message ?? "").includes("chat_notification_jobs");
 }
 
 async function touchAuthorCursor(

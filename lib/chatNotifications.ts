@@ -50,31 +50,59 @@ export async function processChatNotificationJobs(limit = 25) {
   let failed = 0;
 
   for (const job of (jobs ?? []) as ChatNotificationJob[]) {
-    const locked = await lockJob(job.message_id);
-    if (!locked) continue;
-
-    try {
-      await dispatchChatNotification(job);
-      await admin
-        .from("chat_notification_jobs")
-        .update({ status: "sent", last_error: null, updated_at: new Date().toISOString() })
-        .eq("message_id", job.message_id);
-      processed += 1;
-    } catch (err) {
-      failed += 1;
-      await admin
-        .from("chat_notification_jobs")
-        .update({
-          status: "failed",
-          attempts: (job.attempts ?? 0) + 1,
-          last_error: String((err as Error)?.message ?? err).slice(0, 1000),
-          updated_at: new Date().toISOString(),
-        })
-        .eq("message_id", job.message_id);
-    }
+    const result = await processLockedJob(job);
+    if (result === "processed") processed += 1;
+    if (result === "failed") failed += 1;
   }
 
   return { processed, failed, picked: jobs?.length ?? 0 };
+}
+
+export async function processChatNotificationJob(messageId: string) {
+  const { data: job, error } = await admin
+    .from("chat_notification_jobs")
+    .select("message_id, conversa_id, autor_id, autor_nome, conteudo, tipo, attempts")
+    .eq("message_id", messageId)
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!job) return { processed: 0, failed: 0, picked: 0 };
+
+  const result = await processLockedJob(job as ChatNotificationJob);
+  return {
+    processed: result === "processed" ? 1 : 0,
+    failed: result === "failed" ? 1 : 0,
+    picked: 1,
+  };
+}
+
+export async function dispatchChatNotificationNow(job: Omit<ChatNotificationJob, "attempts">) {
+  await dispatchChatNotification({ ...job, attempts: 0 });
+}
+
+async function processLockedJob(job: ChatNotificationJob): Promise<"processed" | "failed" | "skipped"> {
+  const locked = await lockJob(job.message_id);
+  if (!locked) return "skipped";
+
+  try {
+    await dispatchChatNotification(job);
+    await admin
+      .from("chat_notification_jobs")
+      .update({ status: "sent", last_error: null, updated_at: new Date().toISOString() })
+      .eq("message_id", job.message_id);
+    return "processed";
+  } catch (err) {
+    await admin
+      .from("chat_notification_jobs")
+      .update({
+        status: "failed",
+        attempts: (job.attempts ?? 0) + 1,
+        last_error: String((err as Error)?.message ?? err).slice(0, 1000),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("message_id", job.message_id);
+    return "failed";
+  }
 }
 
 async function lockJob(messageId: string) {
@@ -95,7 +123,9 @@ async function lockJob(messageId: string) {
 
 async function dispatchChatNotification(job: ChatNotificationJob) {
   const userIds = (await resolveRecipientIds(job.conversa_id, job.autor_id)).filter((uid) => uid !== job.autor_id);
-  if (!userIds.length) return;
+  if (!userIds.length) {
+    throw new Error("chat sem destinatarios para notificar");
+  }
 
   const nome = job.autor_nome?.split(" ")[0] ?? "Alguém";
   const tipo = job.tipo ?? "texto";
@@ -116,6 +146,9 @@ async function dispatchChatNotification(job: ChatNotificationJob) {
       url: "/dashboard/chat",
       tag: `chat-${job.conversa_id}-${job.message_id}`,
     });
+    if (delivery.attempted === 0) {
+      throw new Error(`destinatarios sem subscription push (${userIds.length})`);
+    }
     if (delivery.sent === 0 && delivery.attempted > 0) {
       console.warn("chat push zero sent:", {
         conversa_id: job.conversa_id,

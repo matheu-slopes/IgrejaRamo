@@ -202,6 +202,22 @@ export default function BottomNav() {
               </div>
             </div>
           )}
+
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 px-1 mb-2">
+              Sistema
+            </p>
+            <Link
+              href="/dashboard/push-diag"
+              onClick={() => setDrawerOpen(false)}
+              className="nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-gray-700"
+            >
+              <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center shrink-0">
+                <Bell className="w-4 h-4 text-gray-600" />
+              </div>
+              Diagnostico Push
+            </Link>
+          </div>
         </div>
       </div>
 
