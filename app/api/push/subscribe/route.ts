@@ -38,10 +38,12 @@ export async function POST(req: NextRequest) {
     .eq("endpoint", endpoint)
     .neq("user_id", user.id);
 
-  // Upsert — atualiza se já existe o mesmo endpoint
+  // Upsert — atualiza se já existe o mesmo endpoint.
+  // Usa onConflict:"endpoint" (índice único criado em 20260514_push_unique_endpoint)
+  // para cobrir qualquer violação residual de unicidade após o DELETE acima.
   const { error } = await admin.from("push_subscriptions").upsert(
     { user_id: user.id, endpoint, p256dh: normalizedP256dh, auth: normalizedAuth },
-    { onConflict: "user_id,endpoint" }
+    { onConflict: "endpoint" }
   );
 
   if (error) {

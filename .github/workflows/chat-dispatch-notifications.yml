@@ -1,0 +1,28 @@
+name: Chat — Dispatch Notifications
+
+on:
+  schedule:
+    # A cada 5 minutos (mínimo do GitHub Actions).
+    # Garante que jobs enfileirados mas não despachados pelo cliente
+    # (ex.: remetente fechou o app antes dos 250 ms) sejam processados.
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Processar fila de notificações de chat
+        run: |
+          URL=$(echo "${{ secrets.APP_URL }}" | sed 's:/$::')
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -X POST \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -d '{"limit":100}' \
+            "${URL}/api/chat/dispatch-notifications")
+          echo "HTTP status: $STATUS"
+          if [ "$STATUS" != "200" ]; then
+            echo "Dispatch retornou status inesperado: $STATUS"
+            exit 1
+          fi

@@ -17,6 +17,8 @@ type ChatNotificationJob = {
 };
 
 export async function enqueueChatNotificationJob(job: Omit<ChatNotificationJob, "attempts">) {
+  // ignoreDuplicates: não sobrescreve jobs já em processing/sent (evita push duplo
+  // e evita resetar um job que está sendo processado ao mesmo tempo).
   const { error } = await admin
     .from("chat_notification_jobs")
     .upsert({
@@ -25,16 +27,19 @@ export async function enqueueChatNotificationJob(job: Omit<ChatNotificationJob, 
       tipo: job.tipo ?? "texto",
       status: "pending",
       updated_at: new Date().toISOString(),
-    }, { onConflict: "message_id" });
+    }, { onConflict: "message_id", ignoreDuplicates: true });
 
   if (error) throw error;
 }
 
 export async function processChatNotificationJobs(limit = 25) {
+  // Recupera pending/failed E jobs presos em processing há mais de 5 minutos
+  // (ocorre quando a função serverless sofre timeout entre o lock e a conclusão).
+  const staleThreshold = new Date(Date.now() - 5 * 60 * 1000).toISOString();
   const { data: jobs, error } = await admin
     .from("chat_notification_jobs")
     .select("message_id, conversa_id, autor_id, autor_nome, conteudo, tipo, attempts")
-    .in("status", ["pending", "failed"])
+    .or(`status.in.(pending,failed),and(status.eq.processing,locked_at.lt.${staleThreshold})`)
     .lt("attempts", 5)
     .order("created_at", { ascending: true })
     .limit(limit);
