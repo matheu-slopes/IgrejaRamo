@@ -32,16 +32,25 @@ function delay(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function fetchWithRetry(input: RequestInfo | URL, init?: RequestInit, attempts = 3): Promise<Response> {
+async function fetchWithRetry(input: RequestInfo | URL, init?: RequestInit, attempts = 3, timeoutMs = 20_000): Promise<Response> {
   let lastError: unknown;
   for (let i = 1; i <= attempts; i++) {
     try {
-      const res = await fetch(input, init);
-      if (res.status >= 500 && i < attempts) {
-        await delay(i * 200);
-        continue;
+      // Timeout por tentativa: evita que o lock do outbox fique preso
+      // indefinidamente em redes lentas ou no iOS PWA.
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(new DOMException("Timeout", "AbortError")), timeoutMs);
+      try {
+        const res = await fetch(input, { ...init, signal: controller.signal });
+        clearTimeout(timer);
+        if (res.status >= 500 && i < attempts) {
+          await delay(i * 200);
+          continue;
+        }
+        return res;
+      } finally {
+        clearTimeout(timer);
       }
-      return res;
     } catch (e) {
       lastError = e;
       if (i < attempts) {
@@ -2372,30 +2381,16 @@ export default function ChatPage() {
       else setGrupos(prev => prev.map(g => g.id === conversaId ? { ...g, mensagens: g.mensagens.map(updater) } : g));
       URL.revokeObjectURL(localUrl);
 
-      // Persiste no banco antes do broadcast para garantir push em ambiente serverless.
-      const saveRes = await fetchWithRetry("/api/chat/mensagem", {
-        method: "POST", keepalive: true,
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ id: msgId, conversa_id: conversaId, autor_id: u.id, autor_nome: u.nome, conteudo: "", tipo: "imagem", media_url: finalUrl }),
+      // Enfileira na outbox com a URL definitiva — retry automático igual às mensagens de texto.
+      const pendingImgMsg: MensagemConversa = { ...msg, mediaUrl: finalUrl, status: "pending" };
+      setMensagemLocal(tipo, conversaId, pendingImgMsg);
+      upsertOutbox(u.id, {
+        id: msgId, conversaId, tipo,
+        message: pendingImgMsg,
+        attempts: 0,
+        updatedAt: new Date().toISOString(),
       });
-      if (!saveRes.ok) {
-        const j = await saveRes.json().catch(() => ({}));
-        throw new Error(j.error ?? "Erro ao salvar imagem");
-      }
-      const saveJson = await saveRes.json().catch(() => ({}));
-      const serverTime = saveJson.criado_em ?? msg.criadoEm;
-
-      // Atualiza horário com o timestamp do servidor e só então faz broadcast.
-      const finalMsg = { ...msg, mediaUrl: finalUrl, criadoEm: serverTime };
-      const updaterFinal = (m: MensagemConversa) => m.id === msgId ? finalMsg : m;
-      if (tipo === "direto") {
-        setDms(prev => prev.map(dm => dm.id === conversaId ? { ...dm, mensagens: dm.mensagens.map(updaterFinal) } : dm));
-      } else {
-        setGrupos(prev => prev.map(g => g.id === conversaId ? { ...g, mensagens: g.mensagens.map(updaterFinal) } : g));
-      }
-      broadcastChannelsRef.current.get(conversaId)?.send({ type: "broadcast", event: "msg", payload: finalMsg })
-        .then((s: string) => { if (s !== "ok") console.warn("broadcast sendImage:", s); });
-      scheduleNotificationDispatch();
+      void flushOutbox(true);
     } catch (err: unknown) {
       const msg2 = err instanceof Error ? err.message : "Erro ao enviar imagem";
       showToast(msg2);
@@ -2438,30 +2433,16 @@ export default function ChatPage() {
       else setGrupos(prev => prev.map(g => g.id === conversaId ? { ...g, mensagens: g.mensagens.map(updater) } : g));
       URL.revokeObjectURL(localUrl);
 
-      // Persiste no banco antes do broadcast para garantir push em ambiente serverless.
-      const saveRes = await fetchWithRetry("/api/chat/mensagem", {
-        method: "POST", keepalive: true,
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ id: msgId, conversa_id: conversaId, autor_id: u.id, autor_nome: u.nome, conteudo: tipoMsg === "documento" ? nomeArquivo : "", tipo: tipoMsg, media_url: finalUrl }),
+      // Enfileira na outbox com a URL definitiva — retry automático igual às mensagens de texto.
+      const pendingArqMsg: MensagemConversa = { ...msg, mediaUrl: finalUrl, status: "pending" };
+      setMensagemLocal(tipo, conversaId, pendingArqMsg);
+      upsertOutbox(u.id, {
+        id: msgId, conversaId, tipo,
+        message: pendingArqMsg,
+        attempts: 0,
+        updatedAt: new Date().toISOString(),
       });
-      if (!saveRes.ok) {
-        const j = await saveRes.json().catch(() => ({}));
-        throw new Error(j.error ?? "Erro ao salvar arquivo");
-      }
-      const saveJson = await saveRes.json().catch(() => ({}));
-      const serverTime = saveJson.criado_em ?? msg.criadoEm;
-
-      // Atualiza horário com o timestamp do servidor e só então faz broadcast.
-      const finalMsg = { ...msg, mediaUrl: finalUrl, criadoEm: serverTime };
-      const updaterFinal = (m: MensagemConversa) => m.id === msgId ? finalMsg : m;
-      if (tipo === "direto") {
-        setDms(prev => prev.map(dm => dm.id === conversaId ? { ...dm, mensagens: dm.mensagens.map(updaterFinal) } : dm));
-      } else {
-        setGrupos(prev => prev.map(g => g.id === conversaId ? { ...g, mensagens: g.mensagens.map(updaterFinal) } : g));
-      }
-      broadcastChannelsRef.current.get(conversaId)?.send({ type: "broadcast", event: "msg", payload: finalMsg })
-        .then((s: string) => { if (s !== "ok") console.warn("broadcast sendArquivo:", s); });
-      scheduleNotificationDispatch();
+      void flushOutbox(true);
     } catch (err: unknown) {
       const errMsg = err instanceof Error ? err.message : "Erro ao enviar arquivo";
       showToast(errMsg);
