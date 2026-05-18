@@ -164,43 +164,21 @@ export default function PushSubscriber() {
     const authKey = json.keys?.auth ?? "";
     if (!p256dh || !authKey) throw new Error("Não foi possível obter as chaves da subscription.");
 
-    let token = "";
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.access_token) {
-        throw new Error("Sessão expirada. Faça login novamente.");
-      }
-      
-      // Valida e renova o token se estiver próximo do vencimento
-      const expiresAt = session.expires_at ?? 0;
-      if (Date.now() / 1000 > expiresAt - 60) {
-        const { data } = await supabase.auth.refreshSession();
-        token = data.session?.access_token ?? "";
-        if (!token) throw new Error("Falha ao renovar sessão.");
-      } else {
-        token = session.access_token;
-      }
-    } catch (e) {
-      throw new Error(`Erro de autenticação: ${String(e).replace("Error: ", "")}`);
-    }
+    const token = await getFreshAccessToken();
 
     // Salva no backend com service role para evitar falhas de RLS entre ambientes.
-    const res = await fetch("/api/push/subscribe", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({
-        endpoint: sub.endpoint,
-        p256dh,
-        auth: authKey,
-      }),
-    });
+    await salvarSubscriptionNoServidor(token, sub.endpoint, p256dh, authKey);
 
-    const jsonRes = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      throw new Error(jsonRes.error ?? "Falha ao registrar notificação.");
+    // Confirma de verdade que o backend gravou a subscription. Isso evita o caso
+    // ruim de o usuário tocar em "Ativar", parecer sucesso, mas ficar Subscriptions 0.
+    let count = await contarSubscriptionsNoServidor(token);
+    if (count === 0) {
+      await salvarSubscriptionNoServidor(token, sub.endpoint, p256dh, authKey);
+      count = await contarSubscriptionsNoServidor(token);
+    }
+
+    if (count === 0) {
+      throw new Error("Permissão concedida, mas o aparelho não ficou registrado. Tente novamente.");
     }
 
     if (user?.id) {
@@ -370,6 +348,53 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
   const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
   const rawData = atob(base64);
   return Uint8Array.from([...rawData].map((c) => c.charCodeAt(0)));
+}
+
+async function getFreshAccessToken() {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.access_token) {
+      throw new Error("Sessão expirada. Faça login novamente.");
+    }
+
+    const expiresAt = session.expires_at ?? 0;
+    if (Date.now() / 1000 > expiresAt - 60) {
+      const { data } = await supabase.auth.refreshSession();
+      const token = data.session?.access_token ?? "";
+      if (!token) throw new Error("Falha ao renovar sessão.");
+      return token;
+    }
+
+    return session.access_token;
+  } catch (e) {
+    throw new Error(`Erro de autenticação: ${String(e).replace("Error: ", "")}`);
+  }
+}
+
+async function salvarSubscriptionNoServidor(token: string, endpoint: string, p256dh: string, auth: string) {
+  const res = await fetch("/api/push/subscribe", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ endpoint, p256dh, auth }),
+  });
+
+  const jsonRes = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(jsonRes.error ?? "Falha ao registrar notificação.");
+  }
+}
+
+async function contarSubscriptionsNoServidor(token: string) {
+  const res = await fetch("/api/push/status", {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: "no-store",
+  });
+  if (!res.ok) return null;
+  const json = await res.json().catch(() => ({}));
+  return typeof json.suas_subscriptions_count === "number" ? json.suas_subscriptions_count : null;
 }
 
 function shouldRenewSubscription(sub: PushSubscription, expectedKey: Uint8Array, userId?: string): boolean {
