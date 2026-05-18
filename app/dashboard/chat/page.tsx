@@ -1159,7 +1159,7 @@ function GrupoAvatar({ grupo, size = "md" }: { grupo: Grupo; size?: "sm" | "md" 
 
 export default function ChatPage() {
   const { user, usuarios } = useAuth();
-  const { setTotalUnread, setActiveChatId } = useChatUnread();
+  const { setTotalUnread, setActiveChatId, contextConversaIds } = useChatUnread();
   const [tab, setTab] = useState<ChatTab>("direto");
   const [activeChat, setActiveChat] = useState<ActiveChat>(null);
   const [isMobileChatViewport, setIsMobileChatViewport] = useState(false);
@@ -1189,6 +1189,7 @@ export default function ChatPage() {
   const [showNewDmModal, setShowNewDmModal] = useState(false);
   const [showNewGroupModal, setShowNewGroupModal] = useState(false);
   const [conversaIds, setConversaIds] = useState<string[]>([]);
+  const [channelRevision, setChannelRevision] = useState(0);
   const startingDmRef = useRef(false);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const broadcastChannelsRef = useRef<Map<string, any>>(new Map());
@@ -1686,7 +1687,7 @@ export default function ChatPage() {
     sincronizarMensagensRecentes();
     const interval = window.setInterval(() => {
       sincronizarMensagensRecentes();
-    }, 5000);
+    }, 2000);
 
     window.addEventListener("focus", onFocus);
     document.addEventListener("visibilitychange", onVisibility);
@@ -1720,11 +1721,28 @@ export default function ChatPage() {
           // Atualiza o cursor do servidor se o usuário está visualizando a conversa agora
           if (isActive && !isMine) markConversaAsRead(cid);
         })
-        .subscribe();
+        .subscribe((status: string) => {
+          if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+            if (map.get(cid) === ch) {
+              supabase.removeChannel(ch);
+              map.delete(cid);
+              setTimeout(() => setChannelRevision(r => r + 1), 2000);
+            }
+          } else if (status === "CLOSED") {
+            // Dá tempo para o Supabase reconectar automaticamente antes de recriar
+            setTimeout(() => {
+              if (map.get(cid) === ch) {
+                supabase.removeChannel(ch);
+                map.delete(cid);
+                setChannelRevision(r => r + 1);
+              }
+            }, 8000);
+          }
+        });
       map.set(cid, ch);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [conversaIds.join(","), user?.id]);
+  }, [conversaIds.join(","), user?.id, channelRevision]);
 
   // Limpa canais de broadcast ao desmontar
   useEffect(() => {
@@ -1836,6 +1854,20 @@ export default function ChatPage() {
 
   // -- mant�m conversaIdsRef sempre atualizado -----------------------
   useEffect(() => { conversaIdsRef.current = conversaIds; }, [conversaIds]);
+
+  // -- semente de canais a partir do contexto global ----------------
+  // Garante que os canais de broadcast estao prontos imediatamente ao
+  // entrar no chat, mesmo antes de carregarConversas() completar.
+  useEffect(() => {
+    if (!user?.id || !contextConversaIds.length) return;
+    setConversaIds(prev => {
+      const merged = [...new Set([...prev, ...contextConversaIds])];
+      if (merged.length === prev.length) return prev; // sem mudanca
+      conversaIdsRef.current = merged;
+      return merged;
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contextConversaIds, user?.id]);
 
   // -- salva cache de forma s�ncrona ao fechar a aba -----------------
   // O useEffect[dms,grupos] pode n�o ter rodado antes do unload.

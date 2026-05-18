@@ -9,12 +9,14 @@ type ChatUnreadCtx = {
   totalUnread: number;
   setTotalUnread: (n: number) => void;
   setActiveChatId: (id: string | null) => void;
+  contextConversaIds: string[];
 };
 
 const ChatUnreadContext = createContext<ChatUnreadCtx>({
   totalUnread: 0,
   setTotalUnread: () => {},
   setActiveChatId: () => {},
+  contextConversaIds: [],
 });
 
 // ── helpers localStorage ────────────────────────────────────────────
@@ -73,6 +75,7 @@ export function ChatUnreadProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const [totalUnread, setTotalUnreadState] = useState(0);
   const [conversaIds, setConversaIds] = useState<string[]>([]);
+  const [channelRevision, setChannelRevision] = useState(0);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const channelsRef = useRef<Map<string, any>>(new Map());
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -199,31 +202,39 @@ export function ChatUnreadProvider({ children }: { children: ReactNode }) {
   }, [user?.id]);
 
   // ── Gerencia canais de broadcast ─────────────────────────────────
-  // ESTRATÉGIA:
-  // - Quando no chat page → remove todos os canais do contexto.
-  //   O chat page cuida dos próprios canais e chama setTotalUnread diretamente.
-  // - Quando fora do chat page → recria canais frescos.
-  //   Isso garante que um LEAVE enviado pelo chat page ao desmontar não
-  //   deixe os canais do contexto "mortos" no servidor.
+  // ESTRATÉGIA: canais ficam ativos durante toda a sessão autenticada.
+  // Quando o usuário está no chat page, os broadcasts são recebidos mas
+  // NÃO incrementam o badge nem salvam no inbox (o chat page cuida disso).
+  // Isso elimina o gap onde mensagens eram perdidas ao entrar/sair do chat.
   useEffect(() => {
-    if (!user?.id) return;
-    const uid = user.id;
     const map = channelsRef.current;
 
-    // Sempre limpa antes (garante canais frescos, evita canais zumbis)
-    map.forEach(ch => supabase.removeChannel(ch));
-    map.clear();
+    if (!user?.id) {
+      // Logout: limpa todos os canais
+      map.forEach(ch => supabase.removeChannel(ch));
+      map.clear();
+      return;
+    }
 
-    // No chat page: sem canais no contexto (chat page gerencia tudo)
-    if (pathname === "/dashboard/chat") return;
+    const uid = user.id;
 
-    const ids = conversaIds;
-    for (const cid of ids) {
+    // Troca de conta: limpa canais do usuário anterior
+    if (userIdRef.current !== uid) {
+      map.forEach(ch => supabase.removeChannel(ch));
+      map.clear();
+    }
+
+    // Adiciona apenas conversas novas (incremental, sem destruir canais ativos)
+    const toAdd = conversaIds.filter(id => !map.has(id));
+    for (const cid of toAdd) {
       const ch = supabase
         .channel(`room:${cid}`)
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .on("broadcast", { event: "msg" }, ({ payload }: { payload: any }) => {
           if (payload?.autorId === uid) return; // mensagem própria
+
+          // No chat page: não duplica inbox/badge (o chat page cuida disso)
+          if (pathnameRef.current === "/dashboard/chat") return;
 
           // Salva no inbox do localStorage (persiste mesmo com gaps de reconexão)
           saveToLocalInbox(uid, cid, {
@@ -244,19 +255,38 @@ export function ChatUnreadProvider({ children }: { children: ReactNode }) {
             return next;
           });
         })
-        .subscribe();
+        .subscribe((status: string) => {
+          if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+            if (map.get(cid) === ch) {
+              supabase.removeChannel(ch);
+              map.delete(cid);
+              setTimeout(() => setChannelRevision(r => r + 1), 2000);
+            }
+          } else if (status === "CLOSED") {
+            setTimeout(() => {
+              if (map.get(cid) === ch) {
+                supabase.removeChannel(ch);
+                map.delete(cid);
+                setChannelRevision(r => r + 1);
+              }
+            }, 8000);
+          }
+        });
       map.set(cid, ch);
     }
-
-    return () => {
-      map.forEach(ch => supabase.removeChannel(ch));
-      map.clear();
-    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathname, user?.id, conversaIds.join(",")]);
+  }, [user?.id, conversaIds.join(","), channelRevision]);
+
+  // Cleanup global ao desmontar o Provider
+  useEffect(() => {
+    return () => {
+      channelsRef.current.forEach(ch => supabase.removeChannel(ch));
+      channelsRef.current.clear();
+    };
+  }, []);
 
   return (
-    <ChatUnreadContext.Provider value={{ totalUnread, setTotalUnread, setActiveChatId }}>
+    <ChatUnreadContext.Provider value={{ totalUnread, setTotalUnread, setActiveChatId, contextConversaIds: conversaIds }}>
       {children}
     </ChatUnreadContext.Provider>
   );

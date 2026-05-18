@@ -96,11 +96,14 @@ export default function AppLifecycleSync() {
     function onFocusOut(e: FocusEvent) {
       const target = e.target as HTMLElement;
       if (
-        target instanceof HTMLInputElement ||
-        target instanceof HTMLTextAreaElement ||
-        target?.getAttribute("contenteditable") === "true"
+        wasKeyboardOpen &&
+        (
+          target instanceof HTMLInputElement ||
+          target instanceof HTMLTextAreaElement ||
+          target?.getAttribute("contenteditable") === "true"
+        )
       ) {
-        // Antecipa o fechamento do teclado
+        // Antecipa o fechamento do teclado (só quando o teclado virtual estava aberto)
         clearResetTimers();
         resetTimer1 = setTimeout(forceViewportReset, 100);
         resetTimer2 = setTimeout(forceViewportReset, 350);
