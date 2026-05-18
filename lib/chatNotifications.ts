@@ -124,9 +124,11 @@ async function dispatchChatNotification(job: ChatNotificationJob) {
         failed: delivery.failed,
         sampleError: delivery.errors[0]?.message ?? null,
       });
+      throw new Error(delivery.errors[0]?.message ?? "push nao entregue para nenhuma subscription");
     }
   } catch (pushErr) {
     console.error("chat push dispatch error:", pushErr);
+    throw pushErr;
   }
 
   const notificacoes = userIds.map((uid) => ({

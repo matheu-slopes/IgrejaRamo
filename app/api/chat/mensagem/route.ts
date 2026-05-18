@@ -1,6 +1,6 @@
 ﻿import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { enqueueChatNotificationJob } from "@/lib/chatNotifications";
+import { enqueueChatNotificationJob, processChatNotificationJobs } from "@/lib/chatNotifications";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -152,8 +152,9 @@ export async function POST(req: NextRequest) {
       conteudo: conteudo ?? "",
       tipo: tipo ?? "texto",
     });
+    await processChatNotificationJobs(10);
   } catch (e) {
-    console.error("chat notification enqueue error:", e);
+    console.error("chat notification enqueue/dispatch error:", e);
     // Não falha o envio da mensagem por erro de fila/notificação.
   }
 
