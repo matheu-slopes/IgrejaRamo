@@ -11,14 +11,27 @@ on:
 jobs:
   dispatch:
     runs-on: ubuntu-latest
+    env:
+      APP_URL: ${{ secrets['APP_URL'] }}
+      DEPLOY_URL: ${{ secrets['DEPLOY_URL'] }}
+      CRON_SECRET: ${{ secrets['CRON_SECRET'] }}
     steps:
       - name: Processar fila de notificações de chat
         run: |
-          URL=$(echo "${{ secrets.APP_URL }}" | sed 's:/$::')
+          URL=$(echo "${APP_URL:-$DEPLOY_URL}" | sed 's:/$::')
+          if [ -z "$URL" ]; then
+            echo "Erro: configure o secret APP_URL no GitHub Actions (ex: https://igreja-ramo.vercel.app)."
+            exit 1
+          fi
+          if [ -z "$CRON_SECRET" ]; then
+            echo "Erro: configure o secret CRON_SECRET no GitHub Actions."
+            exit 1
+          fi
+
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
             -X POST \
             -H "Content-Type: application/json" \
-            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -H "Authorization: Bearer $CRON_SECRET" \
             -d '{"limit":100}' \
             "${URL}/api/chat/dispatch-notifications")
           echo "HTTP status: $STATUS"

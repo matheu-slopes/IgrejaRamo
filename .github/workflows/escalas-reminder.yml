@@ -12,10 +12,28 @@ on:
 jobs:
   send-reminders:
     runs-on: ubuntu-latest
+    env:
+      APP_URL: ${{ secrets['APP_URL'] }}
+      DEPLOY_URL: ${{ secrets['DEPLOY_URL'] }}
+      CRON_SECRET: ${{ secrets['CRON_SECRET'] }}
     steps:
       - name: Enviar lembretes de escala
         run: |
-          URL=$(echo "${{ secrets.APP_URL }}" | sed 's:/$::')
-          curl -s -o /dev/null -w "%{http_code}" \
-            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
-            "${URL}/api/push/escalas-reminder"
+          URL=$(echo "${APP_URL:-$DEPLOY_URL}" | sed 's:/$::')
+          if [ -z "$URL" ]; then
+            echo "Erro: configure o secret APP_URL no GitHub Actions (ex: https://igreja-ramo.vercel.app)."
+            exit 1
+          fi
+          if [ -z "$CRON_SECRET" ]; then
+            echo "Erro: configure o secret CRON_SECRET no GitHub Actions."
+            exit 1
+          fi
+
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            "${URL}/api/push/escalas-reminder")
+          echo "HTTP status: $STATUS"
+          if [ "$STATUS" != "200" ]; then
+            echo "Lembrete de escalas retornou status inesperado: $STATUS"
+            exit 1
+          fi
