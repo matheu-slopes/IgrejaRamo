@@ -42,7 +42,29 @@ export default function BottomNav() {
   const { totalUnread } = useChatUnread();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const drawerRef = useRef<HTMLDivElement>(null);
+  const navRef = useRef<HTMLElement>(null);
   const touchStartY = useRef<number>(0);
+
+  // Mantém o nav pregado na base da tela física no iOS PWA.
+  // position:fixed segue o visual viewport; quando ele encolhe (teclado, prompts, sheets)
+  // o nav subiria. Contrabalançamos ajustando `bottom` para o inverso do encolhimento.
+  useEffect(() => {
+    function pin() {
+      const el = navRef.current;
+      if (!el) return;
+      const vv = window.visualViewport;
+      if (!vv) return;
+      const shrink = Math.max(0, window.innerHeight - vv.offsetTop - vv.height);
+      el.style.bottom = `${-shrink}px`;
+    }
+    pin();
+    window.visualViewport?.addEventListener("resize", pin);
+    window.visualViewport?.addEventListener("scroll", pin);
+    return () => {
+      window.visualViewport?.removeEventListener("resize", pin);
+      window.visualViewport?.removeEventListener("scroll", pin);
+    };
+  }, []);
 
   const isAdmin = user?.role === "admin" || user?.role === "pastor";
   const meusMinisterios = isAdmin
@@ -223,14 +245,9 @@ export default function BottomNav() {
 
       {/* Bottom bar */}
       <nav
+        ref={navRef}
         className="bottom-nav fixed inset-x-0 z-40 md:hidden bg-white border-t border-gray-100 flex items-stretch"
-        style={{
-          bottom: 0,
-          height: "calc(4rem + env(safe-area-inset-bottom))",
-          paddingBottom: "env(safe-area-inset-bottom)",
-          paddingLeft:   "env(safe-area-inset-left)",
-          paddingRight:  "env(safe-area-inset-right)",
-        }}
+        style={{ bottom: 0, height: "4rem" }}
       >
         {navItems.map(({ href, label, icon: Icon }) => {
           const isChat = href === "/dashboard/chat";
