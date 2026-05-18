@@ -56,7 +56,9 @@ export default function BottomNav() {
     function pin() {
       const vv = window.visualViewport;
       const drop = vv ? Math.max(0, window.innerHeight - vv.height) : 0;
-      el!.style.transform = drop > 0 ? `translateY(${drop}px) translateZ(0)` : "";
+      // Só aplica transform quando o teclado está genuinamente aberto (>120px)
+      // para não reagir a mudanças mínimas do viewport (prompts, iOS quirks)
+      el!.style.transform = drop > 120 ? `translateY(${drop}px) translateZ(0)` : "";
     }
 
     function pinAfterDelay() {
@@ -258,7 +260,11 @@ export default function BottomNav() {
       <nav
         ref={navRef}
         className="bottom-nav fixed inset-x-0 z-40 md:hidden bg-white border-t border-gray-100 flex items-stretch"
-        style={{ bottom: 0, height: "4rem" }}
+        style={{
+          bottom: 0,
+          height: "calc(4rem + env(safe-area-inset-bottom))",
+          paddingBottom: "env(safe-area-inset-bottom)",
+        }}
       >
         {navItems.map(({ href, label, icon: Icon }) => {
           const isChat = href === "/dashboard/chat";
