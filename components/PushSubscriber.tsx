@@ -128,6 +128,10 @@ export default function PushSubscriber() {
       }
 
       const permission = await Notification.requestPermission();
+      // O dialog nativo de permissão encolhe o visualViewport no iOS.
+      // Forçamos o resize para o BottomNav reposicionar após o dialog fechar.
+      setTimeout(() => window.visualViewport?.dispatchEvent(new Event("resize")), 200);
+      setTimeout(() => window.visualViewport?.dispatchEvent(new Event("resize")), 600);
       if (permission !== "granted") {
         setStatus("erro");
         setMsg("Permissão negada. Vá em Configurações → Notificações para habilitar.");

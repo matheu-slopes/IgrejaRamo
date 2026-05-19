@@ -66,16 +66,31 @@ export default function BottomNav() {
       setTimeout(pin, 120);
     }
 
+    function pinOnVisible() {
+      // Dialogs nativos (permissão de notificação, teclado) podem deixar a
+      // viewport encolhida sem disparar 'resize' ao fechar. Resetamos ao
+      // app voltar ao foco ou ficar visível.
+      if (document.visibilityState === "visible") {
+        setTimeout(pin, 150);
+        setTimeout(pin, 500);
+      }
+    }
+
     pin();
     window.visualViewport?.addEventListener("resize", pin);
     window.visualViewport?.addEventListener("scroll", pin);
     // Garante restauração quando o teclado fecha (iOS às vezes não dispara 'resize')
     document.addEventListener("focusout", pinAfterDelay);
+    // Garante restauração ao voltar ao app (fechar/abrir, trocar de aba)
+    document.addEventListener("visibilitychange", pinOnVisible);
+    window.addEventListener("focus", pinAfterDelay);
 
     return () => {
       window.visualViewport?.removeEventListener("resize", pin);
       window.visualViewport?.removeEventListener("scroll", pin);
       document.removeEventListener("focusout", pinAfterDelay);
+      document.removeEventListener("visibilitychange", pinOnVisible);
+      window.removeEventListener("focus", pinAfterDelay);
     };
   }, []);
 
