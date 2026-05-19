@@ -39,8 +39,19 @@ export default function PushSubscriber() {
     if (!user) return;
     if (typeof window === "undefined") return;
     if (!pushConfigured) return;
-    if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
-    if (!("Notification" in window)) return;
+
+    // Dispositivo/navegador sem suporte a Push (ex: Samsung Internet antigo, WebView)
+    const semSupporte =
+      !("serviceWorker" in navigator) ||
+      !("PushManager" in window) ||
+      !("Notification" in window);
+
+    if (semSupporte) {
+      setStatus("erro");
+      setMsg("Este navegador não suporta notificações. Tente abrir pelo Chrome.");
+      setTimeout(() => setMostrarBanner(true), 3000);
+      return;
+    }
 
     const podeTentar = () => {
       const now = Date.now();
@@ -69,6 +80,11 @@ export default function PushSubscriber() {
     } else if (Notification.permission === "granted") {
       // Já permitiu: registra automaticamente sem exigir clique manual.
       registrarSilencioso(true);
+    } else if (Notification.permission === "denied") {
+      // Permissão bloqueada no Android/browser — orienta o usuário a ir nas configurações.
+      setStatus("erro");
+      setMsg("Notificações bloqueadas. Vá em Configurações → Apps → [nome do app] → Notificações e habilite.");
+      setTimeout(() => setMostrarBanner(true), 3000);
     }
 
     const onFocus = () => {

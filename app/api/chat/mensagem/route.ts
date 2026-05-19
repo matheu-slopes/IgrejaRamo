@@ -152,20 +152,23 @@ export async function POST(req: NextRequest) {
     tipo: tipo ?? "texto",
   };
 
-  try {
-    await enqueueChatNotificationJob(notificationJob);
-    await processChatNotificationJob(id);
-  } catch (e) {
-    console.error("chat notification enqueue/dispatch error:", e);
-    if (isMissingQueueTable(e)) {
-      try {
-        await dispatchChatNotificationNow(notificationJob);
-      } catch (fallbackErr) {
-        console.error("chat notification direct fallback error:", fallbackErr);
+  // Enfileira + processa notificação fora do caminho crítico (fire-and-forget).
+  // O GitHub Actions (chat-dispatch-notifications.yml) cobre casos não processados em até 5 min.
+  void (async () => {
+    try {
+      await enqueueChatNotificationJob(notificationJob);
+      await processChatNotificationJob(id);
+    } catch (e) {
+      console.error("chat notification enqueue/dispatch error:", e);
+      if (isMissingQueueTable(e)) {
+        try {
+          await dispatchChatNotificationNow(notificationJob);
+        } catch (fallbackErr) {
+          console.error("chat notification direct fallback error:", fallbackErr);
+        }
       }
     }
-    // Não falha o envio da mensagem por erro de fila/notificação.
-  }
+  })();
 
   return NextResponse.json({ ok: true, criado_em: criadoEm, sequence_id: sequenceId });
 }
