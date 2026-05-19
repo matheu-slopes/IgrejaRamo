@@ -67,7 +67,8 @@ export default function BottomNav() {
       const offsetTop = Math.round(vv.offsetTop ?? 0);
 
       const totalTranslate = keyboardDrop + offsetTop;
-      el.style.transform = totalTranslate > 2 ? `translateY(${totalTranslate}px) translateZ(0)` : "";
+      // Só aplica se for relevante (>10px). Evita "vão" por offsetTop pequeno.
+      el.style.transform = totalTranslate > 10 ? `translateY(${totalTranslate}px) translateZ(0)` : "";
     }
 
     function pinAfterDelay() {
