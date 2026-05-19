@@ -55,10 +55,19 @@ export default function BottomNav() {
 
     function pin() {
       const vv = window.visualViewport;
-      const drop = vv ? Math.max(0, window.innerHeight - vv.height) : 0;
-      // Só aplica transform quando o teclado está genuinamente aberto (>120px)
-      // para não reagir a mudanças mínimas do viewport (prompts, iOS quirks)
-      el!.style.transform = drop > 120 ? `translateY(${drop}px) translateZ(0)` : "";
+      if (!vv || !el) return;
+
+      // drop: teclado encolheu a viewport (só compensa se > 120px para ignorar quirks)
+      const drop = Math.max(0, window.innerHeight - vv.height);
+      const keyboardDrop = drop > 120 ? drop : 0;
+
+      // offsetTop: iOS desloca o visual viewport para baixo quando um dialog nativo aparece
+      // (permissão de notificação, share sheet, etc). Para elementos fixed bottom:0,
+      // isso faz o nav aparecer acima do fundo da tela. translateY(offsetTop) compensa.
+      const offsetTop = Math.round(vv.offsetTop ?? 0);
+
+      const totalTranslate = keyboardDrop + offsetTop;
+      el.style.transform = totalTranslate > 2 ? `translateY(${totalTranslate}px) translateZ(0)` : "";
     }
 
     function pinAfterDelay() {
