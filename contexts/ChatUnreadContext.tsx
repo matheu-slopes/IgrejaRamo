@@ -97,11 +97,15 @@ export function ChatUnreadProvider({ children }: { children: ReactNode }) {
     if (userIdRef.current) saveCount(userIdRef.current, n);
   }
 
-  // Inicializa do localStorage quando usuário carrega
+
+  // Sempre força atualização do contador do servidor ao logar ou abrir o app
   useEffect(() => {
     if (!user?.id) return;
     userIdRef.current = user.id;
+    // Primeiro mostra o valor local para feedback rápido
     setTotalUnreadState(persistedCount(user.id));
+    // Em seguida, força atualização do servidor
+    refreshUnreadFromServer(user.id);
   }, [user?.id]);
 
   async function refreshUnreadFromServer(uid: string) {
