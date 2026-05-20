@@ -214,7 +214,7 @@ export default function BottomNav() {
 
       {/* Bottom bar */}
       <nav
-        className="bottom-nav relative z-40 md:hidden bg-white border-t border-gray-100 flex items-stretch shrink-0 -mb-3"
+        className="bottom-nav relative z-40 md:hidden bg-transparent flex items-stretch shrink-0 -mb-3"
       >
         {navItems.map(({ href, label, icon: Icon }) => {
           const isChat = href === "/dashboard/chat";
