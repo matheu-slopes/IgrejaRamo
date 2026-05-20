@@ -54,11 +54,6 @@
     display: none !important;
   }
 
-  /* Oculta o BottomNav quando o teclado está aberto no mobile para evitar sobreposição */
-  body.keyboard-open .bottom-nav {
-    display: none !important;
-  }
-
 
   /* Permitir seleção somente em textos legíveis */
   p, h1, h2, h3, h4, h5, h6, span, a, li, td, th, label {
