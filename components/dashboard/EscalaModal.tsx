@@ -453,17 +453,29 @@ export function EscalaModal({ escala, podeEditar, onClose, onUpdate, onDelete }:
               {/* Sub-tabs */}
               <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl">
                 {(["detalhes", "participantes", "musicas"] as SubTab[]).map((t) => {
-                  const label = t === "detalhes" ? "Detalhes" : t === "participantes" ? `Participantes${form.itens.length ? ` · ${form.itens.length}` : ""}` : `Músicas${form.musicas.length ? ` · ${form.musicas.length}` : ""}`;
                   return (
                     <button
                       key={t}
                       onClick={() => setSubTab(t)}
                       className={clsx(
-                        "flex-1 py-1.5 rounded-lg text-xs font-semibold transition",
+                        "flex-1 py-1.5 rounded-lg text-[11px] sm:text-xs font-semibold transition truncate px-1",
                         subTab === t ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
                       )}
                     >
-                      {label}
+                      {t === "detalhes" && "Detalhes"}
+                      {t === "participantes" && (
+                        <>
+                          <span className="hidden sm:inline">Participantes</span>
+                          <span className="sm:hidden">Membros</span>
+                          {form.itens.length ? ` · ${form.itens.length}` : ""}
+                        </>
+                      )}
+                      {t === "musicas" && (
+                        <>
+                          <span>Músicas</span>
+                          {form.musicas.length ? ` · ${form.musicas.length}` : ""}
+                        </>
+                      )}
                     </button>
                   );
                 })}
@@ -565,32 +577,35 @@ export function EscalaModal({ escala, podeEditar, onClose, onUpdate, onDelete }:
               {subTab === "participantes" && (
                 <div className="space-y-4">
                   {/* Add row */}
-                  <div className="flex gap-2 flex-wrap">
-                    <select
-                      value={novaFuncao}
-                      onChange={(e) => setNovaFuncao(e.target.value)}
-                      className="border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-gray-400"
-                    >
-                      {(FUNCOES_POR_MIN[escala.ministerio] ?? FUNCOES_POR_MIN.Louvor).map((f) => (
-                        <option key={f}>{f}</option>
-                      ))}
-                    </select>
-                    <select
-                      value={novoMembroId}
-                      onChange={(e) => setNovoMembroId(e.target.value)}
-                      className="flex-1 min-w-0 border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-gray-400"
-                    >
-                      <option value="">Selecionar membro...</option>
-                      {membros.map((m) => (
-                        <option key={m.id} value={m.id}>{m.nome}</option>
-                      ))}
-                    </select>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <div className="flex gap-2 flex-1">
+                      <select
+                        value={novaFuncao}
+                        onChange={(e) => setNovaFuncao(e.target.value)}
+                        className="flex-1 sm:flex-initial border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-gray-400 bg-white"
+                      >
+                        {(FUNCOES_POR_MIN[escala.ministerio] ?? FUNCOES_POR_MIN.Louvor).map((f) => (
+                          <option key={f}>{f}</option>
+                        ))}
+                      </select>
+                      <select
+                        value={novoMembroId}
+                        onChange={(e) => setNovoMembroId(e.target.value)}
+                        className="flex-[2] sm:flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-gray-400 min-w-0 bg-white"
+                      >
+                        <option value="">Selecionar membro...</option>
+                        {membros.map((m) => (
+                          <option key={m.id} value={m.id}>{m.nome}</option>
+                        ))}
+                      </select>
+                    </div>
                     <button
                       onClick={addParticipante}
                       disabled={!novoMembroId}
-                      className="flex items-center gap-1 px-3 py-2 bg-black text-white text-sm font-semibold rounded-xl hover:bg-gray-900 transition disabled:opacity-40"
+                      className="flex items-center justify-center gap-1 px-4 py-2 bg-black text-white text-sm font-semibold rounded-xl hover:bg-gray-900 transition disabled:opacity-40 w-full sm:w-auto shrink-0"
                     >
-                      <Plus className="w-4 h-4" />
+                      <Plus className="w-4 h-4 shrink-0" />
+                      <span className="sm:hidden">Adicionar Integrante</span>
                     </button>
                   </div>
 
@@ -787,22 +802,22 @@ export function EscalaModal({ escala, podeEditar, onClose, onUpdate, onDelete }:
             {salvarErro && (
               <p className="text-xs text-red-600 text-right font-medium">{salvarErro}</p>
             )}
-            <div className="flex items-center justify-end gap-2">
-            <button
-              onClick={() => { setMode("view"); setSalvarErro(""); }}
-              className="px-4 py-2 text-sm font-semibold text-gray-600 hover:text-gray-800 bg-gray-100 rounded-xl hover:bg-gray-200 transition"
-            >
-              Cancelar
-            </button>
-            <button
-              onClick={salvar}
-              disabled={saving || !form.culto || !form.data || !form.horario}
-              className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-white bg-black rounded-xl hover:bg-gray-900 transition disabled:opacity-50"
-            >
-              <Save className="w-4 h-4" />
-              {saving ? "Salvando..." : "Salvar"}
-            </button>
-            </div>
+             <div className="flex items-center justify-end gap-2 shrink-0">
+               <button
+                 onClick={() => { setMode("view"); setSalvarErro(""); }}
+                 className="px-4 py-2 text-sm font-semibold text-gray-600 hover:text-gray-800 bg-gray-100 rounded-xl hover:bg-gray-200 transition whitespace-nowrap"
+               >
+                 Cancelar
+               </button>
+               <button
+                 onClick={salvar}
+                 disabled={saving || !form.culto || !form.data || !form.horario}
+                 className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-white bg-black rounded-xl hover:bg-gray-900 transition disabled:opacity-50 whitespace-nowrap shrink-0"
+               >
+                 <Save className="w-4 h-4 shrink-0" />
+                 <span>{saving ? "Salvando..." : "Salvar"}</span>
+               </button>
+             </div>
           </div>
         )}
       </div>

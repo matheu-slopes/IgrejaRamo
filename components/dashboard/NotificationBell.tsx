@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState, useEffect } from "react";
 import { Bell, X, CheckCheck, CalendarDays, MessageSquare, AlertCircle, Users } from "lucide-react";
@@ -148,7 +148,7 @@ export default function NotificationBell() {
             className="fixed inset-0 z-40"
             onClick={() => setOpen(false)}
           />
-          <div className="absolute right-0 top-11 z-50 w-80 bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
+          <div className="fixed sm:absolute right-4 sm:right-0 left-4 sm:left-auto top-16 sm:top-11 z-50 w-auto sm:w-80 bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
             {/* Header */}
             <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
               <div className="flex items-center gap-2">

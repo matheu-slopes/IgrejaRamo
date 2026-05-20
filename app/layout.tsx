@@ -1,4 +1,4 @@
-﻿import type { Metadata, Viewport } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter, Lora } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/contexts/AuthContext";
@@ -89,6 +89,7 @@ export default function RootLayout({
       <head>
         {/* iOS standalone — esconde barra de endereço e UI do browser */}
         <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
         {/* Garante área segura (notch/dynamic island) */}
         <meta name="theme-color" content="#1a2e1a" />
         <link rel="manifest" href="/manifest.json" />

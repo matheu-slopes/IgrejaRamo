@@ -43,6 +43,10 @@
     background-color: #f9fafb;
   }
 
+  body.dashboard-body {
+    background-color: #ffffff !important;
+  }
+
   /* Permitir seleção somente em textos legíveis */
   p, h1, h2, h3, h4, h5, h6, span, a, li, td, th, label {
     -webkit-user-select: text;

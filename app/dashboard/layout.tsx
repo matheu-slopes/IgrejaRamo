@@ -361,6 +361,13 @@ export default function DashboardLayout({
   }, [user, isLoading, router]);
 
   useEffect(() => {
+    document.body.classList.add("dashboard-body");
+    return () => {
+      document.body.classList.remove("dashboard-body");
+    };
+  }, []);
+
+  useEffect(() => {
     if (!isLoading && user?.primeiroAcesso) {
       setNomeForm(user.nome ?? "");
       setEmailForm(user.email ?? "");
@@ -473,10 +480,9 @@ export default function DashboardLayout({
       {/* Bottom nav — apenas mobile */}
       <BottomNav />
 
-      {/* Modal primeiro acesso — troca de senha obrigatória */}
       {senhaModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-7 space-y-5">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-7 space-y-5 max-h-[95vh] overflow-y-auto">
             <div className="text-center space-y-1">
               <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
                 <KeyRound className="w-6 h-6 text-gray-700" />

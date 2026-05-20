@@ -259,7 +259,7 @@ export default function BuscarCifraModal({ onClose, onSalva }: Props) {
         {resultado && (
           <>
             <div className="px-5 py-3 border-b border-gray-100 shrink-0">
-              <div className="flex items-start justify-between gap-3">
+              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="font-bold text-gray-900 truncate">{resultado.name}</p>
                   <p className="text-sm text-gray-500">{resultado.artist}</p>
@@ -270,8 +270,8 @@ export default function BuscarCifraModal({ onClose, onSalva }: Props) {
                     </a>
                   )}
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <div className="flex flex-col items-end gap-0.5">
+                <div className="flex items-center gap-2 shrink-0 self-start sm:self-auto w-full sm:w-auto justify-between sm:justify-end mt-1 sm:mt-0">
+                  <div className="flex flex-col items-start sm:items-end gap-0.5">
                     {tomOriginal && tom !== tomOriginal && (
                       <span className="text-[10px] text-gray-400 leading-none">original: {tomOriginal}</span>
                     )}
@@ -317,24 +317,24 @@ export default function BuscarCifraModal({ onClose, onSalva }: Props) {
             <div className="px-5 py-4 border-t border-gray-100 shrink-0 flex items-center justify-between gap-2">
               <button
                 onClick={() => setResultado(null)}
-                className="text-sm text-gray-400 hover:text-gray-600 transition"
+                className="text-sm text-gray-400 hover:text-gray-600 transition whitespace-nowrap"
               >
                 ← Voltar
               </button>
-              <div className="flex gap-2">
-                <button onClick={onClose} className="text-sm text-gray-500 px-4 py-2 rounded-xl hover:bg-gray-100 transition">
+              <div className="flex gap-2 shrink-0">
+                <button onClick={onClose} className="text-sm text-gray-500 px-3 sm:px-4 py-2 rounded-xl hover:bg-gray-100 transition whitespace-nowrap">
                   Cancelar
                 </button>
                 <button
                   onClick={salvar}
                   disabled={salvo}
                   className={clsx(
-                    "flex items-center gap-2 text-sm font-semibold px-5 py-2 rounded-xl transition",
+                    "flex items-center gap-2 text-sm font-semibold px-4 sm:px-5 py-2 rounded-xl transition whitespace-nowrap",
                     salvo ? "bg-green-600 text-white" : "bg-grape-700 text-white hover:bg-grape-800 disabled:opacity-60"
                   )}
                 >
-                  {salvo ? <Check className="w-4 h-4" /> : null}
-                  {salvo ? "Adicionado!" : "Adicionar à escala"}
+                  {salvo ? <Check className="w-4 h-4 shrink-0" /> : null}
+                  <span>{salvo ? "Adicionado!" : "Adicionar à escala"}</span>
                 </button>
               </div>
             </div>
