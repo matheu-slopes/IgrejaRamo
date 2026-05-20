@@ -217,11 +217,7 @@ export default function PushSubscriber() {
 
   return (
     <div
-      className="fixed left-1/2 bottom-3 z-50 w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 md:bottom-6"
-      style={{
-        // Overlay acima da BottomNav sem depender de bottom + env() dinâmico do iOS.
-        transform: "translateX(-50%) translateY(calc(-4.25rem - max(0px, env(safe-area-inset-bottom))))",
-      }}
+      className="fixed left-1/2 top-20 z-50 w-[calc(100%-2rem)] max-w-sm -translate-x-1/2"
     >
       <div className="bg-vine-900 text-white rounded-2xl shadow-2xl overflow-hidden">
         <div className="px-4 py-3 flex items-center gap-3">

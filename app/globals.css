@@ -26,7 +26,6 @@
     user-select: none;
     /* Ocupa toda a altura disponível */
     min-height: 100%;
-    min-height: var(--app-vvh, 100dvh);
     /* Permite scroll vertical normal do site; evita corte na home */
     overflow-x: hidden;
     overflow-y: auto;
@@ -36,11 +35,6 @@
   a, button, [role="button"], input, textarea, select, label {
     -webkit-tap-highlight-color: transparent;
     tap-highlight-color: transparent;
-  }
-
-  body.chat-conversation-open {
-    overflow: hidden;
-    background-color: #f9fafb;
   }
 
   html.dashboard-root {
@@ -83,16 +77,6 @@
     font-size: 16px !important;
     -webkit-user-select: auto;
     user-select: auto;
-  }
-
-  /* Quando a conversa está aberta no mobile, esconde o header e o bottom nav do dashboard.
-   * O chat panel cobre a tela inteira (z-60) com seu próprio header + safe-area. */
-  body.chat-conversation-open .dashboard-header {
-    display: none;
-  }
-
-  body.chat-conversation-open .bottom-nav {
-    display: none;
   }
 
   /* Granulado sutil para dar profundidade ao fundo cream */

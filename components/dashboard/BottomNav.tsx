@@ -42,7 +42,6 @@ export default function BottomNav() {
   const { totalUnread } = useChatUnread();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const drawerRef = useRef<HTMLDivElement>(null);
-  const navRef = useRef<HTMLElement>(null);
   const touchStartY = useRef<number>(0);
 
 
@@ -53,16 +52,6 @@ export default function BottomNav() {
     : (user?.ministerios ?? []).filter((m) => ministeriosMap[m]);
 
   const hasExtras = meusMinisterios.length > 0 || isAdmin;
-
-  // Scroll-lock no body quando o drawer está aberto
-  useEffect(() => {
-    if (drawerOpen) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "";
-    }
-    return () => { document.body.style.overflow = ""; };
-  }, [drawerOpen]);
 
   // Fecha o drawer ao navegar para outra rota
   useEffect(() => {
@@ -124,7 +113,6 @@ export default function BottomNav() {
           "fixed bottom-0 inset-x-0 z-50 md:hidden bg-white rounded-t-2xl shadow-2xl transition-transform duration-300 ease-out",
           drawerOpen ? "translate-y-0" : "translate-y-full"
         )}
-        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
         onTouchStart={onTouchStart}
         onTouchEnd={onTouchEnd}
       >
@@ -226,11 +214,7 @@ export default function BottomNav() {
 
       {/* Bottom bar */}
       <nav
-        ref={navRef}
         className="bottom-nav relative z-40 md:hidden bg-white border-t border-gray-100 flex items-stretch shrink-0"
-        style={{
-          paddingBottom: "env(safe-area-inset-bottom)",
-        }}
       >
         {navItems.map(({ href, label, icon: Icon }) => {
           const isChat = href === "/dashboard/chat";

@@ -1196,7 +1196,6 @@ export default function ChatPage() {
   const { setTotalUnread, setActiveChatId, contextConversaIds } = useChatUnread();
   const [tab, setTab] = useState<ChatTab>("direto");
   const [activeChat, setActiveChat] = useState<ActiveChat>(null);
-  const [isMobileChatViewport, setIsMobileChatViewport] = useState(false);
   const [search, setSearch] = useState("");
   const [chatSearchQuery, setChatSearchQuery] = useState("");
   const [chatSearchOpen, setChatSearchOpen] = useState(false);
@@ -2124,49 +2123,6 @@ export default function ChatPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeChat?.id]);
 
-  useEffect(() => {
-    const root = document.documentElement;
-    const body = document.body;
-    let timer: ReturnType<typeof setTimeout> | null = null;
-
-    function updateVvh() {
-      const isMobile = window.innerWidth < 768;
-      setIsMobileChatViewport(isMobile);
-      const viewport = window.visualViewport;
-      const vvh = Math.round(viewport?.height ?? window.innerHeight);
-      const offsetTop = Math.round(viewport?.offsetTop ?? 0);
-      root.style.setProperty("--chat-vvh", `${vvh}px`);
-      root.style.setProperty("--vv-offset-top", `${offsetTop}px`);
-      if (activeChat && isMobile) body.classList.add("chat-conversation-open");
-      else body.classList.remove("chat-conversation-open");
-    }
-
-    function scheduleUpdate() {
-      updateVvh();
-      if (timer) clearTimeout(timer);
-      timer = setTimeout(updateVvh, 250);
-    }
-
-    updateVvh();
-    window.visualViewport?.addEventListener("resize", scheduleUpdate);
-    window.visualViewport?.addEventListener("scroll", scheduleUpdate);
-    window.addEventListener("resize", scheduleUpdate);
-    window.addEventListener("orientationchange", scheduleUpdate);
-    window.addEventListener("focusout", scheduleUpdate);
-    document.addEventListener("visibilitychange", scheduleUpdate);
-
-    return () => {
-      if (timer) clearTimeout(timer);
-      window.visualViewport?.removeEventListener("resize", scheduleUpdate);
-      window.visualViewport?.removeEventListener("scroll", scheduleUpdate);
-      window.removeEventListener("resize", scheduleUpdate);
-      window.removeEventListener("orientationchange", scheduleUpdate);
-      window.removeEventListener("focusout", scheduleUpdate);
-      document.removeEventListener("visibilitychange", scheduleUpdate);
-      body.classList.remove("chat-conversation-open");
-    };
-  }, [activeChat?.id]);
-
   function showToast(msg: string) {
     setToast(msg);
     setTimeout(() => setToast(null), 2500);
@@ -2536,26 +2492,11 @@ export default function ChatPage() {
     return [] as MensagemConversa[];
   }
 
-  function settleViewportAfterClosingChat() {
-    if (typeof window === "undefined" || window.innerWidth >= 768) return;
-
-    const focused = document.activeElement as HTMLElement | null;
-    focused?.blur?.();
-    document.body.classList.remove("chat-conversation-open");
-
-    const settle = () => {
-      const fullHeight = Math.round(window.innerHeight);
-      document.documentElement.style.setProperty("--chat-vvh", `${fullHeight}px`);
-      document.documentElement.style.setProperty("--vv-offset-top", "0px");
-    };
-
-    requestAnimationFrame(settle);
-    setTimeout(settle, 120);
-    setTimeout(settle, 320);
-  }
-
   function openChat(chat: ActiveChat) {
-    if (!chat) settleViewportAfterClosingChat();
+    if (!chat && typeof document !== "undefined") {
+      const focused = document.activeElement as HTMLElement | null;
+      focused?.blur?.();
+    }
     setActiveChat(chat);
     activeChatRef.current = chat;
     setActiveChatId(chat?.id ?? null);
@@ -2578,10 +2519,7 @@ export default function ChatPage() {
 
   function renderChatHeader(name: string, subtitle: string, avatarEl: ReactNode) {
     return (
-      <div
-        className="flex items-center gap-2 px-4 py-3 border-b border-gray-100 bg-white shrink-0"
-        style={isMobileChatViewport ? { paddingTop: "calc(0.75rem + env(safe-area-inset-top))" } : undefined}
-      >
+      <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-100 bg-white shrink-0">
         <button
           onClick={() => openChat(null)}
           className="lg:hidden text-gray-400 hover:text-gray-800 transition"
@@ -2964,20 +2902,8 @@ export default function ChatPage() {
       </div>
 
       <div
-        className={clsx(
-          "bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden",
-          activeChat && isMobileChatViewport && "fixed inset-x-0 z-50 rounded-none border-0 shadow-none"
-        )}
-        style={activeChat && isMobileChatViewport
-          ? {
-              top: "var(--vv-offset-top, 0px)",
-              bottom: "auto",
-              height: "var(--chat-vvh, 100dvh)",
-              minHeight: 0,
-              zIndex: 60,
-            }
-          : { height: "calc(100dvh - 180px)", minHeight: 400 }
-        }
+        className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden"
+        style={{ height: "calc(100dvh - 180px)", minHeight: 400 }}
       >
         <div className="flex h-full min-h-0">
           {/* Left list */}
