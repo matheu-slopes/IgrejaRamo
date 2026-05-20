@@ -19,7 +19,6 @@ function updateChatVars() {
   // Variáveis usadas APENAS pelo chat conversation view
   const height = keyboardOpen ? visualHeight : window.innerHeight;
   document.documentElement.style.setProperty("--chat-vvh", `${height}px`);
-  document.documentElement.style.setProperty("--app-vvh", `${window.innerHeight}px`);
   document.documentElement.style.setProperty("--vv-offset-top", keyboardOpen ? `${offsetTop}px` : "0px");
   document.body.classList.toggle("keyboard-open", keyboardOpen);
 }

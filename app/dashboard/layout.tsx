@@ -361,8 +361,10 @@ export default function DashboardLayout({
   }, [user, isLoading, router]);
 
   useEffect(() => {
+    document.documentElement.classList.add("dashboard-root");
     document.body.classList.add("dashboard-body");
     return () => {
+      document.documentElement.classList.remove("dashboard-root");
       document.body.classList.remove("dashboard-body");
     };
   }, []);

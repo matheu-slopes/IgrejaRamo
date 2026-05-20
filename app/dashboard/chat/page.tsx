@@ -2545,7 +2545,6 @@ export default function ChatPage() {
 
     const settle = () => {
       const fullHeight = Math.round(window.innerHeight);
-      document.documentElement.style.setProperty("--app-vvh", `${fullHeight}px`);
       document.documentElement.style.setProperty("--chat-vvh", `${fullHeight}px`);
       document.documentElement.style.setProperty("--vv-offset-top", "0px");
     };
