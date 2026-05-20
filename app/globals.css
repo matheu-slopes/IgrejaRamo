@@ -46,16 +46,19 @@
   body.dashboard-body {
     background-color: #ffffff !important;
     overflow: hidden !important;
-    position: fixed !important;
-    inset: 0 !important;
-    width: 100% !important;
-    height: 100% !important;
+  }
+
+  /* No dashboard, desabilitar overlays decorativos do body que vazam pela safe-area */
+  body.dashboard-body::before,
+  body.dashboard-body::after {
+    display: none !important;
   }
 
   /* Oculta o BottomNav quando o teclado está aberto no mobile para evitar sobreposição */
   body.keyboard-open .bottom-nav {
     display: none !important;
   }
+
 
   /* Permitir seleção somente em textos legíveis */
   p, h1, h2, h3, h4, h5, h6, span, a, li, td, th, label {

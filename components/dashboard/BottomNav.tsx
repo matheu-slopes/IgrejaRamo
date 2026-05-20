@@ -227,10 +227,10 @@ export default function BottomNav() {
       {/* Bottom bar */}
       <nav
         ref={navRef}
-        className="bottom-nav relative z-40 md:hidden bg-white border-t border-gray-100 flex items-stretch shrink-0"
+        className="bottom-nav fixed bottom-0 inset-x-0 z-40 md:hidden bg-white border-t border-gray-100 flex items-stretch"
         style={{
-          height: "calc(4.5rem + env(safe-area-inset-bottom))",
           paddingBottom: "env(safe-area-inset-bottom)",
+          height: "calc(4rem + env(safe-area-inset-bottom))",
         }}
       >
         {navItems.map(({ href, label, icon: Icon }) => {

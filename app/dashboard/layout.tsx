@@ -470,15 +470,18 @@ export default function DashboardLayout({
 
         {/* Conteúdo principal — scroll com overscroll containment para iOS */}
         <main
-          className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-6 pb-6 md:pb-6 scroll-container"
-          style={{ overscrollBehaviorY: "contain" }}
+          className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-6 scroll-container"
+          style={{
+            overscrollBehaviorY: "contain",
+            paddingBottom: "calc(4rem + env(safe-area-inset-bottom) + 1rem)",
+          }}
         >
           {children}
         </main>
-
-        {/* Bottom nav — apenas mobile, integrado no fluxo flex */}
-        <BottomNav />
       </div>
+
+      {/* Bottom nav — fixed ao rodapé físico do device */}
+      <BottomNav />
 
       {senhaModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
