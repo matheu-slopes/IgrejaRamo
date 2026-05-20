@@ -1084,7 +1084,7 @@ function ChatTab({
 
 // ─── TAB: MEMBROS ─────────────────────────────────────────────────────────────
 
-const funcoes: FuncaoMinisterio[] = ["Líder", "Sub-líder", "Membro", "Visitante"];
+const funcoes: FuncaoMinisterio[] = ["Líder", "Colíder", "Voluntário(a)"];
 
 // Permissões que fazem sentido no contexto de um canal de ministério
 const PERMISSOES_CANAL = [
@@ -1143,7 +1143,23 @@ function MembrosTab({
   const [editandoId, setEditandoId] = useState<string | null>(null);
   const [novaFuncao, setNovaFuncao] = useState<FuncaoMinisterio>("Membro");
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ nome: "", email: "", telefone: "", funcao: "Membro" as FuncaoMinisterio });
+  const [usuariosDisponiveis, setUsuariosDisponiveis] = useState<any[]>([]);
+  const [usuarioSelecionado, setUsuarioSelecionado] = useState<string>("");
+  const [novaFuncaoForm, setNovaFuncaoForm] = useState<FuncaoMinisterio>("Membro");
+
+  // Buscar usuários ativos que não estão no ministério
+  useEffect(() => {
+    if (!showForm) return;
+    supabase.from("perfis")
+      .select("id, nome, email, telefone, role")
+      .eq("ativo", true)
+      .then(({ data }) => {
+        if (data) {
+          const idsMembros = new Set(membros.map((m) => m.id));
+          setUsuariosDisponiveis(data.filter((u: any) => !idsMembros.has(u.id)));
+        }
+      });
+  }, [showForm, membros]);
   const [sortBy, setSortBy] = useState<"nome" | "funcao">("nome");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
 
@@ -1152,8 +1168,15 @@ function MembrosTab({
     else { setSortBy(col); setSortDir("asc"); }
   }
 
-  const FUNCAO_ORDER: Record<FuncaoMinisterio, number> = { "L\u00edder": 0, "Sub-l\u00edder": 1, "Membro": 2, "Visitante": 3 };
-  const eLider = (m: MembroMinisterio) => m.funcao === "L\u00edder" || m.funcao === "Sub-l\u00edder";
+  const FUNCAO_ORDER: Record<FuncaoMinisterio, number> = {
+    "Líder": 0,
+    "Colíder": 1,
+    "Sub-líder": 2,
+    "Membro": 3,
+    "Voluntário(a)": 4,
+    "Visitante": 5,
+  };
+  const eLider = (m: MembroMinisterio) => m.funcao === "Líder" || m.funcao === "Colíder";
   const membrosOrdenados = [
     ...membros.filter(eLider).sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR")),
     ...membros.filter((m) => !eLider(m)).sort((a, b) => {
@@ -1206,28 +1229,39 @@ function MembrosTab({
     setMembros((prev) => prev.filter((m) => m.id !== id));
   }
 
-  function adicionar() {
-    if (!form.nome || !form.email) return;
-    const novo: MembroMinisterio = {
-      id: `new-${Date.now()}`,
-      nome: form.nome,
-      email: form.email,
-      telefone: form.telefone || undefined,
-      funcao: form.funcao,
-      ministerio,
-      ativo: true,
-      dataEntrada: new Date().toISOString().split("T")[0],
-    };
-    setMembros((prev) => [...prev, novo]);
-    setForm({ nome: "", email: "", telefone: "", funcao: "Membro" });
-    setShowForm(false);
+  async function adicionar() {
+    if (!usuarioSelecionado) return;
+    const usuario = usuariosDisponiveis.find((u) => u.id === usuarioSelecionado);
+    if (!usuario) return;
+    // Atualiza o array de ministérios do usuário
+    const { error } = await supabase
+      .from("perfis")
+      .update({ ministerios: [...(usuario.ministerios ?? []), ministerio] })
+      .eq("id", usuario.id);
+    if (!error) {
+      setMembros((prev) => [...prev, {
+        id: usuario.id,
+        nome: usuario.nome,
+        email: usuario.email,
+        telefone: usuario.telefone,
+        funcao: novaFuncaoForm,
+        ministerio,
+        ativo: true,
+        dataEntrada: new Date().toISOString().split("T")[0],
+      }]);
+      setUsuarioSelecionado("");
+      setNovaFuncaoForm("Membro");
+      setShowForm(false);
+    }
   }
 
   const funcaoCor: Record<FuncaoMinisterio, string> = {
-    "Líder":     "bg-gold-100 text-gold-800",
-    "Sub-líder": "bg-vine-100 text-vine-800",
-    "Membro":    "bg-gray-100 text-gray-700",
-    "Visitante": "bg-amber-50 text-amber-700",
+    "Líder":        "bg-gold-100 text-gold-800",
+    "Colíder":      "bg-yellow-100 text-yellow-800",
+    "Sub-líder":    "bg-vine-100 text-vine-800",
+    "Membro":       "bg-gray-100 text-gray-700",
+    "Voluntário(a)": "bg-blue-50 text-blue-700",
+    "Visitante":    "bg-amber-50 text-amber-700",
   };
 
   return (
@@ -1247,29 +1281,23 @@ function MembrosTab({
       {/* Formulário de adição */}
       {showForm && (
         <div className="bg-vine-50 border border-vine-200 rounded-2xl p-4 space-y-3">
-          <p className="text-sm font-semibold text-vine-800">Novo membro</p>
+          <p className="text-sm font-semibold text-vine-800">Adicionar membro existente</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <input
-              value={form.nome}
-              onChange={(e) => setForm({ ...form, nome: e.target.value })}
-              placeholder="Nome completo *"
-              className="border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-vine-400"
-            />
-            <input
-              value={form.email}
-              onChange={(e) => setForm({ ...form, email: e.target.value })}
-              placeholder="E-mail *"
-              className="border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-vine-400"
-            />
-            <input
-              value={form.telefone}
-              onChange={(e) => setForm({ ...form, telefone: e.target.value })}
-              placeholder="Telefone"
-              className="border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-vine-400"
-            />
             <select
-              value={form.funcao}
-              onChange={(e) => setForm({ ...form, funcao: e.target.value as FuncaoMinisterio })}
+              value={usuarioSelecionado}
+              onChange={(e) => setUsuarioSelecionado(e.target.value)}
+              className="border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-vine-400 bg-white"
+            >
+              <option value="">Selecione um usuário...</option>
+              {usuariosDisponiveis.map((u) => {
+                const nomes = u.nome.trim().split(" ");
+                const display = nomes.length > 1 ? nomes[0] + " " + nomes[nomes.length - 1] : u.nome;
+                return <option key={u.id} value={u.id}>{display}</option>;
+              })}
+            </select>
+            <select
+              value={novaFuncaoForm}
+              onChange={(e) => setNovaFuncaoForm(e.target.value as FuncaoMinisterio)}
               className="border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-vine-400 bg-white"
             >
               {funcoes.map((f) => <option key={f}>{f}</option>)}
@@ -1277,7 +1305,7 @@ function MembrosTab({
           </div>
           <div className="flex gap-2 justify-end mt-1">
             <button onClick={() => setShowForm(false)} className="text-sm text-gray-500 px-4 py-1.5 rounded-xl hover:bg-gray-100 transition">Cancelar</button>
-            <button onClick={adicionar} className="text-sm bg-vine-700 text-white px-4 py-1.5 rounded-xl hover:bg-vine-600 transition">
+            <button onClick={adicionar} className="text-sm bg-vine-700 text-white px-4 py-1.5 rounded-xl hover:bg-vine-600 transition" disabled={!usuarioSelecionado}>
               Adicionar
             </button>
           </div>
