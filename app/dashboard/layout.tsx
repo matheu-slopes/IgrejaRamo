@@ -434,8 +434,7 @@ export default function DashboardLayout({
     <ChatUnreadProvider>
     <PushSubscriber />
     <div
-      className="fixed inset-x-0 top-0 flex flex-col md:flex-row overflow-hidden bg-gray-50"
-      style={{ height: "var(--app-vvh, 100dvh)" }}
+      className="fixed inset-0 flex flex-col md:flex-row overflow-hidden bg-gray-50"
     >
       {/* Sidebar — apenas desktop */}
       <Sidebar />
