@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState, useMemo } from "react";
 import { X, Search, Music2, Check, ExternalLink, Loader2, AlertCircle, ChevronRight, EyeOff, Eye } from "lucide-react";
@@ -180,8 +180,8 @@ export default function BuscarCifraModal({ onClose, onSalva }: Props) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/50 backdrop-blur-sm px-0 md:px-4">
-      <div className="w-full md:max-w-2xl max-h-[92vh] flex flex-col bg-white md:rounded-2xl rounded-t-2xl shadow-2xl overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+      <div className="w-full max-w-2xl max-h-[90vh] flex flex-col bg-white rounded-2xl shadow-2xl overflow-hidden">
 
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 shrink-0">

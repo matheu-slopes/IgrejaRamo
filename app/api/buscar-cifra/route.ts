@@ -1,4 +1,4 @@
-﻿import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import * as cheerio from "cheerio";
 import { createClient } from "@supabase/supabase-js";
 
@@ -284,19 +284,61 @@ export async function GET(req: NextRequest) {
   const musicaSlug  = toSlug(musica);
   const cifraUrl    = `https://www.cifraclub.com.br/${artistaSlug}/${musicaSlug}/`;
 
-  let res: Response;
+  const CIFRACLUB_API_URL = process.env.CIFRACLUB_API_URL;
+  let res: Response | null = null;
+  let useFallback = false;
+
   try {
     res = await fetch(cifraUrl, { headers: HEADERS, signal: AbortSignal.timeout(15000) });
-  } catch {
-    return NextResponse.json({ error: "Timeout ao acessar o Cifra Club." }, { status: 504 });
+    if (!res.ok) {
+      if (CIFRACLUB_API_URL) {
+        useFallback = true;
+      }
+    }
+  } catch (err) {
+    if (CIFRACLUB_API_URL) {
+      useFallback = true;
+    } else {
+      return NextResponse.json({ error: "Timeout ao acessar o Cifra Club." }, { status: 504 });
+    }
   }
 
-  if (!res.ok) {
+  if (useFallback && CIFRACLUB_API_URL) {
+    try {
+      const fallbackUrl = `${CIFRACLUB_API_URL}/artists/${artistaSlug}/songs/${musicaSlug}`;
+      const fallbackRes = await fetch(fallbackUrl, { signal: AbortSignal.timeout(20000) });
+      if (fallbackRes.ok) {
+        const data = await fallbackRes.json();
+        if (data && !data.error && data.cifra) {
+          return NextResponse.json({
+            artist:       data.artist || artista,
+            name:         data.name || musica,
+            tom_original: data.tom_original || null,
+            youtube_url:  data.youtube_url || null,
+            cifraclub_url: cifraUrl,
+            cifra:        data.cifra,
+          });
+        }
+      }
+    } catch (fallbackErr) {
+      console.error("Erro ao acessar a API fallback do Cifra Club:", fallbackErr);
+    }
+  }
+
+  if (!res || !res.ok) {
+    const status = res?.status || 500;
+    if (status === 403 || status === 503) {
+      return NextResponse.json(
+        { error: "O Cifra Club bloqueou a requisição do servidor (Cloudflare). Tente configurar a API local ou pesquise novamente mais tarde." },
+        { status: 403 }
+      );
+    }
     return NextResponse.json(
       { error: `Música não encontrada. Verifique o nome do artista ("${artista}") e da música ("${musica}").` },
       { status: 404 }
     );
   }
+
 
   const html = await res.text();
   const $ = cheerio.load(html);
