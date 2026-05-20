@@ -71,9 +71,35 @@ export default function BottomNav() {
       el.style.transform = totalTranslate > 10 ? `translateY(${totalTranslate}px) translateZ(0)` : "";
     }
 
+    function resetWindowScroll() {
+      setTimeout(() => {
+        const vv = window.visualViewport;
+        const keyboardActive = vv ? (window.innerHeight - vv.height > 120) : false;
+        
+        // Se o teclado não estiver ativo, garante que o scroll da janela externa seja 0
+        if (!keyboardActive) {
+          if (window.scrollY !== 0) {
+            window.scrollTo(0, 0);
+          }
+          if (document.body.scrollTop !== 0) {
+            document.body.scrollTop = 0;
+          }
+        }
+      }, 150);
+    }
+
+    function handleWindowScroll() {
+      const vv = window.visualViewport;
+      const keyboardActive = vv ? (window.innerHeight - vv.height > 120) : false;
+      if (!keyboardActive && window.scrollY !== 0) {
+        window.scrollTo(0, 0);
+      }
+    }
+
     function pinAfterDelay() {
       // Pequeno delay para deixar a animação do teclado terminar antes de reposicionar
       setTimeout(pin, 120);
+      resetWindowScroll();
     }
 
     function pinOnVisible() {
@@ -81,19 +107,22 @@ export default function BottomNav() {
       // viewport encolhida sem disparar 'resize' ao fechar. Resetamos ao
       // app voltar ao foco ou ficar visível.
       if (document.visibilityState === "visible") {
-        setTimeout(pin, 150);
-        setTimeout(pin, 500);
+        setTimeout(() => { pin(); resetWindowScroll(); }, 150);
+        setTimeout(() => { pin(); resetWindowScroll(); }, 500);
       }
     }
 
     pin();
-    window.visualViewport?.addEventListener("resize", pin);
+    resetWindowScroll();
+
+    window.visualViewport?.addEventListener("resize", () => { pin(); resetWindowScroll(); });
     window.visualViewport?.addEventListener("scroll", pin);
     // Garante restauração quando o teclado fecha (iOS às vezes não dispara 'resize')
     document.addEventListener("focusout", pinAfterDelay);
     // Garante restauração ao voltar ao app (fechar/abrir, trocar de aba)
     document.addEventListener("visibilitychange", pinOnVisible);
     window.addEventListener("focus", pinAfterDelay);
+    window.addEventListener("scroll", handleWindowScroll);
 
     return () => {
       window.visualViewport?.removeEventListener("resize", pin);
@@ -101,6 +130,7 @@ export default function BottomNav() {
       document.removeEventListener("focusout", pinAfterDelay);
       document.removeEventListener("visibilitychange", pinOnVisible);
       window.removeEventListener("focus", pinAfterDelay);
+      window.removeEventListener("scroll", handleWindowScroll);
     };
   }, []);
 
