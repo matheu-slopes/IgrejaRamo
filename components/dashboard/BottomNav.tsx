@@ -45,94 +45,7 @@ export default function BottomNav() {
   const navRef = useRef<HTMLElement>(null);
   const touchStartY = useRef<number>(0);
 
-  // Mantém o nav pregado na base da tela física no iOS PWA.
-  // position:fixed segue o visual viewport; quando ele encolhe (teclado, prompts, sheets)
-  // o nav subiria. Usamos translateY para compensar sem causar reflow.
-  // Também ouvimos focusout porque o iOS às vezes não dispara 'resize' ao fechar o teclado.
-  useEffect(() => {
-    const el = navRef.current;
-    if (!el) return;
 
-    function pin() {
-      const vv = window.visualViewport;
-      if (!vv || !el) return;
-
-      // drop: teclado encolheu a viewport (só compensa se > 120px para ignorar quirks)
-      const drop = Math.max(0, window.innerHeight - vv.height);
-      const keyboardDrop = drop > 120 ? drop : 0;
-
-      // offsetTop: iOS desloca o visual viewport para baixo quando um dialog nativo aparece
-      // (permissão de notificação, share sheet, etc). Para elementos fixed bottom:0,
-      // isso faz o nav aparecer acima do fundo da tela. translateY(offsetTop) compensa.
-      const offsetTop = Math.round(vv.offsetTop ?? 0);
-
-      const totalTranslate = keyboardDrop + offsetTop;
-      // Só aplica se for relevante (>10px). Evita "vão" por offsetTop pequeno.
-      el.style.transform = totalTranslate > 10 ? `translateY(${totalTranslate}px) translateZ(0)` : "";
-    }
-
-    function resetWindowScroll() {
-      setTimeout(() => {
-        const vv = window.visualViewport;
-        const keyboardActive = vv ? (window.innerHeight - vv.height > 120) : false;
-        
-        // Se o teclado não estiver ativo, garante que o scroll da janela externa seja 0
-        if (!keyboardActive) {
-          if (window.scrollY !== 0) {
-            window.scrollTo(0, 0);
-          }
-          if (document.body.scrollTop !== 0) {
-            document.body.scrollTop = 0;
-          }
-        }
-      }, 150);
-    }
-
-    function handleWindowScroll() {
-      const vv = window.visualViewport;
-      const keyboardActive = vv ? (window.innerHeight - vv.height > 120) : false;
-      if (!keyboardActive && window.scrollY !== 0) {
-        window.scrollTo(0, 0);
-      }
-    }
-
-    function pinAfterDelay() {
-      // Pequeno delay para deixar a animação do teclado terminar antes de reposicionar
-      setTimeout(pin, 120);
-      resetWindowScroll();
-    }
-
-    function pinOnVisible() {
-      // Dialogs nativos (permissão de notificação, teclado) podem deixar a
-      // viewport encolhida sem disparar 'resize' ao fechar. Resetamos ao
-      // app voltar ao foco ou ficar visível.
-      if (document.visibilityState === "visible") {
-        setTimeout(() => { pin(); resetWindowScroll(); }, 150);
-        setTimeout(() => { pin(); resetWindowScroll(); }, 500);
-      }
-    }
-
-    pin();
-    resetWindowScroll();
-
-    window.visualViewport?.addEventListener("resize", () => { pin(); resetWindowScroll(); });
-    window.visualViewport?.addEventListener("scroll", pin);
-    // Garante restauração quando o teclado fecha (iOS às vezes não dispara 'resize')
-    document.addEventListener("focusout", pinAfterDelay);
-    // Garante restauração ao voltar ao app (fechar/abrir, trocar de aba)
-    document.addEventListener("visibilitychange", pinOnVisible);
-    window.addEventListener("focus", pinAfterDelay);
-    window.addEventListener("scroll", handleWindowScroll);
-
-    return () => {
-      window.visualViewport?.removeEventListener("resize", pin);
-      window.visualViewport?.removeEventListener("scroll", pin);
-      document.removeEventListener("focusout", pinAfterDelay);
-      document.removeEventListener("visibilitychange", pinOnVisible);
-      window.removeEventListener("focus", pinAfterDelay);
-      window.removeEventListener("scroll", handleWindowScroll);
-    };
-  }, []);
 
   const isAdmin = user?.role === "admin" || user?.role === "pastor";
   const meusMinisterios = isAdmin
@@ -314,10 +227,9 @@ export default function BottomNav() {
       {/* Bottom bar */}
       <nav
         ref={navRef}
-        className="bottom-nav fixed inset-x-0 z-40 md:hidden bg-white border-t border-gray-100 flex items-stretch"
+        className="bottom-nav relative z-40 md:hidden bg-white border-t border-gray-100 flex items-stretch shrink-0"
         style={{
-          bottom: 0,
-          height: "calc(4rem + env(safe-area-inset-bottom))",
+          height: "calc(4.5rem + env(safe-area-inset-bottom))",
           paddingBottom: "env(safe-area-inset-bottom)",
         }}
       >

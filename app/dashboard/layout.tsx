@@ -434,7 +434,8 @@ export default function DashboardLayout({
     <ChatUnreadProvider>
     <PushSubscriber />
     <div
-      className="fixed inset-0 flex overflow-hidden bg-gray-50"
+      className="fixed inset-x-0 top-0 flex flex-col md:flex-row overflow-hidden bg-gray-50"
+      style={{ height: "var(--app-vvh, 100dvh)" }}
     >
       {/* Sidebar — apenas desktop */}
       <Sidebar />
@@ -470,15 +471,15 @@ export default function DashboardLayout({
 
         {/* Conteúdo principal — scroll com overscroll containment para iOS */}
         <main
-          className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-6 pb-[calc(4.5rem+env(safe-area-inset-bottom))] md:pb-6 scroll-container"
+          className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-6 pb-6 md:pb-6 scroll-container"
           style={{ overscrollBehaviorY: "contain" }}
         >
           {children}
         </main>
-      </div>
 
-      {/* Bottom nav — apenas mobile */}
-      <BottomNav />
+        {/* Bottom nav — apenas mobile, integrado no fluxo flex */}
+        <BottomNav />
+      </div>
 
       {senhaModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">

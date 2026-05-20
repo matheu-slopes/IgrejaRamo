@@ -87,13 +87,8 @@ export default function RootLayout({
   return (
     <html lang="pt-BR" data-scroll-behavior="smooth" className={`${inter.variable} ${lora.variable}`}>
       <head>
-        {/* iOS standalone — esconde barra de endereço e UI do browser */}
+        {/* Android PWA fallback */}
         <meta name="mobile-web-app-capable" content="yes" />
-        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
-        {/* Garante área segura (notch/dynamic island) */}
-        <meta name="theme-color" content="#1a2e1a" />
-        <link rel="manifest" href="/manifest.json" />
-        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
       </head>
         <body className="bg-cream text-gray-900 antialiased font-sans" suppressHydrationWarning>
         <PwaUpdater />

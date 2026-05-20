@@ -45,6 +45,16 @@
 
   body.dashboard-body {
     background-color: #ffffff !important;
+    overflow: hidden !important;
+    position: fixed !important;
+    inset: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+  }
+
+  /* Oculta o BottomNav quando o teclado está aberto no mobile para evitar sobreposição */
+  body.keyboard-open .bottom-nav {
+    display: none !important;
   }
 
   /* Permitir seleção somente em textos legíveis */
