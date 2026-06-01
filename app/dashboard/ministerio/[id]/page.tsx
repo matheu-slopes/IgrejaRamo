@@ -1106,27 +1106,33 @@ function MembrosTab({
   const [membros, setMembros] = useState<MembroMinisterio[]>([]);
 
   function carregarMembros() {
-    // Os membros ficam em `perfis` com o array `ministerios`
-    supabase.from("perfis")
-      .select("id, nome, email, telefone, role, lider_ministerios, data_ingresso")
-      .contains("ministerios", [ministerio])
-      .eq("ativo", true)
-      .then(({ data }) => {
-        if (data) setMembros(data.map((p: Record<string, unknown>) => {
-          const liderMins = (p.lider_ministerios as string[]) ?? [];
-          const eLider = p.role === "pastor" || liderMins.includes(ministerio);
-          return {
-            id: p.id as string,
-            nome: p.nome as string,
-            email: p.email as string,
-            telefone: (p.telefone as string) ?? undefined,
-            funcao: (eLider ? "Líder" : "Membro") as FuncaoMinisterio,
-            ministerio,
-            ativo: true,
-            dataEntrada: (p.data_ingresso as string) ?? "",
-          };
-        }));
-      });
+    Promise.all([
+      supabase.from("perfis")
+        .select("id, nome, email, telefone, role, lider_ministerios, data_ingresso")
+        .contains("ministerios", [ministerio])
+        .eq("ativo", true),
+      supabase.from("membros_ministerio")
+        .select("usuario_id, funcao")
+        .eq("ministerio", ministerio),
+    ]).then(([{ data: perfisData }, { data: mmData }]) => {
+      if (!perfisData) return;
+      const funcaoMap = new Map((mmData ?? []).map((r: Record<string, string>) => [r.usuario_id, r.funcao]));
+      setMembros(perfisData.map((p: Record<string, unknown>) => {
+        const liderMins = (p.lider_ministerios as string[]) ?? [];
+        const isLiderPerfil = p.role === "pastor" || liderMins.includes(ministerio);
+        const funcao = (funcaoMap.get(p.id as string) ?? (isLiderPerfil ? "Líder" : "Membro")) as FuncaoMinisterio;
+        return {
+          id: p.id as string,
+          nome: p.nome as string,
+          email: p.email as string,
+          telefone: (p.telefone as string) ?? undefined,
+          funcao,
+          ministerio,
+          ativo: true,
+          dataEntrada: (p.data_ingresso as string) ?? "",
+        };
+      }));
+    });
   }
 
   useAppRefresh(() => { carregarMembros(); }, [ministerio], { minIntervalMs: 2500 });
@@ -1208,18 +1214,23 @@ function MembrosTab({
   function salvarEdicao(id: string) {
     setMembros((prev) => prev.map((m) => m.id === id ? { ...m, funcao: novaFuncao } : m));
     setEditandoId(null);
-    // Persistir lider_ministerios no DB
+    // Salva a função em membros_ministerio
+    supabase.from("membros_ministerio").upsert(
+      { usuario_id: id, ministerio, funcao: novaFuncao },
+      { onConflict: "usuario_id,ministerio" }
+    ).then(() => {});
+    // Mantém lider_ministerios em perfis sincronizado
     supabase.from("perfis").select("lider_ministerios, role").eq("id", id).single().then(({ data }) => {
       if (!data) return;
       const atual: string[] = data.lider_ministerios ?? [];
       let updated: string[];
-      if (novaFuncao === "L\u00edder") {
+      if (novaFuncao === "Líder") {
         updated = atual.includes(ministerio) ? atual : [...atual, ministerio];
       } else {
         updated = atual.filter((m) => m !== ministerio);
       }
       const updates: Record<string, unknown> = { lider_ministerios: updated };
-      if (novaFuncao === "L\u00edder" && data.role === "membro") updates.role = "lider";
+      if (novaFuncao === "Líder" && data.role === "membro") updates.role = "lider";
       if (novaFuncao === "Membro" && updated.length === 0 && data.role === "lider") updates.role = "membro";
       supabase.from("perfis").update(updates).eq("id", id).then(() => {});
     });
@@ -1239,6 +1250,11 @@ function MembrosTab({
       .update({ ministerios: [...(usuario.ministerios ?? []), ministerio] })
       .eq("id", usuario.id);
     if (!error) {
+      // Salva a função em membros_ministerio
+      await supabase.from("membros_ministerio").upsert(
+        { usuario_id: usuario.id, ministerio, funcao: novaFuncaoForm },
+        { onConflict: "usuario_id,ministerio" }
+      );
       setMembros((prev) => [...prev, {
         id: usuario.id,
         nome: usuario.nome,
