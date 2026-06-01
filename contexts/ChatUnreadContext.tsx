@@ -26,15 +26,33 @@ function persistedCount(uid: string): number {
 function saveCount(uid: string, n: number) {
   try { localStorage.setItem(`chat_unread_${uid}`, String(n)); } catch {}
 }
-async function getFreshToken(): Promise<string> {
+async function getFreshToken(forceRefresh = false): Promise<string> {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) return "";
   const expiresAt = session.expires_at ?? 0;
-  if (Date.now() / 1000 > expiresAt - 60) {
+  if (forceRefresh || Date.now() / 1000 > expiresAt - 60) {
     const { data } = await supabase.auth.refreshSession();
     return data.session?.access_token ?? "";
   }
   return session.access_token;
+}
+
+async function fetchUnreadWithAuth(): Promise<Response | null> {
+  let token = await getFreshToken();
+  if (!token) return null;
+  let res = await fetch("/api/chat/unread", {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (res.status === 401) {
+    token = await getFreshToken(true);
+    if (!token) return res;
+    res = await fetch("/api/chat/unread", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  }
+
+  return res;
 }
 function conversaIdsFromCache(uid: string): string[] {
   try {
@@ -110,11 +128,8 @@ export function ChatUnreadProvider({ children }: { children: ReactNode }) {
 
   async function refreshUnreadFromServer(uid: string) {
     try {
-      const token = await getFreshToken();
-      if (!token) return;
-      const res = await fetch("/api/chat/unread", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await fetchUnreadWithAuth();
+      if (!res) return;
       const json = await res.json().catch(() => ({}));
       if (!res.ok || typeof json.total !== "number") return;
       setTotalUnreadState(json.total);

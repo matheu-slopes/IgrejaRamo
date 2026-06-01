@@ -67,7 +67,7 @@ export default function PushSubscriber() {
         await registrarSubscription({ silent: true });
       } catch (e) {
         console.error("PushSubscriber (background):", e);
-        if (mostrarErroNoBanner) {
+        if (mostrarErroNoBanner && !isAuthError(e)) {
           setMsg(String(e).replace("Error: ", ""));
           setStatus("erro");
           setMostrarBanner(true);
@@ -183,14 +183,14 @@ export default function PushSubscriber() {
     const token = await getFreshAccessToken();
 
     // Salva no backend com service role para evitar falhas de RLS entre ambientes.
-    await salvarSubscriptionNoServidor(token, sub.endpoint, p256dh, authKey);
+    await salvarSubscriptionNoServidorComRetry(token, sub.endpoint, p256dh, authKey);
 
     // Confirma de verdade que o backend gravou a subscription. Isso evita o caso
     // ruim de o usuário tocar em "Ativar", parecer sucesso, mas ficar Subscriptions 0.
-    let count = await contarSubscriptionsNoServidor(token);
+    let count = await contarSubscriptionsNoServidorComRetry(token);
     if (count === 0) {
-      await salvarSubscriptionNoServidor(token, sub.endpoint, p256dh, authKey);
-      count = await contarSubscriptionsNoServidor(token);
+      await salvarSubscriptionNoServidorComRetry(token, sub.endpoint, p256dh, authKey);
+      count = await contarSubscriptionsNoServidorComRetry(token);
     }
 
     if (count === 0) {
@@ -362,7 +362,7 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
   return Uint8Array.from([...rawData].map((c) => c.charCodeAt(0)));
 }
 
-async function getFreshAccessToken() {
+async function getFreshAccessToken(forceRefresh = false) {
   try {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.access_token) {
@@ -370,7 +370,7 @@ async function getFreshAccessToken() {
     }
 
     const expiresAt = session.expires_at ?? 0;
-    if (Date.now() / 1000 > expiresAt - 60) {
+    if (forceRefresh || Date.now() / 1000 > expiresAt - 60) {
       const { data } = await supabase.auth.refreshSession();
       const token = data.session?.access_token ?? "";
       if (!token) throw new Error("Falha ao renovar sessão.");
@@ -399,6 +399,21 @@ async function salvarSubscriptionNoServidor(token: string, endpoint: string, p25
   }
 }
 
+function isAuthError(e: unknown) {
+  const msg = String(e).toLowerCase();
+  return msg.includes("token inv") || msg.includes("não autorizado") || msg.includes("nÃ£o autorizado") || msg.includes("sess");
+}
+
+async function salvarSubscriptionNoServidorComRetry(token: string, endpoint: string, p256dh: string, auth: string) {
+  try {
+    await salvarSubscriptionNoServidor(token, endpoint, p256dh, auth);
+  } catch (e) {
+    if (!isAuthError(e)) throw e;
+    const freshToken = await getFreshAccessToken(true);
+    await salvarSubscriptionNoServidor(freshToken, endpoint, p256dh, auth);
+  }
+}
+
 async function contarSubscriptionsNoServidor(token: string) {
   const res = await fetch("/api/push/status", {
     headers: { Authorization: `Bearer ${token}` },
@@ -407,6 +422,13 @@ async function contarSubscriptionsNoServidor(token: string) {
   if (!res.ok) return null;
   const json = await res.json().catch(() => ({}));
   return typeof json.suas_subscriptions_count === "number" ? json.suas_subscriptions_count : null;
+}
+
+async function contarSubscriptionsNoServidorComRetry(token: string) {
+  const count = await contarSubscriptionsNoServidor(token);
+  if (count !== null) return count;
+  const freshToken = await getFreshAccessToken(true);
+  return contarSubscriptionsNoServidor(freshToken);
 }
 
 function shouldRenewSubscription(sub: PushSubscription, expectedKey: Uint8Array, userId?: string): boolean {

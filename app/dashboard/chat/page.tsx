@@ -17,11 +17,11 @@ import clsx from "clsx";
 // --- Helper: retorna sempre um access_token fresco ----------------
 // getSession() usa cache local sem validar expira��o. Se o token
 // estiver a menos de 60 s do vencimento (ou j� vencido), for�a refresh.
-async function getFreshToken(): Promise<string> {
+async function getFreshToken(forceRefresh = false): Promise<string> {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) return "";
   const expiresAt = session.expires_at ?? 0; // segundos desde epoch
-  if (Date.now() / 1000 > expiresAt - 60) {
+  if (forceRefresh || Date.now() / 1000 > expiresAt - 60) {
     const { data } = await supabase.auth.refreshSession();
     return data.session?.access_token ?? "";
   }
@@ -60,6 +60,27 @@ async function fetchWithRetry(input: RequestInfo | URL, init?: RequestInit, atte
     }
   }
   throw lastError ?? new Error("Falha de rede");
+}
+
+async function fetchWithAuthRetry(input: RequestInfo | URL, init?: RequestInit, attempts = 3, timeoutMs = 20_000): Promise<Response> {
+  let token = await getFreshToken();
+  if (!token) throw new Error("Sessão expirada. Faça login novamente.");
+
+  const buildInit = (accessToken: string): RequestInit => ({
+    ...init,
+    headers: {
+      ...(init?.headers ?? {}),
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  let res = await fetchWithRetry(input, buildInit(token), attempts, timeoutMs);
+  if (res.status === 401) {
+    token = await getFreshToken(true);
+    if (!token) return res;
+    res = await fetchWithRetry(input, buildInit(token), attempts, timeoutMs);
+  }
+  return res;
 }
 
 // --- AudioPlayer -------------------------------------------------
@@ -245,12 +266,6 @@ function compareMensagemOrder(a: MensagemConversa, b: MensagemConversa) {
   if (timeA !== timeB) return timeA - timeB;
 
   return a.id.localeCompare(b.id);
-}
-
-function isMissingSequenceColumn(error: unknown) {
-  const err = error as { code?: string; message?: string } | null;
-  const msg = String(err?.message ?? "").toLowerCase();
-  return err?.code === "42703" && msg.includes("sequence_id");
 }
 
 type PendingChatMessage = {
@@ -1350,13 +1365,10 @@ export default function ChatPage() {
   }
 
   async function persistirMensagemPendente(item: PendingChatMessage) {
-    const token = await getFreshToken();
-    if (!token) throw new Error("Sessao expirada");
-
-    const r = await fetchWithRetry("/api/chat/mensagem", {
+    const r = await fetchWithAuthRetry("/api/chat/mensagem", {
       method: "POST",
       keepalive: true,
-      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         id: item.message.id,
         conversa_id: item.conversaId,
@@ -1549,19 +1561,11 @@ export default function ChatPage() {
     const [{ data: conversas }, { data: todosParticipantes }, mensagensResult] = await Promise.all([
       supabase.from("chat_conversas").select("*").in("id", ids),
       supabase.from("chat_participantes").select("conversa_id, user_id").in("conversa_id", ids),
-      supabase.from("chat_mensagens").select("*").in("conversa_id", ids).order("sequence_id", { ascending: false }).order("criado_em", { ascending: false }).limit(ids.length * 3),
+      supabase.from("chat_mensagens").select("*").in("conversa_id", ids).order("criado_em", { ascending: false }).limit(ids.length * 3),
     ]);
 
     let ultimasMsgs = mensagensResult.data;
-    if (mensagensResult.error && isMissingSequenceColumn(mensagensResult.error)) {
-      const fallbackMensagens = await supabase
-        .from("chat_mensagens")
-        .select("*")
-        .in("conversa_id", ids)
-        .order("criado_em", { ascending: false })
-        .limit(ids.length * 3);
-      ultimasMsgs = fallbackMensagens.data;
-    }
+    if (mensagensResult.error) ultimasMsgs = [];
 
     const participantesPorConversa: Record<string, string[]> = {};
     for (const p of (todosParticipantes ?? []) as { conversa_id: string; user_id: string }[]) {
@@ -1683,22 +1687,11 @@ export default function ChatPage() {
   }
 
   async function carregarMensagens(conversaId: string) {
-    let { data, error } = await supabase
+    const { data, error } = await supabase
       .from("chat_mensagens").select("*")
       .eq("conversa_id", conversaId)
-      .order("sequence_id", { ascending: true })
       .order("criado_em", { ascending: true })
       .limit(500);
-
-    if (error && isMissingSequenceColumn(error)) {
-      const fallback = await supabase
-        .from("chat_mensagens").select("*")
-        .eq("conversa_id", conversaId)
-        .order("criado_em", { ascending: true })
-        .limit(500);
-      data = fallback.data;
-      error = fallback.error;
-    }
 
     if (error) {
       console.error("chat load mensagens error:", error);
@@ -1770,13 +1763,10 @@ export default function ChatPage() {
     setGrupos(prev => prev.map(g => g.id === conversaId ? { ...g, mensagens: markRead(g.mensagens) } : g));
 
     try {
-      const token = await getFreshToken();
-      if (!token) return;
-      await fetchWithRetry("/api/chat/ack", {
+      await fetchWithAuthRetry("/api/chat/ack", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({ type: "read", conversaId }),
       }, 2);
@@ -1799,14 +1789,10 @@ export default function ChatPage() {
     try {
       const since = lastBackfillRef.current;
       const afterSequence = lastSequenceRef.current;
-      const token = await getFreshToken();
-      if (!token) return;
       const query = afterSequence > 0
         ? `/api/chat/sync?after_sequence=${encodeURIComponent(String(afterSequence))}`
         : `/api/chat/sync?since=${encodeURIComponent(since)}`;
-      const res = await fetchWithRetry(query, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await fetchWithAuthRetry(query);
       if (!res.ok) return;
       const json = await res.json().catch(() => ({}));
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -2133,12 +2119,10 @@ export default function ChatPage() {
     notificationDispatchTimerRef.current = setTimeout(async () => {
       notificationDispatchTimerRef.current = null;
       try {
-        const token = await getFreshToken();
-        if (!token) return;
-        await fetch("/api/chat/dispatch-notifications", {
+        await fetchWithAuthRetry("/api/chat/dispatch-notifications", {
           method: "POST",
           keepalive: true,
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ limit: 50 }),
         });
       } catch {
@@ -2319,13 +2303,11 @@ export default function ChatPage() {
     // N�o faz broadcast ainda � blob: URL s� funciona localmente
 
     try {
-      const token = await getFreshToken();
       const fd = new FormData();
       fd.append("file", file);
       fd.append("conversa_id", conversaId);
-      const upRes = await fetch("/api/chat/upload-imagem", {
+      const upRes = await fetchWithAuthRetry("/api/chat/upload-imagem", {
         method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
         body: fd,
       });
       if (!upRes.ok) { const j = await upRes.json().catch(() => ({})); throw new Error(j.error ?? "Upload falhou"); }
@@ -2370,15 +2352,13 @@ export default function ChatPage() {
     // N�o faz broadcast ainda � blob: URL s� funciona localmente
 
     try {
-      const token = await getFreshToken();
       const file = fileOrBlob instanceof File ? fileOrBlob : new File([fileOrBlob], nomeArquivo, { type: fileOrBlob.type });
       const fd = new FormData();
       fd.append("file", file);
       fd.append("conversa_id", conversaId);
       fd.append("file_type", tipoMsg);
-      const upRes = await fetch("/api/chat/upload-arquivo", {
+      const upRes = await fetchWithAuthRetry("/api/chat/upload-arquivo", {
         method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
         body: fd,
       });
       if (!upRes.ok) { const j = await upRes.json().catch(() => ({})); throw new Error(j.error ?? "Upload falhou"); }

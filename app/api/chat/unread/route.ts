@@ -59,11 +59,13 @@ export async function GET(req: NextRequest) {
   if (readIds.length) {
     const { data: readMessages, error: readErr } = await admin
       .from("chat_mensagens")
-      .select("id, criado_em, sequence_id")
+      .select("id, criado_em")
       .in("id", [...new Set(readIds)]);
 
     if (readErr) return NextResponse.json({ error: readErr.message }, { status: 500 });
-    for (const message of readMessages ?? []) readMessageById.set(message.id, message);
+    for (const message of readMessages ?? []) {
+      readMessageById.set(message.id, { ...message, sequence_id: null });
+    }
   }
 
   const cursorByConversation = new Map(
@@ -72,10 +74,10 @@ export async function GET(req: NextRequest) {
 
   const { data: messages, error: msgErr } = await admin
     .from("chat_mensagens")
-    .select("id, conversa_id, autor_id, criado_em, sequence_id")
+    .select("id, conversa_id, autor_id, criado_em")
     .in("conversa_id", conversaIds)
     .neq("autor_id", user.id)
-    .order("sequence_id", { ascending: true })
+    .order("criado_em", { ascending: true })
     .limit(5000);
 
   if (msgErr) return NextResponse.json({ error: msgErr.message }, { status: 500 });
@@ -87,7 +89,7 @@ export async function GET(req: NextRequest) {
       ? readMessageById.get(cursor.last_read_message_id) ?? null
       : null;
 
-    if (isNewer(message, readMessage)) {
+    if (isNewer({ ...message, sequence_id: null }, readMessage)) {
       byConversa[message.conversa_id] = (byConversa[message.conversa_id] ?? 0) + 1;
     }
   }
