@@ -227,11 +227,12 @@ export default function AdminPage() {
                 />
               ) : editando ? (
                 <EditarUsuarioPanel
+                  key={editando.id}
                   usuario={editando}
                   euSouEle={eu?.id === editando.id}
                   podeatribuir={temPermissao("atribuir_permissoes")}
-                  onChange={(dados) => {
-                    atualizarUsuario(editando.id, dados);
+                  onChange={async (dados) => {
+                    await atualizarUsuario(editando.id, dados);
                     setEditando({ ...editando, ...dados });
                   }}
                   onRemover={async () => { await removerUsuario(editando.id); setEditando(null); }}
@@ -349,7 +350,7 @@ function EditarUsuarioPanel({
   usuario: User;
   euSouEle: boolean;
   podeatribuir: boolean;
-  onChange: (dados: Partial<User>) => void;
+  onChange: (dados: Partial<User>) => void | Promise<void>;
   onRemover: () => void;
   onFechar: () => void;
 }) {
@@ -364,6 +365,15 @@ function EditarUsuarioPanel({
   const [confirmExcluir, setConfirmExcluir] = useState(false);
   const [excluindo, setExcluindo]           = useState(false);
   const [erroExcluir, setErroExcluir]       = useState("");
+  const [nomeForm, setNomeForm]             = useState(usuario.nome);
+  const [emailForm, setEmailForm]           = useState(usuario.email);
+  const [telefoneForm, setTelefoneForm]     = useState(usuario.telefone ?? "");
+  const [nascimentoForm, setNascimentoForm] = useState(usuario.dataNascimento ?? "");
+  const [ingressoForm, setIngressoForm]     = useState(usuario.dataIngresso ?? "");
+  const [primeiroForm, setPrimeiroForm]     = useState(!!usuario.primeiroAcesso);
+  const [salvandoDados, setSalvandoDados]   = useState(false);
+  const [erroDados, setErroDados]           = useState("");
+  const [okDados, setOkDados]               = useState(false);
 
   async function trocarSenha() {
     if (novaSenha.length < 6) { setErroSenha("Mínimo 6 caracteres."); return; }
@@ -397,6 +407,48 @@ function EditarUsuarioPanel({
     onChange({ role, permissoes: undefined });
   }
 
+  async function salvarDados() {
+    const nome = nomeForm.trim();
+    const email = emailForm.trim().toLowerCase();
+    const telefone = telefoneForm.trim();
+    const dataNascimento = nascimentoForm.trim();
+    const dataIngresso = ingressoForm.trim();
+
+    if (!nome) { setErroDados("Digite o nome do usuário."); return; }
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setErroDados("Digite um email válido.");
+      return;
+    }
+    if (dataNascimento && Number.isNaN(new Date(`${dataNascimento}T00:00:00`).getTime())) {
+      setErroDados("Data de nascimento inválida.");
+      return;
+    }
+    if (dataIngresso && Number.isNaN(new Date(`${dataIngresso}T00:00:00`).getTime())) {
+      setErroDados("Data de ingresso inválida.");
+      return;
+    }
+
+    setSalvandoDados(true);
+    setErroDados("");
+    setOkDados(false);
+    try {
+      await onChange({
+        nome,
+        email,
+        telefone,
+        dataNascimento,
+        dataIngresso: dataIngresso || usuario.dataIngresso,
+        primeiroAcesso: primeiroForm,
+      });
+      setOkDados(true);
+      setTimeout(() => setOkDados(false), 3000);
+    } catch (e) {
+      setErroDados(e instanceof Error ? e.message : "Erro ao salvar dados.");
+    } finally {
+      setSalvandoDados(false);
+    }
+  }
+
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden sticky top-4">
       <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
@@ -421,6 +473,92 @@ function EditarUsuarioPanel({
             Você está editando sua própria conta.
           </div>
         )}
+
+        {/* Dados do usuário */}
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Dados do usuário</p>
+            {usuario.primeiroAcesso && (
+              <span className="text-[10px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
+                Primeiro acesso pendente
+              </span>
+            )}
+          </div>
+          <div className="space-y-2">
+            <div>
+              <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Nome completo</label>
+              <input
+                value={nomeForm}
+                onChange={(e) => { setNomeForm(e.target.value); setErroDados(""); setOkDados(false); }}
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-gray-400 focus:ring-1 focus:ring-gray-300"
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Email de acesso</label>
+              <input
+                type="email"
+                value={emailForm}
+                onChange={(e) => { setEmailForm(e.target.value); setErroDados(""); setOkDados(false); }}
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-gray-400 focus:ring-1 focus:ring-gray-300"
+              />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <div>
+                <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Telefone / WhatsApp</label>
+                <input
+                  type="tel"
+                  value={telefoneForm}
+                  onChange={(e) => { setTelefoneForm(e.target.value); setErroDados(""); setOkDados(false); }}
+                  placeholder="(00) 00000-0000"
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-gray-400 focus:ring-1 focus:ring-gray-300"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Nascimento</label>
+                <input
+                  type="date"
+                  value={nascimentoForm}
+                  onChange={(e) => { setNascimentoForm(e.target.value); setErroDados(""); setOkDados(false); }}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-gray-400 focus:ring-1 focus:ring-gray-300"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Membro desde</label>
+              <input
+                type="date"
+                value={ingressoForm}
+                onChange={(e) => { setIngressoForm(e.target.value); setErroDados(""); setOkDados(false); }}
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-gray-400 focus:ring-1 focus:ring-gray-300"
+              />
+            </div>
+            <label className="flex items-start gap-2.5 px-3 py-2 rounded-xl border border-gray-200 bg-gray-50 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={primeiroForm}
+                onChange={(e) => { setPrimeiroForm(e.target.checked); setErroDados(""); setOkDados(false); }}
+                className="mt-0.5 accent-black w-4 h-4"
+              />
+              <span className="text-xs text-gray-600 leading-relaxed">
+                Forçar tela de completar cadastro no próximo login
+              </span>
+            </label>
+            {erroDados && <p className="text-xs text-red-500">{erroDados}</p>}
+            <button
+              onClick={salvarDados}
+              disabled={salvandoDados}
+              className={clsx(
+                "w-full flex items-center justify-center gap-1.5 py-2 rounded-xl text-sm font-semibold border transition",
+                okDados
+                  ? "bg-green-50 text-green-700 border-green-200"
+                  : "bg-gray-900 text-white border-gray-900 hover:bg-black disabled:opacity-50"
+              )}
+            >
+              <Save className="w-3.5 h-3.5" />
+              {salvandoDados ? "Salvando..." : okDados ? "Dados salvos!" : "Salvar dados"}
+            </button>
+          </div>
+        </div>
 
         {/* Role */}
         {podeatribuir && (
@@ -698,7 +836,7 @@ function NovoUsuarioForm({
   onCancelar: () => void;
 }) {
   const [form, setForm] = useState({
-    nome: "", email: "", telefone: "", role: "membro" as Role,
+    nome: "", email: "", telefone: "", dataNascimento: "", role: "membro" as Role,
     ministerios: [] as Ministerio[], ativo: true,
   });
   const [senha, setSenha]           = useState(gerarSenha);
@@ -715,6 +853,7 @@ function NovoUsuarioForm({
       nome:        form.nome.trim(),
       email:       form.email.trim(),
       telefone:    form.telefone.trim() || undefined,
+      dataNascimento: form.dataNascimento || undefined,
       role:        form.role,
       ministerios: form.ministerios,
       ativo:       true,
@@ -813,6 +952,15 @@ function NovoUsuarioForm({
             placeholder="Telefone"
             className={inputCls}
           />
+          <div>
+            <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Data de nascimento</label>
+            <input
+              value={form.dataNascimento}
+              onChange={(e) => setForm({ ...form, dataNascimento: e.target.value })}
+              type="date"
+              className={inputCls}
+            />
+          </div>
           {/* Campo de senha com geração automática */}
           <div>
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Senha inicial</p>

@@ -304,11 +304,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function atualizarUsuario(id: string, dados: Partial<User>) {
-    await fetch("/api/atualizar-perfil", {
+    const res = await fetch("/api/atualizar-perfil", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id, ...dados }),
     });
+    if (!res.ok) {
+      const json = await res.json().catch(() => ({}));
+      throw new Error(json.error ?? "Erro ao atualizar usuário.");
+    }
     setUsuarios((prev) => prev.map((u) => u.id === id ? { ...u, ...dados } : u));
     if (user?.id === id) {
       const updated = { ...user, ...dados };
