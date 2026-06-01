@@ -1240,31 +1240,26 @@ function MembrosTab({
   }
 
   function remover(id: string) {
+    const membro = membros.find((m) => m.id === id);
+    if (!membro) return;
     setMembros((prev) => prev.filter((m) => m.id !== id));
+    fetch("/api/ministerio/membro", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ usuarioId: id, ministerio }),
+    });
   }
 
   async function adicionar() {
     if (!usuarioSelecionado) return;
     const usuario = usuariosDisponiveis.find((u) => u.id === usuarioSelecionado);
     if (!usuario) return;
-    // Busca os ministérios atuais para não sobrescrever
-    const { data: perfilAtual } = await supabase
-      .from("perfis")
-      .select("ministerios")
-      .eq("id", usuario.id)
-      .single();
-    const ministeriosAtuais: string[] = perfilAtual?.ministerios ?? [];
-    if (ministeriosAtuais.includes(ministerio)) return; // já é membro
-    const { error } = await supabase
-      .from("perfis")
-      .update({ ministerios: [...ministeriosAtuais, ministerio] })
-      .eq("id", usuario.id);
-    if (!error) {
-      // Salva a função em membros_ministerio
-      await supabase.from("membros_ministerio").upsert(
-        { usuario_id: usuario.id, ministerio, funcao: novaFuncaoForm },
-        { onConflict: "usuario_id,ministerio" }
-      );
+    const res = await fetch("/api/ministerio/membro", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ usuarioId: usuario.id, ministerio, funcao: novaFuncaoForm }),
+    });
+    if (res.ok) {
       setMembros((prev) => [...prev, {
         id: usuario.id,
         nome: usuario.nome,
