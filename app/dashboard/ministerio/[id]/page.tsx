@@ -1157,12 +1157,15 @@ function MembrosTab({
   useEffect(() => {
     if (!showForm) return;
     supabase.from("perfis")
-      .select("id, nome, email, telefone, role")
+      .select("id, nome, email, telefone, role, ministerios")
       .eq("ativo", true)
       .then(({ data }) => {
         if (data) {
           const idsMembros = new Set(membros.map((m) => m.id));
-          setUsuariosDisponiveis(data.filter((u: any) => !idsMembros.has(u.id)));
+          const disponiveis = data
+            .filter((u: any) => !idsMembros.has(u.id))
+            .sort((a: any, b: any) => a.nome.localeCompare(b.nome, "pt-BR"));
+          setUsuariosDisponiveis(disponiveis);
         }
       });
   }, [showForm, membros]);
@@ -1244,10 +1247,17 @@ function MembrosTab({
     if (!usuarioSelecionado) return;
     const usuario = usuariosDisponiveis.find((u) => u.id === usuarioSelecionado);
     if (!usuario) return;
-    // Atualiza o array de ministérios do usuário
+    // Busca os ministérios atuais para não sobrescrever
+    const { data: perfilAtual } = await supabase
+      .from("perfis")
+      .select("ministerios")
+      .eq("id", usuario.id)
+      .single();
+    const ministeriosAtuais: string[] = perfilAtual?.ministerios ?? [];
+    if (ministeriosAtuais.includes(ministerio)) return; // já é membro
     const { error } = await supabase
       .from("perfis")
-      .update({ ministerios: [...(usuario.ministerios ?? []), ministerio] })
+      .update({ ministerios: [...ministeriosAtuais, ministerio] })
       .eq("id", usuario.id);
     if (!error) {
       // Salva a função em membros_ministerio
