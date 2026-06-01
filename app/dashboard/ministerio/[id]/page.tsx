@@ -91,7 +91,7 @@ export default function CanalMinisterioPage() {
   }
 
   const corBg = corMap[slug] ?? corMap[canalBase.cor] ?? "bg-gray-900";
-  const nomeCanal = slug === "Cantina" ? "Recepcionamento" : slug;
+  const nomeCanal = slug;
 
   return (
     <div className="space-y-0">

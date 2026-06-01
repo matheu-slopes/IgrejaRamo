@@ -25,7 +25,7 @@ export const TONS = [
 export const FUNCOES_POR_MIN: Record<string, string[]> = {
   Louvor:        ["Ministro","Guitarra","Baixo","Cajón","Teclado","Backing Vocal","Violão"],
   "Mídias":      ["Transmissão","Projeção/Letras","Fotografia","Câmera"],
-  Cantina:       ["Abertura","Oferta","Recepção"],
+  Recepcionamento: ["Abertura","Oferta","Recepção"],
   Limpeza:       ["Escala de Limpeza"],
   Infantil:      ["Professor(a)","Monitor(a)","Auxiliar"],
   "Ação Social": ["Coordenação","Voluntário(a)"],

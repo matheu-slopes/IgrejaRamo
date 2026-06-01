@@ -27,7 +27,7 @@ export type Ministerio =
   | "Ação Social"
   | "Infantil"
   | "Mídias"
-  | "Cantina"
+  | "Recepcionamento"
   | "Jovens"
   | "Limpeza";
 

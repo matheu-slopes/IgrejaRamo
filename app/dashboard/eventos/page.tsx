@@ -10,9 +10,9 @@ import { useAppRefresh } from "@/hooks/useAppRefresh";
 import { Plus, ChevronRight, MapPin } from "lucide-react";
 import clsx from "clsx";
 
-const TODOS: Ministerio[] = ["Louvor", "Mídias", "Cantina", "Infantil", "Ação Social", "Jovens", "Ensino"];
+const TODOS: Ministerio[] = ["Louvor", "Mídias", "Recepcionamento", "Infantil", "Ação Social", "Jovens", "Ensino"];
 const EMOJI: Record<string, string> = {
-  Louvor: "🎸", "Mídias": "📹", Cantina: "🧹",
+  Louvor: "🎸", "Mídias": "📹", Recepcionamento: "🤝",
   Infantil: "🧒", "Ação Social": "🤝", Jovens: "⚡", Ensino: "📖",
 };
 

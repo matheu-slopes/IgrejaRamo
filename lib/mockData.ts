@@ -54,7 +54,7 @@ export const mockUsers: User[] = [
     nome: "Ana Rodrigues",
     email: "ana@ramo.church",
     role: "voluntario",
-    ministerios: ["Infantil", "Cantina"],
+    ministerios: ["Infantil", "Recepcionamento"],
     dataIngresso: "2021-07-05",
     ativo: true,
   },
@@ -259,7 +259,7 @@ export const mockEscalas: Escala[] = [
   // ── Geral — Domingo 19/04
   {
     id: "esc4",
-    ministerio: "Cantina",
+    ministerio: "Recepcionamento",
     data: "2026-04-19",
     horario: "18:30",
     culto: "Culto Domingo 18h30",
@@ -423,7 +423,7 @@ export const mockCanais: CanalMinisterio[] = [
   { ministerio: "Infantil",    descricao: "Ministério de crianças e adolescentes.",              chatBloqueado: false, cor: "gold"   },
   { ministerio: "Ação Social", descricao: "Ações de solidariedade e alcance comunitário.",      chatBloqueado: false, cor: "vine"   },
   { ministerio: "Jovens",      descricao: "Movimento jovem da Igreja Ramo da Vida.",            chatBloqueado: false, cor: "grape"  },
-  { ministerio: "Cantina", descricao: "Acolhimento, abertura, oferta e recepção no culto.", chatBloqueado: false, cor: "bark"   },
+  { ministerio: "Recepcionamento", descricao: "Acolhimento, abertura, oferta e recepção no culto.", chatBloqueado: false, cor: "bark"   },
 ];
 
 // ─── Membros por ministério ───────────────────────────────────────
@@ -447,7 +447,7 @@ export const mockMembrosMinisterio: MembroMinisterio[] = [
   { id: "5c", nome: "Lucas Ferreira",    email: "lucas@ramo.church",                               funcao: "Líder",      ministerio: "Ação Social", ativo: true,  dataEntrada: "2022-02-14" },
   { id: "4b", nome: "Ana Rodrigues",     email: "ana@ramo.church",                                funcao: "Membro",     ministerio: "Ação Social", ativo: true,  dataEntrada: "2021-07-05" },
   // Recepcionamento
-  { id: "4c", nome: "Ana Rodrigues",     email: "ana@ramo.church",                                funcao: "Líder",      ministerio: "Cantina",     ativo: true,  dataEntrada: "2021-07-05" },
+  { id: "4c", nome: "Ana Rodrigues",     email: "ana@ramo.church",                                funcao: "Líder",      ministerio: "Recepcionamento", ativo: true,  dataEntrada: "2021-07-05" },
   // Ensino
   { id: "1b", nome: "Pastor João Silva", email: "pastor@ramo.church", telefone: "(11) 99999-0001", funcao: "Líder",      ministerio: "Ensino",      ativo: true,  dataEntrada: "2018-03-10" },
 ];
@@ -865,9 +865,9 @@ export const mockGrupos: Grupo[] = [
     id: "g_recepcionamento",
     nome: "Recepcionamento",
     tipo: "ministerio",
-    emoji: "🍞",
+    emoji: "🤝",
     cor: "bg-amber-700",
-    ministerio: "Cantina",
+    ministerio: "Recepcionamento",
     descricao: "Acolhimento, abertura, oferta e recepção",
     adminId: "4",
     membros: ["4"],

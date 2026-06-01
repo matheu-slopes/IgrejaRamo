@@ -41,7 +41,7 @@ DROP FUNCTION IF EXISTS handle_new_user() CASCADE;
 CREATE TYPE role_tipo AS ENUM ('admin', 'pastor', 'lider', 'voluntario', 'membro');
 
 CREATE TYPE ministerio_tipo AS ENUM (
-  'Ensino', 'Louvor', 'Ação Social', 'Infantil', 'Mídias', 'Cantina', 'Jovens'
+  'Ensino', 'Louvor', 'Ação Social', 'Infantil', 'Mídias', 'Recepcionamento', 'Jovens', 'Limpeza'
 );
 
 CREATE TYPE tipo_mensagem AS ENUM ('texto', 'imagem', 'audio');
@@ -283,7 +283,7 @@ INSERT INTO canais_ministerio (ministerio, descricao, cor) VALUES
   ('Ação Social', 'Canal de ação social e evangelismo',          'olive'),
   ('Infantil',    'Canal do ministério infantil',                'amber'),
   ('Mídias',      'Canal do ministério de mídias e transmissão', 'cyan'),
-  ('Cantina',     'Canal de abertura, oferta e recepção',        'orange'),
+  ('Recepcionamento', 'Canal de abertura, oferta e recepção',     'orange'),
   ('Jovens',      'Canal do ministério de jovens',               'vine');
 
 -- ──────────────────────────────────────────────────────────────

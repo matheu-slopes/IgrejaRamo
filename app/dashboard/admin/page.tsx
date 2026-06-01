@@ -19,9 +19,9 @@ import { supabase } from "@/lib/supabase";
 import { notificarBroadcast } from "@/lib/notificarBroadcast";
 
 const ROLES: Role[] = ["admin", "pastor", "lider", "voluntario", "membro"];
-const MINISTERIOS: Ministerio[] = ["Louvor","Mídias","Ensino","Infantil","Ação Social","Jovens","Limpeza","Cantina"];
+const MINISTERIOS: Ministerio[] = ["Louvor","Mídias","Ensino","Infantil","Ação Social","Jovens","Limpeza","Recepcionamento"];
 
-const displayMinisterio = (m: string) => (m === "Cantina" ? "Recepcionamento" : m);
+const displayMinisterio = (m: string) => m;
 
 const ROLE_COR: Record<Role, string> = {
   admin:      "bg-red-100 text-red-700 border-red-200",
@@ -252,7 +252,7 @@ function MinisteriosTab({
   usuarios: User[];
   temPermissao: (p: Permissao) => boolean;
 }) {
-  const MINISTERIOS_LISTA: Ministerio[] = ["Louvor","Mídias","Ensino","Infantil","Ação Social","Jovens","Limpeza","Cantina"];
+  const MINISTERIOS_LISTA: Ministerio[] = ["Louvor","Mídias","Ensino","Infantil","Ação Social","Jovens","Limpeza","Recepcionamento"];
   const [editandoMin, setEditandoMin] = useState<Ministerio | null>(null);
   const [salvando, setSalvando] = useState(false);
 

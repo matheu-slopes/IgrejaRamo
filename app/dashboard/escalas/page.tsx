@@ -17,8 +17,7 @@ import clsx from "clsx";
 // ─── Constantes ───────────────────────────────────────────────────────────────
 // Nomes de exibição (o valor do DB permanece igual)
 const MIN_LABEL: Record<string, string> = {
-  Cantina: "Recepcionamento",
-  Ensino:  "Pregação",
+  Ensino: "Pregação",
 };
 const minLabel = (m: string) => MIN_LABEL[m] ?? m;
 
@@ -54,19 +53,19 @@ function agruparItens(itens: Escala["itens"]) {
   });
 }
 
-// Ordem pelo fluxo do culto: Limpeza → Portaria(Cantina) → Louvor → Mídias → Pregação(Ensino) → Infantil → Jovens
-const MINISTERIOS_CULTO: Ministerio[] = ["Limpeza", "Cantina", "Louvor", "Mídias", "Ensino", "Infantil", "Jovens"];
-const TODOS: Ministerio[] = ["Limpeza", "Cantina", "Louvor", "Mídias", "Ensino", "Infantil", "Jovens"];
+// Ordem pelo fluxo do culto: Limpeza → Recepcionamento → Louvor → Mídias → Pregação(Ensino) → Infantil → Jovens
+const MINISTERIOS_CULTO: Ministerio[] = ["Limpeza", "Recepcionamento", "Louvor", "Mídias", "Ensino", "Infantil", "Jovens"];
+const TODOS: Ministerio[] = ["Limpeza", "Recepcionamento", "Louvor", "Mídias", "Ensino", "Infantil", "Jovens"];
 
 const EMOJI: Record<string, string> = {
-  Louvor: "🎸", "Mídias": "📹", Cantina: "🤝",
+  Louvor: "🎸", "Mídias": "📹", Recepcionamento: "🤝",
   Infantil: "🧒", Jovens: "⚡", Ensino: "📖", Limpeza: "🧽",
 };
 
 const COR_MIN_BADGE: Record<string, string> = {
   Louvor:   "bg-grape-100 text-grape-800",
   "Mídias": "bg-blue-100 text-blue-700",
-  Cantina:  "bg-orange-100 text-orange-700",
+  Recepcionamento: "bg-orange-100 text-orange-700",
   Infantil: "bg-yellow-100 text-yellow-700",
   Jovens:   "bg-gray-100 text-gray-900",
   Ensino:   "bg-teal-100 text-teal-700",

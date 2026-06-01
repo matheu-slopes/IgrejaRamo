@@ -49,7 +49,7 @@ const ministerios = [
   { value: "Infantil", label: "Infantil", icon: Baby },
   { value: "Ação Social", label: "Ação Social", icon: HeartHandshake },
   { value: "Jovens", label: "Jovens", icon: Users },
-  { value: "Cantina", label: "Recepcionamento", icon: Users },
+  { value: "Recepcionamento", label: "Recepcionamento", icon: Users },
   { value: "Limpeza", label: "Limpeza", icon: Sparkles },
 ];
 
