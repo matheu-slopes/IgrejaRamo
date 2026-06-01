@@ -1120,7 +1120,7 @@ function MembrosTab({
       setMembros(perfisData.map((p: Record<string, unknown>) => {
         const liderMins = (p.lider_ministerios as string[]) ?? [];
         const isLiderPerfil = p.role === "pastor" || liderMins.includes(ministerio);
-        const funcao = (funcaoMap.get(p.id as string) ?? (isLiderPerfil ? "Líder" : "Membro")) as FuncaoMinisterio;
+        const funcao = (funcaoMap.get(p.id as string) ?? (isLiderPerfil ? "Líder" : "Voluntário(a)")) as FuncaoMinisterio;
         return {
           id: p.id as string,
           nome: p.nome as string,
@@ -1147,11 +1147,11 @@ function MembrosTab({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ministerio]);
   const [editandoId, setEditandoId] = useState<string | null>(null);
-  const [novaFuncao, setNovaFuncao] = useState<FuncaoMinisterio>("Membro");
+  const [novaFuncao, setNovaFuncao] = useState<FuncaoMinisterio>("Voluntário(a)");
   const [showForm, setShowForm] = useState(false);
   const [usuariosDisponiveis, setUsuariosDisponiveis] = useState<any[]>([]);
   const [usuarioSelecionado, setUsuarioSelecionado] = useState<string>("");
-  const [novaFuncaoForm, setNovaFuncaoForm] = useState<FuncaoMinisterio>("Membro");
+  const [novaFuncaoForm, setNovaFuncaoForm] = useState<FuncaoMinisterio>("Voluntário(a)");
 
   // Buscar usuários ativos que não estão no ministério
   useEffect(() => {
@@ -1231,7 +1231,7 @@ function MembrosTab({
       }
       const updates: Record<string, unknown> = { lider_ministerios: updated };
       if (novaFuncao === "Líder" && data.role === "membro") updates.role = "lider";
-      if (novaFuncao === "Membro" && updated.length === 0 && data.role === "lider") updates.role = "membro";
+      if (novaFuncao !== "Líder" && novaFuncao !== "Colíder" && updated.length === 0 && data.role === "lider") updates.role = "membro";
       supabase.from("perfis").update(updates).eq("id", id).then(() => {});
     });
   }
@@ -1266,7 +1266,7 @@ function MembrosTab({
         dataEntrada: new Date().toISOString().split("T")[0],
       }]);
       setUsuarioSelecionado("");
-      setNovaFuncaoForm("Membro");
+      setNovaFuncaoForm("Voluntário(a)");
       setShowForm(false);
     }
   }
