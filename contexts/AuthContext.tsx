@@ -26,6 +26,7 @@ function rowToUser(row: Record<string, unknown>): User {
                          ? (row.lider_ministerios as User["ministerios"])
                          : undefined,
     dataIngresso:      row.data_ingresso as string,
+    dataNascimento:    (row.data_nascimento as string) ?? undefined,
     ativo:             row.ativo as boolean,
     primeiroAcesso:    (row.primeiro_acesso as boolean) ?? false,
     permissoes:        (row.permissoes as Permissao[])?.length
@@ -329,6 +330,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         ministerios:       dados.ministerios,
         liderMinisterios:  dados.liderMinisterios ?? [],
         dataIngresso:      dados.dataIngresso,
+        dataNascimento:    dados.dataNascimento,
         ativo:             dados.ativo,
         permissoes:        dados.permissoes ?? [],
       }),

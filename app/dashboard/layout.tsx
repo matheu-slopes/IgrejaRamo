@@ -345,6 +345,7 @@ export default function DashboardLayout({
   const [nomeForm, setNomeForm] = useState("");
   const [emailForm, setEmailForm] = useState("");
   const [telefoneForm, setTelefoneForm] = useState("");
+  const [dataNascimentoForm, setDataNascimentoForm] = useState("");
   const [showSenhaPrimeiro, setShowSenhaPrimeiro] = useState(false);
   const [salvandoPrimeiro, setSalvandoPrimeiro] = useState(false);
   const [erroPrimeiro, setErroPrimeiro] = useState("");
@@ -374,19 +375,22 @@ export default function DashboardLayout({
       setNomeForm(user.nome ?? "");
       setEmailForm(user.email ?? "");
       setTelefoneForm(user.telefone ?? "");
+      setDataNascimentoForm(user.dataNascimento ?? "");
       setSenhaModal(true);
     }
-  }, [isLoading, user?.primeiroAcesso]);
+  }, [isLoading, user?.primeiroAcesso, user?.nome, user?.email, user?.telefone, user?.dataNascimento]);
 
   async function salvarPrimeiraSenha() {
     if (!user) return;
     const nomeTrimmed = nomeForm.trim();
     const emailTrimmed = emailForm.trim().toLowerCase();
     const telTrimmed = telefoneForm.trim();
+    const nascimento = dataNascimentoForm.trim();
     if (!nomeTrimmed) { setErroPrimeiro("Digite seu nome completo."); return; }
     if (!emailTrimmed) { setErroPrimeiro("Digite seu email."); return; }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailTrimmed)) { setErroPrimeiro("Digite um email válido."); return; }
     if (!telTrimmed) { setErroPrimeiro("Digite seu telefone."); return; }
+    if (!nascimento) { setErroPrimeiro("Digite sua data de nascimento."); return; }
     if (novaSenhaPrimeiro.length < 6) { setErroPrimeiro("A nova senha deve ter no mínimo 6 caracteres."); return; }
     setSalvandoPrimeiro(true); setErroPrimeiro("");
     const res = await fetch("/api/alterar-senha", {
@@ -396,7 +400,13 @@ export default function DashboardLayout({
     });
     const json = await res.json().catch(() => ({}));
     if (!res.ok) { setErroPrimeiro(json.error ?? "Erro ao alterar senha."); setSalvandoPrimeiro(false); return; }
-    await atualizarUsuario(user.id, { primeiroAcesso: false, nome: nomeTrimmed, email: emailTrimmed, telefone: telTrimmed });
+    await atualizarUsuario(user.id, {
+      primeiroAcesso: false,
+      nome: nomeTrimmed,
+      email: emailTrimmed,
+      telefone: telTrimmed,
+      dataNascimento: nascimento,
+    });
     setSenhaModal(false);
     setNovaSenhaPrimeiro("");
     setSalvandoPrimeiro(false);
@@ -531,6 +541,17 @@ export default function DashboardLayout({
                 />
               </div>
 
+              {/* Data de nascimento */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Data de nascimento</label>
+                <input
+                  type="date"
+                  value={dataNascimentoForm}
+                  onChange={(e) => { setDataNascimentoForm(e.target.value); setErroPrimeiro(""); }}
+                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-gray-400 focus:ring-1 focus:ring-gray-100"
+                />
+              </div>
+
               {/* Nova senha */}
               <div>
                 <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Nova senha</label>
@@ -553,7 +574,7 @@ export default function DashboardLayout({
             {erroPrimeiro && <p className="text-xs text-red-500 -mt-2">{erroPrimeiro}</p>}
             <button
               onClick={salvarPrimeiraSenha}
-              disabled={salvandoPrimeiro || !nomeForm || !emailForm || !telefoneForm || !novaSenhaPrimeiro}
+              disabled={salvandoPrimeiro || !nomeForm || !emailForm || !telefoneForm || !dataNascimentoForm || !novaSenhaPrimeiro}
               className="w-full py-3 bg-[#0a0a0a] text-white rounded-xl text-sm font-semibold hover:bg-[#111] transition disabled:opacity-50"
             >
               {salvandoPrimeiro ? "Salvando..." : "Confirmar e entrar"}

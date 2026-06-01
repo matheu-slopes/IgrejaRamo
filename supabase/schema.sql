@@ -72,7 +72,9 @@ CREATE TABLE perfis (
   ministerios   ministerio_tipo[] DEFAULT '{}',
   lider_ministerios ministerio_tipo[] DEFAULT '{}',
   data_ingresso DATE        NOT NULL DEFAULT CURRENT_DATE,
+  data_nascimento DATE,
   ativo         BOOLEAN     NOT NULL DEFAULT TRUE,
+  primeiro_acesso BOOLEAN   NOT NULL DEFAULT FALSE,
   permissoes    TEXT[]      DEFAULT '{}',
   created_at    TIMESTAMPTZ DEFAULT NOW(),
   updated_at    TIMESTAMPTZ DEFAULT NOW()

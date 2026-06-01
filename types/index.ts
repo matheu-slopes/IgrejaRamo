@@ -46,6 +46,7 @@ export interface User {
    */
   liderMinisterios?: Ministerio[];
   dataIngresso: string; // ISO date
+  dataNascimento?: string; // ISO date
   ativo: boolean;
   primeiroAcesso?: boolean;
   /**

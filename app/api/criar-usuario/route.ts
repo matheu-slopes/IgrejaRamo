@@ -14,7 +14,19 @@ export async function POST(req: NextRequest) {
   });
 
   const body = await req.json();
-  const { email, senha, nome, telefone, role, ministerios, liderMinisterios, dataIngresso, ativo, permissoes } = body;
+  const {
+    email,
+    senha,
+    nome,
+    telefone,
+    role,
+    ministerios,
+    liderMinisterios,
+    dataIngresso,
+    dataNascimento,
+    ativo,
+    permissoes,
+  } = body;
 
   if (!email || !senha || !nome) {
     return NextResponse.json({ error: "Campos obrigatórios ausentes." }, { status: 400 });
@@ -40,7 +52,9 @@ export async function POST(req: NextRequest) {
     ministerios:       ministerios ?? [],
     lider_ministerios: liderMinisterios ?? [],
     data_ingresso:     dataIngresso ?? null,
+    data_nascimento:   dataNascimento ?? null,
     ativo:             ativo ?? true,
+    primeiro_acesso:   true,
     permissoes:        permissoes ?? [],
   });
 
