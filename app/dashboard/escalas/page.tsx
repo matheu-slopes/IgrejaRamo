@@ -938,22 +938,6 @@ export default function EscalasDashboardPage() {
             </div>
           )}
 
-          {/* Jovens — acesso separado para líderes (cultos quinzenais de sábado) */}
-          {(isAdmin || meus.includes("Jovens")) && isLider && (
-            <button
-              onClick={() => setEditing("Jovens")}
-              className="flex items-center justify-between gap-3 bg-white rounded-2xl border border-gray-100 px-5 py-4 text-left hover:shadow-md hover:border-gray-200 transition shadow-sm mt-1"
-            >
-              <div className="flex items-center gap-3">
-                <span className="text-xl">⚡</span>
-                <div>
-                  <p className="text-sm font-bold text-gray-700">Jovens</p>
-                  <p className="text-xs text-gray-400">Cultos quinzenais de sábado — gerenciar escala</p>
-                </div>
-              </div>
-              <ChevronRight className="w-4 h-4 text-gray-300 shrink-0" />
-            </button>
-          )}
         </>
       )}
 
