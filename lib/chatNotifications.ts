@@ -168,46 +168,7 @@ async function dispatchChatNotification(job: ChatNotificationJob) {
     throw pushErr;
   }
 
-  const notificacoes = userIds.map((uid) => ({
-    usuario_id: uid,
-    titulo: title,
-    corpo: body,
-    tipo: "ministerio",
-    link: "/dashboard/chat",
-    chat_mensagem_id: job.message_id,
-  }));
-
-  const { error: notifError } = await admin
-    .from("notificacoes")
-    .upsert(notificacoes, { onConflict: "usuario_id,chat_mensagem_id" });
-
-  if (notifError) {
-    const missingTable = notifError.code === "42P01" || String(notifError.message ?? "").includes("notificacoes");
-    if (missingTable) {
-      console.warn("chat notificacoes table missing; skipping in-app notification");
-      return;
-    }
-
-    const missingColumn = notifError.code === "42703" || String(notifError.message ?? "").includes("chat_mensagem_id");
-    if (!missingColumn) throw notifError;
-
-    const fallback = userIds.map((uid) => ({
-      usuario_id: uid,
-      titulo: title,
-      corpo: body,
-      tipo: "ministerio",
-      link: "/dashboard/chat",
-    }));
-    const { error: fallbackError } = await admin.from("notificacoes").insert(fallback);
-    if (fallbackError) {
-      const fallbackMissingTable = fallbackError.code === "42P01" || String(fallbackError.message ?? "").includes("notificacoes");
-      if (fallbackMissingTable) {
-        console.warn("chat notificacoes table missing; skipping fallback in-app notification");
-        return;
-      }
-      throw fallbackError;
-    }
-  }
+  // Chat usa push + contador proprio de Conversas. Nao alimenta o sininho geral.
 }
 
 async function resolveConversationInfo(conversaId: string): Promise<{ tipo: string | null; nome: string | null } | null> {

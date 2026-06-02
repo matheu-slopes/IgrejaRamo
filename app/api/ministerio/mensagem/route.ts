@@ -125,15 +125,6 @@ async function sendPushMembros(
   }
 
   // Alimenta o sininho de notificações no app
-  const notificacoes = membroIds.map((uid) => ({
-    usuario_id: uid,
-    titulo: title,
-    corpo: body,
-    tipo: "ministerio",
-    link: url,
-    ministerio,
-  }));
-
-  const { error: notifError } = await admin.from("notificacoes").insert(notificacoes);
-  if (notifError) console.error("ministerio notificacoes insert error:", notifError);
+  // Mensagens de ministerio usam push. O sininho geral fica reservado para avisos,
+  // eventos, escalas e entrada em ministerios.
 }

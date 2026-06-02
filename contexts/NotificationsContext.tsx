@@ -32,6 +32,7 @@ const EMPTY_COUNTS: NotificationCounts = {
   eventos: 0,
   ministerios: {},
 };
+const TIPOS_SININHO = new Set(["aviso", "escala", "evento"]);
 
 const NotificationsContext = createContext<NotificationsCtx>({
   notificacoes: [],
@@ -89,26 +90,6 @@ function demoNotificacoes(): Notificacao[] {
       criadaEm: at(24),
       link: "/dashboard/eventos",
       ministerio: "Jovens",
-    },
-    {
-      id: "demo-jovens",
-      titulo: "Jovens",
-      corpo: "Matheus: Alinhamento da escala do proximo culto.",
-      tipo: "ministerio",
-      lida: false,
-      criadaEm: at(39),
-      link: "/dashboard/ministerio/Jovens",
-      ministerio: "Jovens",
-    },
-    {
-      id: "demo-midias",
-      titulo: "Midias",
-      corpo: "Larissa: Transmissao e projecao confirmadas.",
-      tipo: "ministerio",
-      lida: false,
-      criadaEm: at(58),
-      link: "/dashboard/ministerio/M%C3%ADdias",
-      ministerio: "Mídias",
     },
   ];
 }
@@ -170,6 +151,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
       .from("notificacoes")
       .select()
       .eq("usuario_id", user.id)
+      .in("tipo", ["aviso", "escala", "evento"])
       .order("criada_em", { ascending: false })
       .limit(50)
       .then(({ data }) => {
@@ -184,6 +166,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
         table: "notificacoes",
         filter: `usuario_id=eq.${user.id}`,
       }, (payload: any) => {
+        if (!TIPOS_SININHO.has(payload.new?.tipo)) return;
         setNotificacoes((prev) => [rowToNotif(payload.new), ...prev.filter((n) => n.id !== payload.new.id)].slice(0, 50));
       })
       .on("postgres_changes" as any, {
@@ -192,6 +175,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
         table: "notificacoes",
         filter: `usuario_id=eq.${user.id}`,
       }, (payload: any) => {
+        if (!TIPOS_SININHO.has(payload.new?.tipo)) return;
         setNotificacoes((prev) => prev.map((n) => n.id === payload.new.id ? rowToNotif(payload.new) : n));
       })
       .on("postgres_changes" as any, {

@@ -51,17 +51,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: mmError.message }, { status: 500 });
   }
 
-  await admin
-    .from("notificacoes")
-    .insert({
-      usuario_id: usuarioId,
-      titulo: `Voce entrou no ministerio ${ministerio}`,
-      corpo: "Acesse o canal para acompanhar mensagens, eventos e escalas.",
-      tipo: "ministerio",
-      link: `/dashboard/ministerio/${encodeURIComponent(ministerio)}`,
-      ministerio,
-    });
-
   return NextResponse.json({ ok: true });
 }
 

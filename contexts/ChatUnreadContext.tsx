@@ -101,9 +101,46 @@ export function ChatUnreadProvider({ children }: { children: ReactNode }) {
   const pathnameRef = useRef(pathname);
   const userIdRef = useRef<string | undefined>(undefined);
   const activeChatIdRef = useRef<string | null>(null);
+  const seenMessageIdsRef = useRef<Set<string>>(new Set());
 
   function setActiveChatId(id: string | null) {
     activeChatIdRef.current = id;
+  }
+
+  function handleIncomingChatMessage(uid: string, cid: string, msg: {
+    id?: string;
+    autorId?: string;
+    autorNome?: string;
+    conteudo?: string;
+    tipo?: string;
+    mediaUrl?: string;
+    criadoEm?: string;
+  }) {
+    if (!msg.id || msg.autorId === uid) return;
+    if (pathnameRef.current === "/dashboard/chat") return;
+    if (seenMessageIdsRef.current.has(msg.id)) return;
+
+    seenMessageIdsRef.current.add(msg.id);
+    if (seenMessageIdsRef.current.size > 300) {
+      seenMessageIdsRef.current = new Set([...seenMessageIdsRef.current].slice(-150));
+    }
+
+    saveToLocalInbox(uid, cid, {
+      id: msg.id,
+      autorId: msg.autorId,
+      autorNome: msg.autorNome ?? "",
+      conteudo: msg.conteudo ?? "",
+      tipo: msg.tipo ?? "texto",
+      mediaUrl: msg.mediaUrl,
+      criadoEm: msg.criadoEm ?? new Date().toISOString(),
+      lida: false,
+    });
+
+    setTotalUnreadState(prev => {
+      const next = prev + 1;
+      saveCount(uid, next);
+      return next;
+    });
   }
 
   // Mantém pathnameRef sempre atualizado dentro dos closures
@@ -250,28 +287,31 @@ export function ChatUnreadProvider({ children }: { children: ReactNode }) {
         .channel(`room:${cid}`)
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .on("broadcast", { event: "msg" }, ({ payload }: { payload: any }) => {
-          if (payload?.autorId === uid) return; // mensagem própria
-
-          // No chat page: não duplica inbox/badge (o chat page cuida disso)
-          if (pathnameRef.current === "/dashboard/chat") return;
-
-          // Salva no inbox do localStorage (persiste mesmo com gaps de reconexão)
-          saveToLocalInbox(uid, cid, {
-            id:        payload.id,
-            autorId:   payload.autorId,
-            autorNome: payload.autorNome,
-            conteudo:  payload.conteudo ?? "",
-            tipo:      payload.tipo ?? "texto",
-            mediaUrl:  payload.mediaUrl,
-            criadoEm:  payload.criadoEm ?? new Date().toISOString(),
-            lida:      false,
+          handleIncomingChatMessage(uid, cid, {
+            id: payload?.id,
+            autorId: payload?.autorId,
+            autorNome: payload?.autorNome,
+            conteudo: payload?.conteudo,
+            tipo: payload?.tipo,
+            mediaUrl: payload?.mediaUrl,
+            criadoEm: payload?.criadoEm,
           });
-
-          // Incrementa badge
-          setTotalUnreadState(prev => {
-            const next = prev + 1;
-            saveCount(uid, next);
-            return next;
+        })
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .on("postgres_changes" as any, {
+          event: "INSERT",
+          schema: "public",
+          table: "chat_mensagens",
+          filter: `conversa_id=eq.${cid}`,
+        }, (payload: any) => {
+          const row = payload.new;
+          handleIncomingChatMessage(uid, cid, {
+            id: row?.id,
+            autorId: row?.autor_id,
+            conteudo: row?.conteudo,
+            tipo: row?.tipo,
+            mediaUrl: row?.media_url,
+            criadoEm: row?.criado_em,
           });
         })
         .subscribe((status: string) => {
