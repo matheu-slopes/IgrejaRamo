@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { useChatUnread } from "@/contexts/ChatUnreadContext";
+import { useNotifications } from "@/contexts/NotificationsContext";
 import {
   LayoutDashboard, CalendarCheck, MessageSquare, CalendarDays,
   MoreHorizontal, X, Users, Shield, Bell, BookOpen, Music, Video,
@@ -40,6 +41,7 @@ export default function BottomNav() {
   const pathname = usePathname();
   const { user } = useAuth();
   const { totalUnread } = useChatUnread();
+  const { counts, marcarTipo, marcarMinisterio } = useNotifications();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const drawerRef = useRef<HTMLDivElement>(null);
   const touchStartY = useRef<number>(0);
@@ -68,11 +70,12 @@ export default function BottomNav() {
   }
 
   function NavItem({
-    href, label, icon: Icon, active, badge,
-  }: { href: string; label: string; icon: React.ElementType; active: boolean; badge?: number }) {
+    href, label, icon: Icon, active, badge, onClick,
+  }: { href: string; label: string; icon: React.ElementType; active: boolean; badge?: number; onClick?: () => void }) {
     return (
       <Link
         href={href}
+        onClick={onClick}
         className={clsx(
           "nav-item flex-1 flex flex-col items-center justify-end gap-0.5 pt-2 pb-0 relative select-none",
           active ? "text-vine-600" : "text-gray-400"
@@ -145,17 +148,25 @@ export default function BottomNav() {
                   if (!m) return null;
                   const Icon = m.icon;
                   const active = pathname.includes("/ministerio/") && decodeURIComponent(pathname).includes(nome);
+                  const badge = counts.ministerios[nome] ?? 0;
                   return (
                     <Link
                       key={nome}
                       href={m.href}
-                      onClick={() => setDrawerOpen(false)}
+                      onClick={() => { marcarMinisterio(nome); setDrawerOpen(false); }}
                       className={clsx(
                         "nav-item flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-semibold",
                         active ? "bg-gray-50 text-gray-900" : "bg-gray-50 text-gray-700"
                       )}
                     >
-                      <Icon className="w-4 h-4 shrink-0" />
+                      <div className="relative shrink-0">
+                        <Icon className="w-4 h-4" />
+                        {badge > 0 && (
+                          <span className="absolute -top-1.5 -right-1.5 min-w-[13px] h-[13px] rounded-full bg-red-500 text-white text-[8px] font-bold flex items-center justify-center px-0.5">
+                            {badge > 99 ? "99+" : badge}
+                          </span>
+                        )}
+                      </div>
                       <span className="truncate">{nome}</span>
                     </Link>
                   );
@@ -219,6 +230,12 @@ export default function BottomNav() {
         {navItems.map(({ href, label, icon: Icon }) => {
           const isChat = href === "/dashboard/chat";
           const active = pathname === href || (href !== "/dashboard" && pathname.startsWith(href));
+          const badge =
+            isChat ? totalUnread :
+            href === "/dashboard" ? counts.avisos :
+            href === "/dashboard/escalas" ? counts.escalas :
+            href === "/dashboard/eventos" ? counts.eventos :
+            undefined;
           return (
             <NavItem
               key={href}
@@ -226,7 +243,12 @@ export default function BottomNav() {
               label={label}
               icon={Icon}
               active={active}
-              badge={isChat ? totalUnread : undefined}
+              badge={badge}
+              onClick={() => {
+                if (href === "/dashboard") marcarTipo("aviso");
+                if (href === "/dashboard/escalas") marcarTipo("escala");
+                if (href === "/dashboard/eventos") marcarTipo("evento");
+              }}
             />
           );
         })}
@@ -237,12 +259,15 @@ export default function BottomNav() {
             const nome = meusMinisterios[0];
             const m = ministeriosMap[nome];
             const active = m ? (pathname.includes("/ministerio/") && decodeURIComponent(pathname).includes(nome)) : false;
+            const badge = counts.ministerios[nome] ?? 0;
             return (
               <NavItem
                 href={m?.href ?? "/dashboard"}
                 label={nome}
                 icon={Layers}
                 active={active}
+                badge={badge}
+                onClick={() => marcarMinisterio(nome)}
               />
             );
           })()
@@ -256,6 +281,11 @@ export default function BottomNav() {
           >
             <div className="relative">
               <Layers className={clsx("w-5 h-5 transition-transform duration-150", drawerOpen && "scale-110")} />
+              {Object.values(counts.ministerios).some((n) => n > 0) && (
+                <span className="absolute -top-1.5 -right-1.5 min-w-[14px] h-[14px] rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center px-0.5">
+                  {Math.min(99, Object.values(counts.ministerios).reduce((s, n) => s + n, 0))}
+                </span>
+              )}
             </div>
             <span className={clsx("text-[10px] font-semibold leading-none", drawerOpen ? "text-vine-600" : "text-gray-400")}>
               Ministérios

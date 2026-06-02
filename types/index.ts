@@ -21,15 +21,7 @@ export type Permissao =
   | "criar_aviso"                 // criar avisos/notificações para o grupo
   | "ver_relatorios";              // ver relatórios e estatísticas
 
-export type Ministerio =
-  | "Ensino"
-  | "Louvor"
-  | "Ação Social"
-  | "Infantil"
-  | "Mídias"
-  | "Recepcionamento"
-  | "Jovens"
-  | "Limpeza";
+export type Ministerio = string;
 
 export interface User {
   id: string;

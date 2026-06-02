@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { ChatUnreadProvider } from "@/contexts/ChatUnreadContext";
+import { NotificationsProvider } from "@/contexts/NotificationsContext";
 import Sidebar from "@/components/Sidebar";
 import BottomNav from "@/components/dashboard/BottomNav";
 import NotificationBell from "@/components/dashboard/NotificationBell";
@@ -444,6 +445,7 @@ export default function DashboardLayout({
 
   return (
     <ChatUnreadProvider>
+    <NotificationsProvider>
     <PushSubscriber />
     <div
       className="fixed inset-0 flex flex-col md:flex-row overflow-hidden bg-gray-50"
@@ -583,6 +585,7 @@ export default function DashboardLayout({
         </div>
       )}
     </div>
+    </NotificationsProvider>
     </ChatUnreadProvider>
   );
 }

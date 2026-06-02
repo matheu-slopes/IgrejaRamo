@@ -8,6 +8,7 @@ import { Evento, Ministerio } from "@/types";
 import { supabase } from "@/lib/supabase";
 import { downloadICS, linkGoogleCalendar, formatarData, diaSemana } from "@/lib/calendarUtils";
 import { notificarBroadcast } from "@/lib/notificarBroadcast";
+import { notificarInApp } from "@/lib/notificarInApp";
 import { useAppRefresh } from "@/hooks/useAppRefresh";
 
 export function EventosTab({
@@ -84,6 +85,14 @@ export function EventosTab({
     if (lista) setEventos(mapEventos(lista as Record<string, unknown>[]));
     setForm({ titulo: "", descricao: "", data: "", horario: "", local: "", publico: false, ministerio });
     setShowForm(false);
+    await notificarInApp({
+      tipo: "evento",
+      titulo: `Novo evento - ${ministerio}`,
+      corpo: `${form.titulo} em ${form.local}`,
+      link: "/dashboard/eventos",
+      ministerios: [ministerio],
+      ministerio,
+    });
     // Push para membros do ministério
     const pushResult = await notificarBroadcast({ tipo: "evento", titulo: form.titulo, conteudo: form.local, ministerio });
     if (!pushResult.ok) {

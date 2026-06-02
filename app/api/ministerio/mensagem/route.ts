@@ -131,6 +131,7 @@ async function sendPushMembros(
     corpo: body,
     tipo: "ministerio",
     link: url,
+    ministerio,
   }));
 
   const { error: notifError } = await admin.from("notificacoes").insert(notificacoes);

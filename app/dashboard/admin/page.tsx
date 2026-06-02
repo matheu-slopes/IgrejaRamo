@@ -17,9 +17,10 @@ import clsx from "clsx";
 import { User, Role, Ministerio, Permissao, CanalMinisterio, Local } from "@/types";
 import { supabase } from "@/lib/supabase";
 import { notificarBroadcast } from "@/lib/notificarBroadcast";
+import { notificarInApp } from "@/lib/notificarInApp";
 
 const ROLES: Role[] = ["admin", "pastor", "lider", "voluntario", "membro"];
-const MINISTERIOS: Ministerio[] = ["Louvor","Mídias","Ensino","Infantil","Ação Social","Jovens","Limpeza","Recepcionamento"];
+const MINISTERIOS_PADRAO: Ministerio[] = ["Louvor","Mídias","Ensino","Infantil","Ação Social","Jovens","Limpeza","Recepcionamento"];
 
 const displayMinisterio = (m: string) => m;
 
@@ -39,16 +40,35 @@ const ROLE_LABEL: Record<Role, string> = {
 type Painel = "lista" | "novo";
 type AdminTab = "usuarios" | "ministerios" | "locais" | "conteudo";
 
-const CORES_CANAL = ["vine", "grape", "bark", "gold", "blue", "green", "rose"] as const;
-type CorCanal = typeof CORES_CANAL[number];
-const COR_LABEL: Record<string, string> = {
-  vine: "Vinha", grape: "Uva", bark: "Casca", gold: "Ouro",
-  blue: "Azul", green: "Verde", rose: "Rosa",
-};
-const COR_BG: Record<string, string> = {
-  vine: "bg-gray-800", grape: "bg-grape-700", bark: "bg-bark-600", gold: "bg-gold-500",
-  blue: "bg-blue-600", green: "bg-green-600", rose: "bg-rose-500",
-};
+function useMinisteriosCadastrados() {
+  const [canais, setCanais] = useState<CanalMinisterio[]>(
+    MINISTERIOS_PADRAO.map((ministerio) => ({ ministerio, descricao: "", chatBloqueado: false, cor: "vine" }))
+  );
+
+  async function carregar() {
+    const { data, error } = await supabase
+      .from("canais_ministerio")
+      .select("ministerio, descricao, chat_bloqueado, cor")
+      .order("ministerio");
+
+    if (!error && data?.length) {
+      setCanais(data.map((c) => ({
+        ministerio: c.ministerio as Ministerio,
+        descricao: c.descricao ?? "",
+        chatBloqueado: !!c.chat_bloqueado,
+        cor: c.cor ?? "vine",
+      })));
+    }
+  }
+
+  useEffect(() => { void carregar(); }, []);
+
+  return {
+    canais,
+    ministerios: canais.map((c) => c.ministerio),
+    recarregarMinisterios: carregar,
+  };
+}
 
 export default function AdminPage() {
   const { user: eu, usuarios, atualizarUsuario, criarUsuario, removerUsuario, temPermissao } = useAuth();
@@ -71,6 +91,7 @@ export default function AdminPage() {
   const [busca, setBusca] = useState("");
   const [painel, setPainel] = useState<Painel>("lista");
   const [editando, setEditando] = useState<User | null>(null);
+  const { canais, ministerios, recarregarMinisterios } = useMinisteriosCadastrados();
 
   const podeGerenciar = temPermissao("gerenciar_usuarios");
   const podeCriarAviso = temPermissao("criar_aviso");
@@ -94,7 +115,7 @@ export default function AdminPage() {
     <div className="max-w-5xl space-y-6">
 
       {adminTab === "ministerios" && podeGerenciar && (
-        <MinisteriosTab usuarios={usuarios} temPermissao={temPermissao} />
+        <MinisteriosTab usuarios={usuarios} canais={canais} onMinisteriosChange={recarregarMinisterios} temPermissao={temPermissao} />
       )}
 
       {adminTab === "locais" && podeGerenciar && (
@@ -102,7 +123,7 @@ export default function AdminPage() {
       )}
 
       {(adminTab === "conteudo" || (!podeGerenciar && podeCriarAviso)) && (
-        <ConteudoTab initSecao={adminTab !== "conteudo" ? "avisos" : initSecao} />
+        <ConteudoTab initSecao={adminTab !== "conteudo" ? "avisos" : initSecao} ministerios={ministerios} />
       )}
 
       {adminTab === "usuarios" && podeGerenciar && <>
@@ -218,6 +239,7 @@ export default function AdminPage() {
             <div className="w-96 shrink-0">
               {painel === "novo" && !editando ? (
                 <NovoUsuarioForm
+                  ministerios={ministerios}
                   onCriar={async (dados, senha) => {
                     const result = await criarUsuario(dados, senha);
                     if ("error" in result) return { error: result.error };
@@ -229,6 +251,7 @@ export default function AdminPage() {
                 <EditarUsuarioPanel
                   key={editando.id}
                   usuario={editando}
+                  ministerios={ministerios}
                   euSouEle={eu?.id === editando.id}
                   podeatribuir={temPermissao("atribuir_permissoes")}
                   onChange={async (dados) => {
@@ -248,14 +271,20 @@ export default function AdminPage() {
 }
 
 function MinisteriosTab({
-  usuarios,
+  usuarios, canais, onMinisteriosChange,
 }: {
   usuarios: User[];
+  canais: CanalMinisterio[];
+  onMinisteriosChange: () => Promise<void>;
   temPermissao: (p: Permissao) => boolean;
 }) {
-  const MINISTERIOS_LISTA: Ministerio[] = ["Louvor","Mídias","Ensino","Infantil","Ação Social","Jovens","Limpeza","Recepcionamento"];
   const [editandoMin, setEditandoMin] = useState<Ministerio | null>(null);
   const [salvando, setSalvando] = useState(false);
+  const [novoNome, setNovoNome] = useState("");
+  const [criando, setCriando] = useState(false);
+  const [erroCriacao, setErroCriacao] = useState("");
+
+  const ministeriosLista = canais.map((c) => c.ministerio);
 
   async function toggleMembro(usuario: User, ministerio: Ministerio) {
     const ministerioDb = ministerio;
@@ -269,30 +298,93 @@ function MinisteriosTab({
     usuario.ministerios = novos;
   }
 
+  async function criarMinisterio() {
+    const nome = novoNome.trim().replace(/\s+/g, " ");
+    setErroCriacao("");
+
+    if (!nome) {
+      setErroCriacao("Digite o nome do ministério.");
+      return;
+    }
+    if (ministeriosLista.some((m) => m.toLowerCase() === nome.toLowerCase())) {
+      setErroCriacao("Já existe um ministério com esse nome.");
+      return;
+    }
+
+    setCriando(true);
+    const { data: sessionData } = await supabase.auth.getSession();
+    const res = await fetch("/api/ministerios", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(sessionData.session?.access_token ? { Authorization: `Bearer ${sessionData.session.access_token}` } : {}),
+      },
+      body: JSON.stringify({ nome }),
+    });
+    const json = await res.json().catch(() => ({}));
+    setCriando(false);
+
+    if (!res.ok) {
+      setErroCriacao(json.error ?? "Erro ao criar ministério.");
+      return;
+    }
+
+    setNovoNome("");
+    await onMinisteriosChange();
+  }
+
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-gray-500">{MINISTERIOS_LISTA.length} ministérios</p>
-        <p className="text-xs text-gray-400 bg-gray-100 px-3 py-1.5 rounded-lg">Os ministérios são definidos no sistema</p>
+      <div className="space-y-4">
+        <div>
+          <h1 className="text-2xl font-sans font-semibold text-black">Ministérios</h1>
+          <p className="text-sm text-gray-500">{ministeriosLista.length} ministérios cadastrados</p>
+        </div>
+
+        <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+          <div className="mb-3 flex items-center gap-2">
+            <Plus className="h-4 w-4 text-gray-900" />
+            <p className="text-sm font-semibold text-gray-900">Novo ministério</p>
+          </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+            <label className="space-y-1.5">
+              <span className="text-xs font-medium text-gray-500">Nome</span>
+              <input
+                value={novoNome}
+                onChange={(e) => setNovoNome(e.target.value)}
+                placeholder="Nome do ministério"
+                className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-gray-400"
+              />
+            </label>
+            <button
+              onClick={criarMinisterio}
+              disabled={criando}
+              className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-black px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-gray-900 disabled:opacity-60 lg:w-auto"
+            >
+              <Plus className="h-4 w-4" /> {criando ? "Criando..." : "Criar"}
+            </button>
+          </div>
+          {erroCriacao && <p className="mt-3 rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-xs text-red-600">{erroCriacao}</p>}
+        </div>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {MINISTERIOS_LISTA.map((min) => {
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        {ministeriosLista.map((min) => {
           const membros = usuarios.filter((u) => u.ministerios?.some((m) => displayMinisterio(m) === displayMinisterio(min)));
           const isEditing = editandoMin === min;
           return (
             <div key={min} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-              <div className="flex items-center justify-between px-5 py-3 bg-black">
-                <span className="font-semibold text-white">{min}</span>
-                <div className="flex items-center gap-2">
+              <div className="flex flex-col gap-3 bg-black px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+                <span className="min-w-0 truncate font-semibold text-white">{min}</span>
+                <div className="flex flex-wrap items-center gap-2">
                     <a
                     href={`/dashboard/ministerio/${encodeURIComponent(min)}`}
-                    className="text-white/80 hover:text-white text-xs bg-white/10 hover:bg-white/20 px-2.5 py-1 rounded-lg transition flex items-center gap-1"
+                    className="text-white/80 hover:text-white text-xs bg-white/10 hover:bg-white/20 px-2.5 py-1.5 rounded-lg transition flex items-center gap-1"
                   >
                     <Link2 className="w-3 h-3" /> Canal
                   </a>
                   <button
                     onClick={() => setEditandoMin(isEditing ? null : min)}
-                    className="text-white/80 hover:text-white text-xs bg-white/10 hover:bg-white/20 px-2.5 py-1 rounded-lg transition flex items-center gap-1"
+                    className="text-white/80 hover:text-white text-xs bg-white/10 hover:bg-white/20 px-2.5 py-1.5 rounded-lg transition flex items-center gap-1"
                   >
                     <Users className="w-3 h-3" /> {isEditing ? "Fechar" : "Membros"}
                   </button>
@@ -345,9 +437,10 @@ function MinisteriosTab({
 }
 
 function EditarUsuarioPanel({
-  usuario, euSouEle, podeatribuir, onChange, onRemover, onFechar,
+  usuario, ministerios, euSouEle, podeatribuir, onChange, onRemover, onFechar,
 }: {
   usuario: User;
+  ministerios: Ministerio[];
   euSouEle: boolean;
   podeatribuir: boolean;
   onChange: (dados: Partial<User>) => void | Promise<void>;
@@ -590,7 +683,7 @@ function EditarUsuarioPanel({
         <div>
           <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Ministérios</p>
           <div className="flex flex-wrap gap-1.5">
-            {MINISTERIOS.map((m) => {
+            {ministerios.map((m) => {
               const ativo = usuario.ministerios.includes(m);
               return (
                   <button
@@ -623,7 +716,7 @@ function EditarUsuarioPanel({
               Dá privilégios de organização (escala, membros, eventos, avisos) dentro do ministério, independente do role global.
             </p>
             <div className="flex flex-wrap gap-1.5">
-              {MINISTERIOS.map((m) => {
+              {ministerios.map((m) => {
                 const eLider = (usuario.liderMinisterios ?? []).includes(m);
                 return (
                   <button
@@ -830,8 +923,9 @@ function gerarSenha() {
 }
 
 function NovoUsuarioForm({
-  onCriar, onCancelar,
+  ministerios, onCriar, onCancelar,
 }: {
+  ministerios: Ministerio[];
   onCriar: (dados: Omit<User, "id">, senha: string) => Promise<{ ok: true } | { error: string }>;
   onCancelar: () => void;
 }) {
@@ -1016,7 +1110,7 @@ function NovoUsuarioForm({
         <div>
           <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Ministérios</p>
           <div className="flex flex-wrap gap-1.5">
-            {MINISTERIOS.map((m) => {
+            {ministerios.map((m) => {
               const ativo = form.ministerios.includes(m);
               return (
                 <button
@@ -1522,7 +1616,7 @@ function DevocionalPreviewModal({ dev, onClose }: { dev: Devocional | Devocional
   );
 }
 
-function ConteudoTab({ initSecao }: { initSecao?: string }) {
+function ConteudoTab({ initSecao, ministerios }: { initSecao?: string; ministerios: Ministerio[] }) {
   const [secao, setSecao] = useState<"avisos" | "devocional">(
     initSecao === "devocional" ? "devocional" : "avisos"
   );
@@ -1589,8 +1683,24 @@ function ConteudoTab({ initSecao }: { initSecao?: string }) {
         if (lista) setAvisos(lista as Aviso[]);
         setNovoAviso(novoAvisoInicial());
         setAdicionandoAviso(false);
+        await notificarInApp({
+          tipo: "aviso",
+          titulo: "Novo aviso",
+          corpo: novoAviso.titulo.trim(),
+          link: "/dashboard/mural",
+          todos: novoAviso.destinatariosTodos,
+          roles: novoAviso.destinatariosTodos ? undefined : novoAviso.rolesSel,
+          ministerios: novoAviso.ministerios,
+        });
         // Push para todos os membros — aguarda para garantir envio
-        const pushResult = await notificarBroadcast({ tipo: "aviso", titulo: novoAviso.titulo.trim() });
+        const pushResult = await notificarBroadcast({
+          tipo: "aviso",
+          titulo: novoAviso.titulo.trim(),
+          conteudo: novoAviso.conteudo.trim(),
+          todos: novoAviso.destinatariosTodos,
+          roles: novoAviso.destinatariosTodos ? undefined : novoAviso.rolesSel,
+          ministerios: novoAviso.ministerios,
+        });
         if (!pushResult.ok) {
           const sent = pushResult.delivery?.sent ?? 0;
           const attempted = pushResult.delivery?.attempted ?? 0;
@@ -1966,7 +2076,7 @@ function ConteudoTab({ initSecao }: { initSecao?: string }) {
                   <p className="text-xs font-medium text-gray-500">Filtrar por ministério <span className="text-gray-300">(opcional)</span></p>
                   <p className="text-[11px] text-gray-400">Se selecionado, líderes/voluntários de outros ministérios não verão este aviso. Pode selecionar um ou mais.</p>
                   <div className="flex flex-wrap gap-1.5">
-                    {MINISTERIOS.map((m) => {
+                    {ministerios.map((m) => {
                       const sel = novoAviso.ministerios.includes(m);
                       return (
                         <button
@@ -2048,7 +2158,7 @@ function ConteudoTab({ initSecao }: { initSecao?: string }) {
                         <div className="space-y-1.5">
                           <p className="text-xs font-medium text-gray-500">Filtrar por ministério <span className="text-gray-300">(opcional)</span></p>
                           <div className="flex flex-wrap gap-1.5">
-                            {MINISTERIOS.map((m) => {
+                            {ministerios.map((m) => {
                               const sel = editAviso.ministerios.includes(m);
                               return (
                                 <button

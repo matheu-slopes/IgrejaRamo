@@ -5,6 +5,9 @@ type BroadcastOpts = {
   titulo: string;
   conteudo?: string;
   ministerio?: string;
+  todos?: boolean;
+  roles?: string[];
+  ministerios?: string[];
 };
 
 type BroadcastDelivery = {

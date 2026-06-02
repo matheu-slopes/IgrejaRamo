@@ -69,8 +69,8 @@ CREATE TABLE perfis (
   telefone      TEXT,
   foto          TEXT,
   role          role_tipo   NOT NULL DEFAULT 'membro',
-  ministerios   ministerio_tipo[] DEFAULT '{}',
-  lider_ministerios ministerio_tipo[] DEFAULT '{}',
+  ministerios   TEXT[] DEFAULT '{}',
+  lider_ministerios TEXT[] DEFAULT '{}',
   data_ingresso DATE        NOT NULL DEFAULT CURRENT_DATE,
   data_nascimento DATE,
   ativo         BOOLEAN     NOT NULL DEFAULT TRUE,
@@ -112,7 +112,7 @@ CREATE TABLE eventos (
   horario     TIME             NOT NULL,
   local       TEXT             NOT NULL,
   publico     BOOLEAN          NOT NULL DEFAULT FALSE,
-  ministerio  ministerio_tipo,
+  ministerio  TEXT,
   imagem_url  TEXT,
   criado_por  UUID             REFERENCES perfis(id),
   recorrente  BOOLEAN          DEFAULT FALSE,
@@ -128,7 +128,7 @@ CREATE TABLE avisos (
   conteudo      TEXT             NOT NULL,
   criado_em     TIMESTAMPTZ      DEFAULT NOW(),
   destinatarios JSONB            NOT NULL DEFAULT '"todos"',
-  ministerios   ministerio_tipo[] DEFAULT '{}',
+  ministerios   TEXT[] DEFAULT '{}',
   visivel_home  BOOLEAN          NOT NULL DEFAULT false,
   criado_por    UUID             REFERENCES perfis(id) ON DELETE SET NULL
 );
@@ -169,7 +169,7 @@ CREATE TABLE musicas (
 -- ──────────────────────────────────────────────────────────────
 CREATE TABLE escalas (
   id                       UUID             PRIMARY KEY DEFAULT gen_random_uuid(),
-  ministerio               ministerio_tipo  NOT NULL,
+  ministerio               TEXT             NOT NULL,
   data                     DATE             NOT NULL,
   horario                  TIME             NOT NULL,
   culto                    TEXT             NOT NULL,
@@ -206,7 +206,7 @@ CREATE TABLE escala_musicas (
 -- ──────────────────────────────────────────────────────────────
 CREATE TABLE mural_mensagens (
   id          UUID             PRIMARY KEY DEFAULT gen_random_uuid(),
-  ministerio  ministerio_tipo  NOT NULL,
+  ministerio  TEXT             NOT NULL,
   autor_id    UUID             REFERENCES perfis(id),
   autor_nome  TEXT             NOT NULL,
   autor_role  role_tipo        NOT NULL,
@@ -265,14 +265,14 @@ CREATE TABLE notificacoes (
   lida        BOOLEAN             DEFAULT FALSE,
   criada_em   TIMESTAMPTZ         DEFAULT NOW(),
   link        TEXT,
-  ministerio  ministerio_tipo
+  ministerio  TEXT
 );
 
 -- ──────────────────────────────────────────────────────────────
 -- CANAIS DE MINISTÉRIO
 -- ──────────────────────────────────────────────────────────────
 CREATE TABLE canais_ministerio (
-  ministerio     ministerio_tipo PRIMARY KEY,
+  ministerio     TEXT PRIMARY KEY,
   descricao      TEXT,
   chat_bloqueado BOOLEAN DEFAULT FALSE,
   cor            TEXT    NOT NULL DEFAULT 'vine'
@@ -294,7 +294,7 @@ INSERT INTO canais_ministerio (ministerio, descricao, cor) VALUES
 CREATE TABLE membros_ministerio (
   id               UUID               PRIMARY KEY DEFAULT gen_random_uuid(),
   usuario_id       UUID               NOT NULL REFERENCES perfis(id) ON DELETE CASCADE,
-  ministerio       ministerio_tipo    NOT NULL,
+  ministerio       TEXT               NOT NULL,
   funcao           funcao_ministerio  NOT NULL DEFAULT 'Membro',
   ativo            BOOLEAN            DEFAULT TRUE,
   data_entrada     DATE               DEFAULT CURRENT_DATE,
@@ -312,7 +312,7 @@ CREATE TABLE grupos (
   emoji        TEXT            NOT NULL DEFAULT '💬',
   cor          TEXT            NOT NULL DEFAULT 'bg-gray-700',
   descricao    TEXT,
-  ministerio   ministerio_tipo,
+  ministerio   TEXT,
   evento_id    UUID            REFERENCES eventos(id),
   data         DATE,
   horario      TIME,

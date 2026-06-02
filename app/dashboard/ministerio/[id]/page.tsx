@@ -76,16 +76,33 @@ export default function CanalMinisterioPage() {
 
   // ── permissão ─────────────────────────────────────────────────────
   const isAdmin               = user?.role === "admin" || user?.role === "pastor";
+  const canaisRestritos = new Set<string>(["Ensino", "Jovens", "Ação Social"]);
+  const pertenceAoMinisterio = user?.ministerios?.includes(slug) || user?.liderMinisterios?.includes(slug);
   const podeBloquearChat     = temPermissaoNoMinisterio("bloquear_chat", slug);
   const podeGerenciarMembros = temPermissaoNoMinisterio("gerenciar_membros_ministerio", slug);
   const podeCriarEvento      = temPermissaoNoMinisterio("criar_evento", slug);
   const podeEditarEvento     = temPermissaoNoMinisterio("editar_evento", slug);
   const podeAtribuirPermissoes = temPermissao("atribuir_permissoes");
+  const temEscalas = slug !== "Ensino";
+
+  useEffect(() => {
+    if (!temEscalas && tab === "escalas") setTab("chat");
+  }, [tab, temEscalas]);
 
   if (!canalBase) {
     return (
       <div className="flex items-center justify-center h-60 text-gray-400">
         Carregando canal...
+      </div>
+    );
+  }
+
+  if (canaisRestritos.has(slug) && !isAdmin && !pertenceAoMinisterio) {
+    return (
+      <div className="flex flex-col items-center justify-center h-72 text-center gap-2">
+        <ShieldCheck className="w-9 h-9 text-gray-200" />
+        <p className="text-sm font-semibold text-gray-700">Canal restrito</p>
+        <p className="text-sm text-gray-400">Este conteúdo é visível apenas para membros de {slug}.</p>
       </div>
     );
   }
@@ -133,7 +150,7 @@ export default function CanalMinisterioPage() {
           >
             {([
               { id: "chat",    label: "Chat",    icon: MessageSquare },
-              { id: "escalas", label: "Escalas", icon: CalendarDays  },
+              ...(temEscalas ? [{ id: "escalas" as const, label: "Escalas", icon: CalendarDays }] : []),
               { id: "eventos", label: "Eventos", icon: Calendar      },
               { id: "membros", label: "Membros", icon: Users         },
             ] as { id: Tab; label: string; icon: React.ElementType }[]).map(({ id, label, icon: Icon }) => (
@@ -159,7 +176,7 @@ export default function CanalMinisterioPage() {
       {tab === "chat"    && <ChatTab ministerio={slug} chatBloqueado={chatBloqueado} podeEnviar={temPermissaoNoMinisterio("enviar_chat", slug)} podeFixar={temPermissaoNoMinisterio("fixar_mensagem", slug)} user={user} />}
       {tab === "membros" && <MembrosTab ministerio={slug} isLider={podeGerenciarMembros} podeAtribuirPermissoes={podeAtribuirPermissoes} />}
       {tab === "eventos" && <EventosTab ministerio={slug} isLider={podeCriarEvento} podeEditar={podeEditarEvento} />}
-      {tab === "escalas" && <EscalasTab ministerio={slug} isLider={isAdmin || temPermissaoNoMinisterio("criar_escala", slug)} />}
+      {temEscalas && tab === "escalas" && <EscalasTab ministerio={slug} isLider={isAdmin || temPermissaoNoMinisterio("criar_escala", slug)} />}
     </div>
   );
 }

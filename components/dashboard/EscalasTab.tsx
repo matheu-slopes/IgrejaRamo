@@ -14,6 +14,7 @@ import {
 import { supabase } from "@/lib/supabase";
 import { useAppRefresh } from "@/hooks/useAppRefresh";
 import BuscarCifraModal from "@/components/dashboard/BuscarCifraModal";
+import { notificarInApp } from "@/lib/notificarInApp";
 
 // --- Constantes ---------------------------------------------------------------
 
@@ -23,15 +24,17 @@ export const TONS = [
 ];
 
 export const FUNCOES_POR_MIN: Record<string, string[]> = {
-  Louvor:        ["Ministro","Guitarra","Baixo","Cajón","Teclado","Backing Vocal","Violão"],
-  "Mídias":      ["Transmissão","Projeção/Letras","Fotografia","Câmera"],
+  Louvor:        ["Ministro","Backing Vocal","Guitarra","Violão","Baixo","Teclado","Cajón"],
+  "Mídias":      ["Projeção","Transmissão","Videomaker"],
   Recepcionamento: ["Abertura","Oferta","Recepção"],
   Limpeza:       ["Escala de Limpeza"],
-  Infantil:      ["Professor(a)","Monitor(a)","Auxiliar"],
-  "Ação Social": ["Coordenação","Voluntário(a)"],
-  Jovens:        ["Líder","Auxiliar"],
+  Infantil:      ["Professor(a)","Auxiliar"],
+  "Ação Social": ["Líder","Voluntário(a)"],
+  Jovens:        ["Discipulador(a)","Recepção","Abertura","Oferta","Pregador(a)"],
   Ensino:        ["Preletor(a)"],
+  "Oração":       ["Responsável"],
 };
+const FUNCOES_GENERICAS = ["Responsável"];
 
 // --- Equipes fixas do Louvor ------------------------------------------------
 export const EQUIPES_LOUVOR = [
@@ -65,11 +68,65 @@ export const EQUIPES_LOUVOR = [
   },
 ];
 
-export const TEMPLATES_CULTO = [
+type TemplateEncontro = {
+  id: string;
+  label: string;
+  horario: string;
+  diaSemana: number | null;
+  cor: string;
+};
+
+export const TEMPLATES_CULTO_REGULAR: TemplateEncontro[] = [
   { id: "quinta",   label: "Culto de Quinta",  horario: "20:00", diaSemana: 4, cor: "bg-grape-100 text-grape-800 border-grape-200" },
   { id: "domingo",  label: "Culto de Domingo", horario: "18:30", diaSemana: 0, cor: "bg-gold-100 text-gold-800 border-gold-200" },
   { id: "especial", label: "Outro",            horario: "19:00", diaSemana: null, cor: "bg-blue-100 text-blue-800 border-blue-200" },
 ];
+export const TEMPLATES_CULTO = TEMPLATES_CULTO_REGULAR;
+
+const TEMPLATE_CULTO_JOVENS: TemplateEncontro = {
+  id: "jovens",
+  label: "Culto de Jovens",
+  horario: "19:30",
+  diaSemana: null,
+  cor: "bg-green-100 text-green-800 border-green-200",
+};
+
+const TEMPLATES_VARIAVEIS: Record<string, TemplateEncontro[]> = {
+  "Oração": [
+    { id: "oracao", label: "Oração", horario: "20:00", diaSemana: 1, cor: "bg-blue-100 text-blue-800 border-blue-200" },
+    { id: "especial", label: "Outro", horario: "20:00", diaSemana: null, cor: "bg-gray-100 text-gray-800 border-gray-200" },
+  ],
+  Ensino: [
+    { id: "ensino", label: "Ensino", horario: "19:30", diaSemana: null, cor: "bg-sky-100 text-sky-800 border-sky-200" },
+    { id: "especial", label: "Outro", horario: "19:30", diaSemana: null, cor: "bg-gray-100 text-gray-800 border-gray-200" },
+  ],
+  Jovens: [
+    TEMPLATE_CULTO_JOVENS,
+    { id: "especial", label: "Outro", horario: "19:30", diaSemana: null, cor: "bg-gray-100 text-gray-800 border-gray-200" },
+  ],
+  "Ação Social": [
+    { id: "acao-social", label: "Ação Social", horario: "09:00", diaSemana: null, cor: "bg-rose-100 text-rose-800 border-rose-200" },
+    { id: "especial", label: "Outro", horario: "09:00", diaSemana: null, cor: "bg-gray-100 text-gray-800 border-gray-200" },
+  ],
+};
+
+function templatesPorMinisterio(ministerio: string): TemplateEncontro[] {
+  if (ministerio === "Louvor" || ministerio === "Mídias") {
+    const templatesSemOutro = TEMPLATES_CULTO_REGULAR.filter((t) => t.id !== "especial");
+    const outro = TEMPLATES_CULTO_REGULAR.find((t) => t.id === "especial");
+    return outro ? [...templatesSemOutro, TEMPLATE_CULTO_JOVENS, outro] : [...templatesSemOutro, TEMPLATE_CULTO_JOVENS];
+  }
+  return TEMPLATES_VARIAVEIS[ministerio] ?? TEMPLATES_CULTO_REGULAR;
+}
+
+function placeholderTitulo(ministerio: string): string {
+  if (ministerio === "Ação Social") return "ex: Ação de Páscoa";
+  if (ministerio === "Oração") return "ex: Oração";
+  if (ministerio === "Jovens") return "ex: Culto de Jovens";
+  if (ministerio === "Ensino") return "ex: Ensino";
+  if (ministerio === "Louvor" || ministerio === "Mídias") return "ex: Culto de Domingo, Culto de Jovens";
+  return "ex: Culto de Domingo, Oração, Vigília";
+}
 
 // --- Helpers ------------------------------------------------------------------
 
@@ -139,25 +196,51 @@ const FUNCAO_DB_MAP: Partial<Record<string, string>> = {
   "Violão":       "Guitarra",
   "Professor(a)": "Professora",
   "Monitor(a)":   "Monitor",
+  "Auxiliar":      "Monitor",
   "Voluntário(a)": "Voluntário",
   "Preletor(a)":  "Ministro",
   "Abertura":     "Abertura/Oferta",
   "Oferta":       "Abertura/Oferta",
+  "Responsável":  "Abertura/Oferta",
+  "Palavra":      "Ministro",
+  "Pregador(a)":  "Ministro",
+  "Recepção":     "Abertura/Oferta",
+  "Apoio":        "Abertura/Oferta",
+  "Discipulador(a)": "Ministro",
+  "Projeção":     "Projeção/Letras",
+  "Foto":         "Fotografia",
+  "Videomaker":   "Fotografia",
+  "Foto/Vídeo":   "Fotografia",
+  "Câmera":       "Fotografia",
 };
-const FUNCAO_ALIAS_SET = new Set(["Cajón", "Pandeiro", "Violão", "Professor(a)", "Monitor(a)", "Voluntário(a)", "Preletor(a)", "Abertura", "Oferta"]);
+const FUNCAO_ALIAS_SET = new Set(["Cajón", "Pandeiro", "Violão", "Professor(a)", "Monitor(a)", "Auxiliar", "Voluntário(a)", "Preletor(a)", "Abertura", "Oferta", "Responsável", "Discipulador(a)", "Palavra", "Pregador(a)", "Recepção", "Apoio", "Projeção", "Foto", "Videomaker", "Foto/Vídeo", "Câmera"]);
+
+function splitAliasObs(obs?: string): { alias?: string; obs?: string } {
+  if (!obs) return {};
+  for (const alias of FUNCAO_ALIAS_SET) {
+    if (obs === alias) return { alias };
+    if (obs.startsWith(`${alias} · `)) return { alias, obs: obs.slice(alias.length + 3) };
+  }
+  return { obs };
+}
 
 /** Retorna a função a exibir: prioriza observação quando é um alias de instrumento; Bateria ? Cajón */
 export function displayFuncao(it: { funcao: string; observacao?: string }): string {
-  if (it.observacao && FUNCAO_ALIAS_SET.has(it.observacao)) return it.observacao;
+  const { alias } = splitAliasObs(it.observacao);
+  if (alias === "Palavra") return "Pregador(a)";
+  if (alias === "Foto" || alias === "Foto/Vídeo" || alias === "Câmera") return "Videomaker";
+  if (alias) return alias;
   if (it.funcao === "Bateria") return "Cajón";
   if (it.funcao === "Professora") return "Professor(a)";
   if (it.funcao === "Monitor") return "Monitor(a)";
   if (it.funcao === "Voluntário") return "Voluntário(a)";
+  if (it.funcao === "Projeção/Letras") return "Projeção";
+  if (it.funcao === "Fotografia") return "Videomaker";
   return it.funcao;
 }
 /** Retorna a observação real (ocultando alias de instrumento que já aparece em displayFuncao) */
 export function displayObs(it: { observacao?: string }): string | undefined {
-  return (it.observacao && FUNCAO_ALIAS_SET.has(it.observacao)) ? undefined : it.observacao;
+  return splitAliasObs(it.observacao).obs;
 }
 /** Normaliza funcao para salvar no DB (resolve aliases ? enum válido + preserva em obs) */
 function normalizeFuncaoParaDB(funcao: string, obs?: string): { funcao: string; observacao: string | null } {
@@ -166,6 +249,21 @@ function normalizeFuncaoParaDB(funcao: string, obs?: string): { funcao: string; 
     return { funcao: mapped, observacao: obs ? `${funcao} · ${obs}` : funcao };
   }
   return { funcao, observacao: obs || null };
+}
+
+function formatHoraInput(value: string): string {
+  const digits = value.replace(/\D/g, "").slice(0, 4);
+  if (digits.length <= 2) return digits;
+  return `${digits.slice(0, 2)}:${digits.slice(2)}`;
+}
+
+function normalizarHorario(value: string): string | null {
+  const match = value.trim().match(/^(\d{1,2}):(\d{2})$/);
+  if (!match) return null;
+  const hora = Number(match[1]);
+  const minuto = Number(match[2]);
+  if (hora < 0 || hora > 23 || minuto < 0 || minuto > 59) return null;
+  return `${String(hora).padStart(2, "0")}:${String(minuto).padStart(2, "0")}`;
 }
 
 const EMPTY_FORM: EscalaForm = {
@@ -322,7 +420,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
   const [subTab, setSubTab] = useState<EscalaSubTab>("detalhes");
   const [form, setForm] = useState<EscalaForm>(EMPTY_FORM);
   const [novoMembroId, setNovoMembroId] = useState("");
-  const [novaFuncao, setNovaFuncao] = useState<string>((FUNCOES_POR_MIN[ministerio] ?? FUNCOES_POR_MIN.Louvor)[0]);
+  const [novaFuncao, setNovaFuncao] = useState<string>((FUNCOES_POR_MIN[ministerio] ?? FUNCOES_GENERICAS)[0]);
   const [novasFuncoes, setNovasFuncoes] = useState<string[]>([]);
   const [novaObs, setNovaObs] = useState("");
   const [buscaMusica, setBuscaMusica] = useState("");
@@ -383,7 +481,27 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
   const [cifraFormAberta, setCifraFormAberta] = useState<number | null>(null);
   const [loadingCifraForm, setLoadingCifraForm] = useState<number | null>(null);
 
-  const funcoesMinisterio = FUNCOES_POR_MIN[ministerio] ?? FUNCOES_POR_MIN.Louvor;
+  const funcoesMinisterio = FUNCOES_POR_MIN[ministerio] ?? FUNCOES_GENERICAS;
+  const funcaoFixaOculta = ministerio === "Limpeza" || ministerio === "Oração";
+  const participanteUnico = ministerio === "Oração";
+  const funcoesUnicas = new Set<string>(
+    ministerio === "Louvor"
+      ? funcoesMinisterio.filter((f) => f !== "Backing Vocal")
+      : ministerio === "Jovens"
+        ? ["Abertura", "Oferta", "Pregador(a)", "Palavra"]
+        : ministerio === "Mídias"
+          ? ["Projeção", "Projeção/Letras", "Transmissão"]
+          : []
+  );
+  const permiteMultiplosFuncao = (funcao: string) => !funcoesUnicas.has(funcao);
+  const usaMusicas = ministerio === "Louvor";
+  const visibilidadeAutomaticaMinisterio = ministerio === "Jovens" || ministerio === "Ação Social";
+
+  useEffect(() => {
+    if (usaMusicas) return;
+    if (subTab === "musicas" || subTab === "roteiro") setSubTab("detalhes");
+    if (form.musicas.length > 0) setForm((f) => ({ ...f, musicas: [] }));
+  }, [form.musicas.length, subTab, usaMusicas]);
 
   async function abrirCifraInline(escalaId: string, idx: number, m: EscalaMusica) {
     if (cifraAberta?.escalaId === escalaId && cifraAberta?.idx === idx) {
@@ -453,7 +571,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
     setForm({
       culto: esc.culto,
       data: esc.data,
-      horario: esc.horario,
+      horario: normalizarHorario(esc.horario) ?? esc.horario.slice(0, 5),
       observacoes: esc.ministerio === "Infantil" ? "" : notas,
       equipe: esc.ministerio === "Infantil" ? "" : equipe,
       ageGroup,
@@ -483,8 +601,31 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
     setForm((f) => ({ ...f, equipe: label, itens }));
   }
 
+  async function notificarEscalados(escalaId: string, itens: ItemEscala[], antigos: ItemEscala[] = []) {
+    const idsAntigos = new Set(antigos.map((i) => i.voluntarioId).filter(Boolean));
+    const usuarioIds = [...new Set(itens
+      .map((i) => i.voluntarioId)
+      .filter((id): id is string => Boolean(id) && !idsAntigos.has(id)))];
+
+    if (!usuarioIds.length) return;
+
+    await notificarInApp({
+      usuarioIds,
+      tipo: "escala",
+      titulo: `Voce foi escalado em ${ministerio}`,
+      corpo: `${form.culto} - ${formatDateSimples(form.data)} as ${form.horario}`,
+      link: "/dashboard/escalas",
+      ministerio,
+    });
+  }
+
   async function salvar() {
     if (!form.culto || !form.data || !form.horario) return;
+    const horarioNormalizado = normalizarHorario(form.horario);
+    if (!horarioNormalizado) {
+      setSalvarErro("Digite a hora no formato 24h, por exemplo 08:00 ou 20:00.");
+      return;
+    }
 
     // Auto-aplica edição de participante pendente (usuário alterou mas não clicou Confirmar)
     let itensFinais = [...form.itens];
@@ -493,9 +634,9 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
       const nomeResolv = membro?.nome ?? form.itens.find((it) => (it.voluntarioId ?? it.voluntarioNome) === editandoKey)?.voluntarioNome;
       if (nomeResolv) {
         const funcoesSel = novasFuncoes.length > 0 ? novasFuncoes : [funcoesMinisterio[0]];
-        const itensDeOutros = itensFinais.filter((it) => (it.voluntarioId ?? it.voluntarioNome) !== editandoKey);
+        const itensDeOutros = participanteUnico ? [] : itensFinais.filter((it) => (it.voluntarioId ?? it.voluntarioNome) !== editandoKey);
         const novosItens = funcoesSel
-          .filter((f) => f === "Backing Vocal" || !itensDeOutros.some((it) => it.funcao === f || displayFuncao(it) === f))
+          .filter((f) => permiteMultiplosFuncao(f) || !itensDeOutros.some((it) => it.funcao === f || displayFuncao(it) === f))
           .map((f) => ({ funcao: f as FuncaoEscala, voluntarioId: novoMembroId, voluntarioNome: nomeResolv, observacao: novaObs.trim() || undefined }));
         if (novosItens.length > 0) {
           itensFinais = [...itensDeOutros, ...novosItens];
@@ -515,10 +656,11 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
       : buildObs(form.equipe, form.observacoes);
     try {
       if (editId) {
+        const escalaAnterior = escalas.find((e) => e.id === editId);
         const { error: upErr, data: upData } = await supabase.from("escalas").update({
-          culto: form.culto, horario: form.horario, data: form.data,
+          culto: form.culto, horario: horarioNormalizado, data: form.data,
           observacoes: obsDB,
-          visivel: form.visivel,
+          visivel: visibilidadeAutomaticaMinisterio ? true : form.visivel,
           confirmacao_participantes: form.confirmacaoParticipantes,
         }).eq("id", editId).select("id");
         if (upErr) throw new Error(upErr.message);
@@ -552,14 +694,15 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
           );
           if (insMus) throw new Error(insMus.message);
         }
-        setEscalas((prev) => prev.map((e) => e.id === editId ? { ...e, ...form, itens: itensFinais, observacoes: obsDB ?? undefined } : e));
+        setEscalas((prev) => prev.map((e) => e.id === editId ? { ...e, ...form, visivel: visibilidadeAutomaticaMinisterio ? true : form.visivel, horario: horarioNormalizado, itens: itensFinais, observacoes: obsDB ?? undefined } : e));
+        await notificarEscalados(editId, itensFinais, escalaAnterior?.itens ?? []);
         await broadcastEscalasSync("update");
       } else {
         const { data: inserted, error: insEsc } = await supabase.from("escalas").insert({
-          ministerio, data: form.data, horario: form.horario,
+          ministerio, data: form.data, horario: horarioNormalizado,
           culto: form.culto,
           observacoes: obsDB,
-          visivel: form.visivel,
+          visivel: visibilidadeAutomaticaMinisterio ? true : form.visivel,
           confirmacao_participantes: form.confirmacaoParticipantes,
           criado_por: user?.id ?? null,
         }).select().single();
@@ -586,9 +729,10 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
           }
           const nova: Escala = {
             id: inserted.id, ministerio, criadoPor: user?.id ?? "",
-            ...form, itens: itensFinais, observacoes: obsDB ?? undefined,
+            ...form, visivel: visibilidadeAutomaticaMinisterio ? true : form.visivel, horario: horarioNormalizado, itens: itensFinais, observacoes: obsDB ?? undefined,
           };
           setEscalas((prev) => [nova, ...prev]);
+          await notificarEscalados(inserted.id, itensFinais);
           await broadcastEscalasSync("create");
         }
       }
@@ -631,10 +775,10 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
 
     if (editandoKey !== null) {
       // Remove TODOS os slots dessa pessoa e insere um por função selecionada
-      const itensDeOutros = form.itens.filter((it) => (it.voluntarioId ?? it.voluntarioNome) !== editandoKey);
+      const itensDeOutros = participanteUnico ? [] : form.itens.filter((it) => (it.voluntarioId ?? it.voluntarioNome) !== editandoKey);
       const novosItens: import("@/types").ItemEscala[] = funcoesSel
         .filter((f) => {
-          const permiteMultiplos = f === "Backing Vocal";
+          const permiteMultiplos = permiteMultiplosFuncao(f);
           if (permiteMultiplos) return true;
           // bloqueia se já existe OUTRA pessoa com essa função
           return !itensDeOutros.some((it) => it.funcao === f || displayFuncao(it) === f);
@@ -651,7 +795,11 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
     } else {
       // Adição nova — uma entrada por função selecionada
       const novosItens: import("@/types").ItemEscala[] = funcoesSel
-        .filter((f) => !form.itens.some((it) => it.voluntarioId === novoMembroId && (it.funcao === f || displayFuncao(it) === f)))
+        .filter((f) => {
+          const funcaoJaTemResponsavel = !permiteMultiplosFuncao(f) && form.itens.some((it) => it.funcao === f || displayFuncao(it) === f);
+          const pessoaJaTemFuncao = form.itens.some((it) => it.voluntarioId === novoMembroId && (it.funcao === f || displayFuncao(it) === f));
+          return !funcaoJaTemResponsavel && !pessoaJaTemFuncao;
+        })
         .map((f) => ({
           funcao: f as FuncaoEscala,
           voluntarioId: novoMembroId,
@@ -659,7 +807,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
           observacao: novaObs.trim() || undefined,
         }));
       if (novosItens.length === 0) return;
-      setForm((f) => ({ ...f, itens: [...f.itens, ...novosItens] }));
+      setForm((f) => ({ ...f, itens: participanteUnico ? novosItens : [...f.itens, ...novosItens] }));
       setAdicionandoParticipante(false);
     }
     setNovoMembroId("");
@@ -1278,9 +1426,14 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
   const subTabs: { id: EscalaSubTab; label: string; count?: number }[] = [
     { id: "detalhes",      label: "Detalhes" },
     { id: "participantes", label: "Participantes", count: new Set(form.itens.map((it) => it.voluntarioId ?? it.voluntarioNome)).size },
-    { id: "musicas",       label: "Músicas",       count: form.musicas.length },
-    { id: "roteiro",       label: "Roteiro" },
+    ...(usaMusicas ? [
+      { id: "musicas" as const, label: "Músicas", count: form.musicas.length },
+      { id: "roteiro" as const, label: "Roteiro" },
+    ] : []),
   ];
+  const templatesEncontro = templatesPorMinisterio(ministerio);
+  const templateSelecionado = templatesEncontro.find((t) => t.label === form.culto);
+  const labelsPredefinidos = templatesEncontro.filter((t) => t.id !== "especial").map((t) => t.label);
 
   return (
     <div className="space-y-4">
@@ -1351,12 +1504,12 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
           )}
 
           <div>
-            <p className="text-xs text-gray-400 mb-2 font-semibold uppercase tracking-widest">Tipo de culto</p>
+            <p className="text-xs text-gray-400 mb-2 font-semibold uppercase tracking-widest">Tipo de encontro</p>
             <div className="flex gap-2 flex-wrap">
-              {TEMPLATES_CULTO.map((t) => {
+              {templatesEncontro.map((t) => {
                 const isOutro = t.id === "especial";
                 const isActive = isOutro
-                  ? (form.culto !== "Culto de Quinta" && form.culto !== "Culto de Domingo")
+                  ? !labelsPredefinidos.includes(form.culto)
                   : form.culto === t.label;
                 return (
                 <button
@@ -1380,11 +1533,11 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
             </div>
           </div>
 
-          {(form.culto === "Culto de Quinta" || form.culto === "Culto de Domingo") && (
+          {templateSelecionado?.diaSemana !== null && templateSelecionado?.diaSemana !== undefined && (
             <div>
               <p className="text-xs text-gray-400 mb-2 font-semibold uppercase tracking-widest">Escolher data</p>
               <div className="flex flex-wrap gap-2">
-                {proximasDatas(form.culto === "Culto de Quinta" ? 4 : 0, 6).map((iso) => (
+                {proximasDatas(templateSelecionado.diaSemana, 6).map((iso) => (
                   <button
                     key={iso}
                     onClick={() => setForm((f) => ({ ...f, data: iso }))}
@@ -1401,12 +1554,15 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
           )}
 
           <div className="space-y-3">
-            <input
-              value={form.culto}
-              onChange={(e) => setForm({ ...form, culto: e.target.value })}
-              placeholder="Título *  ex: Culto Domingo 18h30"
-              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-gray-400"
-            />
+            <div>
+              <label className="text-xs text-gray-400 mb-1 block">Título</label>
+              <input
+                value={form.culto}
+                onChange={(e) => setForm({ ...form, culto: e.target.value })}
+                placeholder={placeholderTitulo(ministerio)}
+                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-gray-400"
+              />
+            </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-xs text-gray-400 mb-1 block">Data</label>
@@ -1420,9 +1576,12 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
               <div>
                 <label className="text-xs text-gray-400 mb-1 block">Hora</label>
                 <input
-                  type="time"
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={5}
                   value={form.horario}
-                  onChange={(e) => setForm({ ...form, horario: e.target.value })}
+                  onChange={(e) => setForm({ ...form, horario: formatHoraInput(e.target.value) })}
+                  placeholder="20:00"
                   className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-gray-400 bg-white"
                 />
               </div>
@@ -1476,26 +1635,36 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
             </div>
           )}
 
-          <div className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-xl px-4 py-3">
-            <div className="flex items-center gap-2">
-              {form.visivel ? <Eye className="w-4 h-4 text-green-600" /> : <EyeOff className="w-4 h-4 text-gray-400" />}
+          {visibilidadeAutomaticaMinisterio ? (
+            <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl px-4 py-3">
+              <Eye className="w-4 h-4 text-green-600" />
               <div>
-                <p className="text-sm font-semibold text-gray-800">Visibilidade</p>
-                <p className="text-xs text-gray-500">
-                  {form.visivel ? "Publicada, visível para todos os membros." : "Rascunho, só você vê."}
-                </p>
+                <p className="text-sm font-semibold text-gray-800">Visível para membros de {ministerio}</p>
+                <p className="text-xs text-gray-500">Esta escala não aparece para quem não compõe este ministério.</p>
               </div>
             </div>
-            <button
-              onClick={() => setForm({ ...form, visivel: !form.visivel })}
-              className={clsx("w-11 h-6 rounded-full transition relative", form.visivel ? "bg-black" : "bg-gray-300")}
-            >
-              <span className={clsx(
-                "absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform",
-                form.visivel ? "translate-x-5" : "translate-x-0"
-              )} />
-            </button>
-          </div>
+          ) : (
+            <div className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-xl px-4 py-3">
+              <div className="flex items-center gap-2">
+                {form.visivel ? <Eye className="w-4 h-4 text-green-600" /> : <EyeOff className="w-4 h-4 text-gray-400" />}
+                <div>
+                  <p className="text-sm font-semibold text-gray-800">Visibilidade</p>
+                  <p className="text-xs text-gray-500">
+                    {form.visivel ? "Publicada, visível para todos os membros." : "Rascunho, só você vê."}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setForm({ ...form, visivel: !form.visivel })}
+                className={clsx("w-11 h-6 rounded-full transition relative", form.visivel ? "bg-black" : "bg-gray-300")}
+              >
+                <span className={clsx(
+                  "absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform",
+                  form.visivel ? "translate-x-5" : "translate-x-0"
+                )} />
+              </button>
+            </div>
+          )}
 
           <div className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-xl px-4 py-3">
             <div className="flex items-center gap-2">
@@ -1564,41 +1733,39 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
                           className="border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-gray-400"
                         />
                       </div>
-                      {/* Badges de função */}
-                      <div className="flex flex-wrap gap-1.5">
-                        {funcoesMinisterio.map((f) => {
-                          const sel = novasFuncoes.includes(f);
-                          const permiteMultiplos = f === "Backing Vocal";
-                          // Bloqueia se já ocupada por OUTRA pessoa
-                          const jaOcupada = !permiteMultiplos && form.itens.some((it2) => (it2.voluntarioId ?? it2.voluntarioNome) !== grp.key && (it2.funcao === f || displayFuncao(it2) === f));
-                          return (
-                            <button
-                              key={f}
-                              type="button"
-                              disabled={jaOcupada}
-                              onClick={() => !jaOcupada && setNovasFuncoes((prev) => sel ? prev.filter((x) => x !== f) : [...prev, f])}
-                              title={jaOcupada ? "Já há alguém nesta função" : undefined}
-                              className={clsx(
-                                "text-xs font-medium px-3 py-1 rounded-full border transition",
-                                jaOcupada
-                                  ? "bg-gray-100 text-gray-300 border-gray-200 cursor-not-allowed line-through"
-                                  : sel
+                      {!funcaoFixaOculta && (
+                        <div className="flex flex-wrap gap-1.5">
+                          {funcoesMinisterio.map((f) => {
+                            const sel = novasFuncoes.includes(f);
+                            const permiteMultiplos = permiteMultiplosFuncao(f);
+                            // Bloqueia se já ocupada por OUTRA pessoa
+                            const jaOcupada = !permiteMultiplos && form.itens.some((it2) => (it2.voluntarioId ?? it2.voluntarioNome) !== grp.key && (it2.funcao === f || displayFuncao(it2) === f));
+                            if (jaOcupada) return null;
+                            return (
+                              <button
+                                key={f}
+                                type="button"
+                                onClick={() => setNovasFuncoes((prev) => sel ? prev.filter((x) => x !== f) : [...prev, f])}
+                                className={clsx(
+                                  "text-xs font-medium px-3 py-1 rounded-full border transition",
+                                  sel
                                     ? "bg-gray-900 text-white border-gray-900"
                                     : "bg-white text-gray-600 border-gray-300 hover:border-gray-500"
-                              )}
-                            >
-                              {f}
-                            </button>
-                          );
-                        })}
-                      </div>
-                      {novasFuncoes.length === 0 && (
+                                )}
+                              >
+                                {f}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                      {!funcaoFixaOculta && novasFuncoes.length === 0 && (
                         <p className="text-xs text-amber-600">Selecione ao menos uma função.</p>
                       )}
                       <div className="flex items-center gap-2">
                         <button
                           onClick={addParticipante}
-                          disabled={!novoMembroId || novasFuncoes.length === 0}
+                          disabled={!novoMembroId || (!funcaoFixaOculta && novasFuncoes.length === 0)}
                           className="flex items-center gap-1.5 text-white text-xs font-semibold px-4 py-2 rounded-xl bg-black hover:bg-gray-900 disabled:opacity-40 disabled:cursor-not-allowed transition"
                         >
                           <Save className="w-3.5 h-3.5" /> Confirmar
@@ -1616,7 +1783,9 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
                     <div className="flex items-center justify-between bg-white border border-gray-100 rounded-xl px-4 py-3 shadow-sm">
                       <div>
                         <p className="text-sm font-semibold text-gray-800">{grp.voluntarioNome}</p>
-                        <p className="text-xs text-grape-700 font-medium">{grp.funcoes.join(" · ")}</p>
+                        {!funcaoFixaOculta && (
+                          <p className="text-xs text-grape-700 font-medium">{grp.funcoes.join(" · ")}</p>
+                        )}
                       </div>
                       <div className="flex items-center gap-1">
                         <button
@@ -1665,40 +1834,38 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
                     className="border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-gray-400"
                   />
                 </div>
-                {/* Funções — badges clicáveis; Backing Vocal permite múltiplos, demais apenas 1 */}
-                <div className="flex flex-wrap gap-1.5">
-                  {funcoesMinisterio.map((f) => {
-                    const sel = novasFuncoes.includes(f);
-                    const permiteMultiplos = f === "Backing Vocal";
-                    const jaOcupada = !permiteMultiplos && form.itens.some((it) => it.funcao === f || displayFuncao(it) === f);
-                    return (
-                      <button
-                        key={f}
-                        type="button"
-                        disabled={jaOcupada}
-                        onClick={() => !jaOcupada && setNovasFuncoes((prev) => sel ? prev.filter((x) => x !== f) : [...prev, f])}
-                        title={jaOcupada ? "Já há alguém nesta função" : undefined}
-                        className={clsx(
-                          "text-xs font-medium px-3 py-1 rounded-full border transition",
-                          jaOcupada
-                            ? "bg-gray-100 text-gray-300 border-gray-200 cursor-not-allowed line-through"
-                            : sel
+                {!funcaoFixaOculta && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {funcoesMinisterio.map((f) => {
+                      const sel = novasFuncoes.includes(f);
+                      const permiteMultiplos = permiteMultiplosFuncao(f);
+                      const jaOcupada = !permiteMultiplos && form.itens.some((it) => it.funcao === f || displayFuncao(it) === f);
+                      if (jaOcupada) return null;
+                      return (
+                        <button
+                          key={f}
+                          type="button"
+                          onClick={() => setNovasFuncoes((prev) => sel ? prev.filter((x) => x !== f) : [...prev, f])}
+                          className={clsx(
+                            "text-xs font-medium px-3 py-1 rounded-full border transition",
+                            sel
                               ? "bg-gray-900 text-white border-gray-900"
                               : "bg-white text-gray-600 border-gray-300 hover:border-gray-500"
-                        )}
-                      >
-                        {f}
-                      </button>
-                    );
-                  })}
-                </div>
-                {novasFuncoes.length === 0 && (
+                          )}
+                        >
+                          {f}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+                {!funcaoFixaOculta && novasFuncoes.length === 0 && (
                   <p className="text-xs text-amber-600">Selecione ao menos uma função.</p>
                 )}
                 <div className="flex items-center gap-2">
                   <button
                     onClick={addParticipante}
-                    disabled={!novoMembroId || novasFuncoes.length === 0}
+                    disabled={!novoMembroId || (!funcaoFixaOculta && novasFuncoes.length === 0)}
                     className="flex items-center gap-1.5 text-white text-xs font-semibold px-4 py-2 rounded-xl bg-black hover:bg-gray-900 disabled:opacity-40 disabled:cursor-not-allowed transition"
                   >
                     <Plus className="w-3.5 h-3.5" /> Confirmar
@@ -1724,7 +1891,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
       )}
 
       {/* -- Músicas -- */}
-      {subTab === "musicas" && (
+      {usaMusicas && subTab === "musicas" && (
         <div className="space-y-4">
           {modalCifra && (
             <BuscarCifraModal
@@ -1936,7 +2103,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
       )}
 
       {/* -- Roteiro -- */}
-      {subTab === "roteiro" && (
+      {usaMusicas && subTab === "roteiro" && (
         <div className="space-y-3">
           {form.musicas.length === 0 && (
             <p className="text-sm text-gray-400 text-center py-12">

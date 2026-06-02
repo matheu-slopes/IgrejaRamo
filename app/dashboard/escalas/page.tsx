@@ -56,6 +56,7 @@ function agruparItens(itens: Escala["itens"]) {
 // Ordem pelo fluxo do culto: Limpeza → Recepcionamento → Louvor → Mídias → Pregação(Ensino) → Infantil → Jovens
 const MINISTERIOS_CULTO: Ministerio[] = ["Limpeza", "Recepcionamento", "Louvor", "Mídias", "Ensino", "Infantil", "Jovens"];
 const TODOS: Ministerio[] = ["Limpeza", "Recepcionamento", "Louvor", "Mídias", "Ensino", "Infantil", "Jovens"];
+const MINISTERIOS_ESCALAS_PRIVADAS = new Set<string>(["Jovens", "Ação Social"]);
 
 const EMOJI: Record<string, string> = {
   Louvor: "🎸", "Mídias": "📹", Recepcionamento: "🤝",
@@ -644,6 +645,15 @@ export default function EscalasDashboardPage() {
   const fetchSeqRef = useRef(0);
 
   const hojeStr = new Date().toISOString().split("T")[0];
+  const podeVerEscalaMinisterio = useCallback((ministerio: string) => {
+    if (!MINISTERIOS_ESCALAS_PRIVADAS.has(ministerio)) return true;
+    return isAdmin || meus.includes(ministerio as Ministerio);
+  }, [isAdmin, meus]);
+
+  const escalasVisiveis = useMemo(
+    () => todasEscalas.filter((e) => podeVerEscalaMinisterio(e.ministerio)),
+    [podeVerEscalaMinisterio, todasEscalas]
+  );
 
   const carregarTodas = useCallback(async () => {
     if (isLoading || !user?.id) return;
@@ -711,7 +721,7 @@ export default function EscalasDashboardPage() {
 
   const datasVisiveis = useMemo(() => {
     const set = new Set<string>();
-    for (const e of todasEscalas) {
+    for (const e of escalasVisiveis) {
       if (!visaoMes) {
         const ini = isoDate(semanaBase);
         const fim = isoDate(semanaFim);
@@ -722,23 +732,23 @@ export default function EscalasDashboardPage() {
     }
     return [...set].sort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [todasEscalas, semanaBase, semanaFim, visaoMes]);
+  }, [escalasVisiveis, semanaBase, semanaFim, visaoMes]);
 
   const escalasPorData = useMemo(() => {
     const map: Record<string, Escala[]> = {};
-    for (const e of todasEscalas) {
+    for (const e of escalasVisiveis) {
       if (!map[e.data]) map[e.data] = [];
       map[e.data].push(e);
     }
     return map;
-  }, [todasEscalas]);
+  }, [escalasVisiveis]);
 
   const minhasEscalas = useMemo(() =>
-    todasEscalas
+    escalasVisiveis
       .filter((e) => e.itens.some((it) => it.voluntarioId === user?.id) && e.data >= hojeStr)
       .sort((a, b) => a.data.localeCompare(b.data)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [todasEscalas, user?.id]
+    [escalasVisiveis, user?.id]
   );
 
   const isLider = isAdmin || temPermissao("criar_escala");
@@ -929,7 +939,7 @@ export default function EscalasDashboardPage() {
           )}
 
           {/* Jovens — acesso separado para líderes (cultos quinzenais de sábado) */}
-          {isLider && (
+          {(isAdmin || meus.includes("Jovens")) && isLider && (
             <button
               onClick={() => setEditing("Jovens")}
               className="flex items-center justify-between gap-3 bg-white rounded-2xl border border-gray-100 px-5 py-4 text-left hover:shadow-md hover:border-gray-200 transition shadow-sm mt-1"
