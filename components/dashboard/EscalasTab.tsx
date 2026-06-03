@@ -835,9 +835,13 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
     await notificarInApp({
       usuarioIds,
       tipo: "escala",
-      titulo: `Voce foi escalado em ${ministerio}`,
-      corpo: `${form.culto} - ${formatDateSimples(form.data)} as ${form.horario}`,
-      link: "/dashboard/escalas",
+      titulo: form.confirmacaoParticipantes
+        ? "Voce precisa confirmar uma escala"
+        : `Voce foi escalado em ${ministerio}`,
+      corpo: form.confirmacaoParticipantes
+        ? `${form.culto} - ${formatDateSimples(form.data)} as ${form.horario}. Confirme se voce pode servir.`
+        : `${form.culto} - ${formatDateSimples(form.data)} as ${form.horario}`,
+      link: "/dashboard/escalas?aba=minhas",
       ministerio,
     });
   }

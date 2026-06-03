@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { useChatUnread } from "@/contexts/ChatUnreadContext";
 import { useNotifications } from "@/contexts/NotificationsContext";
+import { usePendingScaleConfirmations } from "@/hooks/usePendingScaleConfirmations";
 import {
   LayoutDashboard, CalendarCheck, MessageSquare, CalendarDays,
   MoreHorizontal, X, Users, Shield, Bell, BookOpen, Music, Video,
@@ -42,6 +43,7 @@ export default function BottomNav() {
   const { user } = useAuth();
   const { totalUnread } = useChatUnread();
   const { counts, marcarTipo, marcarMinisterio } = useNotifications();
+  const { count: escalasPendentes } = usePendingScaleConfirmations(user?.id);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const drawerRef = useRef<HTMLDivElement>(null);
   const touchStartY = useRef<number>(0);
@@ -70,8 +72,8 @@ export default function BottomNav() {
   }
 
   function NavItem({
-    href, label, icon: Icon, active, badge, onClick,
-  }: { href: string; label: string; icon: React.ElementType; active: boolean; badge?: number; onClick?: () => void }) {
+    href, label, icon: Icon, active, badge, pendingBadge, onClick,
+  }: { href: string; label: string; icon: React.ElementType; active: boolean; badge?: number; pendingBadge?: number; onClick?: () => void }) {
     return (
       <Link
         href={href}
@@ -86,6 +88,11 @@ export default function BottomNav() {
           {!!badge && badge > 0 && (
             <span className="absolute -top-1.5 -right-1.5 min-w-[14px] h-[14px] rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center px-0.5">
               {badge > 99 ? "99+" : badge}
+            </span>
+          )}
+          {!!pendingBadge && pendingBadge > 0 && (
+            <span className="absolute -bottom-1.5 -right-1.5 min-w-[14px] h-[14px] rounded-full bg-amber-400 text-amber-950 text-[9px] font-black flex items-center justify-center px-0.5 border border-white">
+              {pendingBadge > 99 ? "99+" : pendingBadge}
             </span>
           )}
         </div>
@@ -244,6 +251,7 @@ export default function BottomNav() {
               icon={Icon}
               active={active}
               badge={badge}
+              pendingBadge={href === "/dashboard/escalas" ? escalasPendentes : undefined}
               onClick={() => {
                 if (href === "/dashboard") marcarTipo("aviso");
                 if (href === "/dashboard/escalas") marcarTipo("escala");

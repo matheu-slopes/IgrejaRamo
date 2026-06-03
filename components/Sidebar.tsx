@@ -8,6 +8,7 @@ import clsx from "clsx";
 import { useAuth } from "@/contexts/AuthContext";
 import { useChatUnread } from "@/contexts/ChatUnreadContext";
 import { useNotifications } from "@/contexts/NotificationsContext";
+import { usePendingScaleConfirmations } from "@/hooks/usePendingScaleConfirmations";
 import { supabase } from "@/lib/supabase";
 import {
   LayoutDashboard,
@@ -70,6 +71,7 @@ export default function Sidebar() {
   const [ministerios, setMinisterios] = useState(() => MINISTERIOS_PADRAO.map(montarItemMinisterio));
   const { totalUnread } = useChatUnread();
   const { counts, marcarTipo, marcarMinisterio } = useNotifications();
+  const { count: escalasPendentes } = usePendingScaleConfirmations(user?.id);
 
   useEffect(() => {
     supabase
@@ -132,13 +134,15 @@ export default function Sidebar() {
       <nav className="flex-1 overflow-y-auto py-4 space-y-1 px-2" style={{ scrollbarWidth: "none" }}>
         {navMain.map(({ href, label, icon: Icon }) => {
           const isChat = href === "/dashboard/chat";
+          const isEscalas = href === "/dashboard/escalas";
           const badge =
             isChat ? totalUnread :
             href === "/dashboard" ? counts.avisos :
-            href === "/dashboard/escalas" ? counts.escalas :
+            isEscalas ? counts.escalas :
             href === "/dashboard/eventos" ? counts.eventos :
             0;
           const hasBadge = badge > 0 && !(isChat && pathname === "/dashboard/chat");
+          const hasPendingBadge = isEscalas && escalasPendentes > 0;
           return (
             <Link
               key={href}
@@ -161,8 +165,25 @@ export default function Sidebar() {
                     {badge > 99 ? "99+" : badge}
                   </span>
                 )}
+                {hasPendingBadge && (
+                  <span
+                    className="absolute -bottom-1.5 -right-1.5 min-w-[14px] h-[14px] rounded-full bg-amber-400 text-amber-950 text-[9px] font-black flex items-center justify-center px-0.5 border border-vine-900"
+                    title={`${escalasPendentes} resposta${escalasPendentes > 1 ? "s" : ""} pendente${escalasPendentes > 1 ? "s" : ""}`}
+                  >
+                    {escalasPendentes > 99 ? "99+" : escalasPendentes}
+                  </span>
+                )}
               </div>
-              {!collapsed && <span>{label}</span>}
+              {!collapsed && (
+                <span className="flex items-center gap-1.5 min-w-0">
+                  <span>{label}</span>
+                  {hasPendingBadge && (
+                    <span className="rounded-full bg-amber-400/95 text-amber-950 text-[10px] font-black px-1.5 py-0.5 leading-none">
+                      pendente
+                    </span>
+                  )}
+                </span>
+              )}
             </Link>
           );
         })}

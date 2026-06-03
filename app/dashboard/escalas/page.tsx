@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { Ministerio, Escala, FuncaoEscala, EscalaMusica } from "@/types";
 import { EscalasTab } from "@/components/dashboard/EscalasTab";
@@ -10,7 +11,7 @@ import { store, STORE_KEYS } from "@/lib/dataStore";
 import { useAppRefresh } from "@/hooks/useAppRefresh";
 import {
   ChevronLeft, ChevronRight, ChevronDown, ChevronUp,
-  Music2, Users, Calendar, Star, Settings2, ClipboardCopy, Check, UserCheck,
+  Music2, Users, Calendar, Star, Settings2, ClipboardCopy, Check, UserCheck, AlertCircle,
 } from "lucide-react";
 import clsx from "clsx";
 
@@ -67,6 +68,12 @@ function agruparItens(itens: Escala["itens"]) {
     const bMin = b.funcoes.includes("Ministro") ? 0 : 1;
     return aMin - bMin;
   });
+}
+
+function escalaPendenteParaUsuario(escala: Escala, userId?: string | null) {
+  if (!userId || !escala.confirmacaoParticipantes) return false;
+  const minhasFuncoes = escala.itens.filter((it) => it.voluntarioId === userId);
+  return minhasFuncoes.some((it) => statusConfirmacaoItem(it) === "pendente");
 }
 
 // Ordem pelo fluxo do culto: Limpeza → Recepcionamento → Louvor → Mídias → Pregação(Ensino) → Infantil → Jovens
@@ -691,13 +698,15 @@ function MinhasEscalasList({
         const precisaConfirmar = esc.confirmacaoParticipantes && minhasFuncoes.length > 0;
         const recusado = precisaConfirmar && minhasFuncoes.some((it) => statusConfirmacaoItem(it) === "recusado");
         const confirmado = precisaConfirmar && !recusado && minhasFuncoes.every((it) => statusConfirmacaoItem(it) === "confirmado");
+        const pendente = precisaConfirmar && !confirmado && !recusado;
         return (
           <button
             key={esc.id}
             onClick={() => onOpen(esc)}
             className={clsx(
-              "flex items-center gap-4 bg-white rounded-2xl border px-5 py-4 text-left hover:shadow-md transition",
-              isDomingo ? "border-t-2 border-t-gold-400 border-gray-100" : "border-t-2 border-t-bark-500 border-gray-100"
+              "flex items-center gap-4 rounded-2xl border px-5 py-4 text-left hover:shadow-md transition",
+              pendente ? "bg-amber-50/70 border-amber-200 ring-1 ring-amber-200" : "bg-white border-gray-100",
+              isDomingo ? "border-t-2 border-t-gold-400" : "border-t-2 border-t-bark-500"
             )}
           >
             <div className={clsx(
@@ -723,9 +732,13 @@ function MinhasEscalasList({
               <p className="text-sm font-bold text-gray-800">{esc.culto}</p>
               <p className="text-xs text-gray-400">{esc.horario.slice(0, 5)}</p>
               {precisaConfirmar && (
-                <p className={clsx("text-[11px] font-bold mt-1", confirmado ? "text-green-600" : recusado ? "text-red-600" : "text-amber-600")}>
-                  {confirmado ? "Confirmado" : recusado ? "Você marcou que não consegue" : "Confirmação pendente"}
-                </p>
+                <span className={clsx(
+                  "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold mt-1",
+                  confirmado ? "bg-green-50 text-green-700" : recusado ? "bg-red-50 text-red-700" : "bg-amber-100 text-amber-800"
+                )}>
+                  {pendente && <AlertCircle className="w-3 h-3" />}
+                  {confirmado ? "Confirmado" : recusado ? "Voce marcou que nao consegue" : "Resposta pendente"}
+                </span>
               )}
             </div>
 
@@ -747,6 +760,7 @@ function MinhasEscalasList({
 // ─── Página principal ─────────────────────────────────────────────────────────
 
 export default function EscalasDashboardPage() {
+  const searchParams = useSearchParams();
   const { user, isLoading, temPermissao, temPermissaoNoMinisterio } = useAuth();
   const isAdmin = user?.role === "admin" || user?.role === "pastor";
   const meus = (user?.ministerios ?? []) as Ministerio[];
@@ -758,7 +772,7 @@ export default function EscalasDashboardPage() {
   );
   const [editing, setEditing] = useState<Ministerio | null>(null);
   const [modalEscala, setModalEscala] = useState<Escala | null>(null);
-  const [aba, setAba] = useState<"minhas" | "culto">("culto");
+  const [aba, setAba] = useState<"minhas" | "culto">(() => searchParams.get("aba") === "minhas" ? "minhas" : "culto");
   const [visaoMes, setVisaoMes] = useState(false);
   const [semanaBase, setSemanaBase] = useState(() => semanaInicio(new Date()));
   const [confirmandoIds, setConfirmandoIds] = useState<Set<string>>(new Set());
@@ -802,6 +816,10 @@ export default function EscalasDashboardPage() {
     if (isLoading || !user?.id) return;
     void carregarTodas();
   }, [carregarTodas, isLoading, user?.id]);
+
+  useEffect(() => {
+    if (searchParams.get("aba") === "minhas") setAba("minhas");
+  }, [searchParams]);
 
   useEffect(() => {
     if (isLoading || !user?.id) return;
@@ -869,6 +887,11 @@ export default function EscalasDashboardPage() {
       .sort((a, b) => a.data.localeCompare(b.data)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [escalasVisiveis, user?.id]
+  );
+
+  const pendenciasMinhas = useMemo(
+    () => minhasEscalas.filter((e) => escalaPendenteParaUsuario(e, user?.id)).length,
+    [minhasEscalas, user?.id]
   );
 
   const isLider = isAdmin || temPermissao("criar_escala");
@@ -978,6 +1001,11 @@ export default function EscalasDashboardPage() {
                 aba === "minhas" ? "bg-gray-100 text-gray-900" : "bg-gray-200 text-gray-500"
               )}>
                 {minhasEscalas.length}
+              </span>
+            )}
+            {pendenciasMinhas > 0 && (
+              <span className="text-[11px] font-black px-1.5 py-0.5 rounded-full bg-amber-400 text-amber-950">
+                {pendenciasMinhas} pendente{pendenciasMinhas > 1 ? "s" : ""}
               </span>
             )}
           </button>
