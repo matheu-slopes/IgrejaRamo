@@ -167,10 +167,10 @@ export default function Sidebar() {
                 )}
                 {hasPendingBadge && (
                   <span
-                    className="absolute -bottom-1 -right-2 min-w-[15px] h-[15px] rounded-full bg-amber-400 text-amber-950 text-[9px] font-black flex items-center justify-center px-0.5 ring-2 ring-vine-900 shadow-sm"
+                    className="absolute -bottom-1 -right-1.5 w-3 h-3 rounded-full bg-amber-400 ring-2 ring-vine-900 shadow-sm"
                     title={`${escalasPendentes} resposta${escalasPendentes > 1 ? "s" : ""} pendente${escalasPendentes > 1 ? "s" : ""}`}
                   >
-                    {escalasPendentes > 99 ? "99+" : escalasPendentes}
+                    <span className="absolute inset-0 rounded-full bg-amber-300 opacity-60 animate-ping" />
                   </span>
                 )}
               </div>

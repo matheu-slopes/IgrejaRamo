@@ -1004,9 +1004,13 @@ export default function EscalasDashboardPage() {
               </span>
             )}
             {pendenciasMinhas > 0 && (
-              <span className="inline-flex items-center gap-1 text-[11px] font-black px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200 shadow-sm">
+              <span
+                className="relative inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-100 text-amber-800 border border-amber-200 shadow-sm"
+                title={`${pendenciasMinhas} resposta${pendenciasMinhas > 1 ? "s" : ""} pendente${pendenciasMinhas > 1 ? "s" : ""}`}
+                aria-label={`${pendenciasMinhas} resposta${pendenciasMinhas > 1 ? "s" : ""} pendente${pendenciasMinhas > 1 ? "s" : ""}`}
+              >
+                <span className="absolute inline-flex h-full w-full rounded-full bg-amber-300 opacity-40 animate-ping" />
                 <AlertCircle className="w-3 h-3" />
-                Responder {pendenciasMinhas}
               </span>
             )}
           </button>

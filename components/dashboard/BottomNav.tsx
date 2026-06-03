@@ -91,8 +91,8 @@ export default function BottomNav() {
             </span>
           )}
           {!!pendingBadge && pendingBadge > 0 && (
-            <span className="absolute -bottom-1 -right-2 min-w-[15px] h-[15px] rounded-full bg-amber-400 text-amber-950 text-[9px] font-black flex items-center justify-center px-0.5 ring-2 ring-white shadow-sm">
-              {pendingBadge > 99 ? "99+" : pendingBadge}
+            <span className="absolute -bottom-1 -right-1.5 w-3 h-3 rounded-full bg-amber-400 ring-2 ring-white shadow-sm">
+              <span className="absolute inset-0 rounded-full bg-amber-300 opacity-60 animate-ping" />
             </span>
           )}
         </div>
