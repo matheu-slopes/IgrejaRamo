@@ -266,6 +266,85 @@ function normalizarHorario(value: string): string | null {
   return `${String(hora).padStart(2, "0")}:${String(minuto).padStart(2, "0")}`;
 }
 
+function normalizarBusca(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
+function ordenarMembrosPorNome<T extends { nome: string }>(lista: T[]): T[] {
+  return [...lista].sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR", { sensitivity: "base" }));
+}
+
+function MembroSearchSelect({
+  membros,
+  value,
+  onChange,
+  placeholder = "Pesquisar membro",
+}: {
+  membros: MembroMinisterio[];
+  value: string;
+  onChange: (id: string) => void;
+  placeholder?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const selected = membros.find((m) => m.id === value);
+  const termo = normalizarBusca(query);
+  const filtrados = ordenarMembrosPorNome(membros)
+    .filter((m) => !termo || normalizarBusca(m.nome).includes(termo))
+    .slice(0, 40);
+
+  return (
+    <div className="relative">
+      <input
+        value={open ? query : selected?.nome ?? ""}
+        onFocus={() => {
+          setOpen(true);
+          setQuery("");
+        }}
+        onChange={(e) => {
+          setQuery(e.target.value);
+          setOpen(true);
+          if (!e.target.value.trim()) onChange("");
+        }}
+        placeholder={selected ? selected.nome : placeholder}
+        className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-gray-400 bg-white"
+      />
+      {open && (
+        <>
+          <div className="fixed inset-0 z-20" onClick={() => setOpen(false)} />
+          <div className="absolute z-30 mt-1 w-full max-h-64 overflow-y-auto rounded-xl border border-gray-200 bg-white shadow-lg">
+            {filtrados.length === 0 ? (
+              <p className="px-3 py-2 text-sm text-gray-400">Nenhum membro encontrado.</p>
+            ) : (
+              filtrados.map((m) => (
+                <button
+                  key={m.id}
+                  type="button"
+                  onClick={() => {
+                    onChange(m.id);
+                    setQuery("");
+                    setOpen(false);
+                  }}
+                  className={clsx(
+                    "w-full px-3 py-2 text-left text-sm hover:bg-gray-50 transition",
+                    value === m.id && "bg-gray-100 font-semibold text-gray-900"
+                  )}
+                >
+                  {m.nome}
+                </button>
+              ))
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 const EMPTY_FORM: EscalaForm = {
   culto: "", data: "", horario: "", observacoes: "", equipe: "",
   ageGroup: "", temaInfantil: "",
@@ -320,7 +399,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
     if (reqSeq !== fetchSeqRef.current) return;
 
     if (perfisRes.data) {
-      setMembros(perfisRes.data.map((p: Record<string, unknown>) => ({
+      setMembros(ordenarMembrosPorNome(perfisRes.data.map((p: Record<string, unknown>) => ({
         id: p.id as string,
         nome: p.nome as string,
         email: (p.email ?? "") as string,
@@ -329,7 +408,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
         ministerio,
         ativo: true,
         dataEntrada: (p.data_ingresso as string) ?? "",
-      })));
+      }))));
     }
 
     if (escalasRes.error) {
@@ -1712,20 +1791,12 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
                     <div className="border border-gray-300 rounded-xl p-3 space-y-3 bg-gray-50">
                       <p className="text-xs font-semibold text-gray-500">Editando: <span className="text-gray-800">{grp.voluntarioNome}</span></p>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        <select
+                        <MembroSearchSelect
                           value={novoMembroId}
-                          onChange={(e) => setNovoMembroId(e.target.value)}
-                          className="border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-gray-400 bg-white"
-                        >
-                          <option value="">Selecionar membro</option>
-                          {novoMembroId && !membros.find((m) => m.id === novoMembroId) && (
-                            <option value={novoMembroId}>{grp.voluntarioNome}</option>
-                          )}
-                          {membros
-                            .filter((m) => m.id === novoMembroId || !form.itens.some((it2) => (it2.voluntarioId ?? it2.voluntarioNome) !== grp.key && it2.voluntarioId === m.id))
-                            .map((m) => <option key={m.id} value={m.id}>{m.nome}</option>)
-                          }
-                        </select>
+                          onChange={setNovoMembroId}
+                          placeholder="Pesquisar membro"
+                          membros={membros.filter((m) => m.id === novoMembroId || !form.itens.some((it2) => (it2.voluntarioId ?? it2.voluntarioNome) !== grp.key && it2.voluntarioId === m.id))}
+                        />
                         <input
                           value={novaObs}
                           onChange={(e) => setNovaObs(e.target.value)}
@@ -1819,14 +1890,12 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
               <div className="border border-gray-200 rounded-xl p-3 space-y-3 bg-gray-50">
                 <p className="text-xs font-semibold text-gray-600">Adicionar participante</p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  <select
+                  <MembroSearchSelect
                     value={novoMembroId}
-                    onChange={(e) => setNovoMembroId(e.target.value)}
-                    className="border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-gray-400 bg-white"
-                  >
-                    <option value="">Selecionar membro</option>
-                    {membrosDisponiveis.map((m) => <option key={m.id} value={m.id}>{m.nome}</option>)}
-                  </select>
+                    onChange={setNovoMembroId}
+                    placeholder="Pesquisar membro"
+                    membros={membrosDisponiveis}
+                  />
                   <input
                     value={novaObs}
                     onChange={(e) => setNovaObs(e.target.value)}
