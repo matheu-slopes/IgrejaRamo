@@ -79,7 +79,7 @@ export default function BottomNav() {
         href={href}
         onClick={onClick}
         className={clsx(
-          "nav-item flex-1 flex flex-col items-center justify-end gap-0.5 pt-2 pb-0 relative select-none",
+          "nav-item flex-1 flex flex-col items-center justify-center gap-1 py-2 relative select-none",
           active ? "text-vine-600" : "text-gray-400"
         )}
       >
@@ -232,7 +232,8 @@ export default function BottomNav() {
 
       {/* Bottom bar */}
       <nav
-        className="bottom-nav relative z-[9999] md:hidden bg-transparent flex items-stretch shrink-0 h-14 overflow-hidden translate-y-3"
+        className="bottom-nav relative z-[9999] md:hidden bg-white border-t border-gray-100 flex items-stretch shrink-0 min-h-16 overflow-visible shadow-[0_-8px_24px_rgba(15,23,42,0.05)]"
+        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       >
         {navItems.map(({ href, label, icon: Icon }) => {
           const isChat = href === "/dashboard/chat";
@@ -283,7 +284,7 @@ export default function BottomNav() {
           <button
             onClick={() => setDrawerOpen(true)}
             className={clsx(
-              "nav-item flex-1 flex flex-col items-center justify-end gap-0.5 pt-2 pb-0 relative select-none",
+              "nav-item flex-1 flex flex-col items-center justify-center gap-1 py-2 relative select-none",
               drawerOpen ? "text-vine-600" : "text-gray-400"
             )}
           >
@@ -306,7 +307,7 @@ export default function BottomNav() {
           <button
             onClick={() => setDrawerOpen(true)}
             className={clsx(
-              "nav-item flex-1 flex flex-col items-center justify-end gap-0.5 pt-2 pb-0 relative select-none",
+              "nav-item flex-1 flex flex-col items-center justify-center gap-1 py-2 relative select-none",
               drawerOpen ? "text-gray-900" : "text-gray-400"
             )}
           >
