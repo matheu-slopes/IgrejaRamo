@@ -278,6 +278,27 @@ function aplicarConfirmacoes(
   });
 }
 
+function erroColunaConfirmacaoAusente(error: unknown): boolean {
+  const err = error as { message?: string; code?: string } | null;
+  const message = String(err?.message ?? "").toLowerCase();
+  return message.includes("'confirmado' column") || message.includes("confirmado") && message.includes("schema cache");
+}
+
+function itemEscalaPayload(escalaId: string, item: ItemEscala, incluirConfirmacao: boolean) {
+  const norm = normalizeFuncaoParaDB(item.funcao, item.observacao);
+  return {
+    escala_id: escalaId,
+    funcao: norm.funcao,
+    voluntario_id: item.voluntarioId || null,
+    voluntario_nome: item.voluntarioNome,
+    observacao: norm.observacao,
+    ...(incluirConfirmacao ? {
+      confirmado: item.confirmado ?? false,
+      confirmado_em: item.confirmadoEm ?? null,
+    } : {}),
+  };
+}
+
 function formatHoraInput(value: string): string {
   const digits = value.replace(/\D/g, "").slice(0, 4);
   if (digits.length <= 2) return digits;
@@ -779,19 +800,16 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
         if (delItens) throw new Error(delItens.message);
 
         if (itensFinais.length > 0) {
-          const itensParaSalvar = itensFinais.map((i) => {
-            const norm = normalizeFuncaoParaDB(i.funcao, i.observacao);
-            return {
-              escala_id: editId,
-              funcao: norm.funcao,
-              voluntario_id: i.voluntarioId || null,
-              voluntario_nome: i.voluntarioNome,
-              observacao: norm.observacao,
-              confirmado: i.confirmado ?? false,
-              confirmado_em: i.confirmadoEm ?? null,
-            };
-          });
-          const { error: insItens, data: insData } = await supabase.from("escala_itens").insert(itensParaSalvar).select("id");
+          const itensParaSalvar = itensFinais.map((i) => itemEscalaPayload(editId, i, true));
+          let { error: insItens, data: insData } = await supabase.from("escala_itens").insert(itensParaSalvar).select("id");
+          if (insItens && erroColunaConfirmacaoAusente(insItens)) {
+            const fallback = await supabase
+              .from("escala_itens")
+              .insert(itensFinais.map((i) => itemEscalaPayload(editId, i, false)))
+              .select("id");
+            insItens = fallback.error;
+            insData = fallback.data;
+          }
           if (insItens) throw new Error(insItens.message);
           if (!insData || insData.length !== itensFinais.length) {
             throw new Error(`Erro ao salvar participantes (${insData?.length ?? 0}/${itensFinais.length}). Possível função inválida.`);
@@ -825,32 +843,32 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
         }).select().single();
         if (insEsc) throw new Error(insEsc.message);
         if (inserted) {
-          if (itensFinais.length > 0) {
-            const { error: insItens } = await supabase.from("escala_itens").insert(
-              itensFinais.map((i) => {
-                const norm = normalizeFuncaoParaDB(i.funcao, i.observacao);
-                return {
-                  escala_id: inserted.id,
-                  funcao: norm.funcao,
-                  voluntario_id: i.voluntarioId || null,
-                  voluntario_nome: i.voluntarioNome,
-                  observacao: norm.observacao,
-                  confirmado: i.confirmado ?? false,
-                  confirmado_em: i.confirmadoEm ?? null,
-                };
-              })
-            );
-            if (insItens) throw new Error(insItens.message);
-          }
-          if (form.musicas.length > 0) {
-            const { error: insMus } = await supabase.from("escala_musicas").insert(
-              form.musicas.map((m, idx) => ({
-                escala_id: inserted.id, musica_id: m.musicaId || null,
-                titulo: m.titulo, artista: m.artista, tom: m.tom, bpm: m.bpm ?? null, ordem: idx,
-                artista_slug: m.artistaSlug ?? null, musica_slug: m.musicaSlug ?? null,
-              }))
-            );
-            if (insMus) throw new Error(insMus.message);
+          try {
+            if (itensFinais.length > 0) {
+              let { error: insItens } = await supabase
+                .from("escala_itens")
+                .insert(itensFinais.map((i) => itemEscalaPayload(inserted.id, i, true)));
+              if (insItens && erroColunaConfirmacaoAusente(insItens)) {
+                const fallback = await supabase
+                  .from("escala_itens")
+                  .insert(itensFinais.map((i) => itemEscalaPayload(inserted.id, i, false)));
+                insItens = fallback.error;
+              }
+              if (insItens) throw new Error(insItens.message);
+            }
+            if (form.musicas.length > 0) {
+              const { error: insMus } = await supabase.from("escala_musicas").insert(
+                form.musicas.map((m, idx) => ({
+                  escala_id: inserted.id, musica_id: m.musicaId || null,
+                  titulo: m.titulo, artista: m.artista, tom: m.tom, bpm: m.bpm ?? null, ordem: idx,
+                  artista_slug: m.artistaSlug ?? null, musica_slug: m.musicaSlug ?? null,
+                }))
+              );
+              if (insMus) throw new Error(insMus.message);
+            }
+          } catch (erroItensOuMusicas) {
+            await supabase.from("escalas").delete().eq("id", inserted.id);
+            throw erroItensOuMusicas;
           }
           const nova: Escala = {
             id: inserted.id, ministerio, criadoPor: user?.id ?? "",

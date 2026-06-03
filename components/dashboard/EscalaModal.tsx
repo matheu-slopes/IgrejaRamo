@@ -58,6 +58,26 @@ function corBadge(culto: string) {
 }
 
 // ─── componente principal ─────────────────────────────────────────────────────
+function erroColunaConfirmacaoAusente(error: unknown): boolean {
+  const err = error as { message?: string } | null;
+  const message = String(err?.message ?? "").toLowerCase();
+  return message.includes("'confirmado' column") || message.includes("confirmado") && message.includes("schema cache");
+}
+
+function itemEscalaPayload(escalaId: string, item: ItemEscala, incluirConfirmacao: boolean) {
+  return {
+    escala_id: escalaId,
+    funcao: item.funcao,
+    voluntario_id: item.voluntarioId || null,
+    voluntario_nome: item.voluntarioNome,
+    observacao: item.observacao || null,
+    ...(incluirConfirmacao ? {
+      confirmado: item.confirmado ?? false,
+      confirmado_em: item.confirmadoEm ?? null,
+    } : {}),
+  };
+}
+
 interface Props {
   escala: Escala;
   podeEditar: boolean;
@@ -145,17 +165,15 @@ export function EscalaModal({ escala, podeEditar, onClose, onUpdate, onDelete }:
       const { error: errDelItens } = await supabase.from("escala_itens").delete().eq("escala_id", escala.id);
       if (errDelItens) throw new Error(errDelItens.message);
       if (form.itens.length > 0) {
-        const { error: errInsItens } = await supabase.from("escala_itens").insert(
-          form.itens.map((i) => ({
-            escala_id: escala.id,
-            funcao: i.funcao,
-            voluntario_id: i.voluntarioId || null,
-            voluntario_nome: i.voluntarioNome,
-            observacao: i.observacao || null,
-            confirmado: i.confirmado ?? false,
-            confirmado_em: i.confirmadoEm ?? null,
-          }))
-        );
+        let { error: errInsItens } = await supabase
+          .from("escala_itens")
+          .insert(form.itens.map((i) => itemEscalaPayload(escala.id, i, true)));
+        if (errInsItens && erroColunaConfirmacaoAusente(errInsItens)) {
+          const fallback = await supabase
+            .from("escala_itens")
+            .insert(form.itens.map((i) => itemEscalaPayload(escala.id, i, false)));
+          errInsItens = fallback.error;
+        }
         if (errInsItens) throw new Error(errInsItens.message);
       }
 
