@@ -251,6 +251,33 @@ function normalizeFuncaoParaDB(funcao: string, obs?: string): { funcao: string; 
   return { funcao, observacao: obs || null };
 }
 
+function chaveConfirmacao(item: ItemEscala): string {
+  return `${item.voluntarioId || item.voluntarioNome}::${displayFuncao(item)}`;
+}
+
+function aplicarConfirmacoes(
+  itens: ItemEscala[],
+  anteriores: ItemEscala[],
+  solicitaConfirmacao: boolean
+): ItemEscala[] {
+  if (!solicitaConfirmacao) {
+    return itens.map((item) => ({ ...item, confirmado: false, confirmadoEm: undefined }));
+  }
+
+  const confirmacoesAnteriores = new Map(
+    anteriores.map((item) => [chaveConfirmacao(item), item])
+  );
+
+  return itens.map((item) => {
+    const anterior = confirmacoesAnteriores.get(chaveConfirmacao(item));
+    return {
+      ...item,
+      confirmado: anterior?.confirmado ?? item.confirmado ?? false,
+      confirmadoEm: anterior?.confirmadoEm ?? item.confirmadoEm,
+    };
+  });
+}
+
 function formatHoraInput(value: string): string {
   const digits = value.replace(/\D/g, "").slice(0, 4);
   if (digits.length <= 2) return digits;
@@ -429,6 +456,8 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
           voluntarioId: (i.voluntario_id as string) ?? undefined,
           voluntarioNome: i.voluntario_nome as string,
           observacao: (i.observacao as string) ?? undefined,
+          confirmado: (i.confirmado as boolean) ?? false,
+          confirmadoEm: (i.confirmado_em as string) ?? undefined,
         })),
         musicas: ((e.escala_musicas as Record<string, unknown>[]) ?? [])
           .sort((a, b) => (a.ordem as number) - (b.ordem as number))
@@ -734,8 +763,9 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
       ? ([form.ageGroup, form.temaInfantil].filter(Boolean).join("|") || null)
       : buildObs(form.equipe, form.observacoes);
     try {
+      const escalaAnterior = editId ? escalas.find((e) => e.id === editId) : undefined;
+      itensFinais = aplicarConfirmacoes(itensFinais, escalaAnterior?.itens ?? [], form.confirmacaoParticipantes);
       if (editId) {
-        const escalaAnterior = escalas.find((e) => e.id === editId);
         const { error: upErr, data: upData } = await supabase.from("escalas").update({
           culto: form.culto, horario: horarioNormalizado, data: form.data,
           observacoes: obsDB,
@@ -751,7 +781,15 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
         if (itensFinais.length > 0) {
           const itensParaSalvar = itensFinais.map((i) => {
             const norm = normalizeFuncaoParaDB(i.funcao, i.observacao);
-            return { escala_id: editId, funcao: norm.funcao, voluntario_id: i.voluntarioId || null, voluntario_nome: i.voluntarioNome, observacao: norm.observacao };
+            return {
+              escala_id: editId,
+              funcao: norm.funcao,
+              voluntario_id: i.voluntarioId || null,
+              voluntario_nome: i.voluntarioNome,
+              observacao: norm.observacao,
+              confirmado: i.confirmado ?? false,
+              confirmado_em: i.confirmadoEm ?? null,
+            };
           });
           const { error: insItens, data: insData } = await supabase.from("escala_itens").insert(itensParaSalvar).select("id");
           if (insItens) throw new Error(insItens.message);
@@ -791,7 +829,15 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
             const { error: insItens } = await supabase.from("escala_itens").insert(
               itensFinais.map((i) => {
                 const norm = normalizeFuncaoParaDB(i.funcao, i.observacao);
-                return { escala_id: inserted.id, funcao: norm.funcao, voluntario_id: i.voluntarioId || null, voluntario_nome: i.voluntarioNome, observacao: norm.observacao };
+                return {
+                  escala_id: inserted.id,
+                  funcao: norm.funcao,
+                  voluntario_id: i.voluntarioId || null,
+                  voluntario_nome: i.voluntarioNome,
+                  observacao: norm.observacao,
+                  confirmado: i.confirmado ?? false,
+                  confirmado_em: i.confirmadoEm ?? null,
+                };
               })
             );
             if (insItens) throw new Error(insItens.message);
@@ -1773,15 +1819,17 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
             )}
             {(() => {
               // Agrupa participantes por pessoa (evita cards duplicados para quem tem múltiplas funções)
-              const grupos: { key: string; voluntarioId: string | undefined; voluntarioNome: string; funcoes: string[] }[] = [];
+              const grupos: { key: string; voluntarioId: string | undefined; voluntarioNome: string; funcoes: string[]; confirmado: boolean }[] = [];
               const vistos = new Map<string, number>();
               for (const it of form.itens) {
                 const k = it.voluntarioId ?? it.voluntarioNome;
                 if (vistos.has(k)) {
-                  grupos[vistos.get(k)!].funcoes.push(displayFuncao(it));
+                  const grupo = grupos[vistos.get(k)!];
+                  grupo.funcoes.push(displayFuncao(it));
+                  grupo.confirmado = grupo.confirmado && Boolean(it.confirmado);
                 } else {
                   vistos.set(k, grupos.length);
-                  grupos.push({ key: k, voluntarioId: it.voluntarioId, voluntarioNome: it.voluntarioNome, funcoes: [displayFuncao(it)] });
+                  grupos.push({ key: k, voluntarioId: it.voluntarioId, voluntarioNome: it.voluntarioNome, funcoes: [displayFuncao(it)], confirmado: Boolean(it.confirmado) });
                 }
               }
               return grupos.map((grp) => (
@@ -1856,6 +1904,16 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
                         <p className="text-sm font-semibold text-gray-800">{grp.voluntarioNome}</p>
                         {!funcaoFixaOculta && (
                           <p className="text-xs text-grape-700 font-medium">{grp.funcoes.join(" · ")}</p>
+                        )}
+                        {form.confirmacaoParticipantes && (
+                          <span className={clsx(
+                            "inline-flex mt-1 text-[11px] font-bold px-2 py-0.5 rounded-full border",
+                            grp.confirmado
+                              ? "bg-green-50 text-green-700 border-green-100"
+                              : "bg-amber-50 text-amber-700 border-amber-100"
+                          )}>
+                            {grp.confirmado ? "Confirmado" : "Pendente"}
+                          </span>
                         )}
                       </div>
                       <div className="flex items-center gap-1">

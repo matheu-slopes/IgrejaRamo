@@ -105,6 +105,8 @@ export interface ItemEscala {
   voluntarioId: string;
   voluntarioNome: string;
   observacao?: string;
+  confirmado?: boolean;
+  confirmadoEm?: string;
 }
 
 // Música do repertório

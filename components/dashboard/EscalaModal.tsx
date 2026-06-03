@@ -84,6 +84,7 @@ export function EscalaModal({ escala, podeEditar, onClose, onUpdate, onDelete }:
   const [novaMusica, setNovaMusica] = useState({ titulo: "", artista: "", tom: "" });
   const [savingNova, setSavingNova] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [confirming, setConfirming] = useState(false);
   const [salvarErro, setSalvarErro] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
   const backdropRef = useRef<HTMLDivElement>(null);
@@ -151,6 +152,8 @@ export function EscalaModal({ escala, podeEditar, onClose, onUpdate, onDelete }:
             voluntario_id: i.voluntarioId || null,
             voluntario_nome: i.voluntarioNome,
             observacao: i.observacao || null,
+            confirmado: i.confirmado ?? false,
+            confirmado_em: i.confirmadoEm ?? null,
           }))
         );
         if (errInsItens) throw new Error(errInsItens.message);
@@ -199,6 +202,40 @@ export function EscalaModal({ escala, podeEditar, onClose, onUpdate, onDelete }:
     }));
     setNovoMembroId("");
     setNovaObs("");
+  }
+
+  async function confirmarMinhaEscala() {
+    if (!user?.id || confirming) return;
+    setConfirming(true);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      if (!token) throw new Error("Sessão expirada. Entre novamente.");
+
+      const res = await fetch("/api/escalas/confirmar", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ escalaId: escala.id }),
+      });
+      const data = await res.json().catch(() => null) as { confirmadoEm?: string; error?: string } | null;
+      if (!res.ok) throw new Error(data?.error ?? "Não foi possível confirmar a escala.");
+
+      const confirmadoEm = data?.confirmadoEm ?? new Date().toISOString();
+      const updated: Escala = {
+        ...escala,
+        itens: escala.itens.map((item) => item.voluntarioId === user.id
+          ? { ...item, confirmado: true, confirmadoEm }
+          : item),
+      };
+      onUpdate(updated);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Não foi possível confirmar a escala.");
+    } finally {
+      setConfirming(false);
+    }
   }
 
   // ── músicas ──────────────────────────────────────────────────────────────────
@@ -356,6 +393,38 @@ export function EscalaModal({ escala, podeEditar, onClose, onUpdate, onDelete }:
           {/* ══ VIEW MODE ══════════════════════════════════════════════════════ */}
           {mode === "view" && (
             <div className="px-6 py-5 space-y-6">
+              {(() => {
+                const minhasFuncoes = escala.itens.filter((it) => it.voluntarioId === user?.id);
+                if (!escala.confirmacaoParticipantes || minhasFuncoes.length === 0) return null;
+                const confirmado = minhasFuncoes.every((it) => it.confirmado);
+                return (
+                  <div className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-bold text-gray-800">
+                        {confirmado ? "Sua escala está confirmada" : "Confirme sua participação"}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {confirmado ? "O líder já consegue ver sua confirmação." : "Confirme para o líder saber que você viu e pode servir."}
+                      </p>
+                    </div>
+                    {confirmado ? (
+                      <span className="self-start sm:self-auto text-xs font-bold text-green-700 bg-green-50 border border-green-100 px-3 py-1 rounded-full">
+                        Confirmado
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={confirmarMinhaEscala}
+                        disabled={confirming}
+                        className="self-start sm:self-auto text-xs font-bold bg-black text-white px-4 py-2 rounded-xl disabled:opacity-50"
+                      >
+                        {confirming ? "Confirmando..." : "Confirmar escala"}
+                      </button>
+                    )}
+                  </div>
+                );
+              })()}
+
               {/* Participantes */}
               {escala.itens.length > 0 ? (
                 <div className="space-y-2">

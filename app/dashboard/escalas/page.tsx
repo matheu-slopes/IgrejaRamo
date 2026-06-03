@@ -10,7 +10,7 @@ import { store, STORE_KEYS } from "@/lib/dataStore";
 import { useAppRefresh } from "@/hooks/useAppRefresh";
 import {
   ChevronLeft, ChevronRight, ChevronDown, ChevronUp,
-  Music2, Users, Calendar, Star, Settings2, ClipboardCopy, Check,
+  Music2, Users, Calendar, Star, Settings2, ClipboardCopy, Check, UserCheck,
 } from "lucide-react";
 import clsx from "clsx";
 
@@ -32,17 +32,26 @@ const showFuncao = (it: { funcao: string; observacao?: string }) => {
 
 // Agrupa itens de escala por pessoa, retornando funções concatenadas
 function agruparItens(itens: Escala["itens"]) {
-  const grupos: { key: string; voluntarioId?: string; voluntarioNome: string; funcoes: string[]; observacao?: string }[] = [];
+  const grupos: { key: string; voluntarioId?: string; voluntarioNome: string; funcoes: string[]; observacao?: string; confirmado: boolean }[] = [];
   const vistos = new Map<string, number>();
   for (const it of itens) {
     const k = it.voluntarioId ?? it.voluntarioNome;
     const funcaoDisplay = showFuncao(it);
     if (vistos.has(k)) {
-      grupos[vistos.get(k)!].funcoes.push(funcaoDisplay);
+      const grupo = grupos[vistos.get(k)!];
+      grupo.funcoes.push(funcaoDisplay);
+      grupo.confirmado = grupo.confirmado && Boolean(it.confirmado);
     } else {
       vistos.set(k, grupos.length);
       const obs = it.observacao && !["Cajón", "Pandeiro", "Violão"].includes(it.observacao) ? it.observacao : undefined;
-      grupos.push({ key: k, voluntarioId: it.voluntarioId, voluntarioNome: it.voluntarioNome, funcoes: [funcaoDisplay], observacao: obs });
+      grupos.push({
+        key: k,
+        voluntarioId: it.voluntarioId,
+        voluntarioNome: it.voluntarioNome,
+        funcoes: [funcaoDisplay],
+        observacao: obs,
+        confirmado: Boolean(it.confirmado),
+      });
     }
   }
   // Ministro sempre primeiro
@@ -91,6 +100,8 @@ function parseEscala(e: Record<string, unknown>): Escala {
       voluntarioId: (i.voluntario_id as string) ?? undefined,
       voluntarioNome: i.voluntario_nome as string,
       observacao: (i.observacao as string) ?? undefined,
+      confirmado: (i.confirmado as boolean) ?? false,
+      confirmadoEm: (i.confirmado_em as string) ?? undefined,
     })),
     musicas: ((e.escala_musicas as Record<string, unknown>[]) ?? [])
       .sort((a, b) => (a.ordem as number) - (b.ordem as number))
@@ -227,14 +238,63 @@ function MusicasSection({ musicas }: { musicas: EscalaMusica[] }) {
 
 // ─── Seção de um ministério dentro do CultoCard ───────────────────────────────
 
+function ConfirmacaoEscalaPanel({
+  escala, userId, onConfirmar, confirmando,
+}: {
+  escala: Escala;
+  userId: string;
+  onConfirmar: (escalaId: string) => void;
+  confirmando: boolean;
+}) {
+  const minhasFuncoes = escala.itens.filter((it) => it.voluntarioId === userId);
+  if (!escala.confirmacaoParticipantes || minhasFuncoes.length === 0) return null;
+
+  const confirmado = minhasFuncoes.every((it) => it.confirmado);
+
+  return (
+    <div className="mt-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-xl border border-gray-100 bg-gray-50 px-3 py-2">
+      <div className="flex items-center gap-2">
+        <UserCheck className={clsx("w-4 h-4", confirmado ? "text-green-600" : "text-amber-600")} />
+        <div>
+          <p className="text-xs font-bold text-gray-800">
+            {confirmado ? "Participação confirmada" : "Confirme sua participação"}
+          </p>
+          <p className="text-[11px] text-gray-500">
+            {confirmado ? "O líder já consegue ver que você confirmou." : "Avise pelo sistema que você viu e pode servir."}
+          </p>
+        </div>
+      </div>
+      {confirmado ? (
+        <span className="self-start sm:self-auto text-[11px] font-bold text-green-700 bg-green-50 border border-green-100 px-2 py-1 rounded-full">
+          Confirmado
+        </span>
+      ) : (
+        <button
+          type="button"
+          disabled={confirmando}
+          onClick={(e) => {
+            e.stopPropagation();
+            onConfirmar(escala.id);
+          }}
+          className="self-start sm:self-auto text-xs font-bold bg-black text-white px-3 py-1.5 rounded-lg disabled:opacity-50"
+        >
+          {confirmando ? "Confirmando..." : "Confirmar escala"}
+        </button>
+      )}
+    </div>
+  );
+}
+
 function MinisterioSection({
-  ministerio, escala, userId, isLider, onGerenciar,
+  ministerio, escala, userId, isLider, onGerenciar, onConfirmar, confirmando,
 }: {
   ministerio: Ministerio;
   escala: Escala;
   userId: string;
   isLider: boolean;
   onGerenciar: () => void;
+  onConfirmar: (escalaId: string) => void;
+  confirmando: boolean;
 }) {
   const [open, setOpen] = useState(true);
   const temMinha = escala.itens.some((it) => it.voluntarioId === userId);
@@ -324,6 +384,12 @@ function MinisterioSection({
               })}
             </div>
           )}
+          <ConfirmacaoEscalaPanel
+            escala={escala}
+            userId={userId}
+            onConfirmar={onConfirmar}
+            confirmando={confirmando}
+          />
         </div>
       )}
     </div>
@@ -333,12 +399,14 @@ function MinisterioSection({
 // ─── Seção unificada do Infantil (uma só, com sub-seções por faixa etária) ────
 
 function InfantilSection({
-  escalas, userId, isLider, onGerenciar,
+  escalas, userId, isLider, onGerenciar, onConfirmar, confirmandoIds,
 }: {
   escalas: Escala[];
   userId: string;
   isLider: boolean;
   onGerenciar: () => void;
+  onConfirmar: (escalaId: string) => void;
+  confirmandoIds: Set<string>;
 }) {
   const [open, setOpen] = useState(true);
   const temMinha = escalas.some((e) => e.itens.some((it) => it.voluntarioId === userId));
@@ -431,6 +499,14 @@ function InfantilSection({
                     })}
                   </div>
                 )}
+                <div className="px-3 pb-2">
+                  <ConfirmacaoEscalaPanel
+                    escala={esc}
+                    userId={userId}
+                    onConfirmar={onConfirmar}
+                    confirmando={confirmandoIds.has(esc.id)}
+                  />
+                </div>
               </div>
             );
           })}
@@ -443,13 +519,15 @@ function InfantilSection({
 // ─── Card de um culto (agrupa todos os ministérios) ───────────────────────────
 
 function CultoCard({
-  data, escalas, userId, isLider, onGerenciarMinisterio,
+  data, escalas, userId, isLider, onGerenciarMinisterio, onConfirmar, confirmandoIds,
 }: {
   data: string;
   escalas: Escala[];
   userId: string;
   isLider: boolean;
   onGerenciarMinisterio: (m: Ministerio) => void;
+  onConfirmar: (escalaId: string) => void;
+  confirmandoIds: Set<string>;
 }) {
   const d = new Date(data + "T00:00:00");
   const hojeStr = new Date().toISOString().split("T")[0];
@@ -529,6 +607,8 @@ function CultoCard({
                   userId={userId}
                   isLider={isLider}
                   onGerenciar={() => onGerenciarMinisterio("Infantil")}
+                  onConfirmar={onConfirmar}
+                  confirmandoIds={confirmandoIds}
                 />
               );
             }
@@ -542,6 +622,8 @@ function CultoCard({
                   userId={userId}
                   isLider={isLider}
                   onGerenciar={() => onGerenciarMinisterio(min)}
+                  onConfirmar={onConfirmar}
+                  confirmando={confirmandoIds.has(escala.id)}
                 />
                 {min === "Louvor" && (escala.musicas ?? []).length > 0 && (
                   <MusicasSection musicas={escala.musicas ?? []} />
@@ -577,6 +659,8 @@ function MinhasEscalasList({
         const d = new Date(esc.data + "T00:00:00");
         const isDomingo = d.getDay() === 0;
         const minhasFuncoes = esc.itens.filter((it) => it.voluntarioId === userId);
+        const precisaConfirmar = esc.confirmacaoParticipantes && minhasFuncoes.length > 0;
+        const confirmado = precisaConfirmar && minhasFuncoes.every((it) => it.confirmado);
         return (
           <button
             key={esc.id}
@@ -608,6 +692,11 @@ function MinhasEscalasList({
               </div>
               <p className="text-sm font-bold text-gray-800">{esc.culto}</p>
               <p className="text-xs text-gray-400">{esc.horario.slice(0, 5)}</p>
+              {precisaConfirmar && (
+                <p className={clsx("text-[11px] font-bold mt-1", confirmado ? "text-green-600" : "text-amber-600")}>
+                  {confirmado ? "Confirmado" : "Confirmação pendente"}
+                </p>
+              )}
             </div>
 
             <div className="flex flex-col items-end gap-1 shrink-0">
@@ -642,6 +731,7 @@ export default function EscalasDashboardPage() {
   const [aba, setAba] = useState<"minhas" | "culto">("culto");
   const [visaoMes, setVisaoMes] = useState(false);
   const [semanaBase, setSemanaBase] = useState(() => semanaInicio(new Date()));
+  const [confirmandoIds, setConfirmandoIds] = useState<Set<string>>(new Set());
   const fetchSeqRef = useRef(0);
 
   const hojeStr = new Date().toISOString().split("T")[0];
@@ -752,6 +842,57 @@ export default function EscalasDashboardPage() {
   );
 
   const isLider = isAdmin || temPermissao("criar_escala");
+
+  const confirmarEscala = useCallback(async (escalaId: string) => {
+    if (!user?.id || confirmandoIds.has(escalaId)) return;
+    setConfirmandoIds((prev) => new Set(prev).add(escalaId));
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      if (!token) throw new Error("Sessão expirada. Entre novamente.");
+
+      const res = await fetch("/api/escalas/confirmar", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ escalaId }),
+      });
+      const data = await res.json().catch(() => null) as { confirmadoEm?: string; error?: string } | null;
+      if (!res.ok) throw new Error(data?.error ?? "Não foi possível confirmar a escala.");
+
+      const confirmadoEm = data?.confirmadoEm ?? new Date().toISOString();
+      setTodasEscalas((prev) => {
+        const updated = prev.map((escala) => escala.id === escalaId
+          ? {
+              ...escala,
+              itens: escala.itens.map((item) => item.voluntarioId === user.id
+                ? { ...item, confirmado: true, confirmadoEm }
+                : item),
+            }
+          : escala);
+        store.set(STORE_KEYS.ESCALAS_TODAS, updated);
+        return updated;
+      });
+      setModalEscala((prev) => prev && prev.id === escalaId
+        ? {
+            ...prev,
+            itens: prev.itens.map((item) => item.voluntarioId === user.id
+              ? { ...item, confirmado: true, confirmadoEm }
+              : item),
+          }
+        : prev);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Não foi possível confirmar a escala.");
+    } finally {
+      setConfirmandoIds((prev) => {
+        const next = new Set(prev);
+        next.delete(escalaId);
+        return next;
+      });
+    }
+  }, [confirmandoIds, user?.id]);
 
   // ── Modo de edição por ministério ──────────────────────────────────────────
   if (editing) {
@@ -931,6 +1072,8 @@ export default function EscalasDashboardPage() {
                       userId={user?.id ?? ""}
                       isLider={isLider}
                       onGerenciarMinisterio={setEditing}
+                      onConfirmar={confirmarEscala}
+                      confirmandoIds={confirmandoIds}
                     />
                   ))}
                 </div>

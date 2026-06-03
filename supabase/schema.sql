@@ -187,7 +187,9 @@ CREATE TABLE escala_itens (
   funcao          funcao_escala NOT NULL,
   voluntario_id   UUID          REFERENCES perfis(id),
   voluntario_nome TEXT          NOT NULL,
-  observacao      TEXT
+  observacao      TEXT,
+  confirmado      BOOLEAN       NOT NULL DEFAULT FALSE,
+  confirmado_em   TIMESTAMPTZ
 );
 
 -- Músicas de uma escala (com tom específico para aquele culto)

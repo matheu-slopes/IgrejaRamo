@@ -1,0 +1,57 @@
+import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
+
+const admin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
+
+async function authUser(req: NextRequest) {
+  const token = req.headers.get("authorization")?.replace("Bearer ", "").trim();
+  if (!token) return null;
+  const { data: { user } } = await admin.auth.getUser(token);
+  return user ?? null;
+}
+
+export async function POST(req: NextRequest) {
+  const user = await authUser(req);
+  if (!user) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+
+  const body = await req.json().catch(() => null) as { escalaId?: string } | null;
+  const escalaId = body?.escalaId;
+  if (!escalaId) return NextResponse.json({ error: "Escala não informada" }, { status: 400 });
+
+  const { data: escala, error: escalaErr } = await admin
+    .from("escalas")
+    .select("id, confirmacao_participantes")
+    .eq("id", escalaId)
+    .maybeSingle();
+
+  if (escalaErr) return NextResponse.json({ error: escalaErr.message }, { status: 500 });
+  if (!escala) return NextResponse.json({ error: "Escala não encontrada" }, { status: 404 });
+  if (!escala.confirmacao_participantes) {
+    return NextResponse.json({ error: "Esta escala não solicita confirmação" }, { status: 400 });
+  }
+
+  const { data: itens, error: itensErr } = await admin
+    .from("escala_itens")
+    .select("id")
+    .eq("escala_id", escalaId)
+    .eq("voluntario_id", user.id);
+
+  if (itensErr) return NextResponse.json({ error: itensErr.message }, { status: 500 });
+  if (!itens?.length) {
+    return NextResponse.json({ error: "Você não está nesta escala" }, { status: 403 });
+  }
+
+  const confirmadoEm = new Date().toISOString();
+  const { error: updateErr } = await admin
+    .from("escala_itens")
+    .update({ confirmado: true, confirmado_em: confirmadoEm })
+    .eq("escala_id", escalaId)
+    .eq("voluntario_id", user.id);
+
+  if (updateErr) return NextResponse.json({ error: updateErr.message }, { status: 500 });
+
+  return NextResponse.json({ ok: true, confirmadoEm });
+}
