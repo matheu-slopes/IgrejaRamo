@@ -167,23 +167,14 @@ export default function Sidebar() {
                 )}
                 {hasPendingBadge && (
                   <span
-                    className="absolute -bottom-1.5 -right-1.5 min-w-[14px] h-[14px] rounded-full bg-amber-400 text-amber-950 text-[9px] font-black flex items-center justify-center px-0.5 border border-vine-900"
+                    className="absolute -bottom-1 -right-2 min-w-[15px] h-[15px] rounded-full bg-amber-400 text-amber-950 text-[9px] font-black flex items-center justify-center px-0.5 ring-2 ring-vine-900 shadow-sm"
                     title={`${escalasPendentes} resposta${escalasPendentes > 1 ? "s" : ""} pendente${escalasPendentes > 1 ? "s" : ""}`}
                   >
                     {escalasPendentes > 99 ? "99+" : escalasPendentes}
                   </span>
                 )}
               </div>
-              {!collapsed && (
-                <span className="flex items-center gap-1.5 min-w-0">
-                  <span>{label}</span>
-                  {hasPendingBadge && (
-                    <span className="rounded-full bg-amber-400/95 text-amber-950 text-[10px] font-black px-1.5 py-0.5 leading-none">
-                      pendente
-                    </span>
-                  )}
-                </span>
-              )}
+              {!collapsed && <span>{label}</span>}
             </Link>
           );
         })}
