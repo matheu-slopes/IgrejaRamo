@@ -5,6 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import {
   Plus, Trash2, Pencil, X, Save, Music2, Users, Eye, EyeOff, UserCheck,
   ChevronUp as ArrowUp, ChevronDown as ArrowDown, Star, Filter, Search, Youtube, ClipboardCopy, Check, ChevronLeft,
+  CheckCircle2, XCircle, Clock3,
 } from "lucide-react";
 import clsx from "clsx";
 import {
@@ -315,9 +316,107 @@ function itemEscalaPayload(escalaId: string, item: ItemEscala, incluirConfirmaca
   };
 }
 
-function statusConfirmacaoItem(item: { confirmado?: boolean; confirmacaoStatus?: string }) {
-  if (item.confirmacaoStatus) return item.confirmacaoStatus;
+type StatusConfirmacao = "pendente" | "confirmado" | "recusado";
+
+function statusConfirmacaoItem(item: { confirmado?: boolean; confirmacaoStatus?: string }): StatusConfirmacao {
+  if (item.confirmacaoStatus === "confirmado" || item.confirmacaoStatus === "recusado" || item.confirmacaoStatus === "pendente") {
+    return item.confirmacaoStatus;
+  }
   return item.confirmado ? "confirmado" : "pendente";
+}
+
+function statusConfirmacaoGrupo(statusAtual: StatusConfirmacao, novoStatus: StatusConfirmacao): StatusConfirmacao {
+  if (statusAtual === "recusado" || novoStatus === "recusado") return "recusado";
+  if (statusAtual === "pendente" || novoStatus === "pendente") return "pendente";
+  return "confirmado";
+}
+
+function statusConfirmacaoPorPessoa(itens: ItemEscala[]) {
+  const pessoas = new Map<string, StatusConfirmacao>();
+
+  for (const item of itens) {
+    const key = item.voluntarioId ?? item.voluntarioNome;
+    const status = statusConfirmacaoItem(item);
+    const atual = pessoas.get(key);
+    pessoas.set(key, atual ? statusConfirmacaoGrupo(atual, status) : status);
+  }
+
+  return pessoas;
+}
+
+function resumoConfirmacaoItens(itens: ItemEscala[]) {
+  const pessoas = statusConfirmacaoPorPessoa(itens);
+
+  return Array.from(pessoas.values()).reduce(
+    (acc, status) => {
+      acc[status] += 1;
+      return acc;
+    },
+    { confirmado: 0, pendente: 0, recusado: 0 } as Record<StatusConfirmacao, number>
+  );
+}
+
+function StatusConfirmacaoBadge({ status, className, compact = false }: { status: StatusConfirmacao; className?: string; compact?: boolean }) {
+  const sizeClass = compact ? "w-3.5 h-3.5" : "w-5 h-5";
+  const iconClass = compact ? "w-2.5 h-2.5" : "w-3.5 h-3.5";
+
+  if (status === "confirmado") {
+    return (
+      <span
+        className={clsx("inline-flex items-center justify-center rounded-full bg-green-50 text-green-700 border border-green-100", sizeClass, className)}
+        title="Confirmado"
+        aria-label="Confirmado"
+      >
+        <CheckCircle2 className={iconClass} />
+      </span>
+    );
+  }
+
+  if (status === "recusado") {
+    return (
+      <span
+        className={clsx("inline-flex items-center justify-center rounded-full bg-red-50 text-red-700 border border-red-100", sizeClass, className)}
+        title="Não consegue"
+        aria-label="Não consegue"
+      >
+        <XCircle className={iconClass} />
+      </span>
+    );
+  }
+
+  return (
+    <span
+      className={clsx("inline-flex items-center justify-center rounded-full bg-amber-50 text-amber-700 border border-amber-100", sizeClass, className)}
+      title="Pendente"
+      aria-label="Pendente"
+    >
+      <Clock3 className={iconClass} />
+    </span>
+  );
+}
+
+function ResumoConfirmacaoEscala({ itens }: { itens: ItemEscala[] }) {
+  const resumo = resumoConfirmacaoItens(itens);
+  const total = resumo.confirmado + resumo.pendente + resumo.recusado;
+
+  if (!total) return null;
+
+  return (
+    <div className="flex flex-wrap items-center gap-1" title="Resumo das confirmações">
+      <span className="inline-flex items-center gap-1 rounded-full bg-green-50 text-green-700 border border-green-100 px-1.5 py-0.5 text-[10px] font-bold" title="Confirmados">
+        <CheckCircle2 className="w-3 h-3" />
+        {resumo.confirmado}
+      </span>
+      <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 text-amber-700 border border-amber-100 px-1.5 py-0.5 text-[10px] font-bold" title="Pendentes">
+        <Clock3 className="w-3 h-3" />
+        {resumo.pendente}
+      </span>
+      <span className="inline-flex items-center gap-1 rounded-full bg-red-50 text-red-700 border border-red-100 px-1.5 py-0.5 text-[10px] font-bold" title="Não conseguem">
+        <XCircle className="w-3 h-3" />
+        {resumo.recusado}
+      </span>
+    </div>
+  );
 }
 
 function formatHoraInput(value: string): string {
@@ -1256,25 +1355,35 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
                 }
               </div>
               <p className="text-xs text-gray-400">{esc.horario}</p>
+              {isLider && esc.confirmacaoParticipantes && (
+                <ResumoConfirmacaoEscala itens={esc.itens} />
+              )}
               {esc.itens.length > 0 && !equipeLabel && (() => {
                 const pessoasUnicas = Array.from(
                   new Map(esc.itens.map((it) => [it.voluntarioId ?? it.voluntarioNome, it])).values()
                 );
+                const statusPorPessoa = statusConfirmacaoPorPessoa(esc.itens);
                 return (
                   <div className="flex flex-wrap gap-1">
-                    {pessoasUnicas.slice(0, 4).map((it) => (
-                      <span
-                        key={it.voluntarioId ?? it.voluntarioNome}
-                        className={clsx(
-                          "text-[10px] px-1.5 py-0.5 rounded font-medium",
-                          it.voluntarioId === user?.id
-                            ? "bg-gray-200 text-black"
-                            : "bg-gray-100 text-gray-600"
-                        )}
-                      >
-                        {it.voluntarioNome.split(" ")[0]}
-                      </span>
-                    ))}
+                    {pessoasUnicas.slice(0, 4).map((it) => {
+                      const pessoaKey = it.voluntarioId ?? it.voluntarioNome;
+                      return (
+                        <span
+                          key={pessoaKey}
+                          className={clsx(
+                            "inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded font-medium",
+                            it.voluntarioId === user?.id
+                              ? "bg-gray-200 text-black"
+                              : "bg-gray-100 text-gray-600"
+                          )}
+                        >
+                          {isLider && esc.confirmacaoParticipantes && (
+                            <StatusConfirmacaoBadge status={statusPorPessoa.get(pessoaKey) ?? "pendente"} compact />
+                          )}
+                          {it.voluntarioNome.split(" ")[0]}
+                        </span>
+                      );
+                    })}
                     {pessoasUnicas.length > 4 && (
                       <span className="text-[10px] text-gray-400">+{pessoasUnicas.length - 4}</span>
                     )}
@@ -1517,16 +1626,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
                                     <p className="text-xs text-gray-400 font-normal mt-0.5">{grp.observacao}</p>
                                   )}
                                   {isLider && selectedEscala.confirmacaoParticipantes && (
-                                    <span className={clsx(
-                                      "inline-flex mt-1 text-[11px] font-bold px-2 py-0.5 rounded-full border",
-                                      grp.status === "confirmado"
-                                        ? "bg-green-50 text-green-700 border-green-100"
-                                        : grp.status === "recusado"
-                                          ? "bg-red-50 text-red-700 border-red-100"
-                                          : "bg-amber-50 text-amber-700 border-amber-100"
-                                    )}>
-                                      {grp.status === "confirmado" ? "Confirmado" : grp.status === "recusado" ? "Não consegue" : "Pendente"}
-                                    </span>
+                                    <StatusConfirmacaoBadge status={grp.status} className="ml-1.5 align-middle" />
                                   )}
                                 </td>
                               </tr>
@@ -2020,16 +2120,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
                           <p className="text-xs text-grape-700 font-medium">{grp.funcoes.join(" · ")}</p>
                         )}
                         {form.confirmacaoParticipantes && (
-                          <span className={clsx(
-                            "inline-flex mt-1 text-[11px] font-bold px-2 py-0.5 rounded-full border",
-                            grp.status === "confirmado"
-                              ? "bg-green-50 text-green-700 border-green-100"
-                              : grp.status === "recusado"
-                                ? "bg-red-50 text-red-700 border-red-100"
-                              : "bg-amber-50 text-amber-700 border-amber-100"
-                          )}>
-                            {grp.status === "confirmado" ? "Confirmado" : grp.status === "recusado" ? "Não consegue" : "Pendente"}
-                          </span>
+                          <StatusConfirmacaoBadge status={grp.status} className="mt-1" />
                         )}
                       </div>
                       <div className="flex items-center gap-1">
