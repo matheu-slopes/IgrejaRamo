@@ -149,6 +149,15 @@ export function formatDateSimples(iso: string) {
   return d.toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "short" });
 }
 
+function dataJaUsadaNoMinisterio(
+  escala: Escala,
+  data: string,
+  culto: string,
+  editId?: string | null
+): boolean {
+  return escala.id !== editId && escala.data === data && escala.culto === culto;
+}
+
 // --- Types --------------------------------------------------------------------
 
 type EscalaSubTab = "detalhes" | "participantes" | "musicas" | "roteiro";
@@ -1607,6 +1616,11 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
   const templatesEncontro = templatesPorMinisterio(ministerio);
   const templateSelecionado = templatesEncontro.find((t) => t.label === form.culto);
   const labelsPredefinidos = templatesEncontro.filter((t) => t.id !== "especial").map((t) => t.label);
+  const datasSugeridasDisponiveis = templateSelecionado?.diaSemana !== null && templateSelecionado?.diaSemana !== undefined
+    ? proximasDatas(templateSelecionado.diaSemana, 10)
+        .filter((iso) => !escalas.some((esc) => dataJaUsadaNoMinisterio(esc, iso, templateSelecionado.label, editId)))
+        .slice(0, 6)
+    : [];
 
   return (
     <div className="space-y-4">
@@ -1688,12 +1702,15 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
                 <button
                   key={t.id}
                   onClick={() => {
-                    const primeiraData = t.diaSemana !== null ? proximasDatas(t.diaSemana, 1)[0] : "";
+                    const proximaDataLivre = t.diaSemana !== null
+                      ? proximasDatas(t.diaSemana, 10)
+                          .find((iso) => !escalas.some((esc) => dataJaUsadaNoMinisterio(esc, iso, t.label, editId))) ?? ""
+                      : "";
                     setForm((f) => ({
                       ...f,
                       culto: isOutro ? "" : t.label,
                       horario: t.horario,
-                      data: f.data || primeiraData,
+                      data: isOutro ? f.data : proximaDataLivre || f.data,
                     }));
                   }}
                   className={clsx(
@@ -1710,7 +1727,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
             <div>
               <p className="text-xs text-gray-400 mb-2 font-semibold uppercase tracking-widest">Escolher data</p>
               <div className="flex flex-wrap gap-2">
-                {proximasDatas(templateSelecionado.diaSemana, 6).map((iso) => (
+                {datasSugeridasDisponiveis.map((iso) => (
                   <button
                     key={iso}
                     onClick={() => setForm((f) => ({ ...f, data: iso }))}
@@ -1723,6 +1740,11 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
                   >{formatDateSimples(iso)}</button>
                 ))}
               </div>
+              {datasSugeridasDisponiveis.length === 0 && (
+                <p className="text-xs text-gray-400">
+                  Todas as próximas datas sugeridas já têm escala criada para {ministerio}.
+                </p>
+              )}
             </div>
           )}
 
