@@ -13,6 +13,12 @@ async function authUser(req: NextRequest) {
   return user ?? null;
 }
 
+function erroColunaConfirmacaoAusente(error: unknown): boolean {
+  const err = error as { message?: string } | null;
+  const message = String(err?.message ?? "").toLowerCase();
+  return message.includes("'confirmado' column") || message.includes("confirmado") && message.includes("schema cache");
+}
+
 export async function POST(req: NextRequest) {
   const user = await authUser(req);
   if (!user) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
@@ -51,7 +57,14 @@ export async function POST(req: NextRequest) {
     .eq("escala_id", escalaId)
     .eq("voluntario_id", user.id);
 
-  if (updateErr) return NextResponse.json({ error: updateErr.message }, { status: 500 });
+  if (updateErr) {
+    if (erroColunaConfirmacaoAusente(updateErr)) {
+      return NextResponse.json({
+        error: "A confirmação ainda precisa ser ativada no banco. Aplique a migration de confirmação no Supabase e tente novamente.",
+      }, { status: 503 });
+    }
+    return NextResponse.json({ error: updateErr.message }, { status: 500 });
+  }
 
   return NextResponse.json({ ok: true, confirmadoEm });
 }
