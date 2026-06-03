@@ -344,18 +344,6 @@ function statusConfirmacaoPorPessoa(itens: ItemEscala[]) {
   return pessoas;
 }
 
-function resumoConfirmacaoItens(itens: ItemEscala[]) {
-  const pessoas = statusConfirmacaoPorPessoa(itens);
-
-  return Array.from(pessoas.values()).reduce(
-    (acc, status) => {
-      acc[status] += 1;
-      return acc;
-    },
-    { confirmado: 0, pendente: 0, recusado: 0 } as Record<StatusConfirmacao, number>
-  );
-}
-
 function StatusConfirmacaoBadge({ status, className, compact = false }: { status: StatusConfirmacao; className?: string; compact?: boolean }) {
   const sizeClass = compact ? "w-3.5 h-3.5" : "w-5 h-5";
   const iconClass = compact ? "w-2.5 h-2.5" : "w-3.5 h-3.5";
@@ -395,28 +383,10 @@ function StatusConfirmacaoBadge({ status, className, compact = false }: { status
   );
 }
 
-function ResumoConfirmacaoEscala({ itens }: { itens: ItemEscala[] }) {
-  const resumo = resumoConfirmacaoItens(itens);
-  const total = resumo.confirmado + resumo.pendente + resumo.recusado;
-
-  if (!total) return null;
-
-  return (
-    <div className="flex flex-wrap items-center gap-1" title="Resumo das confirmações">
-      <span className="inline-flex items-center gap-1 rounded-full bg-green-50 text-green-700 border border-green-100 px-1.5 py-0.5 text-[10px] font-bold" title="Confirmados">
-        <CheckCircle2 className="w-3 h-3" />
-        {resumo.confirmado}
-      </span>
-      <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 text-amber-700 border border-amber-100 px-1.5 py-0.5 text-[10px] font-bold" title="Pendentes">
-        <Clock3 className="w-3 h-3" />
-        {resumo.pendente}
-      </span>
-      <span className="inline-flex items-center gap-1 rounded-full bg-red-50 text-red-700 border border-red-100 px-1.5 py-0.5 text-[10px] font-bold" title="Não conseguem">
-        <XCircle className="w-3 h-3" />
-        {resumo.recusado}
-      </span>
-    </div>
-  );
+function nomeCurtoPessoa(nome: string) {
+  const partes = nome.trim().split(/\s+/).filter(Boolean);
+  if (partes.length <= 2) return partes.join(" ");
+  return `${partes[0]} ${partes[partes.length - 1]}`;
 }
 
 function formatHoraInput(value: string): string {
@@ -1355,9 +1325,6 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
                 }
               </div>
               <p className="text-xs text-gray-400">{esc.horario}</p>
-              {isLider && esc.confirmacaoParticipantes && (
-                <ResumoConfirmacaoEscala itens={esc.itens} />
-              )}
               {esc.itens.length > 0 && !equipeLabel && (() => {
                 const pessoasUnicas = Array.from(
                   new Map(esc.itens.map((it) => [it.voluntarioId ?? it.voluntarioNome, it])).values()
@@ -1380,7 +1347,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
                           {isLider && esc.confirmacaoParticipantes && (
                             <StatusConfirmacaoBadge status={statusPorPessoa.get(pessoaKey) ?? "pendente"} compact />
                           )}
-                          {it.voluntarioNome.split(" ")[0]}
+                          {nomeCurtoPessoa(it.voluntarioNome)}
                         </span>
                       );
                     })}
