@@ -408,6 +408,8 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
   const [escalas, setEscalas] = useState<Escala[]>([]);
   const [musicas, setMusicas] = useState<Musica[]>([]);
   const fetchSeqRef = useRef(0);
+  const escalasExcluidasRef = useRef<Set<string>>(new Set());
+  const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const syncChannelRef = useRef<any>(null);
 
@@ -462,7 +464,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
     if (escalasRes.error) {
       console.error("Erro ao carregar escalas do ministério:", escalasRes.error.message);
     } else {
-      setEscalas((escalasRes.data ?? []).map((e: Record<string, unknown>) => ({
+      const escalasParseadas = (escalasRes.data ?? []).map((e: Record<string, unknown>) => ({
         id: e.id as string,
         ministerio: e.ministerio as Ministerio,
         data: e.data as string,
@@ -491,7 +493,8 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
             artistaSlug: (m.artista_slug as string) ?? undefined,
             musicaSlug: (m.musica_slug as string) ?? undefined,
           })),
-      })));
+      }));
+      setEscalas(escalasParseadas.filter((e) => !escalasExcluidasRef.current.has(e.id)));
     }
 
     if (musicasRes.data) {
@@ -890,6 +893,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
   }
 
   async function excluir(escala: Escala) {
+    if (deletingIds.has(escala.id)) return;
     const dataFmt = formatDateSimples(escala.data);
     const confirmou = window.confirm(
       [
@@ -904,9 +908,34 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
 
     if (!confirmou) return;
 
-    await supabase.from("escalas").delete().eq("id", escala.id);
+    escalasExcluidasRef.current.add(escala.id);
     setEscalas((prev) => prev.filter((e) => e.id !== escala.id));
-    await broadcastEscalasSync("delete");
+    setSelectedId((atual) => atual === escala.id ? null : atual);
+    setDeletingIds((prev) => new Set(prev).add(escala.id));
+
+    try {
+      const { data, error } = await supabase
+        .from("escalas")
+        .delete()
+        .eq("id", escala.id)
+        .select("id");
+      if (error) throw new Error(error.message);
+      if (!data || data.length === 0) {
+        throw new Error("A escala não foi excluída. Verifique sua permissão e tente novamente.");
+      }
+      await broadcastEscalasSync("delete");
+    } catch (erro) {
+      escalasExcluidasRef.current.delete(escala.id);
+      setEscalas((prev) => prev.some((e) => e.id === escala.id) ? prev : [escala, ...prev]);
+      setSelectedId(escala.id);
+      alert(erro instanceof Error ? erro.message : "Não foi possível excluir a escala.");
+    } finally {
+      setDeletingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(escala.id);
+        return next;
+      });
+    }
   }
 
   function addParticipante() {
@@ -1388,9 +1417,10 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
                           <Pencil className="w-4 h-4" />
                         </button>
                         <button
-                          onClick={() => { void excluir(selectedEscala); setSelectedId(null); }}
-                          className="p-2 text-gray-500 hover:text-red-600 hover:bg-white/70 rounded-xl transition"
-                          title="Excluir"
+                          onClick={() => { void excluir(selectedEscala); }}
+                          disabled={deletingIds.has(selectedEscala.id)}
+                          className="p-2 text-gray-500 hover:text-red-600 hover:bg-white/70 rounded-xl transition disabled:opacity-40 disabled:cursor-not-allowed"
+                          title={deletingIds.has(selectedEscala.id) ? "Excluindo..." : "Excluir"}
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
