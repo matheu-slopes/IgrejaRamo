@@ -107,6 +107,7 @@ export interface ItemEscala {
   observacao?: string;
   confirmado?: boolean;
   confirmadoEm?: string;
+  confirmacaoStatus?: "pendente" | "confirmado" | "recusado";
 }
 
 // Música do repertório

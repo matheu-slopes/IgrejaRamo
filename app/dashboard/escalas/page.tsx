@@ -31,8 +31,13 @@ const showFuncao = (it: { funcao: string; observacao?: string }) => {
 };
 
 // Agrupa itens de escala por pessoa, retornando funções concatenadas
+function statusConfirmacaoItem(item: { confirmado?: boolean; confirmacaoStatus?: string }) {
+  if (item.confirmacaoStatus) return item.confirmacaoStatus;
+  return item.confirmado ? "confirmado" : "pendente";
+}
+
 function agruparItens(itens: Escala["itens"]) {
-  const grupos: { key: string; voluntarioId?: string; voluntarioNome: string; funcoes: string[]; observacao?: string; confirmado: boolean }[] = [];
+  const grupos: { key: string; voluntarioId?: string; voluntarioNome: string; funcoes: string[]; observacao?: string; status: "pendente" | "confirmado" | "recusado" }[] = [];
   const vistos = new Map<string, number>();
   for (const it of itens) {
     const k = it.voluntarioId ?? it.voluntarioNome;
@@ -40,7 +45,9 @@ function agruparItens(itens: Escala["itens"]) {
     if (vistos.has(k)) {
       const grupo = grupos[vistos.get(k)!];
       grupo.funcoes.push(funcaoDisplay);
-      grupo.confirmado = grupo.confirmado && Boolean(it.confirmado);
+      const status = statusConfirmacaoItem(it) as "pendente" | "confirmado" | "recusado";
+      if (grupo.status !== "recusado") grupo.status = status === "recusado" ? "recusado" : grupo.status;
+      if (grupo.status === "confirmado" && status === "pendente") grupo.status = "pendente";
     } else {
       vistos.set(k, grupos.length);
       const obs = it.observacao && !["Cajón", "Pandeiro", "Violão"].includes(it.observacao) ? it.observacao : undefined;
@@ -50,7 +57,7 @@ function agruparItens(itens: Escala["itens"]) {
         voluntarioNome: it.voluntarioNome,
         funcoes: [funcaoDisplay],
         observacao: obs,
-        confirmado: Boolean(it.confirmado),
+        status: statusConfirmacaoItem(it) as "pendente" | "confirmado" | "recusado",
       });
     }
   }
@@ -102,6 +109,7 @@ function parseEscala(e: Record<string, unknown>): Escala {
       observacao: (i.observacao as string) ?? undefined,
       confirmado: (i.confirmado as boolean) ?? false,
       confirmadoEm: (i.confirmado_em as string) ?? undefined,
+      confirmacaoStatus: (i.confirmacao_status as "pendente" | "confirmado" | "recusado") ?? ((i.confirmado as boolean) ? "confirmado" : "pendente"),
     })),
     musicas: ((e.escala_musicas as Record<string, unknown>[]) ?? [])
       .sort((a, b) => (a.ordem as number) - (b.ordem as number))
@@ -243,24 +251,28 @@ function ConfirmacaoEscalaPanel({
 }: {
   escala: Escala;
   userId: string;
-  onConfirmar: (escalaId: string) => void;
+  onConfirmar: (escalaId: string, acao: "confirmar" | "recusar") => void;
   confirmando: boolean;
 }) {
   const minhasFuncoes = escala.itens.filter((it) => it.voluntarioId === userId);
   if (!escala.confirmacaoParticipantes || minhasFuncoes.length === 0) return null;
 
-  const confirmado = minhasFuncoes.every((it) => it.confirmado);
-
+  const recusado = minhasFuncoes.some((it) => statusConfirmacaoItem(it) === "recusado");
+  const confirmado = !recusado && minhasFuncoes.every((it) => statusConfirmacaoItem(it) === "confirmado");
   return (
     <div className="mt-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-xl border border-gray-100 bg-gray-50 px-3 py-2">
       <div className="flex items-center gap-2">
-        <UserCheck className={clsx("w-4 h-4", confirmado ? "text-green-600" : "text-amber-600")} />
+        <UserCheck className={clsx("w-4 h-4", confirmado ? "text-green-600" : recusado ? "text-red-600" : "text-amber-600")} />
         <div>
           <p className="text-xs font-bold text-gray-800">
-            {confirmado ? "Participação confirmada" : "Confirme sua participação"}
+            {confirmado ? "Participação confirmada" : recusado ? "Você marcou que não consegue" : "Confirme sua participação"}
           </p>
           <p className="text-[11px] text-gray-500">
-            {confirmado ? "O líder já consegue ver que você confirmou." : "Avise pelo sistema que você viu e pode servir."}
+            {confirmado
+              ? "O líder já consegue ver que você confirmou."
+              : recusado
+                ? "O líder foi avisado e pode ajustar a escala."
+                : "Avise pelo sistema se você pode servir nessa data."}
           </p>
         </div>
       </div>
@@ -268,18 +280,35 @@ function ConfirmacaoEscalaPanel({
         <span className="self-start sm:self-auto text-[11px] font-bold text-green-700 bg-green-50 border border-green-100 px-2 py-1 rounded-full">
           Confirmado
         </span>
+      ) : recusado ? (
+        <span className="self-start sm:self-auto text-[11px] font-bold text-red-700 bg-red-50 border border-red-100 px-2 py-1 rounded-full">
+          Não consegue
+        </span>
       ) : (
-        <button
-          type="button"
-          disabled={confirmando}
-          onClick={(e) => {
-            e.stopPropagation();
-            onConfirmar(escala.id);
-          }}
-          className="self-start sm:self-auto text-xs font-bold bg-black text-white px-3 py-1.5 rounded-lg disabled:opacity-50"
-        >
-          {confirmando ? "Confirmando..." : "Confirmar escala"}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            disabled={confirmando}
+            onClick={(e) => {
+              e.stopPropagation();
+              onConfirmar(escala.id, "recusar");
+            }}
+            className="text-xs font-bold bg-white text-gray-700 border border-gray-200 px-3 py-1.5 rounded-lg disabled:opacity-50"
+          >
+            Não consigo
+          </button>
+          <button
+            type="button"
+            disabled={confirmando}
+            onClick={(e) => {
+              e.stopPropagation();
+              onConfirmar(escala.id, "confirmar");
+            }}
+            className="text-xs font-bold bg-black text-white px-3 py-1.5 rounded-lg disabled:opacity-50"
+          >
+            {confirmando ? "Salvando..." : "Confirmar"}
+          </button>
+        </div>
       )}
     </div>
   );
@@ -293,7 +322,7 @@ function MinisterioSection({
   userId: string;
   isLider: boolean;
   onGerenciar: () => void;
-  onConfirmar: (escalaId: string) => void;
+  onConfirmar: (escalaId: string, acao: "confirmar" | "recusar") => void;
   confirmando: boolean;
 }) {
   const [open, setOpen] = useState(true);
@@ -405,7 +434,7 @@ function InfantilSection({
   userId: string;
   isLider: boolean;
   onGerenciar: () => void;
-  onConfirmar: (escalaId: string) => void;
+  onConfirmar: (escalaId: string, acao: "confirmar" | "recusar") => void;
   confirmandoIds: Set<string>;
 }) {
   const [open, setOpen] = useState(true);
@@ -526,7 +555,7 @@ function CultoCard({
   userId: string;
   isLider: boolean;
   onGerenciarMinisterio: (m: Ministerio) => void;
-  onConfirmar: (escalaId: string) => void;
+  onConfirmar: (escalaId: string, acao: "confirmar" | "recusar") => void;
   confirmandoIds: Set<string>;
 }) {
   const d = new Date(data + "T00:00:00");
@@ -660,7 +689,8 @@ function MinhasEscalasList({
         const isDomingo = d.getDay() === 0;
         const minhasFuncoes = esc.itens.filter((it) => it.voluntarioId === userId);
         const precisaConfirmar = esc.confirmacaoParticipantes && minhasFuncoes.length > 0;
-        const confirmado = precisaConfirmar && minhasFuncoes.every((it) => it.confirmado);
+        const recusado = precisaConfirmar && minhasFuncoes.some((it) => statusConfirmacaoItem(it) === "recusado");
+        const confirmado = precisaConfirmar && !recusado && minhasFuncoes.every((it) => statusConfirmacaoItem(it) === "confirmado");
         return (
           <button
             key={esc.id}
@@ -693,8 +723,8 @@ function MinhasEscalasList({
               <p className="text-sm font-bold text-gray-800">{esc.culto}</p>
               <p className="text-xs text-gray-400">{esc.horario.slice(0, 5)}</p>
               {precisaConfirmar && (
-                <p className={clsx("text-[11px] font-bold mt-1", confirmado ? "text-green-600" : "text-amber-600")}>
-                  {confirmado ? "Confirmado" : "Confirmação pendente"}
+                <p className={clsx("text-[11px] font-bold mt-1", confirmado ? "text-green-600" : recusado ? "text-red-600" : "text-amber-600")}>
+                  {confirmado ? "Confirmado" : recusado ? "Você marcou que não consegue" : "Confirmação pendente"}
                 </p>
               )}
             </div>
@@ -843,7 +873,7 @@ export default function EscalasDashboardPage() {
 
   const isLider = isAdmin || temPermissao("criar_escala");
 
-  const confirmarEscala = useCallback(async (escalaId: string) => {
+  const confirmarEscala = useCallback(async (escalaId: string, acao: "confirmar" | "recusar") => {
     if (!user?.id || confirmandoIds.has(escalaId)) return;
     setConfirmandoIds((prev) => new Set(prev).add(escalaId));
     try {
@@ -857,18 +887,19 @@ export default function EscalasDashboardPage() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ escalaId }),
+        body: JSON.stringify({ escalaId, acao }),
       });
-      const data = await res.json().catch(() => null) as { confirmadoEm?: string; error?: string } | null;
+      const data = await res.json().catch(() => null) as { confirmadoEm?: string; status?: "pendente" | "confirmado" | "recusado"; error?: string } | null;
       if (!res.ok) throw new Error(data?.error ?? "Não foi possível confirmar a escala.");
 
       const confirmadoEm = data?.confirmadoEm ?? new Date().toISOString();
+      const status = data?.status ?? (acao === "recusar" ? "recusado" : "confirmado");
       setTodasEscalas((prev) => {
         const updated = prev.map((escala) => escala.id === escalaId
           ? {
               ...escala,
               itens: escala.itens.map((item) => item.voluntarioId === user.id
-                ? { ...item, confirmado: true, confirmadoEm }
+                ? { ...item, confirmado: status === "confirmado", confirmadoEm, confirmacaoStatus: status }
                 : item),
             }
           : escala);
@@ -879,7 +910,7 @@ export default function EscalasDashboardPage() {
         ? {
             ...prev,
             itens: prev.itens.map((item) => item.voluntarioId === user.id
-              ? { ...item, confirmado: true, confirmadoEm }
+              ? { ...item, confirmado: status === "confirmado", confirmadoEm, confirmacaoStatus: status }
               : item),
           }
         : prev);

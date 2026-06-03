@@ -74,8 +74,14 @@ function itemEscalaPayload(escalaId: string, item: ItemEscala, incluirConfirmaca
     ...(incluirConfirmacao ? {
       confirmado: item.confirmado ?? false,
       confirmado_em: item.confirmadoEm ?? null,
+      confirmacao_status: item.confirmacaoStatus ?? (item.confirmado ? "confirmado" : "pendente"),
     } : {}),
   };
+}
+
+function statusConfirmacaoItem(item: { confirmado?: boolean; confirmacaoStatus?: string }) {
+  if (item.confirmacaoStatus) return item.confirmacaoStatus;
+  return item.confirmado ? "confirmado" : "pendente";
 }
 
 interface Props {
@@ -222,7 +228,7 @@ export function EscalaModal({ escala, podeEditar, onClose, onUpdate, onDelete }:
     setNovaObs("");
   }
 
-  async function confirmarMinhaEscala() {
+  async function responderMinhaEscala(acao: "confirmar" | "recusar") {
     if (!user?.id || confirming) return;
     setConfirming(true);
     try {
@@ -236,16 +242,17 @@ export function EscalaModal({ escala, podeEditar, onClose, onUpdate, onDelete }:
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ escalaId: escala.id }),
+        body: JSON.stringify({ escalaId: escala.id, acao }),
       });
-      const data = await res.json().catch(() => null) as { confirmadoEm?: string; error?: string } | null;
+      const data = await res.json().catch(() => null) as { confirmadoEm?: string; status?: "pendente" | "confirmado" | "recusado"; error?: string } | null;
       if (!res.ok) throw new Error(data?.error ?? "Não foi possível confirmar a escala.");
 
       const confirmadoEm = data?.confirmadoEm ?? new Date().toISOString();
+      const status = data?.status ?? (acao === "recusar" ? "recusado" : "confirmado");
       const updated: Escala = {
         ...escala,
         itens: escala.itens.map((item) => item.voluntarioId === user.id
-          ? { ...item, confirmado: true, confirmadoEm }
+          ? { ...item, confirmado: status === "confirmado", confirmadoEm, confirmacaoStatus: status }
           : item),
       };
       onUpdate(updated);
@@ -414,30 +421,49 @@ export function EscalaModal({ escala, podeEditar, onClose, onUpdate, onDelete }:
               {(() => {
                 const minhasFuncoes = escala.itens.filter((it) => it.voluntarioId === user?.id);
                 if (!escala.confirmacaoParticipantes || minhasFuncoes.length === 0) return null;
-                const confirmado = minhasFuncoes.every((it) => it.confirmado);
+                const recusado = minhasFuncoes.some((it) => statusConfirmacaoItem(it) === "recusado");
+                const confirmado = !recusado && minhasFuncoes.every((it) => statusConfirmacaoItem(it) === "confirmado");
                 return (
                   <div className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div>
                       <p className="text-sm font-bold text-gray-800">
-                        {confirmado ? "Sua escala está confirmada" : "Confirme sua participação"}
+                        {confirmado ? "Sua escala está confirmada" : recusado ? "Você marcou que não consegue" : "Confirme sua participação"}
                       </p>
                       <p className="text-xs text-gray-500">
-                        {confirmado ? "O líder já consegue ver sua confirmação." : "Confirme para o líder saber que você viu e pode servir."}
+                        {confirmado
+                          ? "O líder já consegue ver sua confirmação."
+                          : recusado
+                            ? "O líder foi avisado e pode ajustar a escala."
+                            : "Confirme para o líder saber se você pode servir."}
                       </p>
                     </div>
                     {confirmado ? (
                       <span className="self-start sm:self-auto text-xs font-bold text-green-700 bg-green-50 border border-green-100 px-3 py-1 rounded-full">
                         Confirmado
                       </span>
+                    ) : recusado ? (
+                      <span className="self-start sm:self-auto text-xs font-bold text-red-700 bg-red-50 border border-red-100 px-3 py-1 rounded-full">
+                        Não consegue
+                      </span>
                     ) : (
-                      <button
-                        type="button"
-                        onClick={confirmarMinhaEscala}
-                        disabled={confirming}
-                        className="self-start sm:self-auto text-xs font-bold bg-black text-white px-4 py-2 rounded-xl disabled:opacity-50"
-                      >
-                        {confirming ? "Confirmando..." : "Confirmar escala"}
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => responderMinhaEscala("recusar")}
+                          disabled={confirming}
+                          className="text-xs font-bold bg-white text-gray-700 border border-gray-200 px-4 py-2 rounded-xl disabled:opacity-50"
+                        >
+                          Não consigo
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => responderMinhaEscala("confirmar")}
+                          disabled={confirming}
+                          className="text-xs font-bold bg-black text-white px-4 py-2 rounded-xl disabled:opacity-50"
+                        >
+                          {confirming ? "Salvando..." : "Confirmar"}
+                        </button>
+                      </div>
                     )}
                   </div>
                 );

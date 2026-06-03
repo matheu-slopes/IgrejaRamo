@@ -189,7 +189,9 @@ CREATE TABLE escala_itens (
   voluntario_nome TEXT          NOT NULL,
   observacao      TEXT,
   confirmado      BOOLEAN       NOT NULL DEFAULT FALSE,
-  confirmado_em   TIMESTAMPTZ
+  confirmado_em   TIMESTAMPTZ,
+  confirmacao_status TEXT        NOT NULL DEFAULT 'pendente'
+    CHECK (confirmacao_status IN ('pendente', 'confirmado', 'recusado'))
 );
 
 -- Músicas de uma escala (com tom específico para aquele culto)

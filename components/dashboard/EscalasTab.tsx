@@ -270,7 +270,7 @@ function aplicarConfirmacoes(
   solicitaConfirmacao: boolean
 ): ItemEscala[] {
   if (!solicitaConfirmacao) {
-    return itens.map((item) => ({ ...item, confirmado: false, confirmadoEm: undefined }));
+    return itens.map((item) => ({ ...item, confirmado: false, confirmadoEm: undefined, confirmacaoStatus: "pendente" }));
   }
 
   const confirmacoesAnteriores = new Map(
@@ -283,6 +283,7 @@ function aplicarConfirmacoes(
       ...item,
       confirmado: anterior?.confirmado ?? item.confirmado ?? false,
       confirmadoEm: anterior?.confirmadoEm ?? item.confirmadoEm,
+      confirmacaoStatus: anterior?.confirmacaoStatus ?? item.confirmacaoStatus ?? (anterior?.confirmado || item.confirmado ? "confirmado" : "pendente"),
     };
   });
 }
@@ -290,7 +291,12 @@ function aplicarConfirmacoes(
 function erroColunaConfirmacaoAusente(error: unknown): boolean {
   const err = error as { message?: string; code?: string } | null;
   const message = String(err?.message ?? "").toLowerCase();
-  return message.includes("'confirmado' column") || message.includes("confirmado") && message.includes("schema cache");
+  return (
+    message.includes("'confirmado' column") ||
+    message.includes("'confirmacao_status' column") ||
+    message.includes("confirmado") && message.includes("schema cache") ||
+    message.includes("confirmacao_status") && message.includes("schema cache")
+  );
 }
 
 function itemEscalaPayload(escalaId: string, item: ItemEscala, incluirConfirmacao: boolean) {
@@ -304,8 +310,14 @@ function itemEscalaPayload(escalaId: string, item: ItemEscala, incluirConfirmaca
     ...(incluirConfirmacao ? {
       confirmado: item.confirmado ?? false,
       confirmado_em: item.confirmadoEm ?? null,
+      confirmacao_status: item.confirmacaoStatus ?? (item.confirmado ? "confirmado" : "pendente"),
     } : {}),
   };
+}
+
+function statusConfirmacaoItem(item: { confirmado?: boolean; confirmacaoStatus?: string }) {
+  if (item.confirmacaoStatus) return item.confirmacaoStatus;
+  return item.confirmado ? "confirmado" : "pendente";
 }
 
 function formatHoraInput(value: string): string {
@@ -490,6 +502,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
           observacao: (i.observacao as string) ?? undefined,
           confirmado: (i.confirmado as boolean) ?? false,
           confirmadoEm: (i.confirmado_em as string) ?? undefined,
+          confirmacaoStatus: (i.confirmacao_status as "pendente" | "confirmado" | "recusado") ?? ((i.confirmado as boolean) ? "confirmado" : "pendente"),
         })),
         musicas: ((e.escala_musicas as Record<string, unknown>[]) ?? [])
           .sort((a, b) => (a.ordem as number) - (b.ordem as number))
@@ -1463,15 +1476,26 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
                         <tbody className="divide-y divide-gray-50">
                           {(() => {
                             // Agrupa por pessoa, Ministro primeiro
-                            const grupos: { key: string; voluntarioId?: string; voluntarioNome: string; funcoes: string[]; observacao?: string }[] = [];
+                            const grupos: { key: string; voluntarioId?: string; voluntarioNome: string; funcoes: string[]; observacao?: string; status: "pendente" | "confirmado" | "recusado" }[] = [];
                             const vistos = new Map<string, number>();
                             for (const it of selectedEscala.itens) {
                               const k = it.voluntarioId ?? it.voluntarioNome;
                               if (vistos.has(k)) {
-                                grupos[vistos.get(k)!].funcoes.push(displayFuncao(it));
+                                const grupo = grupos[vistos.get(k)!];
+                                grupo.funcoes.push(displayFuncao(it));
+                                const status = statusConfirmacaoItem(it) as "pendente" | "confirmado" | "recusado";
+                                if (grupo.status !== "recusado") grupo.status = status === "recusado" ? "recusado" : grupo.status;
+                                if (grupo.status === "confirmado" && status === "pendente") grupo.status = "pendente";
                               } else {
                                 vistos.set(k, grupos.length);
-                                grupos.push({ key: k, voluntarioId: it.voluntarioId, voluntarioNome: it.voluntarioNome, funcoes: [displayFuncao(it)], observacao: displayObs(it) });
+                                grupos.push({
+                                  key: k,
+                                  voluntarioId: it.voluntarioId,
+                                  voluntarioNome: it.voluntarioNome,
+                                  funcoes: [displayFuncao(it)],
+                                  observacao: displayObs(it),
+                                  status: statusConfirmacaoItem(it) as "pendente" | "confirmado" | "recusado",
+                                });
                               }
                             }
                             grupos.sort((a, b) => (a.funcoes.includes("Ministro") ? 0 : 1) - (b.funcoes.includes("Ministro") ? 0 : 1));
@@ -1491,6 +1515,18 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
                                   )}
                                   {grp.observacao && (
                                     <p className="text-xs text-gray-400 font-normal mt-0.5">{grp.observacao}</p>
+                                  )}
+                                  {isLider && selectedEscala.confirmacaoParticipantes && (
+                                    <span className={clsx(
+                                      "inline-flex mt-1 text-[11px] font-bold px-2 py-0.5 rounded-full border",
+                                      grp.status === "confirmado"
+                                        ? "bg-green-50 text-green-700 border-green-100"
+                                        : grp.status === "recusado"
+                                          ? "bg-red-50 text-red-700 border-red-100"
+                                          : "bg-amber-50 text-amber-700 border-amber-100"
+                                    )}>
+                                      {grp.status === "confirmado" ? "Confirmado" : grp.status === "recusado" ? "Não consegue" : "Pendente"}
+                                    </span>
                                   )}
                                 </td>
                               </tr>
@@ -1889,17 +1925,25 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
             )}
             {(() => {
               // Agrupa participantes por pessoa (evita cards duplicados para quem tem múltiplas funções)
-              const grupos: { key: string; voluntarioId: string | undefined; voluntarioNome: string; funcoes: string[]; confirmado: boolean }[] = [];
+              const grupos: { key: string; voluntarioId: string | undefined; voluntarioNome: string; funcoes: string[]; status: "pendente" | "confirmado" | "recusado" }[] = [];
               const vistos = new Map<string, number>();
               for (const it of form.itens) {
                 const k = it.voluntarioId ?? it.voluntarioNome;
                 if (vistos.has(k)) {
                   const grupo = grupos[vistos.get(k)!];
                   grupo.funcoes.push(displayFuncao(it));
-                  grupo.confirmado = grupo.confirmado && Boolean(it.confirmado);
+                  const status = statusConfirmacaoItem(it) as "pendente" | "confirmado" | "recusado";
+                  if (grupo.status !== "recusado") grupo.status = status === "recusado" ? "recusado" : grupo.status;
+                  if (grupo.status === "confirmado" && status === "pendente") grupo.status = "pendente";
                 } else {
                   vistos.set(k, grupos.length);
-                  grupos.push({ key: k, voluntarioId: it.voluntarioId, voluntarioNome: it.voluntarioNome, funcoes: [displayFuncao(it)], confirmado: Boolean(it.confirmado) });
+                  grupos.push({
+                    key: k,
+                    voluntarioId: it.voluntarioId,
+                    voluntarioNome: it.voluntarioNome,
+                    funcoes: [displayFuncao(it)],
+                    status: statusConfirmacaoItem(it) as "pendente" | "confirmado" | "recusado",
+                  });
                 }
               }
               return grupos.map((grp) => (
@@ -1978,11 +2022,13 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
                         {form.confirmacaoParticipantes && (
                           <span className={clsx(
                             "inline-flex mt-1 text-[11px] font-bold px-2 py-0.5 rounded-full border",
-                            grp.confirmado
+                            grp.status === "confirmado"
                               ? "bg-green-50 text-green-700 border-green-100"
+                              : grp.status === "recusado"
+                                ? "bg-red-50 text-red-700 border-red-100"
                               : "bg-amber-50 text-amber-700 border-amber-100"
                           )}>
-                            {grp.confirmado ? "Confirmado" : "Pendente"}
+                            {grp.status === "confirmado" ? "Confirmado" : grp.status === "recusado" ? "Não consegue" : "Pendente"}
                           </span>
                         )}
                       </div>
