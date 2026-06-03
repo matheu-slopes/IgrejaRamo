@@ -98,10 +98,13 @@ export function ChatUnreadProvider({ children }: { children: ReactNode }) {
   const channelsRef = useRef<Map<string, any>>(new Map());
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const updatesChannelRef = useRef<any>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const messageInsertChannelRef = useRef<any>(null);
   const pathnameRef = useRef(pathname);
   const userIdRef = useRef<string | undefined>(undefined);
   const activeChatIdRef = useRef<string | null>(null);
   const seenMessageIdsRef = useRef<Set<string>>(new Set());
+  const conversaIdsRef = useRef<string[]>([]);
 
   function setActiveChatId(id: string | null) {
     activeChatIdRef.current = id;
@@ -145,6 +148,7 @@ export function ChatUnreadProvider({ children }: { children: ReactNode }) {
 
   // Mantém pathnameRef sempre atualizado dentro dos closures
   useEffect(() => { pathnameRef.current = pathname; }, [pathname]);
+  useEffect(() => { conversaIdsRef.current = conversaIds; }, [conversaIds]);
 
   // Wrapper que persiste no localStorage
   function setTotalUnread(n: number) {
@@ -195,6 +199,29 @@ export function ChatUnreadProvider({ children }: { children: ReactNode }) {
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
+
+  // Reconciliacao leve enquanto o dashboard esta aberto. Push pode chegar mesmo
+  // quando o JS estava pausado; esse polling mantem o badge de Conversas correto
+  // sem depender de entrar na tela de chat.
+  useEffect(() => {
+    if (!user?.id) return;
+    const uid = user.id;
+    let cancelled = false;
+
+    const sync = () => {
+      if (cancelled) return;
+      if (document.visibilityState !== "visible") return;
+      refreshUnreadFromServer(uid);
+    };
+
+    sync();
+    const interval = window.setInterval(sync, pathname === "/dashboard/chat" ? 30000 : 8000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname, user?.id]);
 
   // Carrega as conversas do usuário no layout, sem depender da página de chat.
   // Antes, o badge do rodapé só passava a escutar mensagens depois que /dashboard/chat
@@ -257,6 +284,44 @@ export function ChatUnreadProvider({ children }: { children: ReactNode }) {
     };
   }, [user?.id]);
 
+  // Escuta novas mensagens com um unico canal. O polling abaixo continua sendo a
+  // fonte de reconciliacao, mas esta escuta deixa o badge subir quase em tempo real.
+  useEffect(() => {
+    if (!user?.id) return;
+    if (messageInsertChannelRef.current) supabase.removeChannel(messageInsertChannelRef.current);
+
+    const uid = user.id;
+    const channel = supabase
+      .channel(`chat_unread_messages_${uid}`)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .on("postgres_changes" as any, {
+        event: "INSERT",
+        schema: "public",
+        table: "chat_mensagens",
+      }, (payload: any) => {
+        const row = payload.new;
+        const cid = row?.conversa_id as string | undefined;
+        if (!cid || !conversaIdsRef.current.includes(cid)) return;
+        handleIncomingChatMessage(uid, cid, {
+          id: row?.id,
+          autorId: row?.autor_id,
+          conteudo: row?.conteudo,
+          tipo: row?.tipo,
+          mediaUrl: row?.media_url,
+          criadoEm: row?.criado_em,
+        });
+      })
+      .subscribe();
+
+    messageInsertChannelRef.current = channel;
+
+    return () => {
+      if (messageInsertChannelRef.current) supabase.removeChannel(messageInsertChannelRef.current);
+      messageInsertChannelRef.current = null;
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
+
   // ── Gerencia canais de broadcast ─────────────────────────────────
   // ESTRATÉGIA: canais ficam ativos durante toda a sessão autenticada.
   // Quando o usuário está no chat page, os broadcasts são recebidos mas
@@ -297,23 +362,6 @@ export function ChatUnreadProvider({ children }: { children: ReactNode }) {
             criadoEm: payload?.criadoEm,
           });
         })
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .on("postgres_changes" as any, {
-          event: "INSERT",
-          schema: "public",
-          table: "chat_mensagens",
-          filter: `conversa_id=eq.${cid}`,
-        }, (payload: any) => {
-          const row = payload.new;
-          handleIncomingChatMessage(uid, cid, {
-            id: row?.id,
-            autorId: row?.autor_id,
-            conteudo: row?.conteudo,
-            tipo: row?.tipo,
-            mediaUrl: row?.media_url,
-            criadoEm: row?.criado_em,
-          });
-        })
         .subscribe((status: string) => {
           if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
             if (map.get(cid) === ch) {
@@ -341,6 +389,10 @@ export function ChatUnreadProvider({ children }: { children: ReactNode }) {
     return () => {
       channelsRef.current.forEach(ch => supabase.removeChannel(ch));
       channelsRef.current.clear();
+      if (messageInsertChannelRef.current) {
+        supabase.removeChannel(messageInsertChannelRef.current);
+        messageInsertChannelRef.current = null;
+      }
     };
   }, []);
 

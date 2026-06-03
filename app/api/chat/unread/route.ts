@@ -6,6 +6,12 @@ const admin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+function isMissingSequenceColumn(error: unknown) {
+  const err = error as { code?: string; message?: string } | null;
+  const msg = String(err?.message ?? "").toLowerCase();
+  return err?.code === "42703" && msg.includes("sequence_id");
+}
+
 function isNewer(
   candidate: { id: string; criado_em: string | null; sequence_id: number | null },
   current: { id: string; criado_em: string | null; sequence_id: number | null } | null
@@ -57,10 +63,19 @@ export async function GET(req: NextRequest) {
 
   const readMessageById = new Map<string, { id: string; criado_em: string | null; sequence_id: number | null }>();
   if (readIds.length) {
-    const { data: readMessages, error: readErr } = await admin
+    let { data: readMessages, error: readErr } = await admin
       .from("chat_mensagens")
-      .select("id, criado_em")
+      .select("id, criado_em, sequence_id")
       .in("id", [...new Set(readIds)]);
+
+    if (readErr && isMissingSequenceColumn(readErr)) {
+      const fallbackRead = await admin
+        .from("chat_mensagens")
+        .select("id, criado_em")
+        .in("id", [...new Set(readIds)]);
+      readMessages = (fallbackRead.data ?? []).map((m: { id: string; criado_em: string | null }) => ({ ...m, sequence_id: null }));
+      readErr = fallbackRead.error;
+    }
 
     if (readErr) return NextResponse.json({ error: readErr.message }, { status: 500 });
     for (const message of readMessages ?? []) {
@@ -72,13 +87,26 @@ export async function GET(req: NextRequest) {
     (cursors ?? []).map((cursor: { conversa_id: string; last_read_message_id: string | null }) => [cursor.conversa_id, cursor])
   );
 
-  const { data: messages, error: msgErr } = await admin
+  let { data: messages, error: msgErr } = await admin
     .from("chat_mensagens")
-    .select("id, conversa_id, autor_id, criado_em")
+    .select("id, conversa_id, autor_id, criado_em, sequence_id")
     .in("conversa_id", conversaIds)
     .neq("autor_id", user.id)
+    .order("sequence_id", { ascending: true })
     .order("criado_em", { ascending: true })
     .limit(5000);
+
+  if (msgErr && isMissingSequenceColumn(msgErr)) {
+    const fallbackMessages = await admin
+      .from("chat_mensagens")
+      .select("id, conversa_id, autor_id, criado_em")
+      .in("conversa_id", conversaIds)
+      .neq("autor_id", user.id)
+      .order("criado_em", { ascending: true })
+      .limit(5000);
+    messages = (fallbackMessages.data ?? []).map((m: { id: string; conversa_id: string; autor_id: string; criado_em: string | null }) => ({ ...m, sequence_id: null }));
+    msgErr = fallbackMessages.error;
+  }
 
   if (msgErr) return NextResponse.json({ error: msgErr.message }, { status: 500 });
 
