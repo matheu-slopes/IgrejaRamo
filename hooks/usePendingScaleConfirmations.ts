@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useState } from "react";
 import { supabase } from "@/lib/supabase";
 
 type EscalaPendenteRow = {
@@ -19,7 +19,7 @@ function itemPendente(item: { confirmado?: boolean | null; confirmacao_status?: 
 
 export function usePendingScaleConfirmations(userId?: string | null) {
   const [count, setCount] = useState(0);
-  const channelIdRef = useRef(`pending-scale-confirmations-${Math.random().toString(36).slice(2)}`);
+  const channelId = useId().replace(/:/g, "");
 
   const carregar = useCallback(async () => {
     if (!userId) {
@@ -65,7 +65,7 @@ export function usePendingScaleConfirmations(userId?: string | null) {
     };
 
     const channel = supabase
-      .channel(`${channelIdRef.current}-${userId}`)
+      .channel(`pending-scale-confirmations-${channelId}-${userId}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "escalas" }, schedule)
       .on("postgres_changes", { event: "*", schema: "public", table: "escala_itens" }, schedule)
       .subscribe();
@@ -74,7 +74,7 @@ export function usePendingScaleConfirmations(userId?: string | null) {
       if (timer) clearTimeout(timer);
       supabase.removeChannel(channel);
     };
-  }, [carregar, userId]);
+  }, [carregar, channelId, userId]);
 
   return { count, refresh: carregar };
 }

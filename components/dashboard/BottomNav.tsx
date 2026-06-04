@@ -6,10 +6,11 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useChatUnread } from "@/contexts/ChatUnreadContext";
 import { useNotifications } from "@/contexts/NotificationsContext";
 import { usePendingScaleConfirmations } from "@/hooks/usePendingScaleConfirmations";
+import { userMinisterios } from "@/lib/userMinistries";
 import {
   LayoutDashboard, CalendarCheck, MessageSquare, CalendarDays,
   MoreHorizontal, X, Users, Shield, Bell, BookOpen, Music, Video,
-  Baby, HeartHandshake, CalendarDays as CalDays, Layers,
+  Baby, HeartHandshake, CalendarDays as CalDays, Layers, Sparkles,
 } from "lucide-react";
 import clsx from "clsx";
 import { useState, useEffect, useRef } from "react";
@@ -28,6 +29,8 @@ const ministeriosMap: Record<string, { icon: React.ElementType; href: string }> 
   "Infantil":    { icon: Baby,           href: "/dashboard/ministerio/Infantil" },
   "Ação Social": { icon: HeartHandshake, href: "/dashboard/ministerio/A%C3%A7%C3%A3o%20Social" },
   "Jovens":      { icon: Users,          href: "/dashboard/ministerio/Jovens" },
+  "Recepcionamento": { icon: Users,      href: "/dashboard/ministerio/Recepcionamento" },
+  "Limpeza":     { icon: Sparkles,       href: "/dashboard/ministerio/Limpeza" },
 };
 
 const navAdmin = [
@@ -53,7 +56,7 @@ export default function BottomNav() {
   const isAdmin = user?.role === "admin" || user?.role === "pastor";
   const meusMinisterios = isAdmin
     ? Object.keys(ministeriosMap)
-    : (user?.ministerios ?? []).filter((m) => ministeriosMap[m]);
+    : userMinisterios(user).filter((m) => ministeriosMap[m]);
 
   const hasExtras = meusMinisterios.length > 0 || isAdmin;
 

@@ -9,6 +9,7 @@ import { EscalaModal } from "@/components/dashboard/EscalaModal";
 import { supabase } from "@/lib/supabase";
 import { store, STORE_KEYS } from "@/lib/dataStore";
 import { useAppRefresh } from "@/hooks/useAppRefresh";
+import { userMinisterios } from "@/lib/userMinistries";
 import {
   ChevronLeft, ChevronRight, ChevronDown, ChevronUp,
   Music2, Users, Calendar, Star, Settings2, ClipboardCopy, Check, UserCheck, AlertCircle,
@@ -763,7 +764,7 @@ export default function EscalasDashboardPage() {
   const searchParams = useSearchParams();
   const { user, isLoading, temPermissao, temPermissaoNoMinisterio } = useAuth();
   const isAdmin = user?.role === "admin" || user?.role === "pastor";
-  const meus = (user?.ministerios ?? []) as Ministerio[];
+  const meus = userMinisterios(user);
   const lista = isAdmin ? TODOS : meus;
 
   // Hidrata instantaneamente do cache — sem tela em branco ao navegar
@@ -895,9 +896,10 @@ export default function EscalasDashboardPage() {
   );
 
   const isLider = isAdmin || temPermissao("criar_escala");
+  const userId = user?.id;
 
   const confirmarEscala = useCallback(async (escalaId: string, acao: "confirmar" | "recusar") => {
-    if (!user?.id || confirmandoIds.has(escalaId)) return;
+    if (!userId || confirmandoIds.has(escalaId)) return;
     setConfirmandoIds((prev) => new Set(prev).add(escalaId));
     try {
       const { data: sessionData } = await supabase.auth.getSession();
@@ -921,7 +923,7 @@ export default function EscalasDashboardPage() {
         const updated = prev.map((escala) => escala.id === escalaId
           ? {
               ...escala,
-              itens: escala.itens.map((item) => item.voluntarioId === user.id
+              itens: escala.itens.map((item) => item.voluntarioId === userId
                 ? { ...item, confirmado: status === "confirmado", confirmadoEm, confirmacaoStatus: status }
                 : item),
             }
@@ -932,7 +934,7 @@ export default function EscalasDashboardPage() {
       setModalEscala((prev) => prev && prev.id === escalaId
         ? {
             ...prev,
-            itens: prev.itens.map((item) => item.voluntarioId === user.id
+            itens: prev.itens.map((item) => item.voluntarioId === userId
               ? { ...item, confirmado: status === "confirmado", confirmadoEm, confirmacaoStatus: status }
               : item),
           }
@@ -946,7 +948,7 @@ export default function EscalasDashboardPage() {
         return next;
       });
     }
-  }, [confirmandoIds, user?.id]);
+  }, [confirmandoIds, userId]);
 
   // ── Modo de edição por ministério ──────────────────────────────────────────
   if (editing) {

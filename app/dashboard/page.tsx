@@ -5,6 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
 import { store, STORE_KEYS } from "@/lib/dataStore";
 import { useAppRefresh } from "@/hooks/useAppRefresh";
+import { userMinisterios } from "@/lib/userMinistries";
 import { Evento, Aviso } from "@/types";
 import {
   CalendarCheck,
@@ -140,7 +141,8 @@ export default function DashboardPage() {
                 a.destinatarios.includes(user.role));
             if (!destMatch) return false;
             if (a.ministerios?.length) {
-              return (a.ministerios as string[]).some((m) => user.ministerios?.includes(m as import("@/types").Ministerio));
+              const meusMinisterios = userMinisterios(user);
+              return (a.ministerios as string[]).some((m) => meusMinisterios.includes(m as import("@/types").Ministerio));
             }
             return true;
           })
@@ -185,7 +187,7 @@ export default function DashboardPage() {
     persistCache();
   }
 
-  useAppRefresh(() => { void carregarResumo(); }, [user?.id, user?.role, user?.ministerios?.join(",")], { minIntervalMs: 2000 });
+  useAppRefresh(() => { void carregarResumo(); }, [user?.id, user?.role, userMinisterios(user).join(",")], { minIntervalMs: 2000 });
 
   // ── Realtime: atualiza cada seção automaticamente ──────────────────────────
   useEffect(() => {

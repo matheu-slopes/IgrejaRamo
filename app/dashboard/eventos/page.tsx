@@ -7,6 +7,7 @@ import { EventosTab } from "@/components/dashboard/EventosTab";
 import { supabase } from "@/lib/supabase";
 import { store, STORE_KEYS } from "@/lib/dataStore";
 import { useAppRefresh } from "@/hooks/useAppRefresh";
+import { userMinisterios } from "@/lib/userMinistries";
 import { Plus, ChevronRight, MapPin } from "lucide-react";
 import clsx from "clsx";
 
@@ -172,7 +173,7 @@ function MinistryEventRow({
 export default function EventosDashboardPage() {
   const { user, temPermissao } = useAuth();
   const isAdmin = user?.role === "admin" || user?.role === "pastor";
-  const meus = (user?.ministerios ?? []) as Ministerio[];
+  const meus = userMinisterios(user);
   const lista = isAdmin ? TODOS : meus;
   const [editing, setEditing] = useState<Ministerio | null>(null);
 

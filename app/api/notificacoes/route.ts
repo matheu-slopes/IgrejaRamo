@@ -30,7 +30,7 @@ async function resolverDestinatarios(body: CreateBody) {
   const explicit = [...new Set((body.usuarioIds ?? []).filter(Boolean))];
   if (explicit.length) return explicit;
 
-  let query = admin.from("perfis").select("id, role, ministerios").eq("ativo", true);
+  const query = admin.from("perfis").select("id, role, ministerios").eq("ativo", true);
   const { data, error } = await query;
   if (error) throw new Error(error.message);
 

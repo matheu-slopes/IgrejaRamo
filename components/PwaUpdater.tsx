@@ -10,6 +10,16 @@ export default function PwaUpdater() {
   useEffect(() => {
     if (typeof window === "undefined" || !("serviceWorker" in navigator)) return;
 
+    if ("caches" in window) {
+      caches.keys().then((keys) => {
+        keys
+          .filter((key) => key === "ramo-cache")
+          .forEach((key) => {
+            void caches.delete(key);
+          });
+      }).catch(() => {});
+    }
+
     const handleUpdate = (reg: ServiceWorkerRegistration) => {
       const sw = reg.installing ?? reg.waiting;
       if (!sw) return;
