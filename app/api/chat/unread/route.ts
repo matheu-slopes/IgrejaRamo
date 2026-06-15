@@ -12,6 +12,12 @@ function isMissingSequenceColumn(error: unknown) {
   return err?.code === "42703" && msg.includes("sequence_id");
 }
 
+function isMissingColumn(error: unknown, column: string) {
+  const err = error as { code?: string; message?: string } | null;
+  const msg = String(err?.message ?? "").toLowerCase();
+  return err?.code === "42703" && msg.includes(column.toLowerCase());
+}
+
 function isNewer(
   candidate: { id: string; criado_em: string | null; sequence_id: number | null },
   current: { id: string; criado_em: string | null; sequence_id: number | null } | null
@@ -39,10 +45,19 @@ export async function GET(req: NextRequest) {
   const user = await authUser(req);
   if (!user) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
 
-  const { data: participacoes, error: partErr } = await admin
+  let { data: participacoes, error: partErr } = await admin
     .from("chat_participantes")
     .select("conversa_id, historico_desde")
     .eq("user_id", user.id);
+
+  if (partErr && isMissingColumn(partErr, "historico_desde")) {
+    const fallback = await admin
+      .from("chat_participantes")
+      .select("conversa_id")
+      .eq("user_id", user.id);
+    participacoes = fallback.data?.map((p: { conversa_id: string }) => ({ ...p, historico_desde: null })) ?? null;
+    partErr = fallback.error;
+  }
 
   if (partErr) return NextResponse.json({ error: partErr.message }, { status: 500 });
 

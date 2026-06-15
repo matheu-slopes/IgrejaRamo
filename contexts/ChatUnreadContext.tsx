@@ -68,6 +68,11 @@ function conversaIdsFromCache(uid: string): string[] {
 function uniqueIds(ids: string[]) {
   return [...new Set(ids.filter(Boolean))];
 }
+function isMissingColumn(error: unknown, column: string) {
+  const err = error as { code?: string; message?: string } | null;
+  const msg = String(err?.message ?? "").toLowerCase();
+  return err?.code === "42703" && msg.includes(column.toLowerCase());
+}
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function saveToLocalInbox(uid: string, cid: string, msg: any) {
   try {
@@ -239,10 +244,21 @@ export function ChatUnreadProvider({ children }: { children: ReactNode }) {
     if (cachedIds.length) setConversaIds(uniqueIds(cachedIds));
 
     async function carregarIds() {
-      const { data, error } = await supabase
+      const result = await supabase
         .from("chat_participantes")
-        .select("conversa_id")
+        .select("conversa_id, historico_desde")
         .eq("user_id", uid);
+      let data = result.data as { conversa_id: string; historico_desde?: string | null }[] | null;
+      let error = result.error;
+
+      if (error && isMissingColumn(error, "historico_desde")) {
+        const fallback = await supabase
+          .from("chat_participantes")
+          .select("conversa_id")
+          .eq("user_id", uid);
+        data = fallback.data as { conversa_id: string }[] | null;
+        error = fallback.error;
+      }
 
       if (cancelled || error) return;
       const dbIds = ((data ?? []) as { conversa_id: string }[]).map((p) => p.conversa_id);

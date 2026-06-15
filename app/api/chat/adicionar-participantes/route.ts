@@ -9,6 +9,12 @@ const admin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+function isMissingColumn(error: unknown, column: string) {
+  const err = error as { code?: string; message?: string } | null;
+  const msg = String(err?.message ?? "").toLowerCase();
+  return err?.code === "42703" && msg.includes(column.toLowerCase());
+}
+
 async function getAuthUser(req: NextRequest) {
   const token = req.headers.get("authorization")?.replace("Bearer ", "").trim();
   if (!token) return null;
@@ -82,13 +88,23 @@ export async function POST(req: NextRequest) {
   }
 
   const historicoDesde = incluirHistorico ? null : new Date().toISOString();
-  const { error: insertErr } = await admin
+  let { error: insertErr } = await admin
     .from("chat_participantes")
     .insert(novos.map((uid: string) => ({
       conversa_id: conversaId,
       user_id: uid,
       historico_desde: historicoDesde,
     })));
+
+  if (insertErr && isMissingColumn(insertErr, "historico_desde")) {
+    const fallback = await admin
+      .from("chat_participantes")
+      .insert(novos.map((uid: string) => ({
+        conversa_id: conversaId,
+        user_id: uid,
+      })));
+    insertErr = fallback.error;
+  }
 
   if (insertErr) {
     return NextResponse.json({ error: insertErr.message }, { status: 500 });

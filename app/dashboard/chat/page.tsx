@@ -235,6 +235,11 @@ function iniciais(nome: string) {
 function grupoEmojiValido(emoji?: string) {
   return Boolean(emoji && emoji !== "??");
 }
+function isMissingColumn(error: unknown, column: string) {
+  const err = error as { code?: string; message?: string } | null;
+  const msg = String(err?.message ?? "").toLowerCase();
+  return err?.code === "42703" && msg.includes(column.toLowerCase());
+}
 function formatTime(iso: string) {
   return new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
 }
@@ -1823,8 +1828,20 @@ export default function ChatPage() {
 
   async function carregarConversas() {
     if (!user) return;
-    const { data: participacoes } = await supabase
+    let { data: participacoes, error: participacoesError } = await supabase
       .from("chat_participantes").select("conversa_id, historico_desde").eq("user_id", user.id);
+
+    if (participacoesError && isMissingColumn(participacoesError, "historico_desde")) {
+      const fallback = await supabase
+        .from("chat_participantes").select("conversa_id").eq("user_id", user.id);
+      participacoes = fallback.data?.map((p: { conversa_id: string }) => ({ ...p, historico_desde: null })) ?? null;
+      participacoesError = fallback.error;
+    }
+
+    if (participacoesError) {
+      console.error("chat participacoes error:", participacoesError.message);
+      return;
+    }
     if (!participacoes?.length) return;
 
     const ids = (participacoes as ChatParticipacao[]).map(p => p.conversa_id);
@@ -1832,11 +1849,19 @@ export default function ChatPage() {
       (participacoes as ChatParticipacao[]).map(p => [p.conversa_id, p.historico_desde ?? null])
     );
 
-    const [{ data: conversas }, { data: todosParticipantes }, mensagensResult] = await Promise.all([
+    const [conversasResult, participantesResult, mensagensResult] = await Promise.all([
       supabase.from("chat_conversas").select("*").in("id", ids),
       supabase.from("chat_participantes").select("conversa_id, user_id, historico_desde").in("conversa_id", ids),
       supabase.from("chat_mensagens").select("*").in("conversa_id", ids).order("criado_em", { ascending: false }).limit(ids.length * 3),
     ]);
+
+    const conversas = conversasResult.data;
+    let todosParticipantes = participantesResult.data as { conversa_id: string; user_id: string; historico_desde?: string | null }[] | null;
+    if (participantesResult.error && isMissingColumn(participantesResult.error, "historico_desde")) {
+      const fallbackParts = await supabase
+        .from("chat_participantes").select("conversa_id, user_id").in("conversa_id", ids);
+      todosParticipantes = fallbackParts.data as { conversa_id: string; user_id: string }[] | null;
+    }
 
     let ultimasMsgs = mensagensResult.data;
     if (mensagensResult.error) ultimasMsgs = [];
@@ -1872,7 +1897,7 @@ export default function ChatPage() {
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     for (const c of (conversas ?? []) as any[]) {
-      const membrosIds = participantesPorConversa[c.id] ?? [];
+      const membrosIds = participantesPorConversa[c.id]?.length ? participantesPorConversa[c.id] : [user.id];
       const lastMsg = lastMsgPorConversa[c.id];
       const mensagens = lastMsg ? [{ ...lastMsg, lida: true }] : [];
 
@@ -2369,6 +2394,10 @@ export default function ChatPage() {
       conversaIdsRef.current = merged;
       return merged;
     });
+    const known = new Set([...dmsRef.current.map((dm) => dm.id), ...gruposRef.current.map((g) => g.id)]);
+    if (contextConversaIds.some((id) => !known.has(id))) {
+      void carregarConversas();
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [contextConversaIds, user?.id]);
 
