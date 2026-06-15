@@ -5,7 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useChatUnread } from "@/contexts/ChatUnreadContext";
 import { supabase } from "@/lib/supabase";
 import { useAppRefresh } from "@/hooks/useAppRefresh";
-import { ConversaDireta, Grupo, MensagemConversa } from "@/types";
+import { ConversaDireta, Grupo, MensagemConversa, User } from "@/types";
 import {
   MessageSquare, Users, Send, ArrowLeft, Search, Lock, Plus,
   Info, Smile, Paperclip, Mic, Star, X, FileText, Square, MicOff,
@@ -185,7 +185,7 @@ function AudioPlayer({ src, isMe }: { src: string; isMe: boolean }) {
             <MicOff className="w-3.5 h-3.5" />
           </div>
           <span className={clsx("text-xs flex-1", isMe ? "text-white/60" : "text-gray-400")}>
-            �udio indispon�vel
+            Áudio indisponível
           </span>
         </>
       ) : (
@@ -428,7 +428,7 @@ function ComposeBar({
     const raw = e.target.files?.[0];
     e.target.value = "";
     if (!raw) return;
-    if (!raw.type.startsWith("image/")) { onToast("Apenas imagens s�o suportadas"); return; }
+    if (!raw.type.startsWith("image/")) { onToast("Apenas imagens são suportadas"); return; }
     const compressed = await compressImage(raw);
     setImgPreview({ file: compressed, url: URL.createObjectURL(compressed) });
     setShowAttach(false);
@@ -438,7 +438,7 @@ function ComposeBar({
     const raw = e.target.files?.[0];
     e.target.value = "";
     if (!raw) return;
-    if (raw.size > 20 * 1024 * 1024) { onToast("Documento muito grande (m�x 20 MB)"); return; }
+    if (raw.size > 20 * 1024 * 1024) { onToast("Documento muito grande (máx 20 MB)"); return; }
     setDocPreview(raw);
     setShowAttach(false);
   }
@@ -472,7 +472,7 @@ function ComposeBar({
       setRecSeconds(0);
       timerRef.current = setInterval(() => setRecSeconds((s) => s + 1), 1000);
     } catch {
-      onToast("Microfone n�o dispon�vel ou permiss�o negada");
+      onToast("Microfone não disponível ou permissão negada");
     }
   }
 
@@ -523,7 +523,7 @@ function ComposeBar({
           <button
             onClick={stopRecording}
             className="w-9 h-9 rounded-full bg-red-500 text-white flex items-center justify-center hover:bg-red-600 transition"
-            title="Parar grava��o"
+            title="Parar gravação"
           >
             <Square className="w-4 h-4 fill-white" />
           </button>
@@ -664,7 +664,7 @@ function ComposeBar({
           <button
             onClick={startRecording}
             className="w-10 h-10 rounded-full bg-slate-700 text-white flex items-center justify-center shrink-0 hover:bg-slate-800 active:scale-95 transition"
-            title="Gravar �udio"
+            title="Gravar áudio"
           >
             <Mic className="w-4 h-4" />
           </button>
@@ -991,7 +991,8 @@ function ConversationMessages({
 
 function InfoPanel({
   name, description, emoji, avatarUrl, cor, messages, starredIds,
-  memberCount, canAddMembers, onAddMembers, canEditAvatar, onAvatarFile, onClose,
+  currentUserId, groupMembers, memberCount, canAddMembers, onAddMembers,
+  canEditAvatar, onAvatarFile, onSearchMessages, onClose,
 }: {
   name: string;
   description?: string;
@@ -1000,23 +1001,32 @@ function InfoPanel({
   cor?: string;
   messages: MensagemConversa[];
   starredIds: Set<string>;
+  currentUserId?: string;
+  groupMembers?: User[];
   memberCount?: number;
   canAddMembers?: boolean;
   onAddMembers?: () => void;
   canEditAvatar?: boolean;
   onAvatarFile?: (file: File) => void;
+  onSearchMessages?: () => void;
   onClose: () => void;
 }) {
-  const [tab, setTab] = useState<"midia" | "favoritos">("midia");
+  const [section, setSection] = useState<"midia" | "favoritos" | null>(null);
+  const [memberSearchOpen, setMemberSearchOpen] = useState(false);
+  const [memberSearch, setMemberSearch] = useState("");
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const starred = messages.filter((m) => starredIds.has(m.id));
   const mediaImages = messages.filter((m) => m.tipo === "imagem" && m.mediaUrl);
+  const filteredMembers = (groupMembers ?? []).filter((member) =>
+    !memberSearch || member.nome.toLowerCase().includes(memberSearch.toLowerCase())
+  );
+  const isGroup = Boolean(groupMembers);
 
   return (
     <div className="w-72 flex flex-col border-l border-gray-100 bg-white h-full shrink-0">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 shrink-0">
-        <h3 className="font-semibold text-gray-800 text-sm">Informacoes</h3>
+        <h3 className="font-semibold text-gray-800 text-sm">{isGroup ? "Dados do grupo" : "Informações"}</h3>
         <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition">
           <X className="w-4 h-4" />
         </button>
@@ -1065,76 +1075,123 @@ function InfoPanel({
         {typeof memberCount === "number" && (
           <p className="text-[11px] text-gray-400">{memberCount} membro{memberCount !== 1 ? "s" : ""}</p>
         )}
-        {canAddMembers && onAddMembers && (
-          <button
-            onClick={onAddMembers}
-            className="mt-2 inline-flex items-center gap-2 rounded-full bg-slate-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-800 transition"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            Adicionar pessoas
-          </button>
-        )}
+        <div className="mt-2 flex items-start justify-center gap-3">
+          {canAddMembers && onAddMembers && (
+            <button onClick={onAddMembers} className="flex flex-col items-center gap-1 text-[10px] text-gray-500 hover:text-gray-800 transition">
+              <span className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center">
+                <Plus className="w-4 h-4" />
+              </span>
+              Adicionar
+            </button>
+          )}
+          {onSearchMessages && (
+            <button onClick={onSearchMessages} className="flex flex-col items-center gap-1 text-[10px] text-gray-500 hover:text-gray-800 transition">
+              <span className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center">
+                <Search className="w-4 h-4" />
+              </span>
+              Pesquisar
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex border-b border-gray-100 shrink-0">
-        {(["midia", "favoritos"] as const).map((t) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={clsx(
-              "flex-1 py-2.5 text-xs font-semibold border-b-2 transition",
-              tab === t ? "border-slate-600 text-slate-800" : "border-transparent text-gray-400 hover:text-gray-800"
-            )}
-          >
-            {t === "midia" ? "Midia" : "Favoritos"}
-          </button>
-        ))}
-      </div>
-
-      {/* Content */}
       <div className="flex-1 overflow-y-auto">
-        {tab === "midia" && (
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 px-4 pt-3 pb-2">
-              Fotos e videos
-            </p>
-            {mediaImages.length === 0 ? (
-              <div className="flex flex-col items-center gap-2 py-8 text-gray-300">
-                <p className="text-xs text-center text-gray-400 leading-relaxed">Nenhuma foto ou vídeo compartilhado.</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-3 gap-0.5">
-                {mediaImages.map((m) => (
-                  <div
-                    key={m.id}
-                    className="aspect-square bg-gray-100 cursor-pointer hover:opacity-90 transition"
-                    style={{ backgroundImage: `url(${m.mediaUrl})`, backgroundSize: "cover", backgroundPosition: "center" }}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {tab === "favoritos" && (
-          <div className="p-3 space-y-2">
-            {starred.length === 0 ? (
-              <div className="flex flex-col items-center gap-2 py-8 text-gray-300">
-                <Star className="w-8 h-8" />
-                <p className="text-xs text-center text-gray-400 leading-relaxed">
-                  Nenhuma mensagem favoritada.<br />Passe o mouse sobre uma mensagem e clique na estrela.
-                </p>
-              </div>
-            ) : (
-              starred.map((m) => (
-                <div key={m.id} className="bg-gray-50 rounded-xl px-3 py-2.5 border border-gray-100">
-                  <p className="text-[10px] font-semibold text-gray-800 mb-0.5">{m.autorNome.split(" ")[0]}</p>
-                  <p className="text-xs text-gray-700 leading-relaxed">{m.conteudo}</p>
-                  <p className="text-[10px] text-gray-400 mt-1">{formatTime(m.criadoEm)}</p>
+        <div className="border-b border-gray-100">
+          <button
+            onClick={() => setSection(section === "midia" ? null : "midia")}
+            className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 transition"
+          >
+            <ImageIcon className="w-5 h-5 text-gray-500 shrink-0" />
+            <span className="flex-1 text-sm text-gray-800">Mídia, links e docs</span>
+            <span className="text-xs text-gray-400">{mediaImages.length}</span>
+          </button>
+          {section === "midia" && (
+            <div className="px-4 pb-4">
+              {mediaImages.length === 0 ? (
+                <p className="text-xs text-gray-400 py-3">Nenhuma foto ou vídeo compartilhado.</p>
+              ) : (
+                <div className="grid grid-cols-3 gap-1">
+                  {mediaImages.map((m) => (
+                    <div
+                      key={m.id}
+                      className="aspect-square bg-gray-100 rounded-md cursor-pointer hover:opacity-90 transition"
+                      style={{ backgroundImage: `url(${m.mediaUrl})`, backgroundSize: "cover", backgroundPosition: "center" }}
+                    />
+                  ))}
                 </div>
-              ))
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="border-b border-gray-100">
+          <button
+            onClick={() => setSection(section === "favoritos" ? null : "favoritos")}
+            className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 transition"
+          >
+            <Star className="w-5 h-5 text-gray-500 shrink-0" />
+            <span className="flex-1 text-sm text-gray-800">Mensagens favoritas</span>
+            <span className="text-xs text-gray-400">{starred.length}</span>
+          </button>
+          {section === "favoritos" && (
+            <div className="px-3 pb-3 space-y-2">
+              {starred.length === 0 ? (
+                <p className="text-xs text-gray-400 px-1 py-3">Nenhuma mensagem favoritada.</p>
+              ) : (
+                starred.map((m) => (
+                  <div key={m.id} className="bg-gray-50 rounded-xl px-3 py-2.5 border border-gray-100">
+                    <p className="text-[10px] font-semibold text-gray-800 mb-0.5">{m.autorNome.split(" ")[0]}</p>
+                    <p className="text-xs text-gray-700 leading-relaxed">{m.conteudo}</p>
+                    <p className="text-[10px] text-gray-400 mt-1">{formatTime(m.criadoEm)}</p>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+        </div>
+
+        {groupMembers && (
+          <div className="px-4 py-4">
+            <div className="flex items-center gap-2 mb-3">
+              <p className="flex-1 text-xs font-semibold text-gray-500">{memberCount ?? groupMembers.length} membro{(memberCount ?? groupMembers.length) !== 1 ? "s" : ""}</p>
+              <button
+                onClick={() => setMemberSearchOpen((v) => !v)}
+                className="w-8 h-8 rounded-full flex items-center justify-center text-gray-500 hover:bg-gray-100 hover:text-gray-800 transition"
+                title="Buscar membro"
+              >
+                <Search className="w-4 h-4" />
+              </button>
+            </div>
+
+            {memberSearchOpen && (
+              <div className="flex items-center gap-2 bg-gray-100 rounded-xl px-3 py-2 mb-3">
+                <Search className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                <input
+                  autoFocus
+                  value={memberSearch}
+                  onChange={(e) => setMemberSearch(e.target.value)}
+                  placeholder="Buscar membro..."
+                  className="bg-transparent text-sm outline-none flex-1 min-w-0 placeholder:text-gray-400"
+                />
+              </div>
             )}
+
+            <div className="space-y-1">
+              {filteredMembers.map((member) => (
+                <div key={member.id} className="flex items-center gap-3 py-2">
+                  <UserAvatar nome={member.nome} foto={member.foto} size="sm" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-gray-800 truncate">
+                      {member.id === currentUserId ? "Você" : member.nome}
+                    </p>
+                    <p className="text-xs text-gray-400 capitalize truncate">{member.role}</p>
+                  </div>
+                </div>
+              ))}
+              {filteredMembers.length === 0 && (
+                <p className="text-center text-gray-400 text-sm py-6">Nenhum membro encontrado.</p>
+              )}
+            </div>
           </div>
         )}
       </div>
@@ -1334,7 +1391,7 @@ function AddGroupMembersModal({
               className="mt-0.5 h-4 w-4 accent-slate-700 shrink-0"
             />
             <span className="min-w-0">
-              <span className="block text-sm font-semibold text-gray-800">Carregar historico anterior</span>
+              <span className="block text-sm font-semibold text-gray-800">Carregar histórico anterior</span>
               <span className="block text-xs text-gray-500 leading-relaxed">
                 Se desligado, novos membros veem apenas mensagens enviadas depois da entrada.
               </span>
@@ -1355,7 +1412,7 @@ function AddGroupMembersModal({
                   {membros.includes(mu.id) && <Check className="w-4 h-4 text-gray-800 shrink-0" />}
                 </button>
               ))}
-              {filtered.length === 0 && <p className="text-center text-gray-400 text-sm py-8">Nenhum membro disponivel.</p>}
+              {filtered.length === 0 && <p className="text-center text-gray-400 text-sm py-8">Nenhum membro disponível.</p>}
             </div>
           </div>
         </div>
@@ -1489,7 +1546,7 @@ export default function ChatPage() {
         msgs
           .slice(-200)
           .map(m => m.mediaUrl?.startsWith("blob:")
-            ? { ...m, mediaUrl: undefined, conteudo: m.conteudo || "? enviando m�dia�" }
+            ? { ...m, mediaUrl: undefined, conteudo: m.conteudo || "Enviando mídia" }
             : m
           );
       const dmsSave    = newDms.map(d => ({ ...d, mensagens: clean(d.mensagens) }));
@@ -1507,7 +1564,7 @@ export default function ChatPage() {
       // anteriores que salvaram campos no formato do banco (autor_id/criado_em).
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const normalizar = (m: any): MensagemConversa | null => {
-        if (m.conteudo === "? enviando m�dia�") return null;
+        if (m.conteudo.startsWith("? enviando") || m.conteudo === "Enviando mídia") return null;
         const autorId = m.autorId ?? m.autor_id ?? "";
         return {
           ...m,
@@ -1821,7 +1878,7 @@ export default function ChatPage() {
 
       if (c.tipo === "direto") {
         const otherId = membrosIds.find((id: string) => id !== user.id) ?? "";
-        const otherNome = nomePorId[otherId] ?? usuarios.find(mu => mu.id === otherId)?.nome ?? "Usu�rio";
+        const otherNome = nomePorId[otherId] ?? usuarios.find(mu => mu.id === otherId)?.nome ?? "Usuário";
         newDms.push({
           id: c.id,
           participantes: [user.id, otherId] as [string, string],
@@ -2479,7 +2536,7 @@ export default function ChatPage() {
       try {
         avatarUrl = await uploadGroupAvatar(cid, avatarFile);
       } catch (err) {
-        showToast(err instanceof Error ? err.message : "Grupo criado, mas a foto nao foi enviada.");
+        showToast(err instanceof Error ? err.message : "Grupo criado, mas a foto não foi enviada.");
       }
     }
     setGrupos((prev) => [...prev, {
@@ -2817,7 +2874,7 @@ export default function ChatPage() {
             onClick={() => setInfoOpen((v) => !v)}
             className={clsx("w-8 h-8 rounded-full flex items-center justify-center transition",
               infoOpen ? "bg-gray-100 text-slate-800" : "text-gray-400 hover:text-gray-800 hover:bg-gray-100")}
-            title="Informacoes"
+            title="Informações"
           >
             <Info className="w-4 h-4" />
           </button>
@@ -2838,11 +2895,14 @@ export default function ChatPage() {
       emoji?: string;
       avatarUrl?: string;
       cor?: string;
+      currentUserId?: string;
+      groupMembers?: User[];
       memberCount?: number;
       canAddMembers?: boolean;
       onAddMembers?: () => void;
       canEditAvatar?: boolean;
       onAvatarFile?: (file: File) => void;
+      onSearchMessages?: () => void;
     } | null = null;
     let locked = false;
 
@@ -2851,7 +2911,15 @@ export default function ChatPage() {
       const otherUser = usuarios.find((mu) => mu.id === other.id);
       const avatarEl = <UserAvatar nome={other.nome} foto={otherUser?.foto} size="sm" />;
       headerEl = renderChatHeader(other.nome, otherUser?.role ?? "membro", avatarEl);
-      infoProps = { name: other.nome, description: otherUser?.role, avatarUrl: otherUser?.foto };
+      infoProps = {
+        name: other.nome,
+        description: otherUser?.role,
+        avatarUrl: otherUser?.foto,
+        onSearchMessages: () => {
+          setChatSearchOpen(true);
+          setInfoOpen(false);
+        },
+      };
     } else if (activeChat.tipo === "grupo" && activeGrupo) {
       locked = !canWrite(activeGrupo);
       const avatarEl = <GrupoAvatar grupo={activeGrupo} size="sm" />;
@@ -2861,17 +2929,31 @@ export default function ChatPage() {
         avatarEl
       );
       const canManageMembers = activeGrupo.adminId === u.id || u.role === "admin" || u.role === "pastor";
+      const groupMembers = activeGrupo.membros
+        .map((id) => id === u.id ? u : usuarios.find((mu) => mu.id === id))
+        .filter(Boolean) as User[];
+      groupMembers.sort((a, b) => {
+        if (a.id === u.id) return -1;
+        if (b.id === u.id) return 1;
+        return a.nome.localeCompare(b.nome);
+      });
       infoProps = {
         name: activeGrupo.nome,
         description: activeGrupo.descricao,
         emoji: activeGrupo.emoji,
         avatarUrl: activeGrupo.avatarUrl,
         cor: activeGrupo.cor,
+        currentUserId: u.id,
+        groupMembers,
         memberCount: activeGrupo.membros.length,
         canAddMembers: canManageMembers,
         onAddMembers: () => setAddMembersGroupId(activeGrupo.id),
         canEditAvatar: canManageMembers,
         onAvatarFile: (file) => updateGroupAvatar(activeGrupo.id, file),
+        onSearchMessages: () => {
+          setChatSearchOpen(true);
+          setInfoOpen(false);
+        },
       };
     }
 
@@ -3051,7 +3133,7 @@ export default function ChatPage() {
                       </div>
                       {last && (
                         <p className={clsx("text-xs truncate mt-0.5", unread > 0 ? "text-gray-700 font-medium" : "text-gray-400")}>
-                          {last.autorId === u.id ? "Voce: " : ""}{last.tipo === "imagem" ? "?? Foto" : last.tipo === "audio" ? "?? �udio" : last.tipo === "documento" ? "?? " + (last.conteudo || "Documento") : last.conteudo}
+                          {last.autorId === u.id ? "Você: " : ""}{last.tipo === "imagem" ? "Foto" : last.tipo === "audio" ? "Áudio" : last.tipo === "documento" ? (last.conteudo || "Documento") : last.conteudo}
                         </p>
                       )}
                     </div>
@@ -3086,7 +3168,7 @@ export default function ChatPage() {
               {gruposBySection.length === 0 && (
                 <div className="flex flex-col items-center gap-2 py-12 text-gray-300">
                   <Users className="w-8 h-8 opacity-40" />
-                  <p className="text-sm text-gray-400">Voce nao participa de nenhum grupo.</p>
+                  <p className="text-sm text-gray-400">Você não participa de nenhum grupo.</p>
                   <button onClick={() => setShowNewGroupModal(true)} className="text-xs text-gray-800 font-semibold mt-1 hover:underline">Criar grupo</button>
                 </div>
               )}
@@ -3119,7 +3201,7 @@ export default function ChatPage() {
                           </div>
                           {last ? (
                             <p className={clsx("text-xs truncate mt-0.5", unread > 0 ? "text-gray-700 font-medium" : "text-gray-400")}>
-                              {last.autorId === u.id ? "Voce: " : last.autorNome.split(" ")[0] + ": "}{last.tipo === "imagem" ? "?? Foto" : last.tipo === "audio" ? "?? �udio" : last.tipo === "documento" ? "?? " + (last.conteudo || "Documento") : last.conteudo}
+                              {last.autorId === u.id ? "Você: " : last.autorNome.split(" ")[0] + ": "}{last.tipo === "imagem" ? "Foto" : last.tipo === "audio" ? "Áudio" : last.tipo === "documento" ? (last.conteudo || "Documento") : last.conteudo}
                             </p>
                           ) : (
                             <p className="text-xs text-gray-300 mt-0.5 italic">{g.descricao}</p>
@@ -3188,7 +3270,7 @@ export default function ChatPage() {
       <div className="mb-3">
         <h1 className="text-xl md:text-2xl font-sans font-semibold text-black">Mensagens</h1>
         <p className="text-sm text-gray-500 mt-0.5 hidden sm:block">
-          Conversas diretas, chat do culto e canais de minist�rio.
+          Conversas diretas, chat do culto e canais de ministério.
         </p>
       </div>
 
