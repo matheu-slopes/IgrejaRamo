@@ -47,13 +47,16 @@ export async function GET(req: NextRequest) {
 
   const { data: participacoes, error: partErr } = await admin
     .from("chat_participantes")
-    .select("conversa_id")
+    .select("conversa_id, historico_desde")
     .eq("user_id", user.id);
 
   if (partErr) {
     return NextResponse.json({ error: partErr.message }, { status: 500 });
   }
 
+  const historicoDesdeByConversa = new Map(
+    (participacoes ?? []).map((p: { conversa_id: string; historico_desde?: string | null }) => [p.conversa_id, p.historico_desde ?? null])
+  );
   const conversaIds = (participacoes ?? []).map((p: { conversa_id: string }) => p.conversa_id);
   if (!conversaIds.length) {
     return NextResponse.json({ ok: true, conversa_ids: [], mensagens: [], max_criado_em: null, max_sequence_id: null });
@@ -97,6 +100,12 @@ export async function GET(req: NextRequest) {
   if (msgErr) {
     return NextResponse.json({ error: msgErr.message }, { status: 500 });
   }
+
+  mensagens = (mensagens ?? []).filter((message: { conversa_id: string; criado_em: string | null }) => {
+    const historicoDesde = historicoDesdeByConversa.get(message.conversa_id);
+    if (!historicoDesde || !message.criado_em) return true;
+    return new Date(message.criado_em).getTime() >= new Date(historicoDesde).getTime();
+  });
 
   // Atualiza apenas o cursor de entrega por conversa.
   try {

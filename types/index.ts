@@ -261,6 +261,7 @@ export interface Grupo {
   nome: string;
   tipo: TipoGrupo;
   emoji: string;
+  avatarUrl?: string;
   cor: string;            // classe tailwind bg (ex: "bg-black")
   descricao?: string;
   ministerio?: Ministerio; // preenchido quando tipo === "ministerio"
@@ -271,6 +272,8 @@ export interface Grupo {
   somenteAdmin?: boolean;
   /** IDs dos usuários que fazem parte deste grupo */
   membros: string[];
+  /** Data mínima para o usuário atual ver mensagens deste grupo */
+  historicoDesde?: string;
   /** ID do criador/admin do grupo */
   adminId?: string;
   /**

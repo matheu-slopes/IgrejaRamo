@@ -41,11 +41,14 @@ export async function GET(req: NextRequest) {
 
   const { data: participacoes, error: partErr } = await admin
     .from("chat_participantes")
-    .select("conversa_id")
+    .select("conversa_id, historico_desde")
     .eq("user_id", user.id);
 
   if (partErr) return NextResponse.json({ error: partErr.message }, { status: 500 });
 
+  const historicoDesdeByConversa = new Map(
+    (participacoes ?? []).map((p: { conversa_id: string; historico_desde?: string | null }) => [p.conversa_id, p.historico_desde ?? null])
+  );
   const conversaIds = (participacoes ?? []).map((p: { conversa_id: string }) => p.conversa_id);
   if (!conversaIds.length) return NextResponse.json({ ok: true, total: 0, by_conversa: {} });
 
@@ -112,6 +115,10 @@ export async function GET(req: NextRequest) {
 
   const byConversa: Record<string, number> = {};
   for (const message of messages ?? []) {
+    const historicoDesde = historicoDesdeByConversa.get(message.conversa_id);
+    if (historicoDesde && message.criado_em && new Date(message.criado_em).getTime() < new Date(historicoDesde).getTime()) {
+      continue;
+    }
     const cursor = cursorByConversation.get(message.conversa_id);
     const readMessage = cursor?.last_read_message_id
       ? readMessageById.get(cursor.last_read_message_id) ?? null

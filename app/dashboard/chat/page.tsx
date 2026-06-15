@@ -10,7 +10,7 @@ import {
   MessageSquare, Users, Send, ArrowLeft, Search, Lock, Plus,
   Info, Smile, Paperclip, Mic, Star, X, FileText, Square, MicOff,
   Image as ImageIcon, MoreVertical, Trash2, LogOut, Check, Archive, Pencil, Reply,
-  Download, Play,
+  Download, Play, Camera,
 } from "lucide-react";
 import clsx from "clsx";
 
@@ -232,6 +232,9 @@ const QUICK_REACTIONS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
 function iniciais(nome: string) {
   return nome.split(" ").slice(0, 2).map((n) => n[0]).join("").toUpperCase();
 }
+function grupoEmojiValido(emoji?: string) {
+  return Boolean(emoji && emoji !== "??");
+}
 function formatTime(iso: string) {
   return new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
 }
@@ -276,6 +279,12 @@ type PendingChatMessage = {
   attempts: number;
   updatedAt: string;
   lastError?: string;
+};
+
+type ChatParticipacao = {
+  conversa_id: string;
+  user_id?: string;
+  historico_desde?: string | null;
 };
 
 type ChatTab = "direto" | "grupos";
@@ -981,17 +990,25 @@ function ConversationMessages({
 // --- InfoPanel ----------------------------------------------------
 
 function InfoPanel({
-  name, description, emoji, cor, messages, starredIds, onClose,
+  name, description, emoji, avatarUrl, cor, messages, starredIds,
+  memberCount, canAddMembers, onAddMembers, canEditAvatar, onAvatarFile, onClose,
 }: {
   name: string;
   description?: string;
   emoji?: string;
+  avatarUrl?: string;
   cor?: string;
   messages: MensagemConversa[];
   starredIds: Set<string>;
+  memberCount?: number;
+  canAddMembers?: boolean;
+  onAddMembers?: () => void;
+  canEditAvatar?: boolean;
+  onAvatarFile?: (file: File) => void;
   onClose: () => void;
 }) {
   const [tab, setTab] = useState<"midia" | "favoritos">("midia");
+  const avatarInputRef = useRef<HTMLInputElement>(null);
   const starred = messages.filter((m) => starredIds.has(m.id));
   const mediaImages = messages.filter((m) => m.tipo === "imagem" && m.mediaUrl);
 
@@ -1007,17 +1024,56 @@ function InfoPanel({
 
       {/* Profile */}
       <div className="flex flex-col items-center gap-2 py-5 px-4 border-b border-gray-100 shrink-0">
-        {emoji ? (
-          <div className={clsx("w-14 h-14 rounded-full flex items-center justify-center text-3xl text-white", cor ?? "bg-slate-700")}>
-            {emoji}
-          </div>
-        ) : (
-          <div className="w-14 h-14 rounded-full bg-slate-700 text-white flex items-center justify-center text-xl font-bold">
-            {iniciais(name)}
-          </div>
-        )}
+        <div className="relative">
+          {avatarUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={avatarUrl} alt={name} className="w-14 h-14 rounded-full object-cover border border-gray-100" />
+          ) : grupoEmojiValido(emoji) ? (
+            <div className={clsx("w-14 h-14 rounded-full flex items-center justify-center text-3xl text-white", cor ?? "bg-slate-700")}>
+              {emoji}
+            </div>
+          ) : (
+            <div className="w-14 h-14 rounded-full bg-slate-700 text-white flex items-center justify-center text-xl font-bold">
+              {iniciais(name)}
+            </div>
+          )}
+          {canEditAvatar && onAvatarFile && (
+            <>
+              <button
+                onClick={() => avatarInputRef.current?.click()}
+                className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-slate-700 text-white flex items-center justify-center border-2 border-white hover:bg-slate-800 transition"
+                title="Alterar foto do grupo"
+              >
+                <Camera className="w-3 h-3" />
+              </button>
+              <input
+                ref={avatarInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) onAvatarFile(file);
+                  e.target.value = "";
+                }}
+              />
+            </>
+          )}
+        </div>
         <p className="font-semibold text-gray-800 text-sm text-center">{name}</p>
         {description && <p className="text-xs text-gray-400 text-center capitalize">{description}</p>}
+        {typeof memberCount === "number" && (
+          <p className="text-[11px] text-gray-400">{memberCount} membro{memberCount !== 1 ? "s" : ""}</p>
+        )}
+        {canAddMembers && onAddMembers && (
+          <button
+            onClick={onAddMembers}
+            className="mt-2 inline-flex items-center gap-2 rounded-full bg-slate-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-800 transition"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            Adicionar pessoas
+          </button>
+        )}
       </div>
 
       {/* Tabs */}
@@ -1121,7 +1177,7 @@ function NewDmModal({
             const hasChat = existingIds.has(mu.id);
             return (
               <button key={mu.id} onClick={() => onStart(mu.id, mu.nome)} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition text-left border-b border-gray-50 last:border-0">
-                <div className="w-9 h-9 rounded-full bg-slate-700 text-white flex items-center justify-center text-sm font-bold shrink-0">{iniciais(mu.nome)}</div>
+                <UserAvatar nome={mu.nome} foto={mu.foto} size="sm" />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-gray-800 truncate">{mu.nome}</p>
                   <p className="text-xs text-gray-400 capitalize truncate">{mu.role}</p>
@@ -1147,16 +1203,34 @@ function NewGroupModal({
   currentUserId: string;
   usuarios: import("@/types").User[];
   onClose: () => void;
-  onCreate: (nome: string, emoji: string, membros: string[]) => void;
+  onCreate: (nome: string, emoji: string, membros: string[], avatarFile?: File | null) => void;
 }) {
   const [nome, setNome] = useState("");
   const [membros, setMembros] = useState<string[]>([]);
   const [search, setSearch] = useState("");
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
   const others = usuarios.filter((mu) => mu.id !== currentUserId);
   const filtered = others.filter((mu) => !search || mu.nome.toLowerCase().includes(search.toLowerCase()));
+
+  useEffect(() => {
+    return () => {
+      if (avatarPreview) URL.revokeObjectURL(avatarPreview);
+    };
+  }, [avatarPreview]);
+
   function toggle(id: string) {
     setMembros((prev) => prev.includes(id) ? prev.filter((m) => m !== id) : [...prev, id]);
   }
+
+  function selectAvatar(file?: File) {
+    if (!file) return;
+    if (avatarPreview) URL.revokeObjectURL(avatarPreview);
+    setAvatarFile(file);
+    setAvatarPreview(URL.createObjectURL(file));
+  }
+
   return (
     <div className="fixed inset-0 bg-slate-700/40 z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden" onClick={(e) => e.stopPropagation()}>
@@ -1165,6 +1239,33 @@ function NewGroupModal({
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition"><X className="w-4 h-4" /></button>
         </div>
         <div className="px-5 py-4 space-y-4">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => avatarInputRef.current?.click()}
+              className="relative w-14 h-14 rounded-full bg-slate-700 text-white flex items-center justify-center overflow-hidden shrink-0 hover:bg-slate-800 transition"
+              title="Adicionar foto do grupo"
+            >
+              {avatarPreview ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={avatarPreview} alt="" className="w-full h-full object-cover" />
+              ) : (
+                <Camera className="w-5 h-5" />
+              )}
+            </button>
+            <div className="min-w-0">
+              <button onClick={() => avatarInputRef.current?.click()} className="text-sm font-semibold text-gray-800 hover:underline">
+                Adicionar foto
+              </button>
+              <p className="text-xs text-gray-400">JPG, PNG ou WebP ate 4 MB</p>
+            </div>
+            <input
+              ref={avatarInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => selectAvatar(e.target.files?.[0])}
+            />
+          </div>
           <input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Nome do grupo" className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-300" />
           <div>
             <p className="text-xs font-semibold text-gray-500 mb-2">Adicionar membros</p>
@@ -1175,7 +1276,7 @@ function NewGroupModal({
             <div className="max-h-36 overflow-y-auto space-y-1">
               {filtered.map((mu) => (
                 <button key={mu.id} onClick={() => toggle(mu.id)} className="w-full flex items-center gap-3 px-2 py-2 rounded-xl hover:bg-gray-50 transition text-left">
-                  <div className="w-8 h-8 rounded-full bg-slate-700 text-white flex items-center justify-center text-xs font-bold shrink-0">{iniciais(mu.nome)}</div>
+                  <UserAvatar nome={mu.nome} foto={mu.foto} size="sm" />
                   <span className="flex-1 text-sm text-gray-700 truncate">{mu.nome}</span>
                   {membros.includes(mu.id) && <Check className="w-4 h-4 text-gray-800 shrink-0" />}
                 </button>
@@ -1184,8 +1285,87 @@ function NewGroupModal({
           </div>
         </div>
         <div className="px-5 pb-4">
-          <button onClick={() => nome.trim() && onCreate(nome.trim(), "", membros)} disabled={!nome.trim()} className="w-full bg-slate-700 text-white rounded-xl py-2.5 text-sm font-semibold hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition">
+          <button onClick={() => nome.trim() && onCreate(nome.trim(), "", membros, avatarFile)} disabled={!nome.trim()} className="w-full bg-slate-700 text-white rounded-xl py-2.5 text-sm font-semibold hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition">
             Criar Grupo{membros.length > 0 ? ` (${membros.length + 1} membros)` : ""}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// --- AddGroupMembersModal -----------------------------------------
+
+function AddGroupMembersModal({
+  currentUserId, grupo, usuarios, onClose, onAdd,
+}: {
+  currentUserId: string;
+  grupo: Grupo;
+  usuarios: import("@/types").User[];
+  onClose: () => void;
+  onAdd: (membros: string[], incluirHistorico: boolean) => void;
+}) {
+  const [membros, setMembros] = useState<string[]>([]);
+  const [search, setSearch] = useState("");
+  const [incluirHistorico, setIncluirHistorico] = useState(false);
+  const available = usuarios.filter((mu) => mu.id !== currentUserId && !grupo.membros.includes(mu.id));
+  const filtered = available.filter((mu) => !search || mu.nome.toLowerCase().includes(search.toLowerCase()));
+
+  function toggle(id: string) {
+    setMembros((prev) => prev.includes(id) ? prev.filter((m) => m !== id) : [...prev, id]);
+  }
+
+  return (
+    <div className="fixed inset-0 bg-slate-700/40 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+          <div className="min-w-0">
+            <h3 className="font-semibold text-gray-800 truncate">Adicionar pessoas</h3>
+            <p className="text-xs text-gray-400 truncate">{grupo.nome}</p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition"><X className="w-4 h-4" /></button>
+        </div>
+        <div className="px-5 py-4 space-y-4">
+          <label className="flex items-start gap-3 rounded-xl border border-gray-100 bg-gray-50 px-3 py-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={incluirHistorico}
+              onChange={(e) => setIncluirHistorico(e.target.checked)}
+              className="mt-0.5 h-4 w-4 accent-slate-700 shrink-0"
+            />
+            <span className="min-w-0">
+              <span className="block text-sm font-semibold text-gray-800">Carregar historico anterior</span>
+              <span className="block text-xs text-gray-500 leading-relaxed">
+                Se desligado, novos membros veem apenas mensagens enviadas depois da entrada.
+              </span>
+            </span>
+          </label>
+
+          <div>
+            <p className="text-xs font-semibold text-gray-500 mb-2">Novos membros</p>
+            <div className="flex items-center gap-2 bg-gray-100 rounded-xl px-3 py-2 mb-2">
+              <Search className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar membro..." className="bg-transparent text-sm outline-none flex-1 min-w-0" />
+            </div>
+            <div className="max-h-44 overflow-y-auto space-y-1">
+              {filtered.map((mu) => (
+                <button key={mu.id} onClick={() => toggle(mu.id)} className="w-full flex items-center gap-3 px-2 py-2 rounded-xl hover:bg-gray-50 transition text-left">
+                  <UserAvatar nome={mu.nome} foto={mu.foto} size="sm" />
+                  <span className="flex-1 text-sm text-gray-700 truncate">{mu.nome}</span>
+                  {membros.includes(mu.id) && <Check className="w-4 h-4 text-gray-800 shrink-0" />}
+                </button>
+              ))}
+              {filtered.length === 0 && <p className="text-center text-gray-400 text-sm py-8">Nenhum membro disponivel.</p>}
+            </div>
+          </div>
+        </div>
+        <div className="px-5 pb-4">
+          <button
+            onClick={() => membros.length > 0 && onAdd(membros, incluirHistorico)}
+            disabled={membros.length === 0}
+            className="w-full bg-slate-700 text-white rounded-xl py-2.5 text-sm font-semibold hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition"
+          >
+            Adicionar{membros.length > 0 ? ` (${membros.length})` : ""}
           </button>
         </div>
       </div>
@@ -1196,10 +1376,36 @@ function NewGroupModal({
 // --- GrupoAvatar -------------------------------------------------
 
 function GrupoAvatar({ grupo, size = "md" }: { grupo: Grupo; size?: "sm" | "md" }) {
-  const sz = size === "sm" ? "w-9 h-9 text-base" : "w-10 h-10 text-xl";
+  const sz = size === "sm" ? "w-9 h-9 text-sm" : "w-10 h-10 text-base";
+  if (grupo.avatarUrl) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={grupo.avatarUrl}
+        alt={grupo.nome}
+        className={clsx("rounded-full object-cover border border-gray-100 shrink-0", sz)}
+      />
+    );
+  }
+
   return (
-    <div className={clsx("rounded-full flex items-center justify-center text-white shrink-0", sz, grupo.cor)}>
-      {grupo.emoji}
+    <div className={clsx("rounded-full flex items-center justify-center text-white font-bold shrink-0", sz, grupo.cor)}>
+      {grupoEmojiValido(grupo.emoji) ? grupo.emoji : iniciais(grupo.nome)}
+    </div>
+  );
+}
+
+function UserAvatar({ nome, foto, size = "md" }: { nome: string; foto?: string; size?: "sm" | "md" }) {
+  const sz = size === "sm" ? "w-9 h-9 text-sm" : "w-10 h-10 text-base";
+  if (foto) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img src={foto} alt={nome} className={clsx("rounded-full object-cover border border-gray-100 shrink-0", sz)} />
+    );
+  }
+  return (
+    <div className={clsx("rounded-full bg-slate-700 text-white flex items-center justify-center font-bold shrink-0", sz)}>
+      {iniciais(nome)}
     </div>
   );
 }
@@ -1236,6 +1442,7 @@ export default function ChatPage() {
   const [ctxMenu, setCtxMenu] = useState<{ id: string; type: "dm" | "grupo" } | null>(null);
   const [showNewDmModal, setShowNewDmModal] = useState(false);
   const [showNewGroupModal, setShowNewGroupModal] = useState(false);
+  const [addMembersGroupId, setAddMembersGroupId] = useState<string | null>(null);
   const [conversaIds, setConversaIds] = useState<string[]>([]);
   const [channelRevision, setChannelRevision] = useState(0);
   const startingDmRef = useRef(false);
@@ -1248,6 +1455,7 @@ export default function ChatPage() {
   const dmsRef = useRef<ConversaDireta[]>([]);
   const gruposRef = useRef<Grupo[]>([]);
   const conversaIdsRef = useRef<string[]>([]);
+  const historicoDesdeRef = useRef<Record<string, string | null>>({});
   const lastBackfillRef = useRef<string>(new Date(Date.now() - 5 * 60 * 1000).toISOString());
   const lastSequenceRef = useRef<number>(0);
   const syncRunningRef = useRef(false);
@@ -1450,6 +1658,12 @@ export default function ChatPage() {
     };
   }
 
+  function canSeeMensagem(conversaId: string, criadoEm?: string | null) {
+    const historicoDesde = historicoDesdeRef.current[conversaId];
+    if (!historicoDesde || !criadoEm) return true;
+    return new Date(criadoEm).getTime() >= new Date(historicoDesde).getTime();
+  }
+
   // -- carregar conversas --------------------------------------------
   useEffect(() => {
     if (!user?.id) return;
@@ -1553,14 +1767,17 @@ export default function ChatPage() {
   async function carregarConversas() {
     if (!user) return;
     const { data: participacoes } = await supabase
-      .from("chat_participantes").select("conversa_id").eq("user_id", user.id);
+      .from("chat_participantes").select("conversa_id, historico_desde").eq("user_id", user.id);
     if (!participacoes?.length) return;
 
-    const ids = (participacoes as { conversa_id: string }[]).map(p => p.conversa_id);
+    const ids = (participacoes as ChatParticipacao[]).map(p => p.conversa_id);
+    historicoDesdeRef.current = Object.fromEntries(
+      (participacoes as ChatParticipacao[]).map(p => [p.conversa_id, p.historico_desde ?? null])
+    );
 
     const [{ data: conversas }, { data: todosParticipantes }, mensagensResult] = await Promise.all([
       supabase.from("chat_conversas").select("*").in("id", ids),
-      supabase.from("chat_participantes").select("conversa_id, user_id").in("conversa_id", ids),
+      supabase.from("chat_participantes").select("conversa_id, user_id, historico_desde").in("conversa_id", ids),
       supabase.from("chat_mensagens").select("*").in("conversa_id", ids).order("criado_em", { ascending: false }).limit(ids.length * 3),
     ]);
 
@@ -1576,6 +1793,7 @@ export default function ChatPage() {
     const lastMsgPorConversa: Record<string, MensagemConversa> = {};
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     for (const row of (ultimasMsgs ?? []) as any[]) {
+      if (!canSeeMensagem(row.conversa_id, row.criado_em)) continue;
       if (!lastMsgPorConversa[row.conversa_id]) lastMsgPorConversa[row.conversa_id] = rowToMensagem(row);
     }
 
@@ -1613,10 +1831,10 @@ export default function ChatPage() {
       } else {
         newGrupos.push({
           id: c.id, nome: c.nome ?? "Grupo", tipo: "geral",
-          emoji: c.emoji ?? "??", cor: c.cor ?? "bg-slate-700",
+          emoji: c.emoji ?? "", avatarUrl: c.avatar_url ?? undefined, cor: c.cor ?? "bg-slate-700",
           descricao: c.descricao ?? undefined, adminId: c.admin_id ?? undefined,
           somenteAdmin: c.somente_admin ?? false, institucional: c.institucional ?? false,
-          membros: membrosIds, mensagens,
+          membros: membrosIds, historicoDesde: historicoDesdeRef.current[c.id] ?? undefined, mensagens,
         });
       }
     }
@@ -1687,11 +1905,14 @@ export default function ChatPage() {
   }
 
   async function carregarMensagens(conversaId: string) {
-    const { data, error } = await supabase
+    let query = supabase
       .from("chat_mensagens").select("*")
       .eq("conversa_id", conversaId)
       .order("criado_em", { ascending: true })
       .limit(500);
+    const historicoDesde = historicoDesdeRef.current[conversaId];
+    if (historicoDesde) query = query.gte("criado_em", historicoDesde);
+    const { data, error } = await query;
 
     if (error) {
       console.error("chat load mensagens error:", error);
@@ -1705,6 +1926,7 @@ export default function ChatPage() {
     // Mensagens do inbox para esta conversa que ainda n�o est�o no banco
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const inboxExtra: MensagemConversa[] = (inboxRef.current[conversaId] ?? [])
+      .filter((im: { criadoEm?: string }) => canSeeMensagem(conversaId, im.criadoEm))
       .filter((im: { id: string }) => !dbIds.has(im.id))
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .map((im: any): MensagemConversa => ({
@@ -1796,7 +2018,8 @@ export default function ChatPage() {
       if (!res.ok) return;
       const json = await res.json().catch(() => ({}));
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const rows = (json.mensagens ?? []) as any[];
+      const rows = ((json.mensagens ?? []) as any[])
+        .filter((row) => canSeeMensagem(row.conversa_id, row.criado_em));
       if (!rows.length) return;
 
       const knownIds = new Set(conversaIdsRef.current);
@@ -1903,6 +2126,7 @@ export default function ChatPage() {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .on("broadcast", { event: "msg" }, ({ payload }: { payload: any }) => {
           const raw = payload as MensagemConversa;
+          if (!canSeeMensagem(cid, raw.criadoEm)) return;
           const isActive = activeChatRef.current?.id === cid;
           const isMine = raw.autorId === user?.id;
           const msg: MensagemConversa = { ...raw, lida: isMine || isActive };
@@ -2003,10 +2227,11 @@ export default function ChatPage() {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       }, async (payload: any) => {
         const cid = payload.new.conversa_id as string;
+        historicoDesdeRef.current[cid] = payload.new.historico_desde ?? null;
         if (conversaIdsRef.current.includes(cid)) return;
         const [{ data: conv }, { data: parts }] = await Promise.all([
           supabase.from("chat_conversas").select("*").eq("id", cid).single(),
-          supabase.from("chat_participantes").select("conversa_id, user_id").eq("conversa_id", cid),
+          supabase.from("chat_participantes").select("conversa_id, user_id, historico_desde").eq("conversa_id", cid),
         ]);
         if (!conv) return;
         const membrosIds = ((parts ?? []) as { user_id: string }[]).map(p => p.user_id);
@@ -2030,10 +2255,10 @@ export default function ChatPage() {
         } else {
           setGrupos(prev => prev.some(g => g.id === cid) ? prev : [...prev, {
             id: cid, nome: c.nome ?? "Grupo", tipo: "geral",
-            emoji: c.emoji ?? "", cor: c.cor ?? "bg-slate-700",
+            emoji: c.emoji ?? "", avatarUrl: c.avatar_url ?? undefined, cor: c.cor ?? "bg-slate-700",
             descricao: c.descricao ?? undefined, adminId: c.admin_id ?? undefined,
             somenteAdmin: c.somente_admin ?? false, institucional: c.institucional ?? false,
-            membros: membrosIds, mensagens: [],
+            membros: membrosIds, historicoDesde: historicoDesdeRef.current[cid] ?? undefined, mensagens: [],
           }]);
         }
         setConversaIds(prev => prev.includes(cid) ? prev : [...prev, cid]);
@@ -2207,7 +2432,32 @@ export default function ChatPage() {
     }
   }
 
-  async function createGroup(nome: string, emoji: string, membros: string[]) {
+  async function uploadGroupAvatar(grupoId: string, file: File) {
+    const fd = new FormData();
+    fd.append("file", file);
+    fd.append("conversa_id", grupoId);
+    const res = await fetchWithAuthRetry("/api/chat/grupo-avatar", {
+      method: "POST",
+      body: fd,
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok || !json.url) {
+      throw new Error(json.error ?? "Erro ao enviar foto do grupo");
+    }
+    return json.url as string;
+  }
+
+  async function updateGroupAvatar(grupoId: string, file: File) {
+    try {
+      const url = await uploadGroupAvatar(grupoId, file);
+      setGrupos((prev) => prev.map((g) => g.id === grupoId ? { ...g, avatarUrl: url, emoji: "" } : g));
+      showToast("Foto do grupo atualizada.");
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Erro ao atualizar foto do grupo");
+    }
+  }
+
+  async function createGroup(nome: string, emoji: string, membros: string[], avatarFile?: File | null) {
     const allMembros = membros.includes(u.id) ? membros : [...membros, u.id];
     const res = await fetch("/api/chat/criar-conversa", {
       method: "POST",
@@ -2224,14 +2474,47 @@ export default function ChatPage() {
       return;
     }
     const cid: string = json.id;
+    let avatarUrl: string | undefined;
+    if (avatarFile) {
+      try {
+        avatarUrl = await uploadGroupAvatar(cid, avatarFile);
+      } catch (err) {
+        showToast(err instanceof Error ? err.message : "Grupo criado, mas a foto nao foi enviada.");
+      }
+    }
     setGrupos((prev) => [...prev, {
       id: cid, nome, tipo: "geral", emoji, cor: "bg-slate-700",
-      descricao: `Grupo criado por ${u.nome}`, adminId: u.id,
+      avatarUrl, descricao: `Grupo criado por ${u.nome}`, adminId: u.id,
       somenteAdmin: false, institucional: false, membros: allMembros, mensagens: [],
     }]);
     setConversaIds(prev => prev.includes(cid) ? prev : [...prev, cid]);
     openChat({ tipo: "grupo", id: cid });
     setShowNewGroupModal(false);
+  }
+
+  async function addGroupMembers(grupoId: string, membros: string[], incluirHistorico: boolean) {
+    if (!membros.length) return;
+    const res = await fetchWithAuthRetry("/api/chat/adicionar-participantes", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        conversa_id: grupoId,
+        participantes: membros,
+        incluir_historico: incluirHistorico,
+      }),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      showToast("Erro ao adicionar pessoas: " + (json.error ?? res.statusText));
+      return;
+    }
+    const adicionados = (json.adicionados ?? membros) as string[];
+    setGrupos((prev) => prev.map((g) => g.id === grupoId
+      ? { ...g, membros: [...new Set([...g.membros, ...adicionados])] }
+      : g
+    ));
+    setAddMembersGroupId(null);
+    showToast(adicionados.length ? "Pessoas adicionadas ao grupo." : "Essas pessoas ja estavam no grupo.");
   }
 
   function otherParticipant(dm: ConversaDireta) {
@@ -2460,6 +2743,7 @@ export default function ChatPage() {
 
   const activeDm = activeChat?.tipo === "direto" ? dms.find((d) => d.id === activeChat.id) : null;
   const activeGrupo = activeChat?.tipo === "grupo" ? grupos.find((g) => g.id === activeChat.id) : null;
+  const addMembersGroup = addMembersGroupId ? grupos.find((g) => g.id === addMembersGroupId) ?? null : null;
 
   const gruposBySection = [
     { label: "Canais", items: filteredGrupos.filter((g) => !!g.institucional) },
@@ -2548,19 +2832,26 @@ export default function ChatPage() {
     if (!activeChat) return null;
     const messages = getMessages();
     let headerEl: ReactNode = null;
-    let infoProps: { name: string; description?: string; emoji?: string; cor?: string } | null = null;
+    let infoProps: {
+      name: string;
+      description?: string;
+      emoji?: string;
+      avatarUrl?: string;
+      cor?: string;
+      memberCount?: number;
+      canAddMembers?: boolean;
+      onAddMembers?: () => void;
+      canEditAvatar?: boolean;
+      onAvatarFile?: (file: File) => void;
+    } | null = null;
     let locked = false;
 
     if (activeChat.tipo === "direto" && activeDm) {
       const other = otherParticipant(activeDm);
       const otherUser = usuarios.find((mu) => mu.id === other.id);
-      const avatarEl = (
-        <div className="w-9 h-9 rounded-full bg-slate-700 text-white flex items-center justify-center text-sm font-bold shrink-0">
-          {iniciais(other.nome)}
-        </div>
-      );
+      const avatarEl = <UserAvatar nome={other.nome} foto={otherUser?.foto} size="sm" />;
       headerEl = renderChatHeader(other.nome, otherUser?.role ?? "membro", avatarEl);
-      infoProps = { name: other.nome, description: otherUser?.role };
+      infoProps = { name: other.nome, description: otherUser?.role, avatarUrl: otherUser?.foto };
     } else if (activeChat.tipo === "grupo" && activeGrupo) {
       locked = !canWrite(activeGrupo);
       const avatarEl = <GrupoAvatar grupo={activeGrupo} size="sm" />;
@@ -2569,7 +2860,19 @@ export default function ChatPage() {
         activeGrupo.somenteAdmin ? "Somente lideranca" : (activeGrupo.descricao ?? ""),
         avatarEl
       );
-      infoProps = { name: activeGrupo.nome, description: activeGrupo.descricao, emoji: activeGrupo.emoji, cor: activeGrupo.cor };
+      const canManageMembers = activeGrupo.adminId === u.id || u.role === "admin" || u.role === "pastor";
+      infoProps = {
+        name: activeGrupo.nome,
+        description: activeGrupo.descricao,
+        emoji: activeGrupo.emoji,
+        avatarUrl: activeGrupo.avatarUrl,
+        cor: activeGrupo.cor,
+        memberCount: activeGrupo.membros.length,
+        canAddMembers: canManageMembers,
+        onAddMembers: () => setAddMembersGroupId(activeGrupo.id),
+        canEditAvatar: canManageMembers,
+        onAvatarFile: (file) => updateGroupAvatar(activeGrupo.id, file),
+      };
     }
 
     return (
@@ -2724,6 +3027,7 @@ export default function ChatPage() {
               )}
               {filteredDms.map((dm) => {
                 const other = otherParticipant(dm);
+                const otherUser = usuarios.find((mu) => mu.id === other.id);
                 const last = dm.mensagens[dm.mensagens.length - 1];
                 const unread = dmUnread(dm);
                 const isActive = activeChat?.tipo === "direto" && activeChat.id === dm.id;
@@ -2735,9 +3039,7 @@ export default function ChatPage() {
                     onClick={() => openChat({ tipo: "direto", id: dm.id })}
                   >
                     <div className="relative shrink-0">
-                      <div className="w-10 h-10 rounded-full bg-slate-700 text-white flex items-center justify-center text-sm font-bold">
-                        {iniciais(other.nome)}
-                      </div>
+                      <UserAvatar nome={other.nome} foto={otherUser?.foto} />
                       {unread > 0 && <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center">{unread}</span>}
                     </div>
                     <div className="flex-1 min-w-0">
@@ -2874,6 +3176,15 @@ export default function ChatPage() {
       {toast && <Toast msg={toast} />}
       {showNewDmModal && <NewDmModal currentUserId={u.id} dms={dms} usuarios={usuarios} onStart={startDm} onClose={() => setShowNewDmModal(false)} />}
       {showNewGroupModal && <NewGroupModal currentUserId={u.id} usuarios={usuarios} onClose={() => setShowNewGroupModal(false)} onCreate={createGroup} />}
+      {addMembersGroup && (
+        <AddGroupMembersModal
+          currentUserId={u.id}
+          grupo={addMembersGroup}
+          usuarios={usuarios}
+          onClose={() => setAddMembersGroupId(null)}
+          onAdd={(membros, incluirHistorico) => addGroupMembers(addMembersGroup.id, membros, incluirHistorico)}
+        />
+      )}
       <div className="mb-3">
         <h1 className="text-xl md:text-2xl font-sans font-semibold text-black">Mensagens</h1>
         <p className="text-sm text-gray-500 mt-0.5 hidden sm:block">

@@ -8,7 +8,7 @@ const admin = createClient(
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const { tipo, nome, emoji, cor, descricao, admin_id, somente_admin, participantes } = body;
+  const { tipo, nome, emoji, avatar_url, cor, descricao, admin_id, somente_admin, participantes } = body;
 
   // Para conversas diretas, verifica se já existe uma entre os mesmos participantes
   if (tipo === "direto" && participantes?.length === 2) {
@@ -42,6 +42,7 @@ export async function POST(req: NextRequest) {
   const insertData: Record<string, unknown> = { tipo };
   if (nome) insertData.nome = nome;
   if (emoji) insertData.emoji = emoji;
+  if (avatar_url) insertData.avatar_url = avatar_url;
   if (cor) insertData.cor = cor;
   if (descricao) insertData.descricao = descricao;
   if (admin_id) insertData.admin_id = admin_id;
