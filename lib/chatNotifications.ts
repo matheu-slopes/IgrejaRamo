@@ -147,7 +147,7 @@ async function dispatchChatNotification(job: ChatNotificationJob) {
     delivery = await sendPushToUsers(userIds, {
       title,
       body,
-      url: "/dashboard/chat",
+      url: `/dashboard/chat?conversa=${encodeURIComponent(job.conversa_id)}`,
       tag: `chat-${job.conversa_id}-${job.message_id}`,
     });
     if (delivery.attempted === 0) {

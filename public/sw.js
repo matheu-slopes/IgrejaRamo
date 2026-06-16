@@ -39,18 +39,25 @@ self.addEventListener("push", (event) => {
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const url = event.notification.data?.url || "/dashboard";
+  const targetUrl = new URL(event.notification.data?.url || "/dashboard", self.location.origin).href;
 
   event.waitUntil(
     clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
       for (const client of clientList) {
-        if (client.url.includes(url) && "focus" in client) {
+        const clientUrl = new URL(client.url);
+        if (clientUrl.origin === self.location.origin && "focus" in client) {
+          if ("navigate" in client) {
+            return client.navigate(targetUrl).then((navigatedClient) => {
+              if (navigatedClient && "focus" in navigatedClient) return navigatedClient.focus();
+              return client.focus();
+            });
+          }
           return client.focus();
         }
       }
 
       if (clients.openWindow) {
-        return clients.openWindow(url);
+        return clients.openWindow(targetUrl);
       }
 
       return undefined;

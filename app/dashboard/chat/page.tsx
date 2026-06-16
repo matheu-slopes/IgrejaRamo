@@ -1479,6 +1479,7 @@ export default function ChatPage() {
   const { setTotalUnread, setActiveChatId, contextConversaIds } = useChatUnread();
   const [tab, setTab] = useState<ChatTab>("direto");
   const [activeChat, setActiveChat] = useState<ActiveChat>(null);
+  const [deepLinkTarget, setDeepLinkTarget] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [chatSearchQuery, setChatSearchQuery] = useState("");
   const [chatSearchOpen, setChatSearchOpen] = useState(false);
@@ -1513,6 +1514,7 @@ export default function ChatPage() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const updatesChannelRef = useRef<any>(null);
   const activeChatRef = useRef<ActiveChat>(null);
+  const deepLinkLoadAttemptRef = useRef<string | null>(null);
   // Refs para leitura s�ncrona no beforeunload e closures
   const dmsRef = useRef<ConversaDireta[]>([]);
   const gruposRef = useRef<Grupo[]>([]);
@@ -2420,6 +2422,50 @@ export default function ChatPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeChat?.id]);
 
+  // -- acompanha mudancas na URL feitas pela PWA/notificacao --------
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const readDeepLink = () => {
+      setDeepLinkTarget(new URLSearchParams(window.location.search).get("conversa"));
+    };
+    readDeepLink();
+    window.addEventListener("focus", readDeepLink);
+    window.addEventListener("popstate", readDeepLink);
+    document.addEventListener("visibilitychange", readDeepLink);
+    return () => {
+      window.removeEventListener("focus", readDeepLink);
+      window.removeEventListener("popstate", readDeepLink);
+      document.removeEventListener("visibilitychange", readDeepLink);
+    };
+  }, []);
+
+  // -- abre conversa vinda de deep link/push ------------------------
+  useEffect(() => {
+    if (!user?.id) return;
+    const targetId = deepLinkTarget;
+    if (!targetId || activeChatRef.current?.id === targetId) return;
+
+    const dm = dms.find((item) => item.id === targetId);
+    if (dm) {
+      deepLinkLoadAttemptRef.current = null;
+      openChat({ tipo: "direto", id: targetId });
+      return;
+    }
+
+    const grupo = grupos.find((item) => item.id === targetId);
+    if (grupo) {
+      deepLinkLoadAttemptRef.current = null;
+      openChat({ tipo: "grupo", id: targetId });
+      return;
+    }
+
+    if (deepLinkLoadAttemptRef.current !== targetId) {
+      deepLinkLoadAttemptRef.current = targetId;
+      void carregarConversas();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, deepLinkTarget, dms, grupos]);
+
   function showToast(msg: string) {
     setToast(msg);
     setTimeout(() => setToast(null), 2500);
@@ -2847,6 +2893,7 @@ export default function ChatPage() {
       const focused = document.activeElement as HTMLElement | null;
       focused?.blur?.();
     }
+    syncChatUrl(chat?.id ?? null);
     setActiveChat(chat);
     activeChatRef.current = chat;
     setActiveChatId(chat?.id ?? null);
@@ -2863,6 +2910,15 @@ export default function ChatPage() {
         ? { ...g, mensagens: g.mensagens.map(m => ({ ...m, lida: true })) }
         : g));
     }
+  }
+
+  function syncChatUrl(conversaId: string | null) {
+    if (typeof window === "undefined") return;
+    const url = new URL(window.location.href);
+    if (conversaId) url.searchParams.set("conversa", conversaId);
+    else url.searchParams.delete("conversa");
+    window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+    setDeepLinkTarget(conversaId);
   }
 
   // -- Chat header ---------------------------------------------------
