@@ -484,7 +484,7 @@ export default function DashboardLayout({
 
         {/* Conteúdo principal */}
         <main
-          className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-6 pb-4 md:pb-6 scroll-container"
+          className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-4 md:p-6 pb-4 md:pb-6 scroll-container"
           style={{ overscrollBehaviorY: "contain" }}
         >
           {children}

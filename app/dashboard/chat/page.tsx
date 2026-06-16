@@ -3339,7 +3339,7 @@ export default function ChatPage() {
   // --- Layout -------------------------------------------------------
 
   return (
-    <div>
+    <div className="h-full min-h-0 flex flex-col">
       {toast && <Toast msg={toast} />}
       {showNewDmModal && <NewDmModal currentUserId={u.id} dms={dms} usuarios={usuarios} onStart={startDm} onClose={() => setShowNewDmModal(false)} />}
       {showNewGroupModal && <NewGroupModal currentUserId={u.id} usuarios={usuarios} onClose={() => setShowNewGroupModal(false)} onCreate={createGroup} />}
@@ -3352,7 +3352,7 @@ export default function ChatPage() {
           onAdd={(membros, incluirHistorico) => addGroupMembers(addMembersGroup.id, membros, incluirHistorico)}
         />
       )}
-      <div className="mb-3">
+      <div className={clsx("mb-3 shrink-0", activeChat ? "hidden md:block" : "block")}>
         <h1 className="text-xl md:text-2xl font-sans font-semibold text-black">Mensagens</h1>
         <p className="text-sm text-gray-500 mt-0.5 hidden sm:block">
           Conversas diretas, chat do culto e canais de ministério.
@@ -3360,8 +3360,10 @@ export default function ChatPage() {
       </div>
 
       <div
-        className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden"
-        style={{ height: "calc(100dvh - 180px)", minHeight: 400 }}
+        className={clsx(
+          "bg-white border border-gray-100 shadow-sm overflow-hidden flex-1 min-h-0",
+          activeChat ? "rounded-none md:rounded-2xl" : "rounded-2xl"
+        )}
       >
         <div className="flex h-full min-h-0">
           {/* Left list */}
