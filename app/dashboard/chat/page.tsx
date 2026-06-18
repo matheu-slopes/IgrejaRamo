@@ -10,7 +10,7 @@ import {
   MessageSquare, Users, Send, ArrowLeft, Search, Lock, Plus,
   Info, Smile, Paperclip, Mic, Star, X, FileText, Square, MicOff,
   Image as ImageIcon, MoreVertical, Trash2, LogOut, Check, Archive, Pencil, Reply,
-  Download, Play, Camera,
+  Download, Play, Camera, CheckCheck, Clock,
 } from "lucide-react";
 import clsx from "clsx";
 
@@ -280,6 +280,20 @@ function compareMensagemOrder(a: MensagemConversa, b: MensagemConversa) {
   return a.id.localeCompare(b.id);
 }
 
+function cursorReachedMessage(cursor: ReceiptMessageCursor | null | undefined, msg: MensagemConversa) {
+  if (!cursor) return false;
+
+  const cursorSeq = cursor.sequence_id ?? 0;
+  const msgSeq = msg.sequenceId ?? 0;
+  if (cursorSeq || msgSeq) return cursorSeq >= msgSeq && cursorSeq > 0;
+
+  const cursorTime = cursor.criado_em ? new Date(cursor.criado_em).getTime() : 0;
+  const msgTime = msg.criadoEm ? new Date(msg.criadoEm).getTime() : 0;
+  if (cursorTime !== msgTime) return cursorTime >= msgTime;
+
+  return cursor.id >= msg.id;
+}
+
 type PendingChatMessage = {
   id: string;
   conversaId: string;
@@ -296,6 +310,25 @@ type ChatParticipacao = {
   historico_desde?: string | null;
   ocultado_em?: string | null;
 };
+
+type ReceiptMessageCursor = {
+  id: string;
+  conversa_id?: string;
+  criado_em: string | null;
+  sequence_id: number | null;
+};
+
+type ConversationReceiptState = {
+  participantIds: string[];
+  participants?: Array<{ userId: string; historicoDesde: string | null }>;
+  cursors: Array<{
+    userId: string;
+    delivered: ReceiptMessageCursor | null;
+    read: ReceiptMessageCursor | null;
+  }>;
+};
+
+type MessageReceiptStatus = "sending" | "queued" | "sent" | "delivered" | "read";
 
 type ChatTab = "direto" | "grupos";
 type ActiveChat = { tipo: "direto"; id: string } | { tipo: "grupo"; id: string } | null;
@@ -686,12 +719,33 @@ function ComposeBar({
 
 // --- MessageBubble ------------------------------------------------
 
+function ReceiptIndicator({ status }: { status?: MessageReceiptStatus }) {
+  if (!status) return null;
+  if (status === "sending") {
+    return <Clock className="w-3 h-3 text-gray-300" aria-label="Enviando" />;
+  }
+  if (status === "queued") {
+    return <Clock className="w-3 h-3 text-amber-500" aria-label="Na fila" />;
+  }
+  if (status === "sent") {
+    return <Check className="w-3 h-3 text-gray-300" aria-label="Enviada" />;
+  }
+  return (
+    <CheckCheck
+      className={clsx("w-3.5 h-3.5", status === "read" ? "text-sky-400" : "text-gray-300")}
+      aria-label={status === "read" ? "Lida" : "Entregue"}
+    />
+  );
+}
+
 function MessageBubble({
-  msg, isMe, showAuthor, onStar, isStarred, onEdit, onReply, onReact, myReacted,
+  msg, isMe, showAuthor, receiptStatus, onRetryFailed, onStar, isStarred, onEdit, onReply, onReact, myReacted,
 }: {
   msg: MensagemConversa;
   isMe: boolean;
   showAuthor: boolean;
+  receiptStatus?: MessageReceiptStatus;
+  onRetryFailed: () => void;
   onStar: (id: string) => void;
   isStarred: boolean;
   onEdit: (id: string, newText: string) => void;
@@ -845,8 +899,13 @@ function MessageBubble({
           {isStarred && <Star className="w-2.5 h-2.5 text-gold-500 fill-gold-500" />}
           {msg.editadoEm && <span className="text-[10px] text-gray-400 italic">editado</span>}
           <span className="text-[10px] text-gray-400">{formatTime(msg.criadoEm)}</span>
+          {isMe && <ReceiptIndicator status={receiptStatus} />}
           {isMe && msg.status === "pending" && <span className="text-[10px] text-gray-400">enviando</span>}
-          {isMe && msg.status === "failed" && <span className="text-[10px] text-amber-600">na fila</span>}
+          {isMe && msg.status === "failed" && (
+            <button onClick={onRetryFailed} className="text-[10px] text-amber-600 hover:text-amber-700 hover:underline">
+              na fila
+            </button>
+          )}
         </div>
 
         {/* Bot�es de a��o � absolutamente posicionados (sem impacto no layout) */}
@@ -920,12 +979,14 @@ function MessageBubble({
 // --- ConversationMessages -----------------------------------------
 
 function ConversationMessages({
-  messages, myId, isGroup, searchQuery, onStar, starredIds, onEdit, onReply, onReact, myReacoes,
+  messages, myId, isGroup, searchQuery, receiptForMessage, onRetryFailed, onStar, starredIds, onEdit, onReply, onReact, myReacoes,
 }: {
   messages: MensagemConversa[];
   myId: string;
   isGroup: boolean;
   searchQuery: string;
+  receiptForMessage: (msg: MensagemConversa) => MessageReceiptStatus | undefined;
+  onRetryFailed: () => void;
   onStar: (id: string) => void;
   starredIds: Set<string>;
   onEdit: (id: string, newText: string) => void;
@@ -974,6 +1035,8 @@ function ConversationMessages({
                   msg={msg}
                   isMe={msg.autorId === myId}
                   showAuthor={showAuthor}
+                  receiptStatus={receiptForMessage(msg)}
+                  onRetryFailed={onRetryFailed}
                   onStar={onStar}
                   isStarred={starredIds.has(msg.id)}
                   onEdit={onEdit}
@@ -1391,20 +1454,33 @@ function AddGroupMembersModal({
   grupo: Grupo;
   usuarios: import("@/types").User[];
   onClose: () => void;
-  onAdd: (membros: string[], incluirHistorico: boolean) => void;
+  onAdd: (membros: string[], incluirHistorico: boolean) => Promise<boolean> | boolean;
 }) {
   const [membros, setMembros] = useState<string[]>([]);
   const [search, setSearch] = useState("");
   const [incluirHistorico, setIncluirHistorico] = useState(false);
+  const [saving, setSaving] = useState(false);
   const available = usuarios.filter((mu) => mu.id !== currentUserId && !grupo.membros.includes(mu.id));
   const filtered = available.filter((mu) => !search || mu.nome.toLowerCase().includes(search.toLowerCase()));
 
   function toggle(id: string) {
+    if (saving) return;
     setMembros((prev) => prev.includes(id) ? prev.filter((m) => m !== id) : [...prev, id]);
   }
 
+  async function handleAdd() {
+    if (!membros.length || saving) return;
+    setSaving(true);
+    try {
+      const ok = await onAdd(membros, incluirHistorico);
+      if (!ok) setSaving(false);
+    } catch {
+      setSaving(false);
+    }
+  }
+
   return (
-    <div className="fixed inset-0 bg-slate-700/40 z-50 flex items-center justify-center p-4" onClick={onClose}>
+    <div className="fixed inset-0 bg-slate-700/40 z-50 flex items-center justify-center p-4" onClick={saving ? undefined : onClose}>
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
           <div className="min-w-0">
@@ -1418,6 +1494,7 @@ function AddGroupMembersModal({
             <input
               type="checkbox"
               checked={incluirHistorico}
+              disabled={saving}
               onChange={(e) => setIncluirHistorico(e.target.checked)}
               className="mt-0.5 h-4 w-4 accent-slate-700 shrink-0"
             />
@@ -1437,7 +1514,7 @@ function AddGroupMembersModal({
             </div>
             <div className="max-h-44 overflow-y-auto space-y-1">
               {filtered.map((mu) => (
-                <button key={mu.id} onClick={() => toggle(mu.id)} className="w-full flex items-center gap-3 px-2 py-2 rounded-xl hover:bg-gray-50 transition text-left">
+                <button key={mu.id} disabled={saving} onClick={() => toggle(mu.id)} className="w-full flex items-center gap-3 px-2 py-2 rounded-xl hover:bg-gray-50 disabled:opacity-60 transition text-left">
                   <UserAvatar nome={mu.nome} foto={mu.foto} size="sm" />
                   <span className="flex-1 text-sm text-gray-700 truncate">{mu.nome}</span>
                   {membros.includes(mu.id) && <Check className="w-4 h-4 text-gray-800 shrink-0" />}
@@ -1449,11 +1526,11 @@ function AddGroupMembersModal({
         </div>
         <div className="px-5 pb-4">
           <button
-            onClick={() => membros.length > 0 && onAdd(membros, incluirHistorico)}
-            disabled={membros.length === 0}
+            onClick={handleAdd}
+            disabled={membros.length === 0 || saving}
             className="w-full bg-slate-700 text-white rounded-xl py-2.5 text-sm font-semibold hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition"
           >
-            Adicionar{membros.length > 0 ? ` (${membros.length})` : ""}
+            {saving ? "Adicionando..." : `Adicionar${membros.length > 0 ? ` (${membros.length})` : ""}`}
           </button>
         </div>
       </div>
@@ -1515,6 +1592,7 @@ export default function ChatPage() {
 
   const [dms, setDms] = useState<ConversaDireta[]>([]);
   const [grupos, setGrupos] = useState<Grupo[]>([]);
+  const [receiptState, setReceiptState] = useState<Record<string, ConversationReceiptState>>({});
   const cacheLoadedRef = useRef(false);
   const [archivedDms, setArchivedDms] = useState<Set<string>>(new Set());
   const [replyTo, setReplyTo] = useState<MensagemConversa | null>(null);
@@ -1550,6 +1628,7 @@ export default function ChatPage() {
   const lastSequenceRef = useRef<number>(0);
   const syncRunningRef = useRef(false);
   const outboxFlushRunningRef = useRef(false);
+  const outboxFlushQueuedRef = useRef(false);
   const notificationDispatchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Timer para debounciar sync quando vários canais reconectam ao mesmo tempo
   const reconnectSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1662,6 +1741,51 @@ export default function ChatPage() {
     }
   }
 
+  async function refreshReceipts(ids = conversaIdsRef.current) {
+    if (!user?.id || !ids.length) return;
+    try {
+      const res = await fetchWithAuthRetry("/api/chat/receipts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ conversa_ids: ids }),
+      }, 2, 12_000);
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.conversas) return;
+      setReceiptState((prev) => ({ ...prev, ...(json.conversas as Record<string, ConversationReceiptState>) }));
+    } catch (err) {
+      console.warn("chat receipts refresh error:", err);
+    }
+  }
+
+  function receiptForMessage(conversaId: string, msg: MensagemConversa): MessageReceiptStatus | undefined {
+    if (msg.autorId !== u.id) return undefined;
+    if (msg.status === "pending") return "sending";
+    if (msg.status === "failed") return "queued";
+
+    const state = receiptState[conversaId];
+    if (!state) return "sent";
+
+    const recipients = state.participants
+      ? state.participants
+          .filter((participant) => {
+            if (participant.userId === msg.autorId) return false;
+            if (!participant.historicoDesde) return true;
+            return new Date(msg.criadoEm).getTime() >= new Date(participant.historicoDesde).getTime();
+          })
+          .map((participant) => participant.userId)
+      : state.participantIds.filter((id) => id !== msg.autorId);
+    if (!recipients.length) return "read";
+
+    const recipientCursors = state.cursors.filter((cursor) => recipients.includes(cursor.userId));
+    const readCount = recipientCursors.filter((cursor) => cursorReachedMessage(cursor.read, msg)).length;
+    if (readCount >= recipients.length) return "read";
+
+    const deliveredCount = recipientCursors.filter((cursor) => cursorReachedMessage(cursor.delivered, msg)).length;
+    if (deliveredCount > 0) return "delivered";
+
+    return "sent";
+  }
+
   async function persistirMensagemPendente(item: PendingChatMessage) {
     const r = await fetchWithAuthRetry("/api/chat/mensagem", {
       method: "POST",
@@ -1690,12 +1814,17 @@ export default function ChatPage() {
   }
 
   async function flushOutbox(showFailureToast = false) {
-    if (!user?.id || outboxFlushRunningRef.current) return;
+    if (!user?.id) return;
+    if (outboxFlushRunningRef.current) {
+      outboxFlushQueuedRef.current = true;
+      return;
+    }
     outboxFlushRunningRef.current = true;
     try {
       const items = lerOutbox(user.id).filter((item) => item.message.autorId === user.id);
       for (const item of items) {
         try {
+          setMensagemLocal(item.tipo, item.conversaId, { ...item.message, status: "pending" });
           const ack = await persistirMensagemPendente(item);
           const finalMsg: MensagemConversa = {
             ...item.message,
@@ -1705,6 +1834,7 @@ export default function ChatPage() {
           };
           setMensagemLocal(item.tipo, item.conversaId, finalMsg);
           removeOutbox(user.id, item.id);
+          void refreshReceipts([item.conversaId]);
           broadcastChannelsRef.current.get(item.conversaId)?.send({ type: "broadcast", event: "msg", payload: finalMsg })
             .then((s: string) => { if (s !== "ok") console.warn("broadcast outbox:", s); });
           scheduleNotificationDispatch();
@@ -1723,6 +1853,10 @@ export default function ChatPage() {
       }
     } finally {
       outboxFlushRunningRef.current = false;
+      if (outboxFlushQueuedRef.current) {
+        outboxFlushQueuedRef.current = false;
+        setTimeout(() => flushOutbox(false), 100);
+      }
     }
   }
 
@@ -1833,6 +1967,7 @@ export default function ChatPage() {
       const ids = [...mergedDms.map(d => d.id), ...mergedGrupos.map(g => g.id)];
       setConversaIds(ids);
       conversaIdsRef.current = ids;
+      void refreshReceipts(ids);
     }
 
     // 2) Busca do servidor em background (mescla, nunca substitui)
@@ -1843,7 +1978,10 @@ export default function ChatPage() {
 
   useEffect(() => {
     if (!user?.id) return;
-    const retry = () => flushOutbox(false);
+    const retry = () => {
+      flushOutbox(false);
+      refreshReceipts();
+    };
     const retryVisible = () => {
       if (document.visibilityState === "visible") retry();
     };
@@ -2016,6 +2154,7 @@ export default function ChatPage() {
     const allIds = [...dmsComPendentes.map(d => d.id), ...gruposComPendentes.map(g => g.id)];
     setConversaIds(allIds);
     conversaIdsRef.current = allIds;
+    void refreshReceipts(allIds);
 
     // Atualiza cursor de backfill para buscar apenas novidades daqui pra frente.
     let latest = "";
@@ -2123,6 +2262,7 @@ export default function ChatPage() {
         },
         body: JSON.stringify({ type: "read", conversaId }),
       }, 2);
+      await refreshReceipts([conversaId]);
     } catch (e) {
       console.error("chat read ack error:", e);
     }
@@ -2151,7 +2291,10 @@ export default function ChatPage() {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const rows = ((json.mensagens ?? []) as any[])
         .filter((row) => canSeeMensagem(row.conversa_id, row.criado_em));
-      if (!rows.length) return;
+      if (!rows.length) {
+        await refreshReceipts();
+        return;
+      }
 
       const knownIds = new Set(conversaIdsRef.current);
       const unknownConversation = rows.some((r) => !knownIds.has(r.conversa_id));
@@ -2210,6 +2353,7 @@ export default function ChatPage() {
       }
       const newest = (json.max_criado_em as string | undefined) ?? (rows[rows.length - 1]?.criado_em as string | undefined);
       if (newest) lastBackfillRef.current = newest;
+      await refreshReceipts();
     } finally {
       syncRunningRef.current = false;
     }
@@ -2355,6 +2499,15 @@ export default function ChatPage() {
         setGrupos(prev => prev.map(g => g.id === cid ? {
           ...g, mensagens: g.mensagens.map(m => m.id === msg.id ? msg : m),
         } : g));
+      })
+      // -- UPDATE/INSERT cursores: recibos de entregue/lido -----------------
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .on("postgres_changes" as any, {
+        event: "*", schema: "public", table: "chat_participante_cursors",
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      }, (payload: any) => {
+        const cid = (payload.new?.conversa_id ?? payload.old?.conversa_id) as string | undefined;
+        if (cid && conversaIdsRef.current.includes(cid)) void refreshReceipts([cid]);
       })
       // -- INSERT chat_participantes: detecta novas conversas em tempo real --
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -2699,33 +2852,41 @@ export default function ChatPage() {
       somenteAdmin: false, institucional: false, membros: allMembros, mensagens: [],
     }]);
     setConversaIds(prev => prev.includes(cid) ? prev : [...prev, cid]);
+    void refreshReceipts([cid]);
     openChat({ tipo: "grupo", id: cid });
     setShowNewGroupModal(false);
   }
 
-  async function addGroupMembers(grupoId: string, membros: string[], incluirHistorico: boolean) {
-    if (!membros.length) return;
-    const res = await fetchWithAuthRetry("/api/chat/adicionar-participantes", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        conversa_id: grupoId,
-        participantes: membros,
-        incluir_historico: incluirHistorico,
-      }),
-    });
-    const json = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      showToast("Erro ao adicionar pessoas: " + (json.error ?? res.statusText));
-      return;
+  async function addGroupMembers(grupoId: string, membros: string[], incluirHistorico: boolean): Promise<boolean> {
+    if (!membros.length) return false;
+    try {
+      const res = await fetchWithAuthRetry("/api/chat/adicionar-participantes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          conversa_id: grupoId,
+          participantes: membros,
+          incluir_historico: incluirHistorico,
+        }),
+      }, 2, 12_000);
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        showToast("Erro ao adicionar pessoas: " + (json.error ?? res.statusText));
+        return false;
+      }
+      const adicionados = (json.adicionados ?? membros) as string[];
+      setGrupos((prev) => prev.map((g) => g.id === grupoId
+        ? { ...g, membros: [...new Set([...g.membros, ...adicionados])] }
+        : g
+      ));
+      await refreshReceipts([grupoId]);
+      setAddMembersGroupId(null);
+      showToast(adicionados.length ? "Pessoas adicionadas ao grupo." : "Essas pessoas ja estavam no grupo.");
+      return true;
+    } catch (err) {
+      showToast("Erro ao adicionar pessoas: " + (err instanceof Error ? err.message : "falha de rede"));
+      return false;
     }
-    const adicionados = (json.adicionados ?? membros) as string[];
-    setGrupos((prev) => prev.map((g) => g.id === grupoId
-      ? { ...g, membros: [...new Set([...g.membros, ...adicionados])] }
-      : g
-    ));
-    setAddMembersGroupId(null);
-    showToast(adicionados.length ? "Pessoas adicionadas ao grupo." : "Essas pessoas ja estavam no grupo.");
   }
 
   async function removeGroupMember(grupoId: string, membro: User) {
@@ -2757,6 +2918,7 @@ export default function ChatPage() {
       ? { ...g, membros: g.membros.filter((id) => !removidos.includes(id)) }
       : g
     ));
+    await refreshReceipts([grupoId]);
     showToast("Pessoa removida do grupo.");
   }
 
@@ -3189,6 +3351,8 @@ export default function ChatPage() {
             myId={u.id}
             isGroup={activeChat.tipo === "grupo"}
             searchQuery={chatSearchOpen ? chatSearchQuery : ""}
+            receiptForMessage={(msg) => receiptForMessage(activeChat.id, msg)}
+            onRetryFailed={() => flushOutbox(true)}
             onStar={toggleStar}
             starredIds={starredIds}
             onEdit={editMsg}
