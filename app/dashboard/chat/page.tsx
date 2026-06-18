@@ -1209,7 +1209,7 @@ function InfoPanel({
                     </div>
                     {podeRemover && (
                       <button
-                        onClick={() => onRemoveMember(member)}
+                        onClick={() => onRemoveMember?.(member)}
                         className="w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:bg-red-50 hover:text-red-600 transition"
                         title="Remover do grupo"
                       >
