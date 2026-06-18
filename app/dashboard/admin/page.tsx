@@ -279,12 +279,16 @@ function MinisteriosTab({
   temPermissao: (p: Permissao) => boolean;
 }) {
   const [editandoMin, setEditandoMin] = useState<Ministerio | null>(null);
-  const [salvando, setSalvando] = useState(false);
+  const [ministeriosOverrides, setMinisteriosOverrides] = useState<Record<string, Ministerio[]>>({});
+  const [salvandoIds, setSalvandoIds] = useState<Set<string>>(new Set());
   const [novoNome, setNovoNome] = useState("");
   const [criando, setCriando] = useState(false);
   const [erroCriacao, setErroCriacao] = useState("");
 
   const ministeriosLista = canais.map((c) => c.ministerio);
+  const usuariosRender = usuarios.map((u) => (
+    ministeriosOverrides[u.id] ? { ...u, ministerios: ministeriosOverrides[u.id] } : u
+  ));
 
   async function toggleMembro(usuario: User, ministerio: Ministerio) {
     const ministerioDb = ministerio;
@@ -292,10 +296,23 @@ function MinisteriosTab({
     const novos = jaEsta
       ? (usuario.ministerios ?? []).filter((m) => displayMinisterio(m) !== displayMinisterio(ministerioDb))
       : [...(usuario.ministerios ?? []), ministerioDb];
-    setSalvando(true);
-    await supabase.from("perfis").update({ ministerios: novos }).eq("id", usuario.id);
-    setSalvando(false);
-    usuario.ministerios = novos;
+    const anteriores = usuario.ministerios ?? [];
+    const saveKey = `${usuario.id}:${ministerioDb}`;
+
+    setMinisteriosOverrides((prev) => ({ ...prev, [usuario.id]: novos }));
+    setSalvandoIds((prev) => new Set(prev).add(saveKey));
+
+    const { error } = await supabase.from("perfis").update({ ministerios: novos }).eq("id", usuario.id);
+
+    if (error) {
+      setMinisteriosOverrides((prev) => ({ ...prev, [usuario.id]: anteriores }));
+    }
+
+    setSalvandoIds((prev) => {
+      const next = new Set(prev);
+      next.delete(saveKey);
+      return next;
+    });
   }
 
   async function criarMinisterio() {
@@ -369,7 +386,7 @@ function MinisteriosTab({
       </div>
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {ministeriosLista.map((min) => {
-          const membros = usuarios.filter((u) => u.ministerios?.some((m) => displayMinisterio(m) === displayMinisterio(min)));
+          const membros = usuariosRender.filter((u) => u.ministerios?.some((m) => displayMinisterio(m) === displayMinisterio(min)));
           const isEditing = editandoMin === min;
           return (
             <div key={min} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
@@ -409,14 +426,15 @@ function MinisteriosTab({
                 ) : (
                   <div className="space-y-1.5 max-h-48 overflow-y-auto">
                     <p className="text-xs text-gray-500 mb-2">Selecione os membros deste ministério:</p>
-                    {usuarios.map((u) => {
+                    {usuariosRender.map((u) => {
                       const jaEsta = u.ministerios?.some((m) => displayMinisterio(m) === displayMinisterio(min));
+                      const salvandoEste = salvandoIds.has(`${u.id}:${min}`);
                       return (
                         <label key={u.id} className="flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-gray-50 cursor-pointer">
                           <input
                             type="checkbox"
                             checked={!!jaEsta}
-                            disabled={salvando}
+                            disabled={salvandoEste}
                             onChange={() => toggleMembro(u, min)}
                             className="accent-black w-4 h-4"
                           />

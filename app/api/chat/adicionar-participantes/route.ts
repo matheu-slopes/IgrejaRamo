@@ -12,7 +12,11 @@ const admin = createClient(
 function isMissingColumn(error: unknown, column: string) {
   const err = error as { code?: string; message?: string } | null;
   const msg = String(err?.message ?? "").toLowerCase();
-  return err?.code === "42703" && msg.includes(column.toLowerCase());
+  const col = column.toLowerCase();
+  return (
+    (err?.code === "42703" && msg.includes(col)) ||
+    (msg.includes(col) && msg.includes("schema cache"))
+  );
 }
 
 async function getAuthUser(req: NextRequest) {

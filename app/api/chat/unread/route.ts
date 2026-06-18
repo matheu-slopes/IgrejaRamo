@@ -6,6 +6,12 @@ const admin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+type ChatParticipacao = {
+  conversa_id: string;
+  historico_desde?: string | null;
+  ocultado_em?: string | null;
+};
+
 function isMissingSequenceColumn(error: unknown) {
   const err = error as { code?: string; message?: string } | null;
   const msg = String(err?.message ?? "").toLowerCase();
@@ -15,7 +21,11 @@ function isMissingSequenceColumn(error: unknown) {
 function isMissingColumn(error: unknown, column: string) {
   const err = error as { code?: string; message?: string } | null;
   const msg = String(err?.message ?? "").toLowerCase();
-  return err?.code === "42703" && msg.includes(column.toLowerCase());
+  const col = column.toLowerCase();
+  return (
+    (err?.code === "42703" && msg.includes(col)) ||
+    (msg.includes(col) && msg.includes("schema cache"))
+  );
 }
 
 function isNewer(
@@ -34,6 +44,14 @@ function isNewer(
   return candidate.id > current.id;
 }
 
+function maxTimestamp(...values: Array<string | null | undefined>) {
+  const valid = values.filter(Boolean) as string[];
+  if (!valid.length) return null;
+  return valid.reduce((latest, current) =>
+    new Date(current).getTime() > new Date(latest).getTime() ? current : latest
+  );
+}
+
 async function authUser(req: NextRequest) {
   const token = req.headers.get("authorization")?.replace("Bearer ", "").trim();
   if (!token) return null;
@@ -45,24 +63,38 @@ export async function GET(req: NextRequest) {
   const user = await authUser(req);
   if (!user) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
 
-  let { data: participacoes, error: partErr } = await admin
+  const participacoesResult = await admin
     .from("chat_participantes")
-    .select("conversa_id, historico_desde")
+    .select("conversa_id, historico_desde, ocultado_em")
     .eq("user_id", user.id);
+  let participacoes = participacoesResult.data as ChatParticipacao[] | null;
+  let partErr = participacoesResult.error;
+
+  if (partErr && isMissingColumn(partErr, "ocultado_em")) {
+    const fallback = await admin
+      .from("chat_participantes")
+      .select("conversa_id, historico_desde")
+      .eq("user_id", user.id);
+    participacoes = fallback.data?.map((p: { conversa_id: string; historico_desde?: string | null }) => ({ ...p, ocultado_em: null })) as ChatParticipacao[] | null;
+    partErr = fallback.error;
+  }
 
   if (partErr && isMissingColumn(partErr, "historico_desde")) {
     const fallback = await admin
       .from("chat_participantes")
       .select("conversa_id")
       .eq("user_id", user.id);
-    participacoes = fallback.data?.map((p: { conversa_id: string }) => ({ ...p, historico_desde: null })) ?? null;
+    participacoes = fallback.data?.map((p: { conversa_id: string }) => ({ ...p, historico_desde: null, ocultado_em: null })) as ChatParticipacao[] | null;
     partErr = fallback.error;
   }
 
   if (partErr) return NextResponse.json({ error: partErr.message }, { status: 500 });
 
   const historicoDesdeByConversa = new Map(
-    (participacoes ?? []).map((p: { conversa_id: string; historico_desde?: string | null }) => [p.conversa_id, p.historico_desde ?? null])
+    (participacoes ?? []).map((p) => [
+      p.conversa_id,
+      maxTimestamp(p.historico_desde, p.ocultado_em),
+    ])
   );
   const conversaIds = (participacoes ?? []).map((p: { conversa_id: string }) => p.conversa_id);
   if (!conversaIds.length) return NextResponse.json({ ok: true, total: 0, by_conversa: {} });

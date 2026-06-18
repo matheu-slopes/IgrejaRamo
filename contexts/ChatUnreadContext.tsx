@@ -246,10 +246,19 @@ export function ChatUnreadProvider({ children }: { children: ReactNode }) {
     async function carregarIds() {
       const result = await supabase
         .from("chat_participantes")
-        .select("conversa_id, historico_desde")
+        .select("conversa_id, historico_desde, ocultado_em")
         .eq("user_id", uid);
-      let data = result.data as { conversa_id: string; historico_desde?: string | null }[] | null;
+      let data = result.data as { conversa_id: string; historico_desde?: string | null; ocultado_em?: string | null }[] | null;
       let error = result.error;
+
+      if (error && isMissingColumn(error, "ocultado_em")) {
+        const fallback = await supabase
+          .from("chat_participantes")
+          .select("conversa_id, historico_desde")
+          .eq("user_id", uid);
+        data = fallback.data as { conversa_id: string; historico_desde?: string | null }[] | null;
+        error = fallback.error;
+      }
 
       if (error && isMissingColumn(error, "historico_desde")) {
         const fallback = await supabase

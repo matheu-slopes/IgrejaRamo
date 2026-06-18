@@ -238,7 +238,11 @@ function grupoEmojiValido(emoji?: string) {
 function isMissingColumn(error: unknown, column: string) {
   const err = error as { code?: string; message?: string } | null;
   const msg = String(err?.message ?? "").toLowerCase();
-  return err?.code === "42703" && msg.includes(column.toLowerCase());
+  const col = column.toLowerCase();
+  return (
+    (err?.code === "42703" && msg.includes(col)) ||
+    (msg.includes(col) && msg.includes("schema cache"))
+  );
 }
 function formatTime(iso: string) {
   return new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
@@ -290,6 +294,7 @@ type ChatParticipacao = {
   conversa_id: string;
   user_id?: string;
   historico_desde?: string | null;
+  ocultado_em?: string | null;
 };
 
 type ChatTab = "direto" | "grupos";
@@ -997,6 +1002,7 @@ function ConversationMessages({
 function InfoPanel({
   name, description, emoji, avatarUrl, cor, messages, starredIds,
   currentUserId, groupMembers, memberCount, canAddMembers, onAddMembers,
+  canRemoveMembers, groupOwnerId, onRemoveMember,
   canEditAvatar, onAvatarFile, onSearchMessages, onClose,
 }: {
   name: string;
@@ -1011,6 +1017,9 @@ function InfoPanel({
   memberCount?: number;
   canAddMembers?: boolean;
   onAddMembers?: () => void;
+  canRemoveMembers?: boolean;
+  groupOwnerId?: string;
+  onRemoveMember?: (member: User) => void;
   canEditAvatar?: boolean;
   onAvatarFile?: (file: File) => void;
   onSearchMessages?: () => void;
@@ -1182,17 +1191,34 @@ function InfoPanel({
             )}
 
             <div className="space-y-1">
-              {filteredMembers.map((member) => (
-                <div key={member.id} className="flex items-center gap-3 py-2">
-                  <UserAvatar nome={member.nome} foto={member.foto} size="sm" />
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold text-gray-800 truncate">
-                      {member.id === currentUserId ? "Você" : member.nome}
-                    </p>
-                    <p className="text-xs text-gray-400 capitalize truncate">{member.role}</p>
+              {filteredMembers.map((member) => {
+                const podeRemover = Boolean(
+                  canRemoveMembers &&
+                  onRemoveMember &&
+                  member.id !== currentUserId &&
+                  member.id !== groupOwnerId
+                );
+                return (
+                  <div key={member.id} className="flex items-center gap-3 py-2">
+                    <UserAvatar nome={member.nome} foto={member.foto} size="sm" />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold text-gray-800 truncate">
+                        {member.id === currentUserId ? "Você" : member.nome}
+                      </p>
+                      <p className="text-xs text-gray-400 capitalize truncate">{member.role}</p>
+                    </div>
+                    {podeRemover && (
+                      <button
+                        onClick={() => onRemoveMember(member)}
+                        className="w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:bg-red-50 hover:text-red-600 transition"
+                        title="Remover do grupo"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
                   </div>
-                </div>
-              ))}
+                );
+              })}
               {filteredMembers.length === 0 && (
                 <p className="text-center text-gray-400 text-sm py-6">Nenhum membro encontrado.</p>
               )}
@@ -1728,6 +1754,14 @@ export default function ChatPage() {
     return new Date(criadoEm).getTime() >= new Date(historicoDesde).getTime();
   }
 
+  function maxTimestamp(...values: Array<string | null | undefined>) {
+    const valid = values.filter(Boolean) as string[];
+    if (!valid.length) return null;
+    return valid.reduce((latest, current) =>
+      new Date(current).getTime() > new Date(latest).getTime() ? current : latest
+    );
+  }
+
   // -- carregar conversas --------------------------------------------
   useEffect(() => {
     if (!user?.id) return;
@@ -1830,13 +1864,22 @@ export default function ChatPage() {
 
   async function carregarConversas() {
     if (!user) return;
-    let { data: participacoes, error: participacoesError } = await supabase
-      .from("chat_participantes").select("conversa_id, historico_desde").eq("user_id", user.id);
+    const participacoesResult = await supabase
+      .from("chat_participantes").select("conversa_id, historico_desde, ocultado_em").eq("user_id", user.id);
+    let participacoes = participacoesResult.data as ChatParticipacao[] | null;
+    let participacoesError = participacoesResult.error;
+
+    if (participacoesError && isMissingColumn(participacoesError, "ocultado_em")) {
+      const fallback = await supabase
+        .from("chat_participantes").select("conversa_id, historico_desde").eq("user_id", user.id);
+      participacoes = fallback.data?.map((p: { conversa_id: string; historico_desde?: string | null }) => ({ ...p, ocultado_em: null })) ?? null;
+      participacoesError = fallback.error;
+    }
 
     if (participacoesError && isMissingColumn(participacoesError, "historico_desde")) {
       const fallback = await supabase
         .from("chat_participantes").select("conversa_id").eq("user_id", user.id);
-      participacoes = fallback.data?.map((p: { conversa_id: string }) => ({ ...p, historico_desde: null })) ?? null;
+      participacoes = fallback.data?.map((p: { conversa_id: string }) => ({ ...p, historico_desde: null, ocultado_em: null })) ?? null;
       participacoesError = fallback.error;
     }
 
@@ -1848,7 +1891,10 @@ export default function ChatPage() {
 
     const ids = (participacoes as ChatParticipacao[]).map(p => p.conversa_id);
     historicoDesdeRef.current = Object.fromEntries(
-      (participacoes as ChatParticipacao[]).map(p => [p.conversa_id, p.historico_desde ?? null])
+      (participacoes as ChatParticipacao[]).map(p => [p.conversa_id, maxTimestamp(p.historico_desde, p.ocultado_em)])
+    );
+    const ocultadoPorConversa = new Map(
+      (participacoes as ChatParticipacao[]).map(p => [p.conversa_id, p.ocultado_em ?? null])
     );
 
     const [conversasResult, participantesResult, mensagensResult] = await Promise.all([
@@ -1901,6 +1947,7 @@ export default function ChatPage() {
     for (const c of (conversas ?? []) as any[]) {
       const membrosIds = participantesPorConversa[c.id]?.length ? participantesPorConversa[c.id] : [user.id];
       const lastMsg = lastMsgPorConversa[c.id];
+      if (ocultadoPorConversa.get(c.id) && !lastMsg) continue;
       const mensagens = lastMsg ? [{ ...lastMsg, lida: true }] : [];
 
       if (c.tipo === "direto") {
@@ -2108,7 +2155,9 @@ export default function ChatPage() {
 
       const knownIds = new Set(conversaIdsRef.current);
       const unknownConversation = rows.some((r) => !knownIds.has(r.conversa_id));
-      if (unknownConversation) {
+      const knownVisibleIds = new Set([...dmsRef.current.map((dm) => dm.id), ...gruposRef.current.map((g) => g.id)]);
+      const hiddenConversationWithNewMessage = rows.some((r) => !knownVisibleIds.has(r.conversa_id));
+      if (unknownConversation || hiddenConversationWithNewMessage) {
         await carregarConversas();
       }
 
@@ -2219,6 +2268,10 @@ export default function ChatPage() {
             // usa compareMensagemOrder (sequence_id first) igual ao resto do sistema
             return [...msgs, msg].sort(compareMensagemOrder);
           };
+          const isKnownVisible = dmsRef.current.some((dm) => dm.id === cid) || gruposRef.current.some((g) => g.id === cid);
+          if (!isKnownVisible) {
+            void carregarConversas();
+          }
           setDms(prev => prev.map(dm => dm.id === cid ? { ...dm, mensagens: insertSorted(dm.mensagens) } : dm));
           setGrupos(prev => prev.map(g => g.id === cid ? { ...g, mensagens: insertSorted(g.mensagens) } : g));
           // Atualiza o cursor do servidor se o usuário está visualizando a conversa agora
@@ -2311,7 +2364,7 @@ export default function ChatPage() {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       }, async (payload: any) => {
         const cid = payload.new.conversa_id as string;
-        historicoDesdeRef.current[cid] = payload.new.historico_desde ?? null;
+        historicoDesdeRef.current[cid] = maxTimestamp(payload.new.historico_desde, payload.new.ocultado_em);
         if (conversaIdsRef.current.includes(cid)) return;
         const [{ data: conv }, { data: parts }] = await Promise.all([
           supabase.from("chat_conversas").select("*").eq("id", cid).single(),
@@ -2501,10 +2554,36 @@ export default function ChatPage() {
   }
 
   async function deleteDm(id: string) {
-    // deleta conversa � ON DELETE CASCADE remove participantes e mensagens
-    await supabase.from("chat_conversas").delete().eq("id", id);
+    const ocultadoEm = new Date().toISOString();
+    const { error } = await supabase
+      .from("chat_participantes")
+      .update({ ocultado_em: ocultadoEm })
+      .eq("conversa_id", id)
+      .eq("user_id", u.id);
+    if (error) {
+      showToast("Não consegui apagar esta conversa para você.");
+      return;
+    }
+    historicoDesdeRef.current[id] = maxTimestamp(historicoDesdeRef.current[id], ocultadoEm);
     setDms((prev) => prev.filter((dm) => dm.id !== id));
     if (activeChat?.tipo === "direto" && activeChat.id === id) openChat(null);
+    setCtxMenu(null);
+  }
+
+  async function hideGrupo(id: string) {
+    const ocultadoEm = new Date().toISOString();
+    const { error } = await supabase
+      .from("chat_participantes")
+      .update({ ocultado_em: ocultadoEm })
+      .eq("conversa_id", id)
+      .eq("user_id", u.id);
+    if (error) {
+      showToast("Não consegui apagar este grupo para você.");
+      return;
+    }
+    historicoDesdeRef.current[id] = maxTimestamp(historicoDesdeRef.current[id], ocultadoEm);
+    setGrupos((prev) => prev.filter((g) => g.id !== id));
+    if (activeChat?.tipo === "grupo" && activeChat.id === id) openChat(null);
     setCtxMenu(null);
   }
 
@@ -2647,6 +2726,38 @@ export default function ChatPage() {
     ));
     setAddMembersGroupId(null);
     showToast(adicionados.length ? "Pessoas adicionadas ao grupo." : "Essas pessoas ja estavam no grupo.");
+  }
+
+  async function removeGroupMember(grupoId: string, membro: User) {
+    const grupo = gruposRef.current.find((g) => g.id === grupoId);
+    if (!grupo) return;
+    if (membro.id === u.id || membro.id === grupo.adminId) return;
+    if (!window.confirm(`Remover ${membro.nome} deste grupo?`)) return;
+
+    const res = await fetchWithAuthRetry("/api/chat/remover-participantes", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        conversa_id: grupoId,
+        participantes: [membro.id],
+      }),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      showToast("Erro ao remover pessoa: " + (json.error ?? res.statusText));
+      return;
+    }
+
+    const removidos = (json.removidos ?? [membro.id]) as string[];
+    if (!removidos.length) {
+      showToast("Não foi possível remover essa pessoa.");
+      return;
+    }
+    setGrupos((prev) => prev.map((g) => g.id === grupoId
+      ? { ...g, membros: g.membros.filter((id) => !removidos.includes(id)) }
+      : g
+    ));
+    showToast("Pessoa removida do grupo.");
   }
 
   function otherParticipant(dm: ConversaDireta) {
@@ -2985,6 +3096,9 @@ export default function ChatPage() {
       memberCount?: number;
       canAddMembers?: boolean;
       onAddMembers?: () => void;
+      canRemoveMembers?: boolean;
+      groupOwnerId?: string;
+      onRemoveMember?: (member: User) => void;
       canEditAvatar?: boolean;
       onAvatarFile?: (file: File) => void;
       onSearchMessages?: () => void;
@@ -3033,6 +3147,9 @@ export default function ChatPage() {
         memberCount: activeGrupo.membros.length,
         canAddMembers: canManageMembers,
         onAddMembers: () => setAddMembersGroupId(activeGrupo.id),
+        canRemoveMembers: canManageMembers,
+        groupOwnerId: activeGrupo.adminId,
+        onRemoveMember: (member) => removeGroupMember(activeGrupo.id, member),
         canEditAvatar: canManageMembers,
         onAvatarFile: (file) => updateGroupAvatar(activeGrupo.id, file),
         onSearchMessages: () => {
@@ -3237,7 +3354,7 @@ export default function ChatPage() {
                             className="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
-                            Apagar conversa
+                            Apagar para mim
                           </button>
                         </div>
                       )}
@@ -3302,19 +3419,26 @@ export default function ChatPage() {
                               <MoreVertical className="w-3.5 h-3.5" />
                             </button>
                             {ctxOpen && (
-                              <div className="absolute right-0 top-8 z-30 bg-white border border-gray-200 rounded-xl shadow-lg py-1 min-w-[150px]">
+                              <div className="absolute right-0 top-8 z-30 bg-white border border-gray-200 rounded-xl shadow-lg py-1 min-w-[190px]">
+                                <button
+                                  onClick={() => hideGrupo(g.id)}
+                                  className="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm text-orange-600 hover:bg-orange-50 transition"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                  Apagar para mim
+                                </button>
                                 {isAdmin ? (
                                   <button
                                     onClick={() => deleteGrupo(g.id)}
                                     className="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition"
                                   >
                                     <Trash2 className="w-3.5 h-3.5" />
-                                    Excluir grupo
+                                    Excluir grupo para todos
                                   </button>
                                 ) : (
                                   <button
                                     onClick={() => leaveGrupo(g.id)}
-                                    className="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm text-orange-600 hover:bg-orange-50 transition"
+                                    className="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition"
                                   >
                                     <LogOut className="w-3.5 h-3.5" />
                                     Sair do grupo

@@ -6,6 +6,16 @@ const admin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+function isMissingColumn(error: unknown, column: string) {
+  const err = error as { code?: string; message?: string } | null;
+  const msg = String(err?.message ?? "").toLowerCase();
+  const col = column.toLowerCase();
+  return (
+    (err?.code === "42703" && msg.includes(col)) ||
+    (msg.includes(col) && msg.includes("schema cache"))
+  );
+}
+
 export async function POST(req: NextRequest) {
   const body = await req.json();
   const { tipo, nome, emoji, avatar_url, cor, descricao, admin_id, somente_admin, participantes } = body;
@@ -33,7 +43,17 @@ export async function POST(req: NextRequest) {
           .eq("id", sharedId)
           .eq("tipo", "direto")
           .single();
-        if (conv) return NextResponse.json({ id: (conv as { id: string }).id });
+        if (conv) {
+          const { error: unhideErr } = await admin
+            .from("chat_participantes")
+            .update({ ocultado_em: null })
+            .eq("conversa_id", (conv as { id: string }).id)
+            .in("user_id", [p1, p2]);
+          if (unhideErr && !isMissingColumn(unhideErr, "ocultado_em")) {
+            return NextResponse.json({ error: unhideErr.message }, { status: 500 });
+          }
+          return NextResponse.json({ id: (conv as { id: string }).id });
+        }
       }
     }
   }
