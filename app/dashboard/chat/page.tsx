@@ -2617,7 +2617,11 @@ export default function ChatPage() {
     const uid = user.id;
     const handler = () => salvarCache(uid, dmsRef.current, gruposRef.current);
     window.addEventListener("beforeunload", handler);
-    return () => window.removeEventListener("beforeunload", handler);
+    window.addEventListener("pagehide", handler);
+    return () => {
+      window.removeEventListener("beforeunload", handler);
+      window.removeEventListener("pagehide", handler);
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 

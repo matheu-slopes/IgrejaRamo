@@ -1,12 +1,9 @@
 "use client";
 
 import { useEffect } from "react";
-import { useRouter } from "next/navigation";
 import { emitAppRefresh } from "@/hooks/useAppRefresh";
 
 export default function AppLifecycleSync() {
-  const router = useRouter();
-
   useEffect(() => {
     let refreshTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -14,7 +11,6 @@ export default function AppLifecycleSync() {
       if (refreshTimer) clearTimeout(refreshTimer);
       refreshTimer = setTimeout(() => {
         emitAppRefresh(reason);
-        router.refresh();
       }, 120);
     }
 
@@ -39,7 +35,7 @@ export default function AppLifecycleSync() {
       window.removeEventListener("pageshow", onPageShow);
       document.removeEventListener("visibilitychange", onVisibilityChange);
     };
-  }, [router]);
+  }, []);
 
   return null;
 }

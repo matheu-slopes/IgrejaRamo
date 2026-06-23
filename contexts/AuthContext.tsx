@@ -172,6 +172,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
 
+      if (error) {
+        // Oscilações temporárias do SDK/rede não devem derrubar a UI inteira.
+        // Mantém o último usuário cacheado e tenta novamente nos próximos eventos de foco/online.
+        if (loadUserCache()) {
+          initialLoadDone = true;
+          setIsLoading(false);
+          return;
+        }
+      }
+
       if (session?.user) {
         try {
           await Promise.race([
@@ -191,13 +201,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setIsLoading(false);
     })();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       // Ignora o disparo inicial que ocorre junto com getSession
       if (!initialLoadDone) return;
       if (session?.user) {
         await carregarPerfil(session.user.id).catch(() => {});
         carregarTodosUsuarios();
-      } else {
+      } else if (event === "SIGNED_OUT") {
         clearUserCache();
         setUser(null);
         setUsuarios([]);
