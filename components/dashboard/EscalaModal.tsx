@@ -14,12 +14,21 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   FUNCOES_POR_MIN, TEMPLATES_CULTO, TONS,
-  proximasDatas, formatDateSimples,
+  proximasDatas, formatDateSimples, displayFuncao,
 } from "@/components/dashboard/EscalasTab";
 
 // ─── tipos locais ─────────────────────────────────────────────────────────────
 type Mode = "view" | "edit";
 type SubTab = "detalhes" | "participantes" | "musicas";
+
+type ConflitoEscalaPessoa = {
+  id: string;
+  ministerio: string;
+  culto: string;
+  data: string;
+  horario: string;
+  funcoes: string[];
+};
 
 interface EscalaForm {
   culto: string;
@@ -114,6 +123,7 @@ export function EscalaModal({ escala, podeEditar, onClose, onUpdate, onDelete }:
   const [salvarErro, setSalvarErro] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
   const backdropRef = useRef<HTMLDivElement>(null);
+  const conflitosConfirmadosRef = useRef<Set<string>>(new Set());
 
   // Busca membros e músicas ao abrir edit
   useEffect(() => {
@@ -210,11 +220,72 @@ export function EscalaModal({ escala, podeEditar, onClose, onUpdate, onDelete }:
   }
 
   // ── participantes ────────────────────────────────────────────────────────────
-  function addParticipante() {
+  async function buscarConflitosEscalaPessoa(voluntarioId: string): Promise<ConflitoEscalaPessoa[]> {
+    if (!form.data) return [];
+
+    const { data, error } = await supabase
+      .from("escalas")
+      .select("id, ministerio, data, horario, culto, escala_itens(voluntario_id, funcao, observacao)")
+      .eq("data", form.data);
+
+    if (error) {
+      console.error("Erro ao verificar conflitos de escala:", error.message);
+      return [];
+    }
+
+    return ((data ?? []) as Record<string, unknown>[])
+      .filter((esc) => esc.id !== escala.id)
+      .map((esc) => {
+        const itens = ((esc.escala_itens as Record<string, unknown>[]) ?? [])
+          .filter((item) => item.voluntario_id === voluntarioId)
+          .map((item) => displayFuncao({
+            funcao: item.funcao as string,
+            observacao: (item.observacao as string) ?? undefined,
+          }));
+
+        return {
+          id: esc.id as string,
+          ministerio: esc.ministerio as string,
+          data: esc.data as string,
+          horario: esc.horario as string,
+          culto: esc.culto as string,
+          funcoes: [...new Set(itens)],
+        };
+      })
+      .filter((esc) => esc.funcoes.length > 0);
+  }
+
+  async function confirmarSobrecargaPessoa(voluntarioId: string, voluntarioNome: string): Promise<boolean> {
+    if (!form.data) return true;
+    const chave = `${form.data}:${voluntarioId}`;
+    if (conflitosConfirmadosRef.current.has(chave)) return true;
+
+    const conflitos = await buscarConflitosEscalaPessoa(voluntarioId);
+    if (!conflitos.length) return true;
+
+    const detalhes = conflitos.map((esc) =>
+      `- ${esc.ministerio}: ${esc.culto} (${esc.funcoes.join(", ")}) às ${esc.horario}`
+    ).join("\n");
+
+    const confirmou = window.confirm([
+      `${voluntarioNome} já está escalado(a) em ${formatDateSimples(form.data)}:`,
+      "",
+      detalhes,
+      "",
+      "Tem certeza que deseja colocar essa pessoa em mais uma escala nesse mesmo dia?",
+    ].join("\n"));
+
+    if (confirmou) conflitosConfirmadosRef.current.add(chave);
+    return confirmou;
+  }
+
+  async function addParticipante() {
     if (!novoMembroId) return;
     const membro = membros.find((m) => m.id === novoMembroId);
     if (!membro) return;
     if (form.itens.some((i) => i.voluntarioId === novoMembroId && i.funcao === novaFuncao)) return;
+    const confirmouSobrecarga = await confirmarSobrecargaPessoa(membro.id, membro.nome);
+    if (!confirmouSobrecarga) return;
     setForm((f) => ({
       ...f,
       itens: [...f.itens, {

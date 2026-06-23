@@ -163,6 +163,15 @@ function dataJaUsadaNoMinisterio(
 
 type EscalaSubTab = "detalhes" | "participantes" | "musicas" | "roteiro";
 
+type ConflitoEscalaPessoa = {
+  id: string;
+  ministerio: string;
+  culto: string;
+  data: string;
+  horario: string;
+  funcoes: string[];
+};
+
 interface EscalaForm {
   culto: string;
   data: string;
@@ -658,6 +667,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
   const [adicionandoParticipante, setAdicionandoParticipante] = useState(false);
   const [viewMode, setViewMode] = useState<"minhas" | "culto">("culto");
   const [busca, setBusca] = useState("");
+  const conflitosConfirmadosRef = useRef<Set<string>>(new Set());
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -846,6 +856,65 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
     });
   }
 
+  async function buscarConflitosEscalaPessoa(voluntarioId: string): Promise<ConflitoEscalaPessoa[]> {
+    if (!form.data) return [];
+
+    const { data, error } = await supabase
+      .from("escalas")
+      .select("id, ministerio, data, horario, culto, escala_itens(voluntario_id, funcao, observacao)")
+      .eq("data", form.data);
+
+    if (error) {
+      console.error("Erro ao verificar conflitos de escala:", error.message);
+      return [];
+    }
+
+    return ((data ?? []) as Record<string, unknown>[])
+      .filter((esc) => esc.id !== editId)
+      .map((esc) => {
+        const itens = ((esc.escala_itens as Record<string, unknown>[]) ?? [])
+          .filter((item) => item.voluntario_id === voluntarioId)
+          .map((item) => displayFuncao({
+            funcao: item.funcao as string,
+            observacao: (item.observacao as string) ?? undefined,
+          }));
+
+        return {
+          id: esc.id as string,
+          ministerio: esc.ministerio as string,
+          data: esc.data as string,
+          horario: esc.horario as string,
+          culto: esc.culto as string,
+          funcoes: [...new Set(itens)],
+        };
+      })
+      .filter((esc) => esc.funcoes.length > 0);
+  }
+
+  async function confirmarSobrecargaPessoa(voluntarioId: string, voluntarioNome: string): Promise<boolean> {
+    if (!form.data) return true;
+    const chave = `${form.data}:${voluntarioId}`;
+    if (conflitosConfirmadosRef.current.has(chave)) return true;
+
+    const conflitos = await buscarConflitosEscalaPessoa(voluntarioId);
+    if (!conflitos.length) return true;
+
+    const detalhes = conflitos.map((esc) =>
+      `- ${esc.ministerio}: ${esc.culto} (${esc.funcoes.join(", ")}) às ${esc.horario}`
+    ).join("\n");
+
+    const confirmou = window.confirm([
+      `${voluntarioNome} já está escalado(a) em ${formatDateSimples(form.data)}:`,
+      "",
+      detalhes,
+      "",
+      "Tem certeza que deseja colocar essa pessoa em mais uma escala nesse mesmo dia?",
+    ].join("\n"));
+
+    if (confirmou) conflitosConfirmadosRef.current.add(chave);
+    return confirmou;
+  }
+
   async function salvar() {
     if (!form.culto || !form.data || !form.horario) return;
     const horarioNormalizado = normalizarHorario(form.horario);
@@ -860,6 +929,11 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
       const membro = membros.find((m) => m.id === novoMembroId);
       const nomeResolv = membro?.nome ?? form.itens.find((it) => (it.voluntarioId ?? it.voluntarioNome) === editandoKey)?.voluntarioNome;
       if (nomeResolv) {
+        const confirmouSobrecarga = await confirmarSobrecargaPessoa(novoMembroId, nomeResolv);
+        if (!confirmouSobrecarga) {
+          setSalvarErro("Participante não adicionado. A pessoa já está escalada nesse dia.");
+          return;
+        }
         const funcoesSel = novasFuncoes.length > 0 ? novasFuncoes : [funcoesMinisterio[0]];
         const itensDeOutros = participanteUnico ? [] : itensFinais.filter((it) => (it.voluntarioId ?? it.voluntarioNome) !== editandoKey);
         const novosItens = funcoesSel
@@ -1033,11 +1107,13 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
     }
   }
 
-  function addParticipante() {
+  async function addParticipante() {
     if (!novoMembroId) return;
     const membro = membros.find((m) => m.id === novoMembroId);
     const nomeResolv = membro?.nome ?? (editandoKey !== null ? form.itens.find((it) => (it.voluntarioId ?? it.voluntarioNome) === editandoKey)?.voluntarioNome : undefined);
     if (!nomeResolv) return;
+    const confirmouSobrecarga = await confirmarSobrecargaPessoa(novoMembroId, nomeResolv);
+    if (!confirmouSobrecarga) return;
     const funcoesSel = novasFuncoes.length > 0 ? novasFuncoes : [funcoesMinisterio[0]];
 
     if (editandoKey !== null) {
