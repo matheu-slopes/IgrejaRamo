@@ -13,6 +13,7 @@ import {
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 import { notificarEscala } from "@/lib/notificarEscala";
+import { analisarAlteracoesEscala, prepararConfirmacoes } from "@/lib/escalaChanges";
 import {
   FUNCOES_POR_MIN, TEMPLATES_CULTO, TONS,
   proximasDatas, formatDateSimples, displayFuncao,
@@ -204,6 +205,8 @@ export function EscalaModal({ escala, podeEditar, onClose, onUpdate, onDelete }:
     setSaving(true);
     setSalvarErro("");
     try {
+      const alteracoes = analisarAlteracoesEscala(escala, form);
+      const itensParaSalvar = prepararConfirmacoes(form.itens, escala.itens, alteracoes.geral, alteracoes.afetados);
       const { error: errUpdate } = await supabase.from("escalas").update({
         culto: form.culto,
         horario: form.horario,
@@ -216,23 +219,15 @@ export function EscalaModal({ escala, podeEditar, onClose, onUpdate, onDelete }:
       const { error: errDelItens } = await supabase.from("escala_itens").delete().eq("escala_id", escala.id);
       if (errDelItens) throw new Error(errDelItens.message);
       
-      if (form.itens.length > 0) {
-        // RESET DE STATUS: Força 'Pendente' e limpa a data de confirmação
-        const itensResetados = form.itens.map((i) => ({
-          ...i,
-          confirmado: false,
-          confirmadoEm: undefined,
-          confirmacaoStatus: "pendente" as const
-        }));
-
+      if (itensParaSalvar.length > 0) {
         let { error: errInsItens } = await supabase
           .from("escala_itens")
-          .insert(itensResetados.map((i) => itemEscalaPayload(escala.id, i, true)));
+          .insert(itensParaSalvar.map((i) => itemEscalaPayload(escala.id, i, true)));
         
         if (errInsItens && erroColunaConfirmacaoAusente(errInsItens)) {
           const fallback = await supabase
             .from("escala_itens")
-            .insert(itensResetados.map((i) => itemEscalaPayload(escala.id, i, false)));
+            .insert(itensParaSalvar.map((i) => itemEscalaPayload(escala.id, i, false)));
           errInsItens = fallback.error;
         }
         if (errInsItens) throw new Error(errInsItens.message);
@@ -255,19 +250,17 @@ export function EscalaModal({ escala, podeEditar, onClose, onUpdate, onDelete }:
         if (errInsMusicas) throw new Error(errInsMusicas.message);
       }
 
-      const notificacao = await notificarEscala(escala.id, "alterada");
+      const notificacao = await notificarEscala(escala.id, "alterada", undefined, {
+        todos: alteracoes.geral,
+        usuarioIds: alteracoes.afetados,
+      });
       if (!notificacao.ok) console.error("Erro ao enviar push de alteração:", notificacao.error);
 
       // Atualizar o frontend com o status resetado
       const updated: Escala = { 
         ...escala, 
         ...form,
-        itens: form.itens.map(i => ({ 
-          ...i, 
-          confirmado: false, 
-          confirmadoEm: undefined, 
-          confirmacaoStatus: "pendente" as const
-        }))
+        itens: itensParaSalvar,
       };
       
       onUpdate(updated);

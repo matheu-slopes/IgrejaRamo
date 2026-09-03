@@ -16,6 +16,7 @@ import { supabase } from "@/lib/supabase";
 import { useAppRefresh } from "@/hooks/useAppRefresh";
 import BuscarCifraModal from "@/components/dashboard/BuscarCifraModal";
 import { notificarEscala } from "@/lib/notificarEscala";
+import { analisarAlteracoesEscala, prepararConfirmacoes } from "@/lib/escalaChanges";
 
 // --- Constantes ---------------------------------------------------------------
 
@@ -268,15 +269,6 @@ function normalizeFuncaoParaDB(funcao: string, obs?: string): { funcao: string; 
     return { funcao: mapped, observacao: obs ? `${funcao} · ${obs}` : funcao };
   }
   return { funcao, observacao: obs || null };
-}
-
-function resetarConfirmacoes(itens: ItemEscala[]): ItemEscala[] {
-  return itens.map((item) => ({
-    ...item,
-    confirmado: false,
-    confirmadoEm: undefined,
-    confirmacaoStatus: "pendente" as const,
-  }));
 }
 
 function erroColunaConfirmacaoAusente(error: unknown): boolean {
@@ -915,7 +907,19 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
       ? ([form.ageGroup, form.temaInfantil].filter(Boolean).join("|") || null)
       : buildObs(form.equipe, form.observacoes);
     try {
-      itensFinais = resetarConfirmacoes(itensFinais);
+      const escalaAnterior = editId ? escalas.find((e) => e.id === editId) : undefined;
+      const alteracoes = analisarAlteracoesEscala(escalaAnterior, {
+        ...form,
+        horario: horarioNormalizado,
+        observacoes: obsDB ?? undefined,
+        itens: itensFinais,
+      });
+      itensFinais = prepararConfirmacoes(
+        itensFinais,
+        escalaAnterior?.itens ?? [],
+        alteracoes.geral,
+        alteracoes.afetados,
+      );
       if (editId) {
         const { error: upErr, data: upData } = await supabase.from("escalas").update({
           culto: form.culto, horario: horarioNormalizado, data: form.data,
@@ -960,7 +964,10 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
           if (insMus) throw new Error(insMus.message);
         }
         setEscalas((prev) => prev.map((e) => e.id === editId ? { ...e, ...form, visivel: visibilidadeAutomaticaMinisterio ? true : form.visivel, horario: horarioNormalizado, itens: itensFinais, observacoes: obsDB ?? undefined } : e));
-        const notificacao = await notificarEscala(editId, "alterada");
+        const notificacao = await notificarEscala(editId, "alterada", undefined, {
+          todos: alteracoes.geral,
+          usuarioIds: alteracoes.afetados,
+        });
         if (!notificacao.ok) console.error("[notificar escala]", notificacao.error);
         await broadcastEscalasSync("update");
       } else {
@@ -1006,7 +1013,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
             ...form, visivel: visibilidadeAutomaticaMinisterio ? true : form.visivel, horario: horarioNormalizado, itens: itensFinais, observacoes: obsDB ?? undefined,
           };
           setEscalas((prev) => [nova, ...prev]);
-          const notificacao = await notificarEscala(inserted.id, "alterada");
+          const notificacao = await notificarEscala(inserted.id, "alterada", undefined, { todos: true });
           if (!notificacao.ok) console.error("[notificar escala]", notificacao.error);
           await broadcastEscalasSync("create");
         }

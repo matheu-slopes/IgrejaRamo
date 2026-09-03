@@ -35,7 +35,13 @@ export async function POST(req: NextRequest) {
   const { data: { user }, error: authError } = await admin.auth.getUser(token);
   if (authError || !user) return NextResponse.json({ ok: false, error: "Token invalido" }, { status: 401 });
 
-  const body = await req.json().catch(() => null) as { escalaId?: string; acao?: Acao; mensagem?: string } | null;
+  const body = await req.json().catch(() => null) as {
+    escalaId?: string;
+    acao?: Acao;
+    mensagem?: string;
+    todos?: boolean;
+    usuarioIds?: string[];
+  } | null;
   if (!body?.escalaId || !body.acao || !["alterada", "cobrar_pendentes", "aviso_geral"].includes(body.acao)) {
     return NextResponse.json({ ok: false, error: "escalaId e acao valida sao obrigatorios" }, { status: 400 });
   }
@@ -65,17 +71,25 @@ export async function POST(req: NextRequest) {
 
   // Uma criacao/edicao invalida todas as respostas anteriores, independentemente
   // de qual campo mudou. O servidor faz o reset para nao depender do cliente.
+  const idsSolicitados = [...new Set((body.usuarioIds ?? []).filter((id): id is string => typeof id === "string" && Boolean(id)))];
+
   if (body.acao === "alterada") {
-    const { error } = await admin.from("escala_itens").update({
+    if (!body.todos && !idsSolicitados.length) {
+      return NextResponse.json({ ok: true, destinatarios: 0, notificacoesInApp: 0, delivery: { attempted: 0, sent: 0, failed: 0, removed: 0, errors: [] } });
+    }
+    let resetQuery = admin.from("escala_itens").update({
       confirmado: false,
       confirmado_em: null,
       confirmacao_status: "pendente",
     }).eq("escala_id", escala.id);
-    if (error) return NextResponse.json({ ok: false, error: `Falha ao resetar confirmacoes: ${error.message}` }, { status: 500 });
+    if (!body.todos) resetQuery = resetQuery.in("voluntario_id", idsSolicitados);
+    const { error: resetError } = await resetQuery;
+    if (resetError) return NextResponse.json({ ok: false, error: `Falha ao resetar confirmacoes: ${resetError.message}` }, { status: 500 });
   }
 
   let itensQuery = admin.from("escala_itens").select("voluntario_id").eq("escala_id", escala.id).not("voluntario_id", "is", null);
   if (body.acao === "cobrar_pendentes") itensQuery = itensQuery.eq("confirmacao_status", "pendente");
+  if (body.acao === "alterada" && !body.todos) itensQuery = itensQuery.in("voluntario_id", idsSolicitados);
   const { data: itens, error: itensError } = await itensQuery;
   if (itensError) return NextResponse.json({ ok: false, error: itensError.message }, { status: 500 });
 

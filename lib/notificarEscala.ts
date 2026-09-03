@@ -22,6 +22,7 @@ export async function notificarEscala(
   escalaId: string,
   acao: AcaoNotificacaoEscala,
   mensagem?: string,
+  escopo?: { todos?: boolean; usuarioIds?: string[] },
 ): Promise<NotificarEscalaResult> {
   let token = await accessToken();
   if (!token) return { ok: false, error: "Sessao expirada. Entre novamente." };
@@ -32,7 +33,7 @@ export async function notificarEscala(
       "Content-Type": "application/json",
       Authorization: `Bearer ${bearer}`,
     },
-    body: JSON.stringify({ escalaId, acao, mensagem }),
+    body: JSON.stringify({ escalaId, acao, mensagem, ...escopo }),
   });
 
   let response = await request(token);
