@@ -129,13 +129,15 @@ function AudioPlayer({ src, isMe }: { src: string; isMe: boolean }) {
       if (el) { el.currentTime = 0; setCurrent(0); }
     }
     function onError() { setLoadError(true); setPlaying(false); }
+    function onPlay() { setPlaying(true); }
+    function onPause() { setPlaying(false); }
     el.addEventListener("loadedmetadata", tryFix);
     el.addEventListener("durationchange", onDurationChange);
     el.addEventListener("timeupdate", onTimeUpdate);
     el.addEventListener("ended", onEnded);
     el.addEventListener("error", onError);
-    el.addEventListener("play",  () => setPlaying(true));
-    el.addEventListener("pause", () => setPlaying(false));
+    el.addEventListener("play", onPlay);
+    el.addEventListener("pause", onPause);
     if (el.readyState >= 1) tryFix();
     return () => {
       el.removeEventListener("loadedmetadata", tryFix);
@@ -143,8 +145,8 @@ function AudioPlayer({ src, isMe }: { src: string; isMe: boolean }) {
       el.removeEventListener("timeupdate", onTimeUpdate);
       el.removeEventListener("ended", onEnded);
       el.removeEventListener("error", onError);
-      el.removeEventListener("play",  () => setPlaying(true));
-      el.removeEventListener("pause", () => setPlaying(false));
+      el.removeEventListener("play", onPlay);
+      el.removeEventListener("pause", onPause);
     };
   }, [src]);
 
@@ -174,7 +176,6 @@ function AudioPlayer({ src, isMe }: { src: string; isMe: boolean }) {
         : "bg-white border border-gray-100 text-gray-800 shadow-sm rounded-bl-sm"
     )}>
       {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-    const pendingOutbox = lerOutbox(uid);
       <audio ref={audioRef} src={src} preload="metadata" className="hidden" />
       {loadError ? (
         <>
