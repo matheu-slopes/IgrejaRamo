@@ -1,45 +1,46 @@
-// Custom service worker code — merged by next-pwa into the generated SW
+'use strict';
 
-// ── Push notifications ──────────────────────────────────────────────────────
-self.addEventListener("push", function (event) {
-  let data = {};
+self.addEventListener('push', function (event) {
+  if (!event.data) return;
+
   try {
-    data = event.data ? event.data.json() : {};
-  } catch {
-    data = { title: "Ramo da Vida", body: event.data ? event.data.text() : "" };
+    const data = event.data.json();
+    const options = {
+      body: data.body || 'Você tem uma nova notificação.',
+      icon: '/icon-192x192.png', // Certifique-se de que este ícone existe na pasta public
+      badge: '/icon-192x192.png', // Opcional: crie um ícone monocromático para o badge do Android
+      data: {
+        url: data.url || '/dashboard/escalas',
+      },
+      vibrate: [200, 100, 200],
+    };
+
+    event.waitUntil(
+      self.registration.showNotification(data.title || 'Sistema de Escalas', options)
+    );
+  } catch (error) {
+    console.error('Erro ao processar payload do push', error);
   }
-
-  const title = data.title || "Ramo da Vida";
-  const options = {
-    body: data.body || "",
-    icon: "/icons/icon-192x192.png",
-    badge: "/icons/icon-72x72.png",
-    data: { url: data.url || "/dashboard" },
-    tag: data.tag || "ramo-notif",
-    renotify: true,
-    vibrate: [200, 100, 200],
-  };
-
-  event.waitUntil(self.registration.showNotification(title, options));
 });
 
-// ── Notification click — abre a URL correta ─────────────────────────────────
-self.addEventListener("notificationclick", function (event) {
+self.addEventListener('notificationclick', function (event) {
   event.notification.close();
-  const url = event.notification.data?.url || "/dashboard";
-
+  
+  const targetUrl = event.notification.data.url || '/dashboard/escalas';
+  
   event.waitUntil(
-    clients
-      .matchAll({ type: "window", includeUncontrolled: true })
-      .then(function (clientList) {
-        for (const client of clientList) {
-          if (client.url.includes(url) && "focus" in client) {
-            return client.focus();
-          }
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
+      // Se o app já estiver aberto, foca na aba e navega para a URL
+      for (let i = 0; i < windowClients.length; i++) {
+        const client = windowClients[i];
+        if (client.url.includes(targetUrl) && 'focus' in client) {
+          return client.focus();
         }
-        if (clients.openWindow) {
-          return clients.openWindow(url);
-        }
-      })
+      }
+      // Se não estiver aberto, abre uma nova janela
+      if (clients.openWindow) {
+        return clients.openWindow(targetUrl);
+      }
+    })
   );
 });

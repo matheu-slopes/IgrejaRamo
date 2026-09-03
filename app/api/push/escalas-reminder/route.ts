@@ -8,36 +8,49 @@ const admin = createClient(
 );
 
 /**
- * GET /api/push/escalas-reminder
- * Chamado pelo Vercel Cron às 12:00 e 18:00 (horário de Brasília = UTC-3).
- * Busca todas as escalas visíveis de HOJE e envia push para cada voluntário escalado.
+ * GET /api/push/escalas-reminder?type=vespera
+ * GET /api/push/escalas-reminder?type=hoje
+ * Chamado pelo Vercel Cron.
+ * Busca as escalas visíveis com base no parâmetro 'type' e envia push para os voluntários.
  */
 export async function GET(req: NextRequest) {
   // Proteção — Vercel Cron envia Authorization: Bearer <CRON_SECRET>
-  // Aceita também x-cron-secret header ou query param (para testes locais)
   const authHeader = req.headers.get("authorization");
   const bearerSecret = authHeader?.replace("Bearer ", "").trim();
   const secret = bearerSecret ?? req.headers.get("x-cron-secret") ?? req.nextUrl.searchParams.get("secret");
+  
   if (secret !== process.env.CRON_SECRET) {
     return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
   }
 
-  // Data de hoje em Brasília
-  const hoje = new Date(
-    new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" })
-  )
-    .toISOString()
-    .split("T")[0];
+  // Identifica o tipo de lembrete
+  const type = req.nextUrl.searchParams.get("type");
+  
+  if (type !== "vespera" && type !== "hoje") {
+    return NextResponse.json({ error: "Tipo inválido. Use ?type=vespera ou ?type=hoje" }, { status: 400 });
+  }
 
-  // Busca escalas de hoje (visíveis)
+  // Calcula a data alvo considerando o fuso horário de Brasília
+  const dataAlvo = new Date(
+    new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" })
+  );
+
+  // Se for véspera, adiciona 1 dia para buscar as escalas de amanhã
+  if (type === "vespera") {
+    dataAlvo.setDate(dataAlvo.getDate() + 1);
+  }
+
+  const dataString = dataAlvo.toISOString().split("T")[0];
+
+  // Busca escalas da data alvo (visíveis)
   const { data: escalas, error: errEscalas } = await admin
     .from("escalas")
     .select("id, culto, horario, ministerio")
-    .eq("data", hoje)
+    .eq("data", dataString)
     .eq("visivel", true);
 
   if (errEscalas || !escalas?.length) {
-    return NextResponse.json({ ok: true, enviados: 0, msg: "Nenhuma escala hoje" });
+    return NextResponse.json({ ok: true, enviados: 0, msg: `Nenhuma escala encontrada para ${dataString}` });
   }
 
   let totalEnviados = 0;
@@ -69,15 +82,24 @@ export async function GET(req: NextRequest) {
 
     for (const [userId, funcoes] of porVoluntario) {
       const funcaoStr = funcoes.join(", ");
+      
+      // Define a mensagem com base no tipo de lembrete
+      const title = type === "vespera" ? `⏰ Lembrete de Véspera!` : `🎶 Lembrete: Escala Hoje!`;
+      const body = type === "vespera"
+        ? `Amanhã você serve em: ${escala.culto} às ${horario} (${funcaoStr}). Organize-se!`
+        : `${escala.culto} às ${horario} — função: ${funcaoStr}. Te esperamos!`;
+
       const delivery = await sendPushToUsers([userId], {
-        title: `🎶 Você está escalado hoje!`,
-        body: `${escala.culto} às ${horario} — função: ${funcaoStr}`,
+        title,
+        body,
         url: "/dashboard/escalas",
-        tag: `escala-${escala.id}-${userId}-${hoje}`,
+        tag: `escala-${escala.id}-${userId}-${type}`,
       });
+      
       totalTentativas += delivery.attempted;
       totalEnviados += delivery.sent;
       totalFalhas += delivery.failed;
+      
       if (delivery.errors[0]?.message) {
         erros.push(delivery.errors[0].message);
       }
@@ -89,7 +111,8 @@ export async function GET(req: NextRequest) {
     enviados: totalEnviados,
     falhas: totalFalhas,
     tentativas: totalTentativas,
-    data: hoje,
+    data: dataString,
+    tipo: type,
     sample_error: erros[0] ?? null,
   });
 }

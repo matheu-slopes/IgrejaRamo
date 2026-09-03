@@ -163,6 +163,56 @@ export function EscalaModal({ escala, podeEditar, onClose, onUpdate, onDelete }:
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
+  // ── funções administrativas ──────────────────────────────────────────────────
+  async function cobrarPendentes() {
+    const pendentes = escala.itens.filter(i => statusConfirmacaoItem(i) === "pendente" && i.voluntarioId);
+    const userIds = pendentes.map(i => i.voluntarioId).filter((id): id is string => !!id);
+
+    if (userIds.length === 0) {
+      return alert("Não há voluntários com resposta pendente nesta escala.");
+    }
+
+    try {
+      await fetch('/api/push/broadcast', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userIds,
+          title: 'Aguardando Confirmação',
+          body: `Lembrete: Sua resposta está pendente para a escala de ${escala.culto} (${formatDateSimples(escala.data)}).`,
+          url: '/dashboard/escalas'
+        })
+      });
+      alert("Cobrança enviada com sucesso para os pendentes!");
+    } catch (e) {
+      alert("Erro ao enviar cobrança.");
+    }
+  }
+
+  async function avisoGeral() {
+    const userIds = escala.itens.map(i => i.voluntarioId).filter((id): id is string => !!id);
+    if (userIds.length === 0) return alert("Nenhum voluntário nesta escala.");
+
+    const msg = window.prompt("Digite a mensagem para enviar a TODOS os participantes desta escala:");
+    if (!msg) return;
+
+    try {
+      await fetch('/api/push/broadcast', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userIds,
+          title: `Aviso: ${escala.culto}`,
+          body: msg,
+          url: '/dashboard/escalas'
+        })
+      });
+      alert("Aviso geral enviado com sucesso!");
+    } catch (e) {
+      alert("Erro ao enviar aviso.");
+    }
+  }
+
   // ── salvar ──────────────────────────────────────────────────────────────────
   async function salvar() {
     if (!form.culto || !form.data || !form.horario) return;
@@ -180,14 +230,24 @@ export function EscalaModal({ escala, podeEditar, onClose, onUpdate, onDelete }:
 
       const { error: errDelItens } = await supabase.from("escala_itens").delete().eq("escala_id", escala.id);
       if (errDelItens) throw new Error(errDelItens.message);
+      
       if (form.itens.length > 0) {
+        // RESET DE STATUS: Força 'Pendente' e limpa a data de confirmação
+        const itensResetados = form.itens.map((i) => ({
+          ...i,
+          confirmado: false,
+          confirmadoEm: undefined,
+          confirmacaoStatus: "pendente"
+        }));
+
         let { error: errInsItens } = await supabase
           .from("escala_itens")
-          .insert(form.itens.map((i) => itemEscalaPayload(escala.id, i, true)));
+          .insert(itensResetados.map((i) => itemEscalaPayload(escala.id, i, true)));
+        
         if (errInsItens && erroColunaConfirmacaoAusente(errInsItens)) {
           const fallback = await supabase
             .from("escala_itens")
-            .insert(form.itens.map((i) => itemEscalaPayload(escala.id, i, false)));
+            .insert(itensResetados.map((i) => itemEscalaPayload(escala.id, i, false)));
           errInsItens = fallback.error;
         }
         if (errInsItens) throw new Error(errInsItens.message);
@@ -195,6 +255,7 @@ export function EscalaModal({ escala, podeEditar, onClose, onUpdate, onDelete }:
 
       const { error: errDelMusicas } = await supabase.from("escala_musicas").delete().eq("escala_id", escala.id);
       if (errDelMusicas) throw new Error(errDelMusicas.message);
+      
       if (form.musicas.length > 0) {
         const { error: errInsMusicas } = await supabase.from("escala_musicas").insert(
           form.musicas.map((m, idx) => ({
@@ -209,7 +270,32 @@ export function EscalaModal({ escala, podeEditar, onClose, onUpdate, onDelete }:
         if (errInsMusicas) throw new Error(errInsMusicas.message);
       }
 
-      const updated: Escala = { ...escala, ...form };
+      // DISPARO IMEDIATO DE NOTIFICAÇÃO
+      try {
+        const userIds = form.itens.map(i => i.voluntarioId).filter((id): id is string => !!id);
+        if (userIds.length > 0) {
+          await fetch('/api/push/broadcast', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              userIds,
+              title: 'Escala Atualizada',
+              body: `A escala de ${form.culto} (${formatDateSimples(form.data)}) foi criada/alterada. Por favor, acesse para confirmar sua presença.`,
+              url: '/dashboard/escalas'
+            })
+          });
+        }
+      } catch (e) {
+        console.error("Erro ao enviar push de alteração:", e);
+      }
+
+      // Atualizar o frontend com o status resetado
+      const updated: Escala = { 
+        ...escala, 
+        ...form,
+        itens: form.itens.map(i => ({ ...i, confirmado: false, confirmadoEm: undefined, confirmacaoStatus: "pendente" }))
+      };
+      
       onUpdate(updated);
       setMode("view");
     } catch (err) {
@@ -626,6 +712,27 @@ export function EscalaModal({ escala, podeEditar, onClose, onUpdate, onDelete }:
                   <p className="text-sm text-gray-600 bg-gray-50 rounded-xl px-3 py-2.5 leading-relaxed">
                     {escala.observacoes}
                   </p>
+                </div>
+              )}
+
+              {/* Ações Administrativas */}
+              {podeEditar && (
+                <div className="mt-8 p-4 bg-gray-100 rounded-xl border border-gray-200 space-y-3">
+                  <p className="text-[11px] font-bold text-gray-500 uppercase tracking-widest">Painel Administrativo da Escala</p>
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <button 
+                      onClick={cobrarPendentes}
+                      className="flex-1 bg-white border border-gray-300 text-gray-700 font-semibold text-sm px-4 py-2.5 rounded-xl hover:bg-gray-50 transition"
+                    >
+                      Cobrar Pendentes
+                    </button>
+                    <button 
+                      onClick={avisoGeral}
+                      className="flex-1 bg-black text-white font-semibold text-sm px-4 py-2.5 rounded-xl hover:bg-gray-900 transition"
+                    >
+                      Enviar Aviso Geral
+                    </button>
+                  </div>
                 </div>
               )}
             </div>

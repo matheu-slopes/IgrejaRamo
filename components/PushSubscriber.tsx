@@ -67,6 +67,17 @@ export default function PushSubscriber() {
         await registrarSubscription({ silent: true });
       } catch (e) {
         console.error("PushSubscriber (background):", e);
+        
+        const errorString = String(e).toLowerCase();
+        // O Safari iOS bloqueia a renovação em background sem clique direto do usuário.
+        // Se batermos nessa trava, forçamos o banner a reaparecer pedindo o clique.
+        if (errorString.includes("notallowederror") || errorString.includes("gesture")) {
+          setStatus("idle");
+          setMsg("Por favor, clique para reativar suas notificações (Requisito do sistema).");
+          setMostrarBanner(true);
+          return;
+        }
+
         if (mostrarErroNoBanner && !isAuthError(e)) {
           setMsg(String(e).replace("Error: ", ""));
           setStatus("erro");
@@ -78,7 +89,7 @@ export default function PushSubscriber() {
     if (Notification.permission === "default") {
       setTimeout(() => setMostrarBanner(true), 3000);
     } else if (Notification.permission === "granted") {
-      // Já permitiu: registra automaticamente sem exigir clique manual.
+      // Já permitiu: registra automaticamente. Se o iOS chiar pela falta de clique, o catch acima resolve.
       registrarSilencioso(true);
     } else if (Notification.permission === "denied") {
       // Permissão bloqueada no Android/browser — orienta o usuário a ir nas configurações.
@@ -452,4 +463,3 @@ function shouldRenewSubscription(sub: PushSubscription, expectedKey: Uint8Array,
     return false;
   }
 }
-

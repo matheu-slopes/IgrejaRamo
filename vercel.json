@@ -1,1 +1,12 @@
-{}
+{
+  "crons": [
+    {
+      "path": "/api/push/escalas-reminder?type=vespera",
+      "schedule": "45 23 * * *"
+    },
+    {
+      "path": "/api/push/escalas-reminder?type=hoje",
+      "schedule": "15 13 * * *"
+    }
+  ]
+}
