@@ -484,7 +484,7 @@ function MembroSearchSelect({
 const EMPTY_FORM: EscalaForm = {
   culto: "", data: "", horario: "", observacoes: "", equipe: "",
   ageGroup: "", temaInfantil: "",
-  visivel: true, confirmacaoParticipantes: false,
+  visivel: true, confirmacaoParticipantes: true,
   itens: [], musicas: [],
 };
 

@@ -175,7 +175,7 @@ CREATE TABLE escalas (
   culto                    TEXT             NOT NULL,
   observacoes              TEXT,
   visivel                  BOOLEAN          DEFAULT FALSE,
-  confirmacao_participantes BOOLEAN         DEFAULT FALSE,
+  confirmacao_participantes BOOLEAN         NOT NULL DEFAULT TRUE,
   criado_por               UUID             REFERENCES perfis(id),
   created_at               TIMESTAMPTZ      DEFAULT NOW()
 );
