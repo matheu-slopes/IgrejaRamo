@@ -2,117 +2,86 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { sendPushToUsers } from "@/lib/sendPush";
 
-const admin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+type Pessoa = { nome: string; funcoes: string[]; pendente: boolean; recusado: boolean };
 
-/**
- * GET /api/push/escalas-reminder?type=vespera
- * GET /api/push/escalas-reminder?type=hoje
- * Chamado pelo Vercel Cron.
- * Busca as escalas visíveis com base no parâmetro 'type' e envia push para os voluntários.
- */
+async function reservar(escalaId: string, usuarioId: string, tipo: string, referencia: string) {
+  const { error } = await admin.from("escala_push_entregas").insert({ escala_id: escalaId, usuario_id: usuarioId, tipo, referencia });
+  if (!error) return true;
+  if (error.code === "23505") return false;
+  if (error.code === "42P01" || error.message?.toLowerCase().includes("schema cache")) return true;
+  throw new Error(error.message);
+}
+
+async function notificarInterno(usuarioId: string, titulo: string, corpo: string, ministerio: string, link = "/dashboard/escalas?aba=minhas") {
+  await admin.from("notificacoes").insert({ usuario_id: usuarioId, titulo, corpo, tipo: "escala", link, ministerio });
+}
+
+function dataBrasilia(diasAdiante: number) {
+  const hoje = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
+  hoje.setDate(hoje.getDate() + diasAdiante);
+  return hoje.toISOString().split("T")[0];
+}
+
 export async function GET(req: NextRequest) {
-  // Proteção — Vercel Cron envia Authorization: Bearer <CRON_SECRET>
-  const authHeader = req.headers.get("authorization");
-  const bearerSecret = authHeader?.replace("Bearer ", "").trim();
-  const secret = bearerSecret ?? req.headers.get("x-cron-secret") ?? req.nextUrl.searchParams.get("secret");
-  
-  if (secret !== process.env.CRON_SECRET) {
-    return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
-  }
-
-  // Identifica o tipo de lembrete
+  const bearer = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "").trim();
+  const secret = bearer ?? req.headers.get("x-cron-secret") ?? req.nextUrl.searchParams.get("secret");
+  if (!process.env.CRON_SECRET || secret !== process.env.CRON_SECRET) return NextResponse.json({ error: "Nao autorizado" }, { status: 401 });
   const type = req.nextUrl.searchParams.get("type");
-  
-  if (type !== "vespera" && type !== "hoje") {
-    return NextResponse.json({ error: "Tipo inválido. Use ?type=vespera ou ?type=hoje" }, { status: 400 });
-  }
+  if (type !== "vespera" && type !== "hoje") return NextResponse.json({ error: "Use ?type=vespera ou ?type=hoje" }, { status: 400 });
+  const referencia = dataBrasilia(type === "vespera" ? 1 : 0);
 
-  // Calcula a data alvo considerando o fuso horário de Brasília
-  const dataAlvo = new Date(
-    new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" })
-  );
+  const { data: escalas, error } = await admin.from("escalas").select("id, culto, horario, ministerio").eq("data", referencia).eq("visivel", true);
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (!escalas?.length) return NextResponse.json({ ok: true, enviados: 0, data: referencia, tipo: type });
 
-  // Se for véspera, adiciona 1 dia para buscar as escalas de amanhã
-  if (type === "vespera") {
-    dataAlvo.setDate(dataAlvo.getDate() + 1);
-  }
-
-  const dataString = dataAlvo.toISOString().split("T")[0];
-
-  // Busca escalas da data alvo (visíveis)
-  const { data: escalas, error: errEscalas } = await admin
-    .from("escalas")
-    .select("id, culto, horario, ministerio")
-    .eq("data", dataString)
-    .eq("visivel", true);
-
-  if (errEscalas || !escalas?.length) {
-    return NextResponse.json({ ok: true, enviados: 0, msg: `Nenhuma escala encontrada para ${dataString}` });
-  }
-
-  let totalEnviados = 0;
-  let totalFalhas = 0;
-  let totalTentativas = 0;
-  const erros: string[] = [];
-
+  let enviados = 0, falhas = 0, tentativas = 0, ignoradosDuplicados = 0;
   for (const escala of escalas) {
-    // Busca itens da escala com voluntário atribuído
-    const { data: itens } = await admin
-      .from("escala_itens")
-      .select("voluntario_id, voluntario_nome, funcao")
-      .eq("escala_id", escala.id)
-      .not("voluntario_id", "is", null);
+    const { data: itens, error: itensError } = await admin.from("escala_itens")
+      .select("voluntario_id, voluntario_nome, funcao, confirmado, confirmacao_status")
+      .eq("escala_id", escala.id).not("voluntario_id", "is", null);
+    if (itensError || !itens?.length) continue;
 
-    if (!itens?.length) continue;
-
-    // Agrupa por voluntário para não mandar múltiplas notificações para o mesmo usuário
-    const porVoluntario = new Map<string, string[]>();
+    const pessoas = new Map<string, Pessoa>();
     for (const item of itens) {
-      if (!porVoluntario.has(item.voluntario_id)) {
-        porVoluntario.set(item.voluntario_id, []);
-      }
-      porVoluntario.get(item.voluntario_id)!.push(item.funcao);
+      const pessoa: Pessoa = pessoas.get(item.voluntario_id) ?? { nome: item.voluntario_nome, funcoes: [], pendente: false, recusado: false };
+      pessoa.funcoes.push(item.funcao);
+      const status = item.confirmacao_status ?? (item.confirmado ? "confirmado" : "pendente");
+      pessoa.pendente ||= status === "pendente";
+      pessoa.recusado ||= status === "recusado";
+      pessoas.set(item.voluntario_id, pessoa);
     }
 
-    // Formata horário
-    const horario = (escala.horario as string).slice(0, 5); // HH:MM
+    const horario = String(escala.horario).slice(0, 5);
+    for (const [usuarioId, pessoa] of pessoas) {
+      if (!(await reservar(escala.id, usuarioId, type, referencia))) { ignoradosDuplicados++; continue; }
+      const titulo = type === "vespera" ? "Lembrete de vespera" : "Sua escala e hoje";
+      let corpo = type === "vespera"
+        ? `Amanha voce serve em ${escala.culto}, as ${horario} (${pessoa.funcoes.join(", ")}).`
+        : `${escala.culto}, as ${horario} - ${pessoa.funcoes.join(", ")}.`;
+      if (pessoa.pendente) corpo += " Sua confirmacao ainda esta pendente. Confirme em Meus Servicos.";
+      else if (pessoa.recusado) corpo += " Voce informou que nao podera servir; procure seu lider se isso mudou.";
+      else corpo += " Presenca confirmada. Te esperamos!";
+      await notificarInterno(usuarioId, titulo, corpo, escala.ministerio);
+      const delivery = await sendPushToUsers([usuarioId], { title: titulo, body: corpo, url: "/dashboard/escalas?aba=minhas", tag: `escala-${escala.id}-${type}-${referencia}` });
+      tentativas += delivery.attempted; enviados += delivery.sent; falhas += delivery.failed;
+    }
 
-    for (const [userId, funcoes] of porVoluntario) {
-      const funcaoStr = funcoes.join(", ");
-      
-      // Define a mensagem com base no tipo de lembrete
-      const title = type === "vespera" ? `⏰ Lembrete de Véspera!` : `🎶 Lembrete: Escala Hoje!`;
-      const body = type === "vespera"
-        ? `Amanhã você serve em: ${escala.culto} às ${horario} (${funcaoStr}). Organize-se!`
-        : `${escala.culto} às ${horario} — função: ${funcaoStr}. Te esperamos!`;
-
-      const delivery = await sendPushToUsers([userId], {
-        title,
-        body,
-        url: "/dashboard/escalas",
-        tag: `escala-${escala.id}-${userId}-${type}`,
-      });
-      
-      totalTentativas += delivery.attempted;
-      totalEnviados += delivery.sent;
-      totalFalhas += delivery.failed;
-      
-      if (delivery.errors[0]?.message) {
-        erros.push(delivery.errors[0].message);
+    if (type === "vespera") {
+      const pendentes = [...pessoas.values()].filter((p) => p.pendente).map((p) => p.nome);
+      const recusados = [...pessoas.values()].filter((p) => p.recusado).map((p) => p.nome);
+      if (pendentes.length || recusados.length) {
+        const { data: lideres } = await admin.from("perfis").select("id").eq("ativo", true).contains("lider_ministerios", [escala.ministerio]);
+        const resumo = [pendentes.length ? `Pendentes: ${pendentes.join(", ")}.` : "", recusados.length ? `Nao poderao: ${recusados.join(", ")}.` : ""].filter(Boolean).join(" ");
+        for (const lider of lideres ?? []) {
+          if (!(await reservar(escala.id, lider.id, "resumo_lider", referencia))) { ignoradosDuplicados++; continue; }
+          const titulo = `Resumo da escala - ${escala.ministerio}`;
+          await notificarInterno(lider.id, titulo, resumo, escala.ministerio, "/dashboard/escalas");
+          const delivery = await sendPushToUsers([lider.id], { title: titulo, body: resumo, url: "/dashboard/escalas", tag: `resumo-${escala.id}-${referencia}` });
+          tentativas += delivery.attempted; enviados += delivery.sent; falhas += delivery.failed;
+        }
       }
     }
   }
-
-  return NextResponse.json({
-    ok: totalEnviados > 0,
-    enviados: totalEnviados,
-    falhas: totalFalhas,
-    tentativas: totalTentativas,
-    data: dataString,
-    tipo: type,
-    sample_error: erros[0] ?? null,
-  });
+  return NextResponse.json({ ok: true, enviados, falhas, tentativas, ignoradosDuplicados, data: referencia, tipo: type });
 }

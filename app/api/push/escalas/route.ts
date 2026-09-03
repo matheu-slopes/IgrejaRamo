@@ -23,6 +23,12 @@ function podeEditarEscala(perfil: Perfil, ministerio: string) {
   return permissoes.includes("criar_escala") || Boolean(perfil.lider_ministerios?.includes(ministerio));
 }
 
+function podeEnviarAvisoManual(perfil: Perfil, ministerio: string) {
+  return perfil.role === "admin" ||
+    perfil.role === "pastor" ||
+    Boolean(perfil.lider_ministerios?.includes(ministerio));
+}
+
 function dataPtBr(data: string) {
   return new Intl.DateTimeFormat("pt-BR", { timeZone: "UTC", day: "2-digit", month: "2-digit", year: "numeric" })
     .format(new Date(`${data}T00:00:00Z`));
@@ -55,11 +61,11 @@ export async function POST(req: NextRequest) {
   if (escalaError) return NextResponse.json({ ok: false, error: escalaError.message }, { status: 500 });
   if (!escala) return NextResponse.json({ ok: false, error: "Escala nao encontrada" }, { status: 404 });
 
-  const somenteAdmin = body.acao === "cobrar_pendentes" || body.acao === "aviso_geral";
-  if (somenteAdmin && perfil.role !== "admin") {
-    return NextResponse.json({ ok: false, error: "Acao exclusiva de administrador" }, { status: 403 });
+  const avisoManual = body.acao === "cobrar_pendentes" || body.acao === "aviso_geral";
+  if (avisoManual && !podeEnviarAvisoManual(perfil as Perfil, escala.ministerio)) {
+    return NextResponse.json({ ok: false, error: "Acao permitida apenas para Admin, Pastor ou lider deste ministerio" }, { status: 403 });
   }
-  if (!somenteAdmin && !podeEditarEscala(perfil as Perfil, escala.ministerio)) {
+  if (!avisoManual && !podeEditarEscala(perfil as Perfil, escala.ministerio)) {
     return NextResponse.json({ ok: false, error: "Sem permissao para notificar esta escala" }, { status: 403 });
   }
 

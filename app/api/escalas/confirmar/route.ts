@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { sendPushToUsers } from "@/lib/sendPush";
 
 const admin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -37,7 +38,7 @@ export async function POST(req: NextRequest) {
 
   const { data: escala, error: escalaErr } = await admin
     .from("escalas")
-    .select("id, confirmacao_participantes")
+    .select("id, culto, data, horario, ministerio, confirmacao_participantes")
     .eq("id", escalaId)
     .maybeSingle();
 
@@ -77,6 +78,27 @@ export async function POST(req: NextRequest) {
       }, { status: 503 });
     }
     return NextResponse.json({ error: updateErr.message }, { status: 500 });
+  }
+
+  if (status === "recusado") {
+    try {
+      const [{ data: perfil }, { data: lideres }] = await Promise.all([
+        admin.from("perfis").select("nome").eq("id", user.id).maybeSingle(),
+        admin.from("perfis").select("id").eq("ativo", true).contains("lider_ministerios", [escala.ministerio]),
+      ]);
+      const ids = [...new Set((lideres ?? []).map((lider) => lider.id).filter((id) => id !== user.id))];
+      if (ids.length) {
+        const titulo = `Recusa na escala - ${escala.ministerio}`;
+        const corpo = `${perfil?.nome ?? "Um voluntario"} informou que nao podera servir em ${escala.culto}, ${escala.data}, as ${String(escala.horario).slice(0, 5)}.`;
+        await admin.from("notificacoes").insert(ids.map((id) => ({
+          usuario_id: id, titulo, corpo, tipo: "escala", link: "/dashboard/escalas", ministerio: escala.ministerio,
+        })));
+        await sendPushToUsers(ids, { title: titulo, body: corpo, url: "/dashboard/escalas", tag: `recusa-${escala.id}-${user.id}` });
+      }
+    } catch (notificationError) {
+      // A resposta do voluntario ja foi salva; uma falha de push nao deve desfaze-la.
+      console.error("Falha ao avisar lider sobre recusa:", notificationError);
+    }
   }
 
   return NextResponse.json({ ok: true, confirmadoEm, status });

@@ -12,7 +12,7 @@ import { useAppRefresh } from "@/hooks/useAppRefresh";
 import { userMinisterios } from "@/lib/userMinistries";
 import {
   ChevronLeft, ChevronRight, ChevronDown, ChevronUp,
-  Music2, Users, Calendar, Star, Settings2, ClipboardCopy, Check, UserCheck, AlertCircle,
+  Music2, Users, Calendar, Star, Settings2, ClipboardCopy, Check, UserCheck, AlertCircle, BellRing,
 } from "lucide-react";
 import clsx from "clsx";
 
@@ -23,14 +23,33 @@ const MIN_LABEL: Record<string, string> = {
 };
 const minLabel = (m: string) => MIN_LABEL[m] ?? m;
 
+const ALIASES_FUNCAO = new Set([
+  "Cajón", "Pandeiro", "Violão", "Abertura", "Oferta", "Recepção", "Apoio", "Responsável",
+]);
+
+function partesObservacao(it: { funcao: string; observacao?: string }) {
+  const partes = (it.observacao ?? "").split(" · ");
+  const primeira = partes[0]?.trim();
+  const alias = primeira && ALIASES_FUNCAO.has(primeira) ? primeira : undefined;
+  return { alias, detalhe: alias ? partes.slice(1).join(" · ") || undefined : it.observacao };
+}
+
 const showFuncao = (it: { funcao: string; observacao?: string }) => {
-  if (it.observacao && ["Cajón","Pandeiro","Violão"].includes(it.observacao)) return it.observacao;
+  const { alias } = partesObservacao(it);
+  if (alias) return alias;
   if (it.funcao === "Bateria") return "Cajón";
   if (it.funcao === "Professora" || it.funcao === "Professor") return "Professor(a)";
   if (it.funcao === "Monitor") return "Monitor(a)";
   if (it.funcao === "Voluntário") return "Voluntário(a)";
   return it.funcao;
 };
+
+function corFuncao(funcao: string) {
+  if (funcao === "Recepção") return "bg-blue-50 text-blue-700 border-blue-200";
+  if (funcao === "Oferta") return "bg-amber-50 text-amber-700 border-amber-200";
+  if (funcao === "Abertura") return "bg-violet-50 text-violet-700 border-violet-200";
+  return "bg-gray-100 text-gray-600 border-gray-200";
+}
 
 // Agrupa itens de escala por pessoa, retornando funções concatenadas
 function statusConfirmacaoItem(item: { confirmado?: boolean; confirmacaoStatus?: string }) {
@@ -52,7 +71,7 @@ function agruparItens(itens: Escala["itens"]) {
       if (grupo.status === "confirmado" && status === "pendente") grupo.status = "pendente";
     } else {
       vistos.set(k, grupos.length);
-      const obs = it.observacao && !["Cajón", "Pandeiro", "Violão"].includes(it.observacao) ? it.observacao : undefined;
+      const obs = partesObservacao(it).detalhe;
       grupos.push({
         key: k,
         voluntarioId: it.voluntarioId,
@@ -96,6 +115,26 @@ const COR_MIN_BADGE: Record<string, string> = {
   Ensino:   "bg-teal-100 text-teal-700",
   Limpeza:  "bg-cyan-100 text-cyan-700",
 };
+
+function agoraEmSaoPaulo() {
+  const partes = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+  }).formatToParts(new Date());
+  const valor = (tipo: Intl.DateTimeFormatPartTypes) => partes.find((p) => p.type === tipo)?.value ?? "00";
+  return {
+    data: `${valor("year")}-${valor("month")}-${valor("day")}`,
+    minutos: Number(valor("hour")) * 60 + Number(valor("minute")),
+  };
+}
+
+function escalaJaIniciou(escala: Pick<Escala, "data" | "horario">, agora = agoraEmSaoPaulo()) {
+  if (escala.data < agora.data) return true;
+  if (escala.data > agora.data) return false;
+  const [h, m] = String(escala.horario).slice(0, 5).split(":").map(Number);
+  return (h * 60 + m) < agora.minutos;
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -323,13 +362,15 @@ function ConfirmacaoEscalaPanel({
 }
 
 function MinisterioSection({
-  ministerio, escala, userId, isLider, onGerenciar, onConfirmar, confirmando,
+  ministerio, escala, userId, isLider, podeAvisar, onGerenciar, onAbrir, onConfirmar, confirmando,
 }: {
   ministerio: Ministerio;
   escala: Escala;
   userId: string;
   isLider: boolean;
+  podeAvisar: boolean;
   onGerenciar: () => void;
+  onAbrir: () => void;
   onConfirmar: (escalaId: string, acao: "confirmar" | "recusar") => void;
   confirmando: boolean;
 }) {
@@ -368,6 +409,16 @@ function MinisterioSection({
           })()}
         </div>
         <div className="flex items-center gap-1 shrink-0">
+          {podeAvisar && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onAbrir(); }}
+              className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-semibold text-vine-700 bg-vine-50 hover:bg-vine-100 rounded-lg transition"
+              title="Cobrar pendentes ou enviar aviso geral"
+            >
+              <BellRing className="w-3.5 h-3.5" />
+              Avisar
+            </button>
+          )}
           {isLider && (
             <button
               onClick={(e) => { e.stopPropagation(); onGerenciar(); }}
@@ -402,9 +453,13 @@ function MinisterioSection({
                       : "bg-gray-50 border border-gray-100"
                   )}
                 >
-                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide shrink-0 w-20 truncate">
-                    {grp.funcoes.join(" · ")}
-                  </span>
+                  <div className="flex flex-wrap gap-1 shrink-0 sm:w-28">
+                    {grp.funcoes.map((funcao) => (
+                      <span key={funcao} className={clsx("text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-md border", corFuncao(funcao))}>
+                        {funcao}
+                      </span>
+                    ))}
+                  </div>
                   <div className="flex-1 min-w-0">
                     <span className={clsx("text-sm truncate block", isMinistro ? "font-bold text-gray-900" : "font-semibold text-gray-800")}>
                       {grp.voluntarioNome}
@@ -436,12 +491,14 @@ function MinisterioSection({
 // ─── Seção unificada do Infantil (uma só, com sub-seções por faixa etária) ────
 
 function InfantilSection({
-  escalas, userId, isLider, onGerenciar, onConfirmar, confirmandoIds,
+  escalas, userId, isLider, podeAvisar, onGerenciar, onAbrirEscala, onConfirmar, confirmandoIds,
 }: {
   escalas: Escala[];
   userId: string;
   isLider: boolean;
+  podeAvisar: boolean;
   onGerenciar: () => void;
+  onAbrirEscala: (escala: Escala) => void;
   onConfirmar: (escalaId: string, acao: "confirmar" | "recusar") => void;
   confirmandoIds: Set<string>;
 }) {
@@ -502,6 +559,14 @@ function InfantilSection({
                   {tema && (
                     <span className="text-[10px] text-orange-600 font-medium italic">Tema: {tema}</span>
                   )}
+                  {podeAvisar && (
+                    <button
+                      onClick={() => onAbrirEscala(esc)}
+                      className="ml-auto inline-flex items-center gap-1 px-2 py-1 text-[11px] font-semibold text-vine-700 bg-vine-50 hover:bg-vine-100 rounded-lg transition"
+                    >
+                      <BellRing className="w-3.5 h-3.5" /> Avisar
+                    </button>
+                  )}
                 </div>
                 {esc.itens.length === 0 ? (
                   <p className="px-3 py-2 text-xs text-gray-400 italic">Equipe não definida.</p>
@@ -519,9 +584,13 @@ function InfantilSection({
                             : "bg-gray-50 border border-gray-100"
                         )}
                       >
-                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide shrink-0 w-20 truncate pt-0.5">
-                          {grp.funcoes.join(" · ")}
-                        </span>
+                        <div className="flex flex-wrap gap-1 shrink-0 sm:w-28 pt-0.5">
+                          {grp.funcoes.map((funcao) => (
+                            <span key={funcao} className={clsx("text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-md border", corFuncao(funcao))}>
+                              {funcao}
+                            </span>
+                          ))}
+                        </div>
                         <div className="flex-1 min-w-0">
                           <span className={clsx("truncate block", isMinistro ? "text-sm font-bold text-gray-900" : "text-sm font-semibold text-gray-800")}>{grp.voluntarioNome}</span>
                           {grp.observacao && (
@@ -556,20 +625,23 @@ function InfantilSection({
 // ─── Card de um culto (agrupa todos os ministérios) ───────────────────────────
 
 function CultoCard({
-  data, escalas, userId, isLider, onGerenciarMinisterio, onConfirmar, confirmandoIds,
+  data, escalas, userId, isLider, podeAvisarMinisterio, onGerenciarMinisterio, onAbrirEscala, onConfirmar, confirmandoIds,
 }: {
   data: string;
   escalas: Escala[];
   userId: string;
   isLider: boolean;
+  podeAvisarMinisterio: (ministerio: Ministerio) => boolean;
   onGerenciarMinisterio: (m: Ministerio) => void;
+  onAbrirEscala: (escala: Escala) => void;
   onConfirmar: (escalaId: string, acao: "confirmar" | "recusar") => void;
   confirmandoIds: Set<string>;
 }) {
   const d = new Date(data + "T00:00:00");
-  const hojeStr = new Date().toISOString().split("T")[0];
+  const hojeStr = agoraEmSaoPaulo().data;
   const isPast = data < hojeStr;
   const isHoje = data === hojeStr;
+  const encerradoHoje = isHoje && escalas.every((escala) => escalaJaIniciou(escala));
   const diaSemana = d.getDay(); // 0=dom, 6=sab
   const isDomingo = diaSemana === 0;
   const isSabado  = diaSemana === 6;
@@ -616,6 +688,7 @@ function CultoCard({
           <div className="flex items-center gap-2 flex-wrap">
             <h3 className="font-bold text-gray-900 text-base leading-tight">{cultoLabel}</h3>
             {isHoje && <span className="text-[10px] bg-black text-white font-bold px-2 py-0.5 rounded-full">Hoje</span>}
+            {encerradoHoje && <span className="text-[10px] bg-gray-200 text-gray-600 font-bold px-2 py-0.5 rounded-full">Encerrado</span>}
             {temMinha && <span className="text-[10px] bg-gray-100 text-gray-900 font-bold px-2 py-0.5 rounded-full">Você serve</span>}
           </div>
           {horario && <p className="text-sm text-gray-500 mt-0.5">{horario.slice(0, 5)}</p>}
@@ -643,7 +716,9 @@ function CultoCard({
                   escalas={escalasInfantil}
                   userId={userId}
                   isLider={isLider}
+                  podeAvisar={podeAvisarMinisterio("Infantil")}
                   onGerenciar={() => onGerenciarMinisterio("Infantil")}
+                  onAbrirEscala={onAbrirEscala}
                   onConfirmar={onConfirmar}
                   confirmandoIds={confirmandoIds}
                 />
@@ -658,7 +733,9 @@ function CultoCard({
                   escala={escala}
                   userId={userId}
                   isLider={isLider}
+                  podeAvisar={podeAvisarMinisterio(min)}
                   onGerenciar={() => onGerenciarMinisterio(min)}
+                  onAbrir={() => onAbrirEscala(escala)}
                   onConfirmar={onConfirmar}
                   confirmando={confirmandoIds.has(escala.id)}
                 />
@@ -779,7 +856,7 @@ export default function EscalasDashboardPage() {
   const [confirmandoIds, setConfirmandoIds] = useState<Set<string>>(new Set());
   const fetchSeqRef = useRef(0);
 
-  const hojeStr = new Date().toISOString().split("T")[0];
+  const agora = agoraEmSaoPaulo();
   const podeVerEscalaMinisterio = useCallback((ministerio: string) => {
     if (!MINISTERIOS_ESCALAS_PRIVADAS.has(ministerio)) return true;
     return isAdmin || meus.includes(ministerio as Ministerio);
@@ -866,7 +943,7 @@ export default function EscalasDashboardPage() {
         const fim = isoDate(semanaFim);
         if (e.data >= ini && e.data <= fim) set.add(e.data);
       } else {
-        if (e.data >= hojeStr) set.add(e.data);
+        if (!escalaJaIniciou(e, agora)) set.add(e.data);
       }
     }
     return [...set].sort();
@@ -884,7 +961,7 @@ export default function EscalasDashboardPage() {
 
   const minhasEscalas = useMemo(() =>
     escalasVisiveis
-      .filter((e) => e.itens.some((it) => it.voluntarioId === user?.id) && e.data >= hojeStr)
+      .filter((e) => e.itens.some((it) => it.voluntarioId === user?.id) && !escalaJaIniciou(e, agora))
       .sort((a, b) => a.data.localeCompare(b.data)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [escalasVisiveis, user?.id]
@@ -1137,7 +1214,13 @@ export default function EscalasDashboardPage() {
                       escalas={escalasPorData[data] ?? []}
                       userId={user?.id ?? ""}
                       isLider={isLider}
+                      podeAvisarMinisterio={(ministerio) =>
+                        user?.role === "admin" ||
+                        user?.role === "pastor" ||
+                        Boolean(user?.liderMinisterios?.includes(ministerio))
+                      }
                       onGerenciarMinisterio={setEditing}
+                      onAbrirEscala={setModalEscala}
                       onConfirmar={confirmarEscala}
                       confirmandoIds={confirmandoIds}
                     />

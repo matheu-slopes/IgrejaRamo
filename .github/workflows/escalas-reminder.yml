@@ -1,7 +1,7 @@
 name: Lembrete de Escalas
 
 on:
-  # O agendamento oficial fica no Vercel Cron (ver vercel.json), evitando
+  # O agendamento oficial fica no Vercel Cron (19:30 na vespera e 08:00 no dia), evitando
   # notificações duplicadas. Este workflow serve apenas para teste/contingência.
   workflow_dispatch:
     inputs:

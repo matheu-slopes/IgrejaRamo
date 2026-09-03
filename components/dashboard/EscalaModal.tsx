@@ -105,6 +105,9 @@ interface Props {
 
 export function EscalaModal({ escala, podeEditar, onClose, onUpdate, onDelete }: Props) {
   const { user } = useAuth();
+  const podeEnviarAviso = user?.role === "admin" ||
+    user?.role === "pastor" ||
+    Boolean(user?.liderMinisterios?.includes(escala.ministerio));
   const [mode, setMode] = useState<Mode>("view");
   const [subTab, setSubTab] = useState<SubTab>("detalhes");
   const [form, setForm] = useState<EscalaForm>(toForm(escala));
@@ -683,7 +686,7 @@ export function EscalaModal({ escala, podeEditar, onClose, onUpdate, onDelete }:
               )}
 
               {/* Ações Administrativas */}
-              {podeEditar && user?.role === "admin" && (
+              {podeEditar && podeEnviarAviso && (
                 <div className="mt-8 p-4 bg-gray-100 rounded-xl border border-gray-200 space-y-3">
                   <p className="text-[11px] font-bold text-gray-500 uppercase tracking-widest">Painel Administrativo da Escala</p>
                   <div className="flex flex-col sm:flex-row gap-3">

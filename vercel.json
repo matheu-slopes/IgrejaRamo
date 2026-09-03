@@ -2,11 +2,11 @@
   "crons": [
     {
       "path": "/api/push/escalas-reminder?type=vespera",
-      "schedule": "45 23 * * *"
+      "schedule": "30 22 * * *"
     },
     {
       "path": "/api/push/escalas-reminder?type=hoje",
-      "schedule": "15 13 * * *"
+      "schedule": "0 11 * * *"
     }
   ]
 }
