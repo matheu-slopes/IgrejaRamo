@@ -43,7 +43,7 @@ export default function CanalMinisterioPage() {
   const { user, temPermissao, temPermissaoNoMinisterio } = useAuth();
 
   // ── estado global ─────────────────────────────────────────────────────
-  const [tab, setTab] = useState<Tab>("chat");
+  const [tab, setTab] = useState<Tab>(() => slug === "Ensino" ? "chat" : "escalas");
   const [canalBase, setCanalBase] = useState<{ ministerio: string; descricao: string; chatBloqueado: boolean; cor: string } | null>(null);
   const [chatBloqueado, setChatBloqueado] = useState(false);
 
@@ -86,8 +86,9 @@ export default function CanalMinisterioPage() {
   const temEscalas = slug !== "Ensino";
 
   useEffect(() => {
-    if (!temEscalas && tab === "escalas") setTab("chat");
-  }, [tab, temEscalas]);
+    // Ao trocar de ministério, abre sua área principal. Ensino não possui escalas.
+    setTab(temEscalas ? "escalas" : "chat");
+  }, [slug, temEscalas]);
 
   if (!canalBase) {
     return (
