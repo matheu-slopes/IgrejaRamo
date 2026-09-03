@@ -237,7 +237,7 @@ export function EscalaModal({ escala, podeEditar, onClose, onUpdate, onDelete }:
           ...i,
           confirmado: false,
           confirmadoEm: undefined,
-          confirmacaoStatus: "pendente"
+          confirmacaoStatus: "pendente" as "pendente"
         }));
 
         let { error: errInsItens } = await supabase
@@ -293,7 +293,12 @@ export function EscalaModal({ escala, podeEditar, onClose, onUpdate, onDelete }:
       const updated: Escala = { 
         ...escala, 
         ...form,
-        itens: form.itens.map(i => ({ ...i, confirmado: false, confirmadoEm: undefined, confirmacaoStatus: "pendente" }))
+        itens: form.itens.map(i => ({ 
+          ...i, 
+          confirmado: false, 
+          confirmadoEm: undefined, 
+          confirmacaoStatus: "pendente" as "pendente" 
+        }))
       };
       
       onUpdate(updated);
