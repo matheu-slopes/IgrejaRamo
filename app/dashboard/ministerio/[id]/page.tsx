@@ -149,8 +149,8 @@ export default function CanalMinisterioPage() {
             } as React.CSSProperties}
           >
             {([
-              { id: "chat",    label: "Chat",    icon: MessageSquare },
               ...(temEscalas ? [{ id: "escalas" as const, label: "Escalas", icon: CalendarDays }] : []),
+              { id: "chat",    label: "Chat",    icon: MessageSquare },
               { id: "eventos", label: "Eventos", icon: Calendar      },
               { id: "membros", label: "Membros", icon: Users         },
             ] as { id: Tab; label: string; icon: React.ElementType }[]).map(({ id, label, icon: Icon }) => (

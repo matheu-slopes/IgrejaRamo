@@ -1,5 +1,6 @@
 ﻿import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { isChatMember } from "@/lib/chatServerAuth";
 
 const admin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -23,6 +24,9 @@ export async function POST(req: NextRequest) {
 
   if (!file || !conversaId) {
     return NextResponse.json({ error: "Arquivo e conversa_id obrigatórios" }, { status: 400 });
+  }
+  if (!(await isChatMember(admin, conversaId, user.id))) {
+    return NextResponse.json({ error: "Você não participa desta conversa" }, { status: 403 });
   }
 
   // Valida tipo MIME

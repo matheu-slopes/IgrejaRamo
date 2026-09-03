@@ -2003,7 +2003,8 @@ export default function ChatPage() {
   async function carregarConversas() {
     if (!user) return;
     const participacoesResult = await supabase
-      .from("chat_participantes").select("conversa_id, historico_desde, ocultado_em").eq("user_id", user.id);
+      .from("chat_participantes").select("conversa_id, historico_desde, ocultado_em").eq("user_id", user.id)
+      .abortSignal(AbortSignal.timeout(15_000));
     let participacoes = participacoesResult.data as ChatParticipacao[] | null;
     let participacoesError = participacoesResult.error;
 
@@ -2036,9 +2037,9 @@ export default function ChatPage() {
     );
 
     const [conversasResult, participantesResult, mensagensResult] = await Promise.all([
-      supabase.from("chat_conversas").select("*").in("id", ids),
-      supabase.from("chat_participantes").select("conversa_id, user_id, historico_desde").in("conversa_id", ids),
-      supabase.from("chat_mensagens").select("*").in("conversa_id", ids).order("criado_em", { ascending: false }).limit(ids.length * 3),
+      supabase.from("chat_conversas").select("*").in("id", ids).abortSignal(AbortSignal.timeout(15_000)),
+      supabase.from("chat_participantes").select("conversa_id, user_id, historico_desde").in("conversa_id", ids).abortSignal(AbortSignal.timeout(15_000)),
+      supabase.from("chat_mensagens").select("*").in("conversa_id", ids).order("criado_em", { ascending: false }).limit(ids.length * 3).abortSignal(AbortSignal.timeout(15_000)),
     ]);
 
     const conversas = conversasResult.data;
@@ -2182,7 +2183,7 @@ export default function ChatPage() {
       .limit(500);
     const historicoDesde = historicoDesdeRef.current[conversaId];
     if (historicoDesde) query = query.gte("criado_em", historicoDesde);
-    const { data, error } = await query;
+    const { data, error } = await query.abortSignal(AbortSignal.timeout(15_000));
 
     if (error) {
       console.error("chat load mensagens error:", error);
@@ -2768,7 +2769,7 @@ export default function ChatPage() {
       setShowNewDmModal(false);
       return;
     }
-    const res = await fetch("/api/chat/criar-conversa", {
+    const res = await fetchWithAuthRetry("/api/chat/criar-conversa", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ tipo: "direto", participantes: [u.id, userId] }),
@@ -2827,7 +2828,7 @@ export default function ChatPage() {
 
   async function createGroup(nome: string, emoji: string, membros: string[], avatarFile?: File | null) {
     const allMembros = membros.includes(u.id) ? membros : [...membros, u.id];
-    const res = await fetch("/api/chat/criar-conversa", {
+    const res = await fetchWithAuthRetry("/api/chat/criar-conversa", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -3089,9 +3090,20 @@ export default function ChatPage() {
     } else {
       setGrupos((prev) => prev.map((g) => g.id === activeChat.id ? { ...g, mensagens: updater(g.mensagens) } : g));
     }
-    // fire-and-forget
-    supabase.from("chat_mensagens")
-      .update({ conteudo: newText, editado_em: new Date().toISOString() }).eq("id", msgId);
+    void fetchWithAuthRetry("/api/chat/mensagem", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: msgId, action: "edit", conteudo: newText }),
+    }, 2, 12_000).then(async (res) => {
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}));
+        showToast(json.error ?? "Não foi possível editar a mensagem.");
+        void carregarMensagens(activeChat.id);
+      }
+    }).catch(() => {
+      showToast("Não foi possível editar a mensagem. Verifique sua conexão.");
+      void carregarMensagens(activeChat.id);
+    });
   }
 
   function toggleReaction(msgId: string, emoji: string) {
@@ -3131,12 +3143,20 @@ export default function ChatPage() {
 
     // 4) Persiste no banco � dispara UPDATE que o postgres_changes j� escuta
     // O outro usu�rio receber� a atualiza��o automaticamente via postgres_changes UPDATE
-    supabase.from("chat_mensagens")
-      .update({ reacoes: newReacoes })
-      .eq("id", msgId)
-      .then(({ error }) => {
-        if (error) console.error("toggleReaction DB error:", error.message);
-      });
+    void fetchWithAuthRetry("/api/chat/mensagem", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: msgId, action: "reactions", reacoes: newReacoes }),
+    }, 2, 12_000).then(async (res) => {
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}));
+        showToast(json.error ?? "Não foi possível salvar a reação.");
+        void carregarMensagens(activeChat.id);
+      }
+    }).catch(() => {
+      showToast("Não foi possível salvar a reação. Verifique sua conexão.");
+      void carregarMensagens(activeChat.id);
+    });
   }
 
   const myDms = dms.filter((dm) => dm.participantes.includes(u.id) && !archivedDms.has(dm.id));
