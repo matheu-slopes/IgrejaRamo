@@ -12,6 +12,7 @@ import {
 } from "@/types";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
+import { notificarEscala } from "@/lib/notificarEscala";
 import {
   FUNCOES_POR_MIN, TEMPLATES_CULTO, TONS,
   proximasDatas, formatDateSimples, displayFuncao,
@@ -173,19 +174,11 @@ export function EscalaModal({ escala, podeEditar, onClose, onUpdate, onDelete }:
     }
 
     try {
-      await fetch('/api/push/broadcast', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userIds,
-          title: 'Aguardando Confirmação',
-          body: `Lembrete: Sua resposta está pendente para a escala de ${escala.culto} (${formatDateSimples(escala.data)}).`,
-          url: '/dashboard/escalas'
-        })
-      });
-      alert("Cobrança enviada com sucesso para os pendentes!");
+      const resultado = await notificarEscala(escala.id, "cobrar_pendentes");
+      if (!resultado.ok) throw new Error(resultado.error);
+      alert(`Cobrança enviada para ${resultado.destinatarios ?? 0} voluntário(s).`);
     } catch (e) {
-      alert("Erro ao enviar cobrança.");
+      alert(e instanceof Error ? e.message : "Erro ao enviar cobrança.");
     }
   }
 
@@ -197,19 +190,11 @@ export function EscalaModal({ escala, podeEditar, onClose, onUpdate, onDelete }:
     if (!msg) return;
 
     try {
-      await fetch('/api/push/broadcast', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userIds,
-          title: `Aviso: ${escala.culto}`,
-          body: msg,
-          url: '/dashboard/escalas'
-        })
-      });
-      alert("Aviso geral enviado com sucesso!");
+      const resultado = await notificarEscala(escala.id, "aviso_geral", msg);
+      if (!resultado.ok) throw new Error(resultado.error);
+      alert(`Aviso enviado para ${resultado.destinatarios ?? 0} voluntário(s).`);
     } catch (e) {
-      alert("Erro ao enviar aviso.");
+      alert(e instanceof Error ? e.message : "Erro ao enviar aviso.");
     }
   }
 
@@ -237,7 +222,7 @@ export function EscalaModal({ escala, podeEditar, onClose, onUpdate, onDelete }:
           ...i,
           confirmado: false,
           confirmadoEm: undefined,
-          confirmacaoStatus: "pendente" as "pendente"
+          confirmacaoStatus: "pendente" as const
         }));
 
         let { error: errInsItens } = await supabase
@@ -270,24 +255,8 @@ export function EscalaModal({ escala, podeEditar, onClose, onUpdate, onDelete }:
         if (errInsMusicas) throw new Error(errInsMusicas.message);
       }
 
-      // DISPARO IMEDIATO DE NOTIFICAÇÃO
-      try {
-        const userIds = form.itens.map(i => i.voluntarioId).filter((id): id is string => !!id);
-        if (userIds.length > 0) {
-          await fetch('/api/push/broadcast', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              userIds,
-              title: 'Escala Atualizada',
-              body: `A escala de ${form.culto} (${formatDateSimples(form.data)}) foi criada/alterada. Por favor, acesse para confirmar sua presença.`,
-              url: '/dashboard/escalas'
-            })
-          });
-        }
-      } catch (e) {
-        console.error("Erro ao enviar push de alteração:", e);
-      }
+      const notificacao = await notificarEscala(escala.id, "alterada");
+      if (!notificacao.ok) console.error("Erro ao enviar push de alteração:", notificacao.error);
 
       // Atualizar o frontend com o status resetado
       const updated: Escala = { 
@@ -297,7 +266,7 @@ export function EscalaModal({ escala, podeEditar, onClose, onUpdate, onDelete }:
           ...i, 
           confirmado: false, 
           confirmadoEm: undefined, 
-          confirmacaoStatus: "pendente" as "pendente" 
+          confirmacaoStatus: "pendente" as const
         }))
       };
       
@@ -721,7 +690,7 @@ export function EscalaModal({ escala, podeEditar, onClose, onUpdate, onDelete }:
               )}
 
               {/* Ações Administrativas */}
-              {podeEditar && (
+              {podeEditar && user?.role === "admin" && (
                 <div className="mt-8 p-4 bg-gray-100 rounded-xl border border-gray-200 space-y-3">
                   <p className="text-[11px] font-bold text-gray-500 uppercase tracking-widest">Painel Administrativo da Escala</p>
                   <div className="flex flex-col sm:flex-row gap-3">
@@ -729,13 +698,13 @@ export function EscalaModal({ escala, podeEditar, onClose, onUpdate, onDelete }:
                       onClick={cobrarPendentes}
                       className="flex-1 bg-white border border-gray-300 text-gray-700 font-semibold text-sm px-4 py-2.5 rounded-xl hover:bg-gray-50 transition"
                     >
-                      Cobrar Pendentes
+                      Cobrar Confirmação Pendente
                     </button>
                     <button 
                       onClick={avisoGeral}
                       className="flex-1 bg-black text-white font-semibold text-sm px-4 py-2.5 rounded-xl hover:bg-gray-900 transition"
                     >
-                      Enviar Aviso Geral
+                      Enviar Aviso Geral da Escala
                     </button>
                   </div>
                 </div>

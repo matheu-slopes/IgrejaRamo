@@ -15,7 +15,7 @@ import {
 import { supabase } from "@/lib/supabase";
 import { useAppRefresh } from "@/hooks/useAppRefresh";
 import BuscarCifraModal from "@/components/dashboard/BuscarCifraModal";
-import { notificarInApp } from "@/lib/notificarInApp";
+import { notificarEscala } from "@/lib/notificarEscala";
 
 // --- Constantes ---------------------------------------------------------------
 
@@ -270,32 +270,13 @@ function normalizeFuncaoParaDB(funcao: string, obs?: string): { funcao: string; 
   return { funcao, observacao: obs || null };
 }
 
-function chaveConfirmacao(item: ItemEscala): string {
-  return `${item.voluntarioId || item.voluntarioNome}::${displayFuncao(item)}`;
-}
-
-function aplicarConfirmacoes(
-  itens: ItemEscala[],
-  anteriores: ItemEscala[],
-  solicitaConfirmacao: boolean
-): ItemEscala[] {
-  if (!solicitaConfirmacao) {
-    return itens.map((item) => ({ ...item, confirmado: false, confirmadoEm: undefined, confirmacaoStatus: "pendente" }));
-  }
-
-  const confirmacoesAnteriores = new Map(
-    anteriores.map((item) => [chaveConfirmacao(item), item])
-  );
-
-  return itens.map((item) => {
-    const anterior = confirmacoesAnteriores.get(chaveConfirmacao(item));
-    return {
-      ...item,
-      confirmado: anterior?.confirmado ?? item.confirmado ?? false,
-      confirmadoEm: anterior?.confirmadoEm ?? item.confirmadoEm,
-      confirmacaoStatus: anterior?.confirmacaoStatus ?? item.confirmacaoStatus ?? (anterior?.confirmado || item.confirmado ? "confirmado" : "pendente"),
-    };
-  });
+function resetarConfirmacoes(itens: ItemEscala[]): ItemEscala[] {
+  return itens.map((item) => ({
+    ...item,
+    confirmado: false,
+    confirmadoEm: undefined,
+    confirmacaoStatus: "pendente" as const,
+  }));
 }
 
 function erroColunaConfirmacaoAusente(error: unknown): boolean {
@@ -834,28 +815,6 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
     setForm((f) => ({ ...f, equipe: label, itens }));
   }
 
-  async function notificarEscalados(escalaId: string, itens: ItemEscala[], antigos: ItemEscala[] = []) {
-    const idsAntigos = new Set(antigos.map((i) => i.voluntarioId).filter(Boolean));
-    const usuarioIds = [...new Set(itens
-      .map((i) => i.voluntarioId)
-      .filter((id): id is string => Boolean(id) && !idsAntigos.has(id)))];
-
-    if (!usuarioIds.length) return;
-
-    await notificarInApp({
-      usuarioIds,
-      tipo: "escala",
-      titulo: form.confirmacaoParticipantes
-        ? "Voce precisa confirmar uma escala"
-        : `Voce foi escalado em ${ministerio}`,
-      corpo: form.confirmacaoParticipantes
-        ? `${form.culto} - ${formatDateSimples(form.data)} as ${form.horario}. Confirme se voce pode servir.`
-        : `${form.culto} - ${formatDateSimples(form.data)} as ${form.horario}`,
-      link: "/dashboard/escalas?aba=minhas",
-      ministerio,
-    });
-  }
-
   async function buscarConflitosEscalaPessoa(voluntarioId: string): Promise<ConflitoEscalaPessoa[]> {
     if (!form.data) return [];
 
@@ -956,8 +915,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
       ? ([form.ageGroup, form.temaInfantil].filter(Boolean).join("|") || null)
       : buildObs(form.equipe, form.observacoes);
     try {
-      const escalaAnterior = editId ? escalas.find((e) => e.id === editId) : undefined;
-      itensFinais = aplicarConfirmacoes(itensFinais, escalaAnterior?.itens ?? [], form.confirmacaoParticipantes);
+      itensFinais = resetarConfirmacoes(itensFinais);
       if (editId) {
         const { error: upErr, data: upData } = await supabase.from("escalas").update({
           culto: form.culto, horario: horarioNormalizado, data: form.data,
@@ -1002,7 +960,8 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
           if (insMus) throw new Error(insMus.message);
         }
         setEscalas((prev) => prev.map((e) => e.id === editId ? { ...e, ...form, visivel: visibilidadeAutomaticaMinisterio ? true : form.visivel, horario: horarioNormalizado, itens: itensFinais, observacoes: obsDB ?? undefined } : e));
-        await notificarEscalados(editId, itensFinais, escalaAnterior?.itens ?? []);
+        const notificacao = await notificarEscala(editId, "alterada");
+        if (!notificacao.ok) console.error("[notificar escala]", notificacao.error);
         await broadcastEscalasSync("update");
       } else {
         const { data: inserted, error: insEsc } = await supabase.from("escalas").insert({
@@ -1047,7 +1006,8 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
             ...form, visivel: visibilidadeAutomaticaMinisterio ? true : form.visivel, horario: horarioNormalizado, itens: itensFinais, observacoes: obsDB ?? undefined,
           };
           setEscalas((prev) => [nova, ...prev]);
-          await notificarEscalados(inserted.id, itensFinais);
+          const notificacao = await notificarEscala(inserted.id, "alterada");
+          if (!notificacao.ok) console.error("[notificar escala]", notificacao.error);
           await broadcastEscalasSync("create");
         }
       }

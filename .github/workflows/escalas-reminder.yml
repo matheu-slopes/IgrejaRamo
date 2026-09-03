@@ -1,13 +1,18 @@
 name: Lembrete de Escalas
 
 on:
-  schedule:
-    # 12:00 horário de Brasília = 15:00 UTC
-    - cron: "0 15 * * *"
-    # 18:00 horário de Brasília = 21:00 UTC
-    - cron: "0 21 * * *"
-  # Permite disparar manualmente pelo GitHub para testar
+  # O agendamento oficial fica no Vercel Cron (ver vercel.json), evitando
+  # notificações duplicadas. Este workflow serve apenas para teste/contingência.
   workflow_dispatch:
+    inputs:
+      tipo:
+        description: Tipo de lembrete
+        required: true
+        default: hoje
+        type: choice
+        options:
+          - hoje
+          - vespera
 
 jobs:
   send-reminders:
@@ -29,9 +34,11 @@ jobs:
             exit 1
           fi
 
+          TYPE="${{ inputs.tipo }}"
+
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
             -H "Authorization: Bearer $CRON_SECRET" \
-            "${URL}/api/push/escalas-reminder")
+            "${URL}/api/push/escalas-reminder?type=${TYPE}")
           echo "HTTP status: $STATUS"
           if [ "$STATUS" != "200" ]; then
             echo "Lembrete de escalas retornou status inesperado: $STATUS"
