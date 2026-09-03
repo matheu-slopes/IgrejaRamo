@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { fetchWithTimeout } from "@/lib/network";
 
 export type AcaoNotificacaoEscala = "alterada" | "cobrar_pendentes" | "aviso_geral";
 
@@ -27,14 +28,14 @@ export async function notificarEscala(
   let token = await accessToken();
   if (!token) return { ok: false, error: "Sessao expirada. Entre novamente." };
 
-  const request = (bearer: string) => fetch("/api/push/escalas", {
+  const request = (bearer: string) => fetchWithTimeout("/api/push/escalas", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${bearer}`,
     },
     body: JSON.stringify({ escalaId, acao, mensagem, ...escopo }),
-  });
+  }, 20_000);
 
   let response = await request(token);
   if (response.status === 401) {

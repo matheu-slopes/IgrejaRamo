@@ -10,6 +10,7 @@ import { supabase } from "@/lib/supabase";
 import { store, STORE_KEYS } from "@/lib/dataStore";
 import { useAppRefresh } from "@/hooks/useAppRefresh";
 import { userMinisterios } from "@/lib/userMinistries";
+import { fetchWithTimeout } from "@/lib/network";
 import {
   ChevronLeft, ChevronRight, ChevronDown, ChevronUp,
   Music2, Users, Calendar, Star, Settings2, ClipboardCopy, Check, UserCheck, AlertCircle, BellRing,
@@ -871,10 +872,14 @@ export default function EscalasDashboardPage() {
     if (isLoading || !user?.id) return;
 
     const requestSeq = ++fetchSeqRef.current;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 15_000);
     const { data, error } = await supabase
       .from("escalas")
       .select("*, escala_itens(*), escala_musicas(*)")
-      .order("data", { ascending: true });
+      .order("data", { ascending: true })
+      .abortSignal(controller.signal);
+    clearTimeout(timer);
     // Ignora resposta antiga para evitar sobrescrever estado com snapshot defasado.
     if (requestSeq !== fetchSeqRef.current) return;
 
@@ -983,7 +988,7 @@ export default function EscalasDashboardPage() {
       const token = sessionData.session?.access_token;
       if (!token) throw new Error("Sessão expirada. Entre novamente.");
 
-      const res = await fetch("/api/escalas/confirmar", {
+      const res = await fetchWithTimeout("/api/escalas/confirmar", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -1018,6 +1023,9 @@ export default function EscalasDashboardPage() {
         : prev);
     } catch (err) {
       alert(err instanceof Error ? err.message : "Não foi possível confirmar a escala.");
+      // A gravação pode ter terminado no servidor após uma oscilação da conexão.
+      // Recarrega em segundo plano para reconciliar a tela com o banco.
+      void carregarTodas();
     } finally {
       setConfirmandoIds((prev) => {
         const next = new Set(prev);
@@ -1025,7 +1033,7 @@ export default function EscalasDashboardPage() {
         return next;
       });
     }
-  }, [confirmandoIds, userId]);
+  }, [carregarTodas, confirmandoIds, userId]);
 
   // ── Modo de edição por ministério ──────────────────────────────────────────
   if (editing) {

@@ -14,6 +14,7 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 import { notificarEscala } from "@/lib/notificarEscala";
 import { analisarAlteracoesEscala, prepararConfirmacoes } from "@/lib/escalaChanges";
+import { fetchWithTimeout } from "@/lib/network";
 import {
   FUNCOES_POR_MIN, TEMPLATES_CULTO, TONS,
   proximasDatas, formatDateSimples, displayFuncao,
@@ -363,7 +364,7 @@ export function EscalaModal({ escala, podeEditar, onClose, onUpdate, onDelete }:
       const token = sessionData.session?.access_token;
       if (!token) throw new Error("Sessão expirada. Entre novamente.");
 
-      const res = await fetch("/api/escalas/confirmar", {
+      const res = await fetchWithTimeout("/api/escalas/confirmar", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
