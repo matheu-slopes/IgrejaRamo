@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertCircle, CheckCircle2, Clock3, Disc3, Download, Drum, Guitar,
   Gauge, LoaderCircle, Mic2, Music2, Pause, Play, Search, Sparkles,
-  Volume2, VolumeX,
+  Repeat2, RotateCcw, Volume2, VolumeX,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
@@ -26,13 +26,17 @@ type Projeto = {
   status: "aguardando" | "baixando" | "analisando" | "separando" | "concluido" | "erro";
   progresso: number;
   tom_original?: string | null;
+  tom_alvo?: string | null;
   bpm?: number | null;
   duracao_segundos?: number | null;
   audio_url?: string | null;
   stem_urls?: Partial<Record<StemName, string | null>>;
   erro?: string | null;
   criado_em: string;
+  escalas?: { id: string; culto: string; data: string; horario: string } | null;
 };
+
+type EscalaOption = { id: string; culto: string; data: string; horario: string };
 
 type StemName = "vocals" | "drums" | "bass" | "other";
 type ToneModule = typeof import("tone");
@@ -60,6 +64,9 @@ const STATUS_LABEL: Record<Projeto["status"], string> = {
   concluido: "Pronto",
   erro: "Falha no processamento",
 };
+
+const TONS = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B",
+  "Cm", "C#m", "Dm", "D#m", "Em", "Fm", "F#m", "Gm", "G#m", "Am", "A#m", "Bm"];
 
 async function token(): Promise<string> {
   const { data } = await supabase.auth.getSession();
@@ -97,19 +104,45 @@ function tomTransposto(original: string | null | undefined, semitons: number) {
   return `${sharp[(index + semitons + 120) % 12]}${match[3] ?? ""}`;
 }
 
-export function LouvorStudioTab({ workerConfigurado }: { workerConfigurado: boolean }) {
+function semitonsEntre(original?: string | null, alvo?: string | null) {
+  if (!original || !alvo) return 0;
+  const notas = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+  const raiz = (tom: string) => tom.replace(/m$/, "");
+  const de = notas.indexOf(raiz(original));
+  const para = notas.indexOf(raiz(alvo));
+  if (de < 0 || para < 0) return 0;
+  let distancia = para - de;
+  if (distancia > 6) distancia -= 12;
+  if (distancia < -6) distancia += 12;
+  return distancia;
+}
+
+export function LouvorStudioTab({
+  podeGerenciar,
+  workerConfigurado,
+  youtubeConfigurado,
+}: {
+  podeGerenciar: boolean;
+  workerConfigurado: boolean;
+  youtubeConfigurado: boolean;
+}) {
   const [query, setQuery] = useState("");
   const [searching, setSearching] = useState(false);
   const [results, setResults] = useState<SearchResult[]>([]);
   const [projects, setProjects] = useState<Projeto[]>([]);
+  const [escalas, setEscalas] = useState<EscalaOption[]>([]);
+  const [escalaId, setEscalaId] = useState("");
+  const [tomAlvo, setTomAlvo] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
   const loadProjects = useCallback(async () => {
     const response = await studioFetch("/api/louvor-studio/projects");
-    const data = await response.json().catch(() => ({})) as { projetos?: Projeto[]; error?: string };
+    const data = await response.json().catch(() => ({})) as { projetos?: Projeto[]; escalas?: EscalaOption[]; error?: string };
     if (response.ok) {
       setProjects(data.projetos ?? []);
+      setEscalas(data.escalas ?? []);
+      setEscalaId((current) => current || data.escalas?.[0]?.id || "");
       setSelectedId((current) => current ?? data.projetos?.find((p) => p.status === "concluido")?.id ?? data.projetos?.[0]?.id ?? null);
     } else {
       setMessage(data.error ?? "Não foi possível carregar o Studio.");
@@ -130,7 +163,7 @@ export function LouvorStudioTab({ workerConfigurado }: { workerConfigurado: bool
 
   async function pesquisar(event: React.FormEvent) {
     event.preventDefault();
-    if (!query.trim() || !workerConfigurado) return;
+    if (!query.trim() || !podeGerenciar) return;
     setSearching(true);
     setMessage(null);
     try {
@@ -158,6 +191,8 @@ export function LouvorStudioTab({ workerConfigurado }: { workerConfigurado: bool
         titulo: result.titulo,
         artista: result.artista,
         thumbnailUrl: result.thumbnailUrl,
+        escalaId,
+        tomAlvo,
       }),
     });
     const data = await response.json().catch(() => ({})) as { projeto?: Projeto; error?: string };
@@ -187,35 +222,63 @@ export function LouvorStudioTab({ workerConfigurado }: { workerConfigurado: bool
             </p>
           </div>
           <span className="w-fit rounded-full bg-white px-3 py-1 text-xs font-medium text-gray-500 ring-1 ring-gray-200">
-            Privado para ministros e líderes
+            Ensaio privado da equipe de Louvor
           </span>
         </div>
 
-        {!workerConfigurado && (
+        {podeGerenciar && !workerConfigurado && (
           <div className="mt-4 flex gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
             <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-            <span>Interface pronta. Falta publicar o processador de áudio e configurar as duas variáveis do worker na Vercel.</span>
+            <span>Configure o segredo do processador na Vercel. Depois, o PC local buscará as tarefas sem ficar exposto na internet.</span>
           </div>
         )}
 
-        <form onSubmit={pesquisar} className="mt-4 flex flex-col gap-2 sm:flex-row">
+        {podeGerenciar ? <form onSubmit={pesquisar} className="mt-4 space-y-2">
+          <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_190px]">
+            <select
+              value={escalaId}
+              onChange={(event) => setEscalaId(event.target.value)}
+              className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-rose-400"
+            >
+              {!escalas.length && <option value="">Nenhuma escala futura do Louvor</option>}
+              {escalas.map((escala) => (
+                <option key={escala.id} value={escala.id}>
+                  {new Date(escala.data + "T12:00:00").toLocaleDateString("pt-BR")} · {escala.culto} · {escala.horario.slice(0, 5)}
+                </option>
+              ))}
+            </select>
+            <select
+              value={tomAlvo}
+              onChange={(event) => setTomAlvo(event.target.value)}
+              className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-rose-400"
+            >
+              <option value="">Tom definido pelo ministro</option>
+              {TONS.map((tom) => <option key={tom} value={tom}>{tom}</option>)}
+            </select>
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
             <input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Ex.: Morada É Tudo Sobre Você"
+              placeholder={youtubeConfigurado ? "Nome da música ou link do YouTube" : "Cole o link do vídeo do YouTube"}
               className="w-full rounded-xl border border-gray-200 bg-white py-2.5 pl-9 pr-3 text-sm outline-none transition focus:border-rose-400 focus:ring-2 focus:ring-rose-100"
             />
           </div>
           <button
-            disabled={searching || !query.trim() || !workerConfigurado}
+            disabled={searching || !query.trim()}
             className="inline-flex items-center justify-center gap-2 rounded-xl bg-gray-950 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40"
           >
             {searching ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
             Pesquisar no YouTube
           </button>
-        </form>
+          </div>
+        </form> : (
+          <p className="mt-4 rounded-xl bg-white p-3 text-sm text-gray-600 ring-1 ring-gray-100">
+            As músicas preparadas pelos ministros aparecem abaixo para toda a equipe ensaiar.
+          </p>
+        )}
         <p className="mt-2 text-[11px] text-gray-400">Use apenas conteúdo próprio, licenciado ou autorizado pelos titulares.</p>
       </div>
 
@@ -242,7 +305,8 @@ export function LouvorStudioTab({ workerConfigurado }: { workerConfigurado: bool
                 </div>
                 <button
                   onClick={() => void processar(result)}
-                  className="flex shrink-0 items-center gap-1.5 rounded-lg bg-rose-700 px-3 py-2 text-xs font-semibold text-white hover:bg-rose-600"
+                  disabled={!workerConfigurado || !escalaId || !tomAlvo}
+                  className="flex shrink-0 items-center gap-1.5 rounded-lg bg-rose-700 px-3 py-2 text-xs font-semibold text-white hover:bg-rose-600 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   <Download className="h-3.5 w-3.5" /> Preparar
                 </button>
@@ -268,6 +332,11 @@ export function LouvorStudioTab({ workerConfigurado }: { workerConfigurado: bool
               >
                 <p className="truncate text-sm font-semibold text-gray-900">{project.titulo}</p>
                 <p className="mt-0.5 truncate text-xs text-gray-400">{project.artista || "YouTube"}</p>
+                {project.escalas && (
+                  <p className="mt-1 truncate text-[11px] text-gray-500">
+                    {new Date(project.escalas.data + "T12:00:00").toLocaleDateString("pt-BR")} · tom {project.tom_alvo || "a definir"}
+                  </p>
+                )}
                 <div className="mt-2 flex items-center gap-1.5 text-[11px] text-gray-500">
                   {project.status === "concluido" ? <CheckCircle2 className="h-3.5 w-3.5 text-green-600" /> :
                     project.status === "erro" ? <AlertCircle className="h-3.5 w-3.5 text-red-500" /> :
@@ -295,7 +364,7 @@ export function LouvorStudioTab({ workerConfigurado }: { workerConfigurado: bool
             <div className="flex min-h-72 flex-col items-center justify-center rounded-2xl border border-gray-100 bg-white px-5 text-center">
               {selected.status === "erro" ? <AlertCircle className="mb-3 h-9 w-9 text-red-400" /> : <LoaderCircle className="mb-3 h-9 w-9 animate-spin text-rose-600" />}
               <p className="font-semibold text-gray-900">{STATUS_LABEL[selected.status]}</p>
-              <p className="mt-1 max-w-md text-sm text-gray-500">{selected.erro || "Você pode sair desta tela. O processamento continuará no servidor."}</p>
+              <p className="mt-1 max-w-md text-sm text-gray-500">{selected.erro || "Você pode sair desta tela. O PC local continuará o processamento enquanto estiver ligado."}</p>
               {selected.status !== "erro" && <p className="mt-3 text-xs font-medium text-rose-700">{selected.progresso}%</p>}
             </div>
           )}
@@ -307,13 +376,17 @@ export function LouvorStudioTab({ workerConfigurado }: { workerConfigurado: bool
 }
 
 function StudioPlayer({ project }: { project: Projeto }) {
+  const tomInicial = semitonsEntre(project.tom_original, project.tom_alvo);
   const engineRef = useRef<AudioEngine | null>(null);
   const animationRef = useRef<number | null>(null);
   const metronomeEnabledRef = useRef(false);
   const [ready, setReady] = useState(false);
   const [playing, setPlaying] = useState(false);
   const [position, setPosition] = useState(0);
-  const [semitones, setSemitones] = useState(0);
+  const [semitones, setSemitones] = useState(tomInicial);
+  const [speed, setSpeed] = useState(1);
+  const [loopStart, setLoopStart] = useState<number | null>(null);
+  const [loopEnd, setLoopEnd] = useState<number | null>(null);
   const [metronome, setMetronome] = useState(false);
   const [volumes, setVolumes] = useState<Record<StemName, number>>({ vocals: 1, drums: 1, bass: 1, other: 1 });
   const [muted, setMuted] = useState<Record<StemName, boolean>>({ vocals: false, drums: false, bass: false, other: false });
@@ -346,7 +419,7 @@ function StudioPlayer({ project }: { project: Projeto }) {
         const url = stemUrls[stem.id];
         if (!url) continue;
         const gain = new Tone.Gain(1).toDestination();
-        const shifter = new Tone.PitchShift({ pitch: 0, windowSize: 0.08 }).connect(gain);
+        const shifter = new Tone.PitchShift({ pitch: tomInicial, windowSize: 0.08 }).connect(gain);
         const player = new Tone.Player({ url }).connect(shifter).sync().start(0);
         gains[stem.id] = gain;
         pitch[stem.id] = shifter;
@@ -381,13 +454,13 @@ function StudioPlayer({ project }: { project: Projeto }) {
       }
       engineRef.current = null;
     };
-  }, [project.bpm, stemUrls]);
+  }, [project.bpm, stemUrls, tomInicial]);
 
   useEffect(() => {
     const tick = () => {
       const engine = engineRef.current;
       if (engine) {
-        const current = Math.min(duration, engine.Tone.getTransport().seconds);
+        const current = Math.min(duration, engine.Tone.getTransport().seconds * speed);
         setPosition(current);
         if (duration && current >= duration) {
           engine.Tone.getTransport().stop();
@@ -400,7 +473,7 @@ function StudioPlayer({ project }: { project: Projeto }) {
     };
     if (playing) animationRef.current = requestAnimationFrame(tick);
     return () => { if (animationRef.current) cancelAnimationFrame(animationRef.current); };
-  }, [duration, playing]);
+  }, [duration, playing, speed]);
 
   async function togglePlay() {
     const engine = engineRef.current;
@@ -414,14 +487,57 @@ function StudioPlayer({ project }: { project: Projeto }) {
   function seek(value: number) {
     const engine = engineRef.current;
     if (!engine) return;
-    engine.Tone.getTransport().seconds = value;
+    engine.Tone.getTransport().seconds = value / speed;
     setPosition(value);
   }
 
   function updatePitch(next: number) {
     const limited = Math.max(-6, Math.min(6, next));
     setSemitones(limited);
-    Object.values(engineRef.current?.pitch ?? {}).forEach((effect) => { if (effect) effect.pitch = limited; });
+    const compensacaoVelocidade = 12 * Math.log2(speed);
+    Object.values(engineRef.current?.pitch ?? {}).forEach((effect) => {
+      if (effect) effect.pitch = limited - compensacaoVelocidade;
+    });
+  }
+
+  function updateSpeed(next: number) {
+    setSpeed(next);
+    const engine = engineRef.current;
+    if (!engine) return;
+    Object.values(engine.players).forEach((player) => { if (player) player.playbackRate = next; });
+    Object.values(engine.pitch).forEach((effect) => {
+      if (effect) effect.pitch = semitones - 12 * Math.log2(next);
+    });
+    const transport = engine.Tone.getTransport();
+    transport.bpm.value = Number(project.bpm || 100) * next;
+    transport.seconds = position / next;
+    if (loopStart !== null && loopEnd !== null) {
+      transport.loopStart = loopStart / next;
+      transport.loopEnd = loopEnd / next;
+    }
+  }
+
+  function marcarLoop() {
+    const engine = engineRef.current;
+    if (!engine) return;
+    const transport = engine.Tone.getTransport();
+    if (loopStart === null || loopEnd !== null) {
+      setLoopStart(position);
+      setLoopEnd(null);
+      transport.loop = false;
+      return;
+    }
+    if (position <= loopStart + 1) return;
+    setLoopEnd(position);
+    transport.loopStart = loopStart / speed;
+    transport.loopEnd = position / speed;
+    transport.loop = true;
+  }
+
+  function limparLoop() {
+    setLoopStart(null);
+    setLoopEnd(null);
+    if (engineRef.current) engineRef.current.Tone.getTransport().loop = false;
   }
 
   function updateVolume(stem: StemName, value: number) {
@@ -451,6 +567,7 @@ function StudioPlayer({ project }: { project: Projeto }) {
           </div>
           <div className="flex gap-2 text-xs">
             <span className="rounded-full bg-white/10 px-3 py-1.5">Tom original: <strong>{project.tom_original || "?"}</strong></span>
+            <span className="rounded-full bg-rose-500/20 px-3 py-1.5">Tom da escala: <strong>{project.tom_alvo || "?"}</strong></span>
             <span className="rounded-full bg-white/10 px-3 py-1.5"><Gauge className="mr-1 inline h-3.5 w-3.5" />{Math.round(Number(project.bpm || 0))} BPM</span>
           </div>
         </div>
@@ -499,7 +616,31 @@ function StudioPlayer({ project }: { project: Projeto }) {
             >
               {!ready ? <LoaderCircle className="h-6 w-6 animate-spin" /> : playing ? <Pause className="h-6 w-6 fill-current" /> : <Play className="ml-1 h-6 w-6 fill-current" />}
             </button>
-            <div className="w-[102px]" />
+            <button
+              onClick={marcarLoop}
+              className={`rounded-xl px-3 py-2 text-xs font-semibold transition ${loopStart !== null ? "bg-blue-600 text-white" : "bg-white/10 text-white/60 hover:bg-white/15"}`}
+              title={loopStart === null ? "Marcar início A" : loopEnd === null ? "Marcar fim B" : "Criar outro trecho"}
+            >
+              <Repeat2 className="mr-1.5 inline h-4 w-4" />
+              {loopStart === null ? "Loop A" : loopEnd === null ? "Marcar B" : "A–B ativo"}
+            </button>
+          </div>
+          <div className="flex flex-wrap items-center justify-center gap-2 text-xs">
+            <span className="text-white/45">Velocidade</span>
+            {[0.75, 0.9, 1, 1.1].map((value) => (
+              <button
+                key={value}
+                onClick={() => updateSpeed(value)}
+                className={`rounded-lg px-2.5 py-1.5 ${speed === value ? "bg-white text-gray-950" : "bg-white/10 text-white/60"}`}
+              >
+                {value}×
+              </button>
+            ))}
+            {loopStart !== null && (
+              <button onClick={limparLoop} className="ml-2 rounded-lg bg-white/10 px-2.5 py-1.5 text-white/60">
+                Limpar loop
+              </button>
+            )}
           </div>
         </div>
 
@@ -511,6 +652,12 @@ function StudioPlayer({ project }: { project: Projeto }) {
             <span className="w-20 text-xs text-white/55">{semitones === 0 ? "Original" : `${semitones > 0 ? "+" : ""}${semitones} semitons`}</span>
             <button onClick={() => updatePitch(semitones + 1)} disabled={semitones >= 6} className="h-9 w-9 rounded-full bg-white/10 text-xl disabled:opacity-30">+</button>
           </div>
+          <button
+            onClick={() => updatePitch(tomInicial)}
+            className="mt-3 inline-flex items-center gap-1 text-[11px] text-white/45 hover:text-white"
+          >
+            <RotateCcw className="h-3 w-3" /> Voltar ao tom da escala
+          </button>
         </div>
       </div>
     </div>

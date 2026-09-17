@@ -1,13 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getLouvorStudioUser, podeUsarLouvorStudio, workerConfigurado } from "@/lib/louvorStudioServer";
+import {
+  getLouvorStudioAccess,
+  getLouvorStudioUser,
+  workerConfigurado,
+  youtubeConfigurado,
+} from "@/lib/louvorStudioServer";
 
 export async function GET(req: NextRequest) {
   const user = await getLouvorStudioUser(req);
   if (!user) return NextResponse.json({ autorizado: false }, { status: 401 });
+  const acesso = await getLouvorStudioAccess(user.id);
 
   return NextResponse.json({
-    autorizado: await podeUsarLouvorStudio(user.id),
+    autorizado: acesso.podeVer,
+    podeGerenciar: acesso.podeGerenciar,
     workerConfigurado: workerConfigurado(),
+    youtubeConfigurado: youtubeConfigurado(),
   });
 }
-

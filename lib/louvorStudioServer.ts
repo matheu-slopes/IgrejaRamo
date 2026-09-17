@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createClient, User as SupabaseUser } from "@supabase/supabase-js";
+import { timingSafeEqual } from "node:crypto";
 import { NextRequest } from "next/server";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -17,46 +18,74 @@ export async function getLouvorStudioUser(req: NextRequest): Promise<SupabaseUse
   return error ? null : data.user;
 }
 
-export async function podeUsarLouvorStudio(userId: string): Promise<boolean> {
+type StudioAccess = { podeVer: boolean; podeGerenciar: boolean };
+
+export async function getLouvorStudioAccess(userId: string): Promise<StudioAccess> {
   const { data: perfil } = await louvorStudioAdmin
     .from("perfis")
-    .select("role, ativo, lider_ministerios")
+    .select("role, ativo, ministerios, lider_ministerios")
     .eq("id", userId)
     .maybeSingle();
 
-  if (!perfil?.ativo) return false;
-  if (["admin", "pastor"].includes(String(perfil.role))) return true;
-  if (((perfil.lider_ministerios as string[] | null) ?? []).includes("Louvor")) return true;
+  if (!perfil?.ativo) return { podeVer: false, podeGerenciar: false };
+  const administrador = ["admin", "pastor"].includes(String(perfil.role));
+  const ministerios = (perfil.ministerios as string[] | null) ?? [];
+  const liderMinisterios = (perfil.lider_ministerios as string[] | null) ?? [];
 
   const { data: membro } = await louvorStudioAdmin
     .from("membros_ministerio")
     .select("funcao")
     .eq("usuario_id", userId)
     .eq("ministerio", "Louvor")
-    .in("funcao", ["Ministro", "Líder", "Colíder"])
     .maybeSingle();
 
-  return Boolean(membro);
+  const funcao = String(membro?.funcao ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  const membroLouvor = Boolean(membro) || ministerios.includes("Louvor") || liderMinisterios.includes("Louvor");
+  const gestorLouvor = liderMinisterios.includes("Louvor") || ["ministro", "lider", "colider"].includes(funcao);
+
+  return {
+    podeVer: administrador || membroLouvor,
+    podeGerenciar: administrador || gestorLouvor,
+  };
+}
+
+export async function podeVerLouvorStudio(userId: string) {
+  return (await getLouvorStudioAccess(userId)).podeVer;
+}
+
+export async function podeGerenciarLouvorStudio(userId: string) {
+  return (await getLouvorStudioAccess(userId)).podeGerenciar;
 }
 
 export function workerConfigurado(): boolean {
-  return Boolean(process.env.LOUVOR_STUDIO_WORKER_URL && process.env.LOUVOR_STUDIO_WORKER_SECRET);
+  return Boolean(process.env.LOUVOR_STUDIO_WORKER_SECRET);
 }
 
-export async function chamarLouvorStudioWorker(path: string, init?: RequestInit): Promise<Response> {
-  const baseUrl = process.env.LOUVOR_STUDIO_WORKER_URL?.replace(/\/$/, "");
-  const secret = process.env.LOUVOR_STUDIO_WORKER_SECRET;
-  if (!baseUrl || !secret) throw new Error("Louvor Studio ainda não foi configurado no servidor.");
-
-  return fetch(`${baseUrl}${path}`, {
-    ...init,
-    cache: "no-store",
-    signal: AbortSignal.timeout(30_000),
-    headers: {
-      "Content-Type": "application/json",
-      "X-Worker-Secret": secret,
-      ...(init?.headers ?? {}),
-    },
-  });
+export function youtubeConfigurado(): boolean {
+  return Boolean(process.env.YOUTUBE_API_KEY);
 }
 
+export function validarWorker(req: NextRequest): boolean {
+  const esperado = process.env.LOUVOR_STUDIO_WORKER_SECRET ?? "";
+  const recebido = req.headers.get("x-worker-secret") ?? "";
+  if (!esperado || esperado.length !== recebido.length) return false;
+  return timingSafeEqual(Buffer.from(esperado), Buffer.from(recebido));
+}
+
+export async function limparProjetosExpirados(): Promise<number> {
+  const { data } = await louvorStudioAdmin
+    .from("louvor_studio_projetos")
+    .select("id")
+    .lt("expira_em", new Date().toISOString())
+    .limit(20);
+
+  let removidos = 0;
+  for (const projeto of data ?? []) {
+    const { data: objetos } = await louvorStudioAdmin.storage.from("louvor-studio").list(projeto.id, { limit: 20 });
+    const paths = (objetos ?? []).map((objeto) => projeto.id + "/" + objeto.name);
+    if (paths.length) await louvorStudioAdmin.storage.from("louvor-studio").remove(paths);
+    const { error } = await louvorStudioAdmin.from("louvor_studio_projetos").delete().eq("id", projeto.id);
+    if (!error) removidos += 1;
+  }
+  return removidos;
+}

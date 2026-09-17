@@ -47,7 +47,12 @@ export default function CanalMinisterioPage() {
   const [tab, setTab] = useState<Tab>(() => slug === "Ensino" ? "chat" : "escalas");
   const [canalBase, setCanalBase] = useState<{ ministerio: string; descricao: string; chatBloqueado: boolean; cor: string } | null>(null);
   const [chatBloqueado, setChatBloqueado] = useState(false);
-  const [studioAccess, setStudioAccess] = useState({ autorizado: false, workerConfigurado: false });
+  const [studioAccess, setStudioAccess] = useState({
+    autorizado: false,
+    podeGerenciar: false,
+    workerConfigurado: false,
+    youtubeConfigurado: false,
+  });
 
   function carregarCanalBase() {
     // Timeout de segurança: se demorar mais de 3s, usa fallback e não trava
@@ -90,7 +95,7 @@ export default function CanalMinisterioPage() {
   useEffect(() => {
     let ativo = true;
     if (slug !== "Louvor" || !user?.id) {
-      setStudioAccess({ autorizado: false, workerConfigurado: false });
+      setStudioAccess({ autorizado: false, podeGerenciar: false, workerConfigurado: false, youtubeConfigurado: false });
       return;
     }
     supabase.auth.getSession().then(({ data }) => {
@@ -104,7 +109,9 @@ export default function CanalMinisterioPage() {
         .then((result) => {
           if (ativo) setStudioAccess({
             autorizado: Boolean(result.autorizado),
+            podeGerenciar: Boolean(result.podeGerenciar),
             workerConfigurado: Boolean(result.workerConfigurado),
+            youtubeConfigurado: Boolean(result.youtubeConfigurado),
           });
         })
         .catch(() => {});
@@ -208,7 +215,13 @@ export default function CanalMinisterioPage() {
       {tab === "membros" && <MembrosTab ministerio={slug} isLider={podeGerenciarMembros} podeAtribuirPermissoes={podeAtribuirPermissoes} />}
       {tab === "eventos" && <EventosTab ministerio={slug} isLider={podeCriarEvento} podeEditar={podeEditarEvento} />}
       {temEscalas && tab === "escalas" && <EscalasTab ministerio={slug} isLider={isAdmin || temPermissaoNoMinisterio("criar_escala", slug)} />}
-      {tab === "studio" && studioAccess.autorizado && <LouvorStudioTab workerConfigurado={studioAccess.workerConfigurado} />}
+      {tab === "studio" && studioAccess.autorizado && (
+        <LouvorStudioTab
+          podeGerenciar={studioAccess.podeGerenciar}
+          workerConfigurado={studioAccess.workerConfigurado}
+          youtubeConfigurado={studioAccess.youtubeConfigurado}
+        />
+      )}
     </div>
   );
 }
