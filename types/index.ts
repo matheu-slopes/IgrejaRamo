@@ -297,7 +297,7 @@ export interface ChatCulto {
 // ─────────────────────────────────────────────
 // Membro dentro de um ministério
 // ─────────────────────────────────────────────
-export type FuncaoMinisterio = "Líder" | "Colíder" | "Sub-líder" | "Membro" | "Voluntário(a)" | "Visitante";
+export type FuncaoMinisterio = "Líder" | "Colíder" | "Ministro" | "Sub-líder" | "Membro" | "Voluntário(a)" | "Visitante";
 
 export interface MembroMinisterio {
   id: string;          // ref para User.id

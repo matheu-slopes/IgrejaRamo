@@ -18,9 +18,10 @@ import { supabase } from "@/lib/supabase";
 import { downloadICS, linkGoogleCalendar, formatarData, diaSemana } from "@/lib/calendarUtils";
 import { EscalasTab } from "@/components/dashboard/EscalasTab";
 import { EventosTab } from "@/components/dashboard/EventosTab";
+import { LouvorStudioTab } from "@/components/dashboard/LouvorStudioTab";
 import { useAppRefresh } from "@/hooks/useAppRefresh";
 
-type Tab = "chat" | "membros" | "eventos" | "escalas";
+type Tab = "chat" | "membros" | "eventos" | "escalas" | "studio";
 
 const corMap: Record<string, string> = {
   Louvor:        "bg-rose-700",
@@ -46,6 +47,7 @@ export default function CanalMinisterioPage() {
   const [tab, setTab] = useState<Tab>(() => slug === "Ensino" ? "chat" : "escalas");
   const [canalBase, setCanalBase] = useState<{ ministerio: string; descricao: string; chatBloqueado: boolean; cor: string } | null>(null);
   const [chatBloqueado, setChatBloqueado] = useState(false);
+  const [studioAccess, setStudioAccess] = useState({ autorizado: false, workerConfigurado: false });
 
   function carregarCanalBase() {
     // Timeout de segurança: se demorar mais de 3s, usa fallback e não trava
@@ -84,6 +86,31 @@ export default function CanalMinisterioPage() {
   const podeEditarEvento     = temPermissaoNoMinisterio("editar_evento", slug);
   const podeAtribuirPermissoes = temPermissao("atribuir_permissoes");
   const temEscalas = slug !== "Ensino";
+
+  useEffect(() => {
+    let ativo = true;
+    if (slug !== "Louvor" || !user?.id) {
+      setStudioAccess({ autorizado: false, workerConfigurado: false });
+      return;
+    }
+    supabase.auth.getSession().then(({ data }) => {
+      const accessToken = data.session?.access_token;
+      if (!accessToken) return;
+      fetch("/api/louvor-studio/access", {
+        cache: "no-store",
+        headers: { Authorization: `Bearer ${accessToken}` },
+      })
+        .then((response) => response.json())
+        .then((result) => {
+          if (ativo) setStudioAccess({
+            autorizado: Boolean(result.autorizado),
+            workerConfigurado: Boolean(result.workerConfigurado),
+          });
+        })
+        .catch(() => {});
+    });
+    return () => { ativo = false; };
+  }, [slug, user?.id]);
 
   useEffect(() => {
     // Ao trocar de ministério, abre sua área principal. Ensino não possui escalas.
@@ -153,6 +180,9 @@ export default function CanalMinisterioPage() {
               ...(temEscalas ? [{ id: "escalas" as const, label: "Escalas", icon: CalendarDays }] : []),
               { id: "chat",    label: "Chat",    icon: MessageSquare },
               { id: "eventos", label: "Eventos", icon: Calendar      },
+              ...(slug === "Louvor" && studioAccess.autorizado
+                ? [{ id: "studio" as const, label: "Studio", icon: Music2 }]
+                : []),
               { id: "membros", label: "Membros", icon: Users         },
             ] as { id: Tab; label: string; icon: React.ElementType }[]).map(({ id, label, icon: Icon }) => (
               <button
@@ -178,6 +208,7 @@ export default function CanalMinisterioPage() {
       {tab === "membros" && <MembrosTab ministerio={slug} isLider={podeGerenciarMembros} podeAtribuirPermissoes={podeAtribuirPermissoes} />}
       {tab === "eventos" && <EventosTab ministerio={slug} isLider={podeCriarEvento} podeEditar={podeEditarEvento} />}
       {temEscalas && tab === "escalas" && <EscalasTab ministerio={slug} isLider={isAdmin || temPermissaoNoMinisterio("criar_escala", slug)} />}
+      {tab === "studio" && studioAccess.autorizado && <LouvorStudioTab workerConfigurado={studioAccess.workerConfigurado} />}
     </div>
   );
 }
@@ -1102,7 +1133,7 @@ function ChatTab({
 
 // ─── TAB: MEMBROS ─────────────────────────────────────────────────────────────
 
-const funcoes: FuncaoMinisterio[] = ["Líder", "Colíder", "Voluntário(a)"];
+const funcoesBase: FuncaoMinisterio[] = ["Líder", "Colíder", "Voluntário(a)"];
 
 // Permissões que fazem sentido no contexto de um canal de ministério
 const PERMISSOES_CANAL = [
@@ -1122,6 +1153,9 @@ function MembrosTab({
   podeAtribuirPermissoes: boolean;
 }) {
   const [membros, setMembros] = useState<MembroMinisterio[]>([]);
+  const funcoes: FuncaoMinisterio[] = ministerio === "Louvor"
+    ? ["Líder", "Colíder", "Ministro", "Voluntário(a)"]
+    : funcoesBase;
 
   function carregarMembros() {
     Promise.all([
@@ -1198,10 +1232,11 @@ function MembrosTab({
   const FUNCAO_ORDER: Record<FuncaoMinisterio, number> = {
     "Líder": 0,
     "Colíder": 1,
-    "Sub-líder": 2,
-    "Membro": 3,
-    "Voluntário(a)": 4,
-    "Visitante": 5,
+    "Ministro": 2,
+    "Sub-líder": 3,
+    "Membro": 4,
+    "Voluntário(a)": 5,
+    "Visitante": 6,
   };
   const eLider = (m: MembroMinisterio) => m.funcao === "Líder" || m.funcao === "Colíder";
   const membrosOrdenados = [
@@ -1297,6 +1332,7 @@ function MembrosTab({
   const funcaoCor: Record<FuncaoMinisterio, string> = {
     "Líder":        "bg-gold-100 text-gold-800",
     "Colíder":      "bg-yellow-100 text-yellow-800",
+    "Ministro":     "bg-rose-100 text-rose-700",
     "Sub-líder":    "bg-vine-100 text-vine-800",
     "Membro":       "bg-gray-100 text-gray-700",
     "Voluntário(a)": "bg-blue-50 text-blue-700",
