@@ -16,12 +16,13 @@ import clsx from "clsx";
 import { Local, Ministerio, MuralMensagem, MembroMinisterio, Evento, FuncaoMinisterio, Escala, EscalaMusica, Musica, FuncaoEscala, ItemEscala } from "@/types";
 import { supabase } from "@/lib/supabase";
 import { downloadICS, linkGoogleCalendar, formatarData, diaSemana } from "@/lib/calendarUtils";
-import { EscalasTab } from "@/components/dashboard/EscalasTab";
+import { EscalasTab, PedidoAnaliseStudio } from "@/components/dashboard/EscalasTab";
 import { EventosTab } from "@/components/dashboard/EventosTab";
 import { LouvorStudioTab } from "@/components/dashboard/LouvorStudioTab";
+import { RepertorioTab } from "@/components/dashboard/RepertorioTab";
 import { useAppRefresh } from "@/hooks/useAppRefresh";
 
-type Tab = "chat" | "membros" | "eventos" | "escalas" | "studio";
+type Tab = "chat" | "membros" | "eventos" | "escalas" | "studio" | "repertorio";
 
 const corMap: Record<string, string> = {
   Louvor:        "bg-rose-700",
@@ -53,6 +54,12 @@ export default function CanalMinisterioPage() {
     workerConfigurado: false,
     youtubeConfigurado: false,
   });
+  const [analiseStudioInicial, setAnaliseStudioInicial] = useState<(PedidoAnaliseStudio & { id: string }) | null>(null);
+
+  function abrirAnaliseNoStudio(pedido: PedidoAnaliseStudio) {
+    setAnaliseStudioInicial({ id: crypto.randomUUID(), ...pedido });
+    setTab("studio");
+  }
 
   function carregarCanalBase() {
     // Timeout de segurança: se demorar mais de 3s, usa fallback e não trava
@@ -89,6 +96,7 @@ export default function CanalMinisterioPage() {
   const podeGerenciarMembros = temPermissaoNoMinisterio("gerenciar_membros_ministerio", slug);
   const podeCriarEvento      = temPermissaoNoMinisterio("criar_evento", slug);
   const podeEditarEvento     = temPermissaoNoMinisterio("editar_evento", slug);
+  const podeGerenciarRepertorio = temPermissaoNoMinisterio("gerenciar_repertorio", slug);
   const podeAtribuirPermissoes = temPermissao("atribuir_permissoes");
   const temEscalas = slug !== "Ensino";
 
@@ -190,6 +198,9 @@ export default function CanalMinisterioPage() {
               ...(slug === "Louvor" && studioAccess.autorizado
                 ? [{ id: "studio" as const, label: "Studio", icon: Music2 }]
                 : []),
+              ...(slug === "Louvor" && studioAccess.autorizado
+                ? [{ id: "repertorio" as const, label: "Repertório", icon: Music2 }]
+                : []),
               { id: "membros", label: "Membros", icon: Users         },
             ] as { id: Tab; label: string; icon: React.ElementType }[]).map(({ id, label, icon: Icon }) => (
               <button
@@ -214,14 +225,16 @@ export default function CanalMinisterioPage() {
       {tab === "chat"    && <ChatTab ministerio={slug} chatBloqueado={chatBloqueado} podeEnviar={temPermissaoNoMinisterio("enviar_chat", slug)} podeFixar={temPermissaoNoMinisterio("fixar_mensagem", slug)} user={user} />}
       {tab === "membros" && <MembrosTab ministerio={slug} isLider={podeGerenciarMembros} podeAtribuirPermissoes={podeAtribuirPermissoes} />}
       {tab === "eventos" && <EventosTab ministerio={slug} isLider={podeCriarEvento} podeEditar={podeEditarEvento} />}
-      {temEscalas && tab === "escalas" && <EscalasTab ministerio={slug} isLider={isAdmin || temPermissaoNoMinisterio("criar_escala", slug)} />}
+      {temEscalas && tab === "escalas" && <EscalasTab ministerio={slug} isLider={isAdmin || temPermissaoNoMinisterio("criar_escala", slug)} podeGerenciarRepertorio={slug === "Louvor" && podeGerenciarRepertorio} onAnalisarNoStudio={slug === "Louvor" && studioAccess.autorizado ? abrirAnaliseNoStudio : undefined} />}
       {tab === "studio" && studioAccess.autorizado && (
         <LouvorStudioTab
           podeGerenciar={studioAccess.podeGerenciar}
           workerConfigurado={studioAccess.workerConfigurado}
-          youtubeConfigurado={studioAccess.youtubeConfigurado}
+          analiseInicial={analiseStudioInicial}
+          onAjustarNaEscala={() => setTab("escalas")}
         />
       )}
+      {tab === "repertorio" && studioAccess.autorizado && <RepertorioTab podeGerenciar={podeGerenciarRepertorio} />}
     </div>
   );
 }
@@ -1366,6 +1379,11 @@ function MembrosTab({
         )}
       </div>
 
+      {ministerio === "Louvor" && isLider && (
+        <p className="rounded-xl border border-rose-100 bg-rose-50 px-3 py-2 text-xs text-rose-800">
+          <strong>Ministro</strong> prepara músicas e as vincula aos cultos no Studio. Os demais membros podem ouvir e ensaiar as músicas prontas.
+        </p>
+      )}
       {/* Formulário de adição */}
       {showForm && (
         <div className="bg-vine-50 border border-vine-200 rounded-2xl p-4 space-y-3">

@@ -62,7 +62,8 @@ export function workerConfigurado(): boolean {
 }
 
 export function youtubeConfigurado(): boolean {
-  return Boolean(process.env.YOUTUBE_API_KEY);
+  // Name search is available through the public search page without an API key.
+  return true;
 }
 
 export function validarWorker(req: NextRequest): boolean {
@@ -81,9 +82,13 @@ export async function limparProjetosExpirados(): Promise<number> {
 
   let removidos = 0;
   for (const projeto of data ?? []) {
-    const { data: objetos } = await louvorStudioAdmin.storage.from("louvor-studio").list(projeto.id, { limit: 20 });
+    const { data: objetos, error: listError } = await louvorStudioAdmin.storage.from("louvor-studio").list(projeto.id, { limit: 1000 });
+    if (listError) continue;
     const paths = (objetos ?? []).map((objeto) => projeto.id + "/" + objeto.name);
-    if (paths.length) await louvorStudioAdmin.storage.from("louvor-studio").remove(paths);
+    if (paths.length) {
+      const {error: storageError}=await louvorStudioAdmin.storage.from("louvor-studio").remove(paths);
+      if(storageError || paths.length === 1000) continue;
+    }
     const { error } = await louvorStudioAdmin.from("louvor_studio_projetos").delete().eq("id", projeto.id);
     if (!error) removidos += 1;
   }

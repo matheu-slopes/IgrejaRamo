@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   Plus, Trash2, Pencil, X, Save, Music2, Users, Eye, EyeOff, UserCheck,
@@ -365,6 +365,81 @@ function StatusConfirmacaoBadge({ status, className, compact = false }: { status
   );
 }
 
+function normalizarTextoBusca(texto: string | null | undefined) {
+  return String(texto ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase("pt-BR")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
+function distanciaEdicao(a: string, b: string) {
+  if (a === b) return 0;
+  if (!a) return b.length;
+  if (!b) return a.length;
+  let anterior = Array.from({ length: b.length + 1 }, (_, indice) => indice);
+  for (let i = 1; i <= a.length; i++) {
+    const atual = [i];
+    for (let j = 1; j <= b.length; j++) {
+      atual[j] = Math.min(
+        anterior[j] + 1,
+        atual[j - 1] + 1,
+        anterior[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1),
+      );
+    }
+    anterior = atual;
+  }
+  return anterior[b.length];
+}
+
+function mesmaMusica(a: Pick<Musica, "titulo" | "artista">, b: Pick<Musica, "titulo" | "artista">) {
+  return normalizarTextoBusca(a.titulo) === normalizarTextoBusca(b.titulo) &&
+    normalizarTextoBusca(a.artista) === normalizarTextoBusca(b.artista);
+}
+
+function pontuacaoBuscaMusica(musica: Musica, consulta: string) {
+  const busca = normalizarTextoBusca(consulta);
+  if (!busca) return 0;
+  const titulo = normalizarTextoBusca(musica.titulo);
+  const artista = normalizarTextoBusca(musica.artista);
+  const cifra = normalizarTextoBusca(musica.cifra);
+  if (titulo.includes(busca)) return 300;
+  if (artista.includes(busca)) return 250;
+  if (cifra.includes(busca)) return 200;
+
+  const termos = busca.split(" ").filter((termo) => termo.length >= 2);
+  // Não use palavras curtas da cifra (por exemplo, o acorde "E") como
+  // correspondência: elas fazem uma busca como "emau" retornar qualquer música.
+  const palavrasPesquisaveis = `${titulo} ${artista} ${cifra}`
+    .split(" ")
+    .filter((palavra) => palavra.length >= 3);
+  const todosTermosReconhecidos = termos.length > 0 && termos.every((termo) =>
+    palavrasPesquisaveis.some((palavra) => {
+      if (palavra.includes(termo)) return true;
+      // Erros pequenos são úteis em títulos, mas não devem deixar a busca ampla.
+      const limite = termo.length >= 4 ? 1 : 0;
+      return limite > 0 && distanciaEdicao(termo, palavra) <= limite;
+    }),
+  );
+  return todosTermosReconhecidos ? 100 : 0;
+}
+
+function erroColunasFonteRepertorioAusentes(error: unknown): boolean {
+  const err = error as { message?: string; code?: string } | null;
+  const texto = String(err?.message ?? "").toLowerCase();
+  const colunas = ["cifra", "link_youtube", "cifra_url", "cifra_artista_slug", "cifra_musica_slug"];
+  return (err?.code === "PGRST204" || err?.code === "42703" || texto.includes("schema cache")) &&
+    colunas.some((coluna) => texto.includes(coluna));
+}
+
+function mensagemDoErro(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  const err = error as { message?: string; details?: string; hint?: string; code?: string } | null;
+  return err?.message ?? err?.details ?? err?.hint ?? err?.code ?? "Erro desconhecido";
+}
+
 function ResumoConfirmacoes({ itens }: { itens: ItemEscala[] }) {
   const statuses = [...statusConfirmacaoPorPessoa(itens).values()];
   const confirmados = statuses.filter((s) => s === "confirmado").length;
@@ -490,11 +565,42 @@ const EMPTY_FORM: EscalaForm = {
 
 // --- Componente principal -----------------------------------------------------
 
-export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; isLider: boolean }) {
+export type MusicaParaPreparacaoStudio = {
+  musicaId: string;
+  titulo: string;
+  artista: string;
+  youtubeUrl?: string;
+};
+
+type StatusStudioMusica = "nao_preparado" | "preparando" | "pronto" | "falhou";
+
+type ProjetoStudioResumo = {
+  escala_id?: string | null;
+  musica_id?: string | null;
+  status?: "aguardando" | "baixando" | "analisando" | "separando" | "concluido" | "erro";
+};
+
+export type PedidoAnaliseStudio = MusicaParaPreparacaoStudio & {
+  escalaId: string;
+  fila?: MusicaParaPreparacaoStudio[];
+};
+
+export function EscalasTab({
+  ministerio,
+  isLider,
+  podeGerenciarRepertorio = false,
+  onAnalisarNoStudio,
+}: {
+  ministerio: Ministerio;
+  isLider: boolean;
+  podeGerenciarRepertorio?: boolean;
+  onAnalisarNoStudio?: (pedido: PedidoAnaliseStudio) => void;
+}) {
   const { user, isLoading } = useAuth();
   const [membros, setMembros] = useState<MembroMinisterio[]>([]);
   const [escalas, setEscalas] = useState<Escala[]>([]);
   const [musicas, setMusicas] = useState<Musica[]>([]);
+  const [statusStudioPorMusica, setStatusStudioPorMusica] = useState<Record<string, StatusStudioMusica>>({});
   const fetchSeqRef = useRef(0);
   const escalasExcluidasRef = useRef<Set<string>>(new Set());
   const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
@@ -519,7 +625,20 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
     if (isLoading || !user?.id) return;
 
     const reqSeq = ++fetchSeqRef.current;
-    const [perfisRes, escalasRes, musicasRes] = await Promise.all([
+    const projetosStudioPromise: Promise<ProjetoStudioResumo[]> = ministerio === "Louvor"
+      ? supabase.auth.getSession().then(async ({ data }) => {
+        if (!data.session?.access_token) return [];
+        const resposta = await fetch("/api/louvor-studio/projects", {
+          cache: "no-store",
+          headers: { Authorization: `Bearer ${data.session.access_token}` },
+        });
+        if (!resposta.ok) return [];
+        const payload = await resposta.json().catch(() => ({})) as { projetos?: ProjetoStudioResumo[] };
+        return payload.projetos ?? [];
+      }).catch(() => [])
+      : Promise.resolve([]);
+
+    const [perfisRes, escalasRes, musicasRes, projetosStudio] = await Promise.all([
       supabase
         .from("perfis")
         .select("id, nome, email, telefone, role, data_ingresso")
@@ -531,6 +650,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
         .eq("ministerio", ministerio)
         .order("data", { ascending: false }),
       supabase.from("musicas").select().order("titulo"),
+      projetosStudioPromise,
     ]);
 
     // Evita sobrescrever com respostas antigas quando há múltiplos eventos em sequência.
@@ -574,6 +694,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
         musicas: ((e.escala_musicas as Record<string, unknown>[]) ?? [])
           .sort((a, b) => (a.ordem as number) - (b.ordem as number))
           .map((m) => ({
+            id: (m.id as string) ?? undefined,
             musicaId: (m.musica_id as string) ?? "",
             titulo: m.titulo as string,
             artista: m.artista as string,
@@ -587,8 +708,34 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
     }
 
     if (musicasRes.data) {
-      setMusicas(musicasRes.data as Musica[]);
+      setMusicas(musicasRes.data.map((m: Record<string, unknown>) => ({
+        id: m.id as string,
+        titulo: m.titulo as string,
+        artista: m.artista as string,
+        tom: (m.tom as string) ?? undefined,
+        estilo: (m.estilo as string) ?? undefined,
+        linkYoutube: (m.link_youtube as string) ?? undefined,
+        cifra: (m.cifra as string) ?? undefined,
+        cifraUrl: (m.cifra_url as string) ?? undefined,
+        cifraArtistaSlug: (m.cifra_artista_slug as string) ?? undefined,
+        cifraMusicaSlug: (m.cifra_musica_slug as string) ?? undefined,
+        arquivada: (m.arquivada as boolean) ?? false,
+      })));
     }
+
+    const proximosStatus: Record<string, StatusStudioMusica> = {};
+    for (const projeto of projetosStudio) {
+      if (!projeto.escala_id || !projeto.musica_id) continue;
+      const chave = `${projeto.escala_id}:${projeto.musica_id}`;
+      // A API devolve os mais recentes primeiro: o primeiro projeto é o estado atual.
+      if (proximosStatus[chave]) continue;
+      proximosStatus[chave] = projeto.status === "concluido"
+        ? "pronto"
+        : projeto.status === "erro"
+          ? "falhou"
+          : "preparando";
+    }
+    setStatusStudioPorMusica(proximosStatus);
   }, [isLoading, ministerio, user?.id]);
 
   useAppRefresh(() => { void carregarDados(); }, [carregarDados], { minIntervalMs: 2000 });
@@ -614,6 +761,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
       .on("postgres_changes", { event: "*", schema: "public", table: "escalas" }, scheduleRefresh)
       .on("postgres_changes", { event: "*", schema: "public", table: "escala_itens" }, scheduleRefresh)
       .on("postgres_changes", { event: "*", schema: "public", table: "escala_musicas" }, scheduleRefresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "louvor_studio_projetos" }, scheduleRefresh)
       .on("postgres_changes", { event: "*", schema: "public", table: "perfis" }, scheduleRefresh)
       .subscribe();
 
@@ -646,18 +794,20 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
   const [novaObs, setNovaObs] = useState("");
   const [buscaMusica, setBuscaMusica] = useState("");
   const [modalCifra, setModalCifra] = useState(false);
-  const [tomOverride, setTomOverride] = useState<Record<string, string>>({});
   const [addingNova, setAddingNova] = useState(false);
   const [novaMusica, setNovaMusica] = useState({ titulo: "", artista: "", tom: "" });
   const [savingNova, setSavingNova] = useState(false);
   const [saving, setSaving] = useState(false);
   const [salvarErro, setSalvarErro] = useState("");
+  const [salvarSucesso, setSalvarSucesso] = useState("");
+  const [avisoMusica, setAvisoMusica] = useState("");
   const [editandoKey, setEditandoKey] = useState<string | null>(null);
   const [adicionandoParticipante, setAdicionandoParticipante] = useState(false);
   const [viewMode, setViewMode] = useState<"minhas" | "culto">("culto");
   const [busca, setBusca] = useState("");
   const conflitosConfirmadosRef = useRef<Set<string>>(new Set());
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [editandoDadosMusica, setEditandoDadosMusica] = useState<number | null>(null);
 
   useEffect(() => {
     if (selectedId && !escalas.some((e) => e.id === selectedId)) {
@@ -782,6 +932,9 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
     setForm(EMPTY_FORM);
     setEditId(null);
     setSubTab("detalhes");
+    setEditandoDadosMusica(null);
+    setAvisoMusica("");
+    setSalvarSucesso("");
     setModo("form");
   }
 
@@ -801,10 +954,21 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
       visivel: esc.visivel ?? true,
       confirmacaoParticipantes: esc.confirmacaoParticipantes ?? false,
       itens: [...esc.itens],
-      musicas: [...(esc.musicas ?? [])],
+      musicas: (esc.musicas ?? []).map((item) => {
+        const catalogo = musicas.find((musica) => musica.id === item.musicaId);
+        return {
+          ...item,
+          artistaSlug: item.artistaSlug ?? catalogo?.cifraArtistaSlug,
+          musicaSlug: item.musicaSlug ?? catalogo?.cifraMusicaSlug,
+          linkYoutube: item.linkYoutube ?? catalogo?.linkYoutube,
+        };
+      }),
     });
     setEditId(esc.id);
     setSubTab("detalhes");
+    setEditandoDadosMusica(null);
+    setAvisoMusica("");
+    setSalvarSucesso("");
     setModo("form");
   }
 
@@ -882,12 +1046,31 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
     return confirmou;
   }
 
-  async function salvar() {
-    if (!form.culto || !form.data || !form.horario) return;
+  function dadosDaMusicaParaStudio(musica: EscalaMusica): MusicaParaPreparacaoStudio {
+    const catalogo = musicas.find((item) => item.id === musica.musicaId);
+    return {
+      musicaId: musica.musicaId,
+      titulo: musica.titulo,
+      artista: musica.artista,
+      youtubeUrl: musica.linkYoutube ?? catalogo?.linkYoutube,
+    };
+  }
+
+  async function salvar(opcoes: {
+    prepararSet?: boolean;
+    fechar?: boolean;
+  } = {}) {
+    const { prepararSet, fechar = false } = opcoes;
+    if (!form.culto || !form.data || !form.horario) {
+      if (prepararSet) {
+        setSalvarErro("Preencha culto, data e horário antes de abrir esta música no Studio.");
+      }
+      return false;
+    }
     const horarioNormalizado = normalizarHorario(form.horario);
     if (!horarioNormalizado) {
       setSalvarErro("Digite a hora no formato 24h, por exemplo 08:00 ou 20:00.");
-      return;
+      return false;
     }
 
     // Auto-aplica edição de participante pendente (usuário alterou mas não clicou Confirmar)
@@ -899,7 +1082,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
         const confirmouSobrecarga = await confirmarSobrecargaPessoa(novoMembroId, nomeResolv);
         if (!confirmouSobrecarga) {
           setSalvarErro("Participante não adicionado. A pessoa já está escalada nesse dia.");
-          return;
+          return false;
         }
         const funcoesSel = novasFuncoes.length > 0 ? novasFuncoes : [funcoesMinisterio[0]];
         const itensDeOutros = participanteUnico ? [] : itensFinais.filter((it) => (it.voluntarioId ?? it.voluntarioNome) !== editandoKey);
@@ -919,9 +1102,11 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
 
     setSaving(true);
     setSalvarErro("");
+    setSalvarSucesso("");
     const obsDB = ministerio === "Infantil"
       ? ([form.ageGroup, form.temaInfantil].filter(Boolean).join("|") || null)
       : buildObs(form.equipe, form.observacoes);
+    let escalaSalvaId: string | null = null;
     try {
       const escalaAnterior = editId ? escalas.find((e) => e.id === editId) : undefined;
       const alteracoes = analisarAlteracoesEscala(escalaAnterior, {
@@ -986,6 +1171,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
         });
         if (!notificacao.ok) console.error("[notificar escala]", notificacao.error);
         await broadcastEscalasSync("update");
+        escalaSalvaId = editId;
       } else {
         const { data: inserted, error: insEsc } = await supabase.from("escalas").insert({
           ministerio, data: form.data, horario: horarioNormalizado,
@@ -1032,13 +1218,29 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
           const notificacao = await notificarEscala(inserted.id, "alterada", undefined, { todos: true });
           if (!notificacao.ok) console.error("[notificar escala]", notificacao.error);
           await broadcastEscalasSync("create");
+          escalaSalvaId = inserted.id;
+          setEditId(inserted.id);
         }
       }
-      setModo("lista");
+      if (escalaSalvaId && prepararSet) {
+        const fila = musicasParaPrepararStudio.map(dadosDaMusicaParaStudio);
+        if (fila.length) {
+          onAnalisarNoStudio?.({ escalaId: escalaSalvaId, ...fila[0], fila });
+        } else {
+          setSalvarErro("Não há músicas aguardando preparação no Studio.");
+        }
+      }
+      if (fechar || prepararSet) {
+        setModo("lista");
+      } else {
+        setSalvarSucesso("Alterações salvas. Você pode continuar montando o set ou preparar as músicas no Studio.");
+      }
+      return true;
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       setSalvarErro(msg.replace(/^TypeError:\s*/i, ""));
       console.error("[salvar escala]", e);
+      return false;
     } finally {
       setSaving(false);
     }
@@ -1163,10 +1365,50 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
     setForm((f) => ({ ...f, itens: f.itens.filter((it) => (it.voluntarioId ?? it.voluntarioNome) !== key) }));
   }
 
-  const musicasFiltradas = musicas.filter((m) =>
-    m.titulo.toLowerCase().includes(buscaMusica.toLowerCase()) ||
-    m.artista.toLowerCase().includes(buscaMusica.toLowerCase())
-  );
+  const musicasFiltradas = useMemo(() => musicas
+    .map((musica) => ({ musica, pontuacao: pontuacaoBuscaMusica(musica, buscaMusica) }))
+    .filter(({ pontuacao }) => pontuacao > 0)
+    .sort((a, b) => b.pontuacao - a.pontuacao || a.musica.titulo.localeCompare(b.musica.titulo, "pt-BR"))
+    .map(({ musica }) => musica), [buscaMusica, musicas]);
+
+  const usoPorMusica = useMemo(() => {
+    const usos = new Map<string, { total: number; ultimaData: string }>();
+    for (const escala of escalas) {
+      if (escala.id === editId) continue;
+      for (const musica of escala.musicas ?? []) {
+        if (!musica.musicaId) continue;
+        const atual = usos.get(musica.musicaId);
+        usos.set(musica.musicaId, {
+          total: (atual?.total ?? 0) + 1,
+          ultimaData: !atual || escala.data > atual.ultimaData ? escala.data : atual.ultimaData,
+        });
+      }
+    }
+    return usos;
+  }, [editId, escalas]);
+
+  const sugestoesRepertorio = useMemo(() => {
+    const porUsoRecente = [...musicas].sort((a, b) => {
+      const usoA = usoPorMusica.get(a.id);
+      const usoB = usoPorMusica.get(b.id);
+      return (usoB?.ultimaData ?? "").localeCompare(usoA?.ultimaData ?? "") ||
+        (usoB?.total ?? 0) - (usoA?.total ?? 0) ||
+        a.titulo.localeCompare(b.titulo, "pt-BR");
+    });
+    const porFrequencia = [...musicas].sort((a, b) => {
+      const usoA = usoPorMusica.get(a.id);
+      const usoB = usoPorMusica.get(b.id);
+      return (usoB?.total ?? 0) - (usoA?.total ?? 0) ||
+        (usoB?.ultimaData ?? "").localeCompare(usoA?.ultimaData ?? "") ||
+        a.titulo.localeCompare(b.titulo, "pt-BR");
+    });
+    return Array.from(new Map([...porUsoRecente.slice(0, 5), ...porFrequencia.slice(0, 5)].map((m) => [m.id, m])).values()).slice(0, 8);
+  }, [musicas, usoPorMusica]);
+
+  const repertorioExibido = (buscaMusica.trim() ? musicasFiltradas : sugestoesRepertorio)
+    .filter((musica) => !musica.arquivada)
+    .filter((musica) => !form.musicas.some((item) => item.musicaId === musica.id));
+  const temResultadoNoRepertorio = buscaMusica.trim().length >= 2 && musicasFiltradas.length > 0;
 
   function addMusica(m: Musica) {
     if (form.musicas.some((em) => em.musicaId === m.id)) return;
@@ -1176,7 +1418,10 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
         musicaId: m.id,
         titulo: m.titulo,
         artista: m.artista,
-        tom: tomOverride[m.id] ?? m.tom ?? "",
+        artistaSlug: m.cifraArtistaSlug,
+        musicaSlug: m.cifraMusicaSlug,
+        linkYoutube: m.linkYoutube,
+        // Tom e BPM pertencem ao culto; ambos podem ser definidos depois pelo Studio.
       }],
     }));
   }
@@ -1206,6 +1451,35 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
       ...f,
       musicas: f.musicas.map((m, i) => i === idx ? { ...m, bpm: bpm === "" ? undefined : isNaN(n) ? m.bpm : n } : m),
     }));
+  }
+
+  function statusDoStudio(musica: EscalaMusica): StatusStudioMusica {
+    if (!editId) return "nao_preparado";
+    return statusStudioPorMusica[`${editId}:${musica.musicaId}`] ?? "nao_preparado";
+  }
+
+  const musicasParaPrepararStudio = form.musicas.filter((musica) => {
+    const status = statusDoStudio(musica);
+    return status === "nao_preparado" || status === "falhou";
+  });
+  const musicasPreparandoStudio = form.musicas.filter((musica) => statusDoStudio(musica) === "preparando");
+  const musicasProntasStudio = form.musicas.filter((musica) => statusDoStudio(musica) === "pronto");
+
+  function textoStatusStudio(status: StatusStudioMusica): string {
+    if (status === "pronto") return "Studio pronto";
+    if (status === "preparando") return "Studio preparando";
+    if (status === "falhou") return "Studio falhou";
+    return "Studio pendente";
+  }
+
+  async function prepararSetNoStudio() {
+    if (!musicasParaPrepararStudio.length) {
+      setSalvarErro(musicasPreparandoStudio.length
+        ? "Já existem músicas sendo preparadas no Studio. Aguarde a conclusão."
+        : "Todas as músicas deste set já estão prontas no Studio.");
+      return;
+    }
+    await salvar({ prepararSet: true, fechar: true });
   }
 
   // Transpõe linhas de cifra de tomOrig para tomDest
@@ -1267,8 +1541,17 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
     return `https://www.youtube.com/results?search_query=${encodeURIComponent(`${titulo} ${artista}`)}` ;
   }
 
+  function linkYoutubeDaMusica(musica: Pick<EscalaMusica, "musicaId" | "titulo" | "artista" | "linkYoutube">) {
+    return musica.linkYoutube ?? musicas.find((item) => item.id === musica.musicaId)?.linkYoutube ?? youtubeUrl(musica.titulo, musica.artista);
+  }
+
   async function salvarNovaMusica() {
     if (!novaMusica.titulo.trim() || !novaMusica.artista.trim()) return;
+    const duplicada = musicas.find((musica) => mesmaMusica(musica, novaMusica));
+    if (duplicada) {
+      setSalvarErro(`“${duplicada.titulo}” — ${duplicada.artista} já está no Repertório.`);
+      return;
+    }
     setSavingNova(true);
     try {
       const { data, error } = await supabase
@@ -1284,6 +1567,85 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
       setAddingNova(false);
     } catch (err) {
       console.error("Erro ao salvar música:", err);
+    } finally {
+      setSavingNova(false);
+    }
+  }
+
+  async function adicionarCifraAoRepertorio(nova: {
+    titulo: string;
+    artista: string;
+    tom: string;
+    artistaSlug: string;
+    musicaSlug: string;
+    cifraUrl?: string;
+    youtubeUrl?: string;
+    cifra: string[];
+  }) {
+    const titulo = nova.titulo.trim();
+    const artista = nova.artista.trim();
+    const existente = musicas.find((musica) => mesmaMusica(musica, { titulo, artista }));
+    if (existente) {
+      setBuscaMusica(existente.titulo);
+      setAvisoMusica(`“${existente.titulo}” — ${existente.artista} já existe no Repertório. Escolha-a na lista para adicioná-la ao set deste culto.`);
+      throw new Error(`Esta música já existe no Repertório. Feche esta janela e selecione “${existente.titulo}” na busca acima.`);
+    }
+    setSavingNova(true);
+    setAvisoMusica("");
+    try {
+      const dadosComFonte = {
+        titulo,
+        artista,
+        tom: nova.tom || null,
+        link_youtube: nova.youtubeUrl || null,
+        cifra: nova.cifra.join("\n"),
+        cifra_url: nova.cifraUrl || null,
+        cifra_artista_slug: nova.artistaSlug,
+        cifra_musica_slug: nova.musicaSlug,
+      };
+      let { data, error } = await supabase
+        .from("musicas")
+        .insert(dadosComFonte)
+        .select()
+        .single();
+      if (erroColunasFonteRepertorioAusentes(error)) {
+        const retry = await supabase
+          .from("musicas")
+          .insert({ titulo, artista, tom: nova.tom || null })
+          .select()
+          .single();
+        data = retry.data;
+        error = retry.error;
+        setAvisoMusica("Música adicionada. Aplique a migration de fontes do Repertório para também guardar o link e a identificação do Cifra Club.");
+      }
+      if (error) throw error;
+      const musica: Musica = {
+        ...(data as Musica),
+        linkYoutube: nova.youtubeUrl,
+        cifra: nova.cifra.join("\n"),
+        cifraUrl: nova.cifraUrl,
+        cifraArtistaSlug: nova.artistaSlug,
+        cifraMusicaSlug: nova.musicaSlug,
+      };
+      setMusicas((prev) => [...prev, musica].sort((a, b) => a.titulo.localeCompare(b.titulo, "pt-BR")));
+      setForm((atual) => ({
+        ...atual,
+        musicas: atual.musicas.some((item) => item.musicaId === musica.id)
+          ? atual.musicas
+          : [...atual.musicas, {
+            musicaId: musica.id,
+            titulo: musica.titulo,
+            artista: musica.artista,
+            artistaSlug: nova.artistaSlug,
+            musicaSlug: nova.musicaSlug,
+            linkYoutube: nova.youtubeUrl,
+          }],
+      }));
+    } catch (erro) {
+      const detalhe = mensagemDoErro(erro);
+      console.error("Erro ao incluir música do Cifra Club no repertório:", detalhe, erro);
+      setSalvarErro(`Não foi possível cadastrar a música no Repertório: ${detalhe}`);
+      throw new Error("Não foi possível cadastrar a música no Repertório. Tente novamente.");
     } finally {
       setSavingNova(false);
     }
@@ -2263,56 +2625,66 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
           {modalCifra && (
             <BuscarCifraModal
               onClose={() => setModalCifra(false)}
-              onSalva={(nova) => {
-                setForm((f) => ({
-                  ...f,
-                  musicas: [...f.musicas, {
-                    musicaId: "",
-                    titulo: nova.titulo,
-                    artista: nova.artista,
-                    tom: nova.tom,
-                    artistaSlug: nova.artistaSlug,
-                    musicaSlug: nova.musicaSlug,
-                  }],
-                }));
-                setModalCifra(false);
-              }}
+              onSalva={adicionarCifraAoRepertorio}
+              buscaInicial={buscaMusica}
             />
+          )}
+          {avisoMusica && (
+            <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              {avisoMusica}
+            </p>
           )}
           <div className="space-y-2">
             <div className="flex gap-2">
               <input
                 value={buscaMusica}
                 onChange={(e) => setBuscaMusica(e.target.value)}
-                placeholder="Buscar no repertório..."
+                placeholder="Título, artista ou trecho da cifra..."
                 className="flex-1 border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-gray-400"
               />
-              <button
+              {podeGerenciarRepertorio && <button
                 onClick={() => setModalCifra(true)}
+                title="Buscar no Cifra Club por título, artista ou trecho da letra"
                 className="flex items-center gap-1.5 bg-grape-700 text-white text-xs font-semibold px-3 py-2 rounded-xl hover:bg-grape-800 transition shrink-0"
               >
                 <Music2 className="w-3.5 h-3.5" />
                 Buscar no Cifra Club
-              </button>
+              </button>}
             </div>
+            {!buscaMusica.trim() && (
+              <p className="px-1 text-xs text-gray-500">
+                Sugestões baseadas nos cultos anteriores. Veja quando a música foi usada para evitar repetições recentes.
+              </p>
+            )}
+            {buscaMusica.trim() && (
+              <p className="px-1 text-xs text-gray-500">
+                {temResultadoNoRepertorio
+                  ? "Encontramos opções no Repertório. Você pode selecioná-las abaixo ou buscar outra versão no Cifra Club."
+                  : "Busca inteligente: entende acentos, trechos da cifra e pequenos erros de digitação. O Cifra Club também encontra título, artista ou trecho da letra."}
+              </p>
+            )}
             <div className="max-h-52 overflow-y-auto space-y-1 border border-gray-100 rounded-xl p-1 bg-gray-50">
-              {musicasFiltradas.length === 0 && buscaMusica && (
+              {repertorioExibido.length === 0 && buscaMusica && (
                 <p className="text-xs text-gray-400 text-center py-4">Nenhuma música encontrada.</p>
               )}
-              {musicasFiltradas.length === 0 && !buscaMusica && (
-                <p className="text-xs text-gray-400 text-center py-4">Digite para buscar no repertório.</p>
+              {repertorioExibido.length === 0 && !buscaMusica && (
+                <p className="text-xs text-gray-400 text-center py-4">O Repertório ainda não tem músicas para sugerir.</p>
               )}
-              {musicasFiltradas.map((m) => {
+              {repertorioExibido.map((m) => {
                 const jaAdicionada = form.musicas.some((em) => em.musicaId === m.id);
+                const uso = usoPorMusica.get(m.id);
                 return (
                   <div key={m.id} className="flex items-center justify-between bg-white rounded-lg px-3 py-2 border border-gray-100">
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold text-gray-800 truncate">{m.titulo}</p>
-                      <p className="text-xs text-gray-400">{m.artista} {m.estilo && `· ${m.estilo}`}</p>
+                      <p className="text-xs text-gray-400">
+                        {m.artista} {m.estilo && `· ${m.estilo}`}
+                        {uso && ` · usada ${uso.total === 1 ? "1 vez" : `${uso.total} vezes`}${uso.ultimaData ? `, por último em ${new Date(`${uso.ultimaData}T12:00:00`).toLocaleDateString("pt-BR")}` : ""}`}
+                      </p>
                     </div>
                     <div className="flex items-center gap-2 shrink-0 ml-2">
                       <a
-                        href={youtubeUrl(m.titulo, m.artista)}
+                        href={m.linkYoutube ?? youtubeUrl(m.titulo, m.artista)}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition"
@@ -2320,14 +2692,6 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
                       >
                         <Youtube className="w-3.5 h-3.5" />
                       </a>
-                      <select
-                        value={tomOverride[m.id] ?? m.tom ?? ""}
-                        onChange={(e) => setTomOverride((prev) => ({ ...prev, [m.id]: e.target.value }))}
-                        className="text-xs border border-gray-200 rounded-lg px-2 py-1 outline-none bg-white w-16"
-                      >
-                        <option value="">Tom</option>
-                        {TONS.map((t) => <option key={t}>{t}</option>)}
-                      </select>
                       <button
                         onClick={() => addMusica(m)}
                         disabled={jaAdicionada}
@@ -2336,7 +2700,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
                           jaAdicionada ? "bg-gray-100 text-gray-400 cursor-not-allowed" : "bg-black text-white hover:bg-gray-900"
                         )}
                       >
-                        {jaAdicionada ? "?" : "+ Add"}
+                        {jaAdicionada ? "No set" : "+ Adicionar"}
                       </button>
                     </div>
                   </div>
@@ -2346,7 +2710,7 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
           </div>
 
           {/* Nova música */}
-          <div className="border border-dashed border-gray-200 rounded-xl overflow-hidden">
+          {podeGerenciarRepertorio && <div className="border border-dashed border-gray-200 rounded-xl overflow-hidden">
             <button
               type="button"
               onClick={() => setAddingNova((v) => !v)}
@@ -2390,21 +2754,30 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
                 </div>
               </div>
             )}
-          </div>
+          </div>}
 
           {form.musicas.length > 0 && (
             <div className="space-y-2">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest">Na escala</p>
+              <div>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest">Set deste culto</p>
+                <p className="mt-1 text-xs text-gray-400">
+                  Studio: {musicasProntasStudio.length} prontas
+                  {musicasPreparandoStudio.length ? ` · ${musicasPreparandoStudio.length} preparando` : ""}
+                  {musicasParaPrepararStudio.length ? ` · ${musicasParaPrepararStudio.length} pendentes` : ""}.
+                </p>
+              </div>
               {form.musicas.map((em, i) => (
                 <div key={i} className="bg-white border border-gray-100 rounded-xl shadow-sm overflow-hidden">
                   <div className="flex items-center gap-3 px-4 py-3">
                     <span className="text-xs text-gray-400 w-4 text-right">{i + 1}</span>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold text-gray-800">{em.titulo}</p>
-                      <p className="text-xs text-gray-400">{em.artista}</p>
+                      <p className="text-xs text-gray-400">
+                        {em.artista} · Tom {em.tom || "—"} · BPM {em.bpm ?? "—"}
+                      </p>
                     </div>
                     <a
-                      href={youtubeUrl(em.titulo, em.artista)}
+                      href={linkYoutubeDaMusica(em)}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition shrink-0"
@@ -2412,23 +2785,28 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
                     >
                       <Youtube className="w-3.5 h-3.5" />
                     </a>
-                    <select
-                      value={em.tom ?? ""}
-                      onChange={(e) => atualizarTomNaEscala(i, e.target.value)}
-                      className="text-xs border border-gray-200 rounded-lg px-2 py-1 outline-none bg-white w-16"
-                    >
-                      <option value="">Tom</option>
-                      {TONS.map((t) => <option key={t}>{t}</option>)}
-                    </select>
-                    <input
-                      type="number"
-                      min={40}
-                      max={300}
-                      value={em.bpm ?? ""}
-                      onChange={(e) => atualizarBpmNaEscala(i, e.target.value)}
-                      placeholder="BPM"
-                      className="text-xs border border-gray-200 rounded-lg px-2 py-1 outline-none bg-white w-16"
-                    />
+                    <span className={clsx(
+                      "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold",
+                      statusDoStudio(em) === "pronto"
+                        ? "bg-emerald-50 text-emerald-700"
+                        : statusDoStudio(em) === "preparando"
+                          ? "bg-sky-50 text-sky-700"
+                          : statusDoStudio(em) === "falhou"
+                            ? "bg-red-50 text-red-700"
+                            : "bg-amber-50 text-amber-700",
+                    )}>
+                      <span className={clsx(
+                        "h-1.5 w-1.5 rounded-full",
+                        statusDoStudio(em) === "pronto"
+                          ? "bg-emerald-500"
+                          : statusDoStudio(em) === "preparando"
+                            ? "animate-pulse bg-sky-500"
+                            : statusDoStudio(em) === "falhou"
+                              ? "bg-red-500"
+                              : "bg-amber-500",
+                      )} />
+                      {textoStatusStudio(statusDoStudio(em))}
+                    </span>
                     {em.artistaSlug && em.musicaSlug && (
                       <button
                         onClick={() => toggleCifraForm(i)}
@@ -2445,6 +2823,42 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
                       <X className="w-3.5 h-3.5" />
                     </button>
                   </div>
+                  <div className="flex flex-wrap items-center justify-end gap-2 border-t border-gray-100 bg-gray-50/40 px-4 py-2.5">
+                    <button
+                      type="button"
+                      onClick={() => setEditandoDadosMusica((aberta) => aberta === i ? null : i)}
+                      className="rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-gray-600 transition hover:border-gray-300 hover:bg-gray-50"
+                    >
+                      {editandoDadosMusica === i ? "Fechar ajuste" : "Definir manualmente"}
+                    </button>
+                  </div>
+                  {editandoDadosMusica === i && (
+                    <div className="grid gap-2 border-t border-gray-100 bg-white px-4 py-3 sm:grid-cols-2">
+                      <label className="text-xs font-medium text-gray-600">
+                        Tom do culto
+                        <select
+                          value={em.tom ?? ""}
+                          onChange={(e) => atualizarTomNaEscala(i, e.target.value)}
+                          className="mt-1 block w-full rounded-lg border border-gray-200 bg-white px-2 py-2 text-sm outline-none focus:border-gray-400"
+                        >
+                          <option value="">A definir</option>
+                          {TONS.map((t) => <option key={t}>{t}</option>)}
+                        </select>
+                      </label>
+                      <label className="text-xs font-medium text-gray-600">
+                        BPM do culto
+                        <input
+                          type="number"
+                          min={40}
+                          max={300}
+                          value={em.bpm ?? ""}
+                          onChange={(e) => atualizarBpmNaEscala(i, e.target.value)}
+                          placeholder="A definir"
+                          className="mt-1 block w-full rounded-lg border border-gray-200 bg-white px-2 py-2 text-sm outline-none focus:border-gray-400"
+                        />
+                      </label>
+                    </div>
+                  )}
                   {cifraFormAberta === i && (
                     <div className="border-t border-gray-100 px-4 py-3 bg-gray-50">
                       {loadingCifraForm === i ? (
@@ -2513,6 +2927,11 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
           ? {salvarErro}
         </p>
       )}
+      {salvarSucesso && (
+        <p className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2">
+          {salvarSucesso}
+        </p>
+      )}
       <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-100">
         <button
           onClick={() => setModo("lista")}
@@ -2520,12 +2939,29 @@ export function EscalasTab({ ministerio, isLider }: { ministerio: Ministerio; is
         >
           Cancelar
         </button>
+        {usaMusicas && form.musicas.length > 0 && onAnalisarNoStudio && (
+          <button
+            type="button"
+            onClick={() => void prepararSetNoStudio()}
+            disabled={saving || musicasParaPrepararStudio.length === 0}
+            className="flex items-center gap-1.5 border border-rose-200 bg-rose-50 text-rose-800 text-sm font-semibold px-4 py-2 rounded-xl hover:bg-rose-100 disabled:opacity-50 disabled:cursor-not-allowed transition"
+          >
+            <Music2 className="w-4 h-4" />
+            {saving
+              ? "Salvando set..."
+              : musicasParaPrepararStudio.length
+                ? `Preparar ${musicasParaPrepararStudio.length} ${musicasParaPrepararStudio.length === 1 ? "música" : "músicas"} no Studio`
+                : musicasPreparandoStudio.length
+                  ? "Studio preparando"
+                  : "Studio pronto"}
+          </button>
+        )}
         <button
-          onClick={salvar}
+          onClick={() => void salvar()}
           disabled={!form.culto || !form.data || !form.horario || saving}
           className="flex items-center gap-1.5 bg-black text-white text-sm font-semibold px-5 py-2 rounded-xl hover:bg-gray-900 disabled:opacity-40 disabled:cursor-not-allowed transition"
         >
-          <Save className="w-4 h-4" /> {saving ? "Salvando..." : "Salvar"}
+          <Save className="w-4 h-4" /> {saving ? "Salvando..." : "Salvar alterações"}
         </button>
       </div>
     </div>
