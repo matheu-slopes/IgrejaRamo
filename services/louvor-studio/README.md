@@ -14,6 +14,7 @@ O download do YouTube continua usando yt-dlp `bestaudio/best`. Pesquisa por nome
 
 - Padrão: `audio-separator==0.47.0`, BS-RoFormer `model_bs_roformer_ep_317_sdr_12.9755.ckpt`: voz e instrumental.
 - Avançado: mesmo pacote, `htdemucs_ft.yaml`: voz, bateria, baixo e outros. Os quatro modelos fine-tuned são mais lentos, especialmente em CPU.
+- Em CPU, o worker usa 8 threads por padrão. Ajuste `LOUVOR_STUDIO_CPU_THREADS` em `.env.worker` para `12` no i5-13500 quando quiser priorizar velocidade; use `4` se precisar manter o PC mais responsivo. Reinicie o worker depois de alterar esse valor.
 - Transposição para download: executável Rubber Band com `-3 --centre-focus --tempo 1 --frequency <razão>`. Na voz, também `--formant`. Não há filtro de pitch do FFmpeg nem Tone.PitchShift no resultado final.
 - No avançado, voz/baixo/outros recebem o mesmo intervalo; bateria a 1× é copiada sem modificar nenhuma amostra. Ao alterar velocidade, todas as faixas mudam de duração igualmente; a altura da bateria fica preservada.
 - FFmpeg faz conversão, soma das faixas e exportação. WAV float32 estéreo é usado nos intermediários. Uma validação rejeita canais/taxas incorretos, amostras inválidas e divergências de duração maiores que 2048 amostras; pequenas diferenças finais são alinhadas.

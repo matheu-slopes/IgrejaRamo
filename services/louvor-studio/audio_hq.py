@@ -18,6 +18,15 @@ MODELS = {"bs_roformer": "model_bs_roformer_ep_317_sdr_12.9755.ckpt", "htdemucs_
 STEMS = {"bs_roformer": ("vocals", "instrumental"), "htdemucs_ft": ("vocals", "drums", "bass", "other")}
 VERSION = "separator-0.47.0-r3-stereo-v1"
 
+def cpu_thread_count():
+    """Return a safe, configurable CPU limit for local separation."""
+    available = os.cpu_count() or 1
+    try:
+        requested = int(os.environ.get("LOUVOR_STUDIO_CPU_THREADS", "8"))
+    except ValueError:
+        requested = 8
+    return max(1, min(requested, available))
+
 def emit(progress, stage="separando"):
     print("HQ_PROGRESS=" + json.dumps({"progress": progress, "stage": stage}), flush=True)
 
@@ -136,7 +145,7 @@ def separate(source:Path, output:Path, mode:str, models_dir:Path):
         raise ValueError("Modo de separação inválido.")
     import torch
     from audio_separator.separator import Separator
-    torch.set_num_threads(min(4,os.cpu_count() or 1))
+    torch.set_num_threads(cpu_thread_count())
     # audio-separator checks ffmpeg by name; provide the bundled binary without a global installation.
     executable=Path(ffmpeg_path())
     bindir=ROOT/".tools";bindir.mkdir(exist_ok=True)

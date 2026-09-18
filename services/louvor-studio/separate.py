@@ -10,6 +10,16 @@ from types import SimpleNamespace
 from separation_progress import ChunkProgress, MARKER
 
 
+def cpu_thread_count() -> int:
+    """Return a safe, configurable CPU limit for legacy separation."""
+    available = os.cpu_count() or 1
+    try:
+        requested = int(os.environ.get('LOUVOR_STUDIO_CPU_THREADS', '8'))
+    except ValueError:
+        requested = 8
+    return max(1, min(requested, available))
+
+
 def decode_audio(path: Path, ffmpeg: str, channels: int, sample_rate: int):
     import numpy as np
     import torch
@@ -29,7 +39,7 @@ def separate(path: Path, output: Path, name: str, ffmpeg: str) -> None:
     from demucs.audio import save_audio
     from demucs.pretrained import get_model
 
-    torch.set_num_threads(min(4, os.cpu_count() or 1))
+    torch.set_num_threads(cpu_thread_count())
     model = get_model(name)
     model.eval()
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
