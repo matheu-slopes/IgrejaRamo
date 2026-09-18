@@ -16,6 +16,10 @@ if (-not (Test-Path -LiteralPath ".venv")) {
 & .\.venv\Scripts\python.exe -m pip install --upgrade pip
 & .\.venv\Scripts\python.exe -m pip install -r requirements.txt
 if ($LASTEXITCODE -ne 0) { throw "Falha ao instalar as dependências." }
+# The default PyPI wheel is CPU-only on Windows. Replace it with the CUDA build
+# so NVIDIA GPUs can process Studio jobs.
+& .\.venv\Scripts\python.exe -m pip install --upgrade --force-reinstall torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
+if ($LASTEXITCODE -ne 0) { throw "Falha ao instalar o PyTorch com CUDA." }
 $ToolsPath = Join-Path $Pasta ".tools"
 New-Item -ItemType Directory -Path $ToolsPath -Force | Out-Null
 $ArchivePath = Join-Path $ToolsPath "rubberband.zip"
