@@ -142,6 +142,207 @@ function secondsText(value: number) {
       .padStart(2, "0")
   );
 }
+
+/**
+ * Mobile browsers struggle when four long MP3s are decoded into Web Audio at
+ * once: decoded PCM can consume more than a gigabyte. The lightweight player
+ * streams the MP3s through native media elements instead, keeping the PWA
+ * responsive while retaining the per-track volume, mute, solo and seek tools.
+ */
+function MobileStudioPlayer({ project }: { project: Project }) {
+  const urls = project.stem_urls ?? {};
+  const [ready, setReady] = useState(false);
+  const [playing, setPlaying] = useState(false);
+  const [position, setPosition] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [message, setMessage] = useState("");
+  const [volumes, setVolumes] = useState(INITIAL);
+  const [muted, setMuted] = useState<Partial<Record<Stem, boolean>>>({});
+  const [solo, setSolo] = useState<Stem | null>(null);
+  const [master, setMaster] = useState(0.8);
+  const tracksRef = useRef<Partial<Record<Stem, HTMLAudioElement>>>({});
+
+  const stems = (Object.keys(urls) as Stem[]).filter((stem) => urls[stem]);
+
+  useEffect(() => {
+    let disposed = false;
+    setReady(false);
+    setPlaying(false);
+    setPosition(0);
+    setMessage("");
+    const tracks: Partial<Record<Stem, HTMLAudioElement>> = {};
+    const waitForMetadata = (audio: HTMLAudioElement) =>
+      new Promise<void>((resolve, reject) => {
+        const done = () => {
+          audio.removeEventListener("loadedmetadata", loaded);
+          audio.removeEventListener("error", failed);
+        };
+        const loaded = () => {
+          done();
+          resolve();
+        };
+        const failed = () => {
+          done();
+          reject(Error("Não foi possível transmitir uma faixa."));
+        };
+        audio.addEventListener("loadedmetadata", loaded);
+        audio.addEventListener("error", failed);
+        audio.load();
+      });
+    async function load() {
+      try {
+        if (!stems.length) throw Error("Faixas indisponíveis.");
+        const waiting = stems.map((stem) => {
+          const audio = new Audio();
+          audio.preload = "metadata";
+          audio.src = urls[stem]!;
+          tracks[stem] = audio;
+          return waitForMetadata(audio);
+        });
+        await Promise.all(waiting);
+        if (disposed) return;
+        const durations = stems
+          .map((stem) => tracks[stem]?.duration ?? 0)
+          .filter((value) => Number.isFinite(value) && value > 0);
+        if (!durations.length) throw Error("A duração das faixas não foi encontrada.");
+        tracksRef.current = tracks;
+        setDuration(Math.min(...durations));
+        setReady(true);
+      } catch (error) {
+        if (!disposed)
+          setMessage(error instanceof Error ? error.message : "Não foi possível carregar as faixas.");
+      }
+    }
+    void load();
+    return () => {
+      disposed = true;
+      Object.values(tracks).forEach((audio) => {
+        audio?.pause();
+        audio?.removeAttribute("src");
+        audio?.load();
+      });
+      tracksRef.current = {};
+    };
+    // URLs identify a distinct prepared project; loading is intentionally once
+    // per project, not once per volume or playback adjustment.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [project.id, JSON.stringify(urls)]);
+
+  useEffect(() => {
+    for (const stem of stems) {
+      const audio = tracksRef.current[stem];
+      if (!audio) continue;
+      const silent = Boolean(muted[stem] || (solo && solo !== stem));
+      audio.volume = silent ? 0 : Math.max(0, Math.min(1, master * volumes[stem]));
+    }
+  }, [master, muted, solo, stems, volumes]);
+
+  useEffect(() => {
+    if (!playing) return;
+    const timer = window.setInterval(() => {
+      const lead = tracksRef.current[stems[0]];
+      if (!lead) return;
+      if (lead.ended || lead.currentTime >= lead.duration) {
+        Object.values(tracksRef.current).forEach((audio) => audio?.pause());
+        setPlaying(false);
+        setPosition(0);
+      } else setPosition(lead.currentTime);
+    }, 250);
+    return () => window.clearInterval(timer);
+  }, [playing, stems]);
+
+  function seek(value: number) {
+    const next = Math.max(0, Math.min(duration, value));
+    Object.values(tracksRef.current).forEach((audio) => {
+      if (audio) audio.currentTime = next;
+    });
+    setPosition(next);
+  }
+
+  async function toggle() {
+    const tracks = Object.values(tracksRef.current).filter(
+      (audio): audio is HTMLAudioElement => Boolean(audio),
+    );
+    if (!tracks.length || !ready) return;
+    if (playing) {
+      tracks.forEach((audio) => audio.pause());
+      setPlaying(false);
+      return;
+    }
+    try {
+      tracks.forEach((audio) => {
+        audio.currentTime = position;
+      });
+      await Promise.all(tracks.map((audio) => audio.play()));
+      setPlaying(true);
+    } catch {
+      tracks.forEach((audio) => audio.pause());
+      setMessage("O celular não permitiu iniciar todas as faixas. Toque em Reproduzir novamente.");
+    }
+  }
+
+  return (
+    <section aria-label="Player de ensaio no celular" className="overflow-hidden rounded-2xl border border-white/10 bg-[radial-gradient(ellipse_at_top_right,_#344b51_0%,_#202f35_50%,_#131d23_100%)] p-4 text-white shadow-xl">
+      <header className="min-w-0">
+        <p className="mb-1 text-[10px] font-semibold uppercase tracking-[.18em] text-white/45">Louvor Studio · modo leve</p>
+        <h3 className="truncate text-lg font-semibold">{project.titulo}</h3>
+        {project.artista && <p className="mt-1 truncate text-sm text-white/50">{project.artista}</p>}
+      </header>
+      <p className="mt-3 rounded-xl bg-white/5 px-3 py-2 text-xs leading-relaxed text-white/65">As faixas são transmitidas sem baixar a música inteira na memória do celular. Tom ao vivo e metrônomo avançado ficam disponíveis no computador.</p>
+
+      <div className="mt-4 space-y-2" aria-label="Faixas de áudio">
+        {stems.map((stem) => {
+          const Icon = ICONS[stem];
+          const silent = Boolean(muted[stem] || (solo && solo !== stem));
+          return (
+            <div key={stem} className="rounded-xl bg-black/15 px-2 py-2">
+              <div className="flex items-center gap-2">
+                <button type="button" aria-label={`Silenciar ${LABELS[stem]}`} aria-pressed={Boolean(muted[stem])} onClick={() => setMuted((current) => ({ ...current, [stem]: !current[stem] }))} className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${silent ? "text-white/30" : "text-white/90"}`}>
+                  {muted[stem] ? <VolumeX size={20} /> : <Icon size={21} />}
+                </button>
+                <label className="min-w-0 flex-1 text-xs text-white/70">
+                  <span className="flex justify-between gap-2"><span>{LABELS[stem]}</span><span>{Math.round(volumes[stem] * 100)}%</span></span>
+                  <input aria-label={`Volume de ${LABELS[stem]}`} className={styles.slider} style={{ "--level": `${volumes[stem] * 100}%`, "--fill": silent ? "#64747a" : "#f1f5f4" } as CSSProperties} type="range" min="0" max="1" step=".01" value={volumes[stem]} onChange={(event) => setVolumes((current) => ({ ...current, [stem]: Number(event.target.value) }))} />
+                </label>
+                <button type="button" aria-pressed={solo === stem} onClick={() => setSolo(solo === stem ? null : stem)} className={`min-h-10 rounded-lg px-2 text-[11px] ${solo === stem ? "bg-white text-[#203138]" : "text-white/60"}`}>Solo</button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <label className="mt-4 flex items-center gap-3 text-xs text-white/65">
+        <Volume2 size={17} /> Volume geral
+        <input aria-label="Volume geral" className={styles.slider + " min-w-0 flex-1"} style={{ "--level": `${master * 100}%`, "--fill": "#f1f5f4" } as CSSProperties} type="range" min="0" max="1" step=".01" value={master} onChange={(event) => setMaster(Number(event.target.value))} />
+      </label>
+      {message && <p className="mt-3 text-xs text-amber-100" role="status">{message}</p>}
+
+      <div className="mt-5">
+        <input aria-label="Posição da música" className={styles.slider} style={{ "--level": `${duration ? position / duration * 100 : 0}%`, "--fill": "#f1f5f4" } as CSSProperties} type="range" min="0" max={duration || 1} step=".1" value={position} disabled={!ready} onChange={(event) => seek(Number(event.target.value))} />
+        <div className="-mt-1 flex justify-between text-xs tabular-nums text-white/45"><span>{secondsText(position)}</span><span>−{secondsText(Math.max(0, duration - position))}</span></div>
+        <div className="mt-3 flex items-center justify-center gap-5">
+          <button type="button" aria-label="Voltar 10 segundos" disabled={!ready} onClick={() => seek(position - 10)} className="flex h-12 w-12 flex-col items-center justify-center text-white/80 disabled:opacity-30"><RotateCcw size={22} /><span className="text-[9px]">10s</span></button>
+          <button type="button" aria-label={playing ? "Pausar" : "Reproduzir"} disabled={!ready} onClick={() => void toggle()} className="flex h-16 w-16 items-center justify-center rounded-full bg-white text-[#203138] shadow-lg disabled:opacity-40">{!ready ? <LoaderCircle className="animate-spin" /> : playing ? <Pause size={27} fill="currentColor" /> : <Play size={27} fill="currentColor" className="ml-1" />}</button>
+          <button type="button" aria-label="Avançar 10 segundos" disabled={!ready} onClick={() => seek(position + 10)} className="flex h-12 w-12 flex-col items-center justify-center text-white/80 disabled:opacity-30"><RotateCw size={22} /><span className="text-[9px]">10s</span></button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+export function LouvorStudioPlayer({ project }: { project: Project }) {
+  const [mobile, setMobile] = useState<boolean | null>(null);
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 767px), (pointer: coarse)");
+    const update = () => setMobile(media.matches);
+    update();
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, []);
+  if (mobile == null)
+    return <section aria-busy="true" className="flex min-h-48 items-center justify-center rounded-2xl bg-[#203138] p-4 text-sm text-white/65"><LoaderCircle className="mr-2 h-5 w-5 animate-spin" />Carregando player…</section>;
+  return mobile ? <MobileStudioPlayer project={project} /> : <DesktopStudioPlayer project={project} />;
+}
 function tempoName(bpm: number) {
   if (bpm < 60) return "Largo";
   if (bpm < 76) return "Adagio";
@@ -150,7 +351,7 @@ function tempoName(bpm: number) {
   if (bpm < 168) return "Allegro";
   return "Presto";
 }
-export function LouvorStudioPlayer({ project }: { project: Project }) {
+function DesktopStudioPlayer({ project }: { project: Project }) {
   const initial = keyAt(project.tom_original || "C", 0);
   const analyzedBeatOffset =
     typeof project.beat_offset_seg === "number" &&
