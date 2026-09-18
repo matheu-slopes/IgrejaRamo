@@ -10,6 +10,7 @@ import sys
 import tempfile
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 import requests
 from dotenv import load_dotenv
@@ -65,14 +66,21 @@ def process(job):
             result=json.loads((work/"result.json").read_text(encoding="utf-8"))
             uploads=api("POST",{**identity,"action":"uploads"})["uploads"]
             if set(uploads)!=set(result["files"]):raise ValueError("Arquivos de saída inesperados.")
-            for index,(name,upload) in enumerate(uploads.items()):
+            def upload_file(index,name,upload):
                 path=work/"output"/result["files"][name]
                 if path.resolve().parent!=(work/"output").resolve():raise ValueError("Caminho inválido.")
-                progress["progress"]=90+int(9*index/len(uploads))
                 with path.open("rb") as audio:
                     response=requests.put(upload["signedUrl"],data=audio,
                         headers={"Content-Type":"audio/wav" if path.suffix==".wav" else "audio/mpeg","x-upsert":"true"},timeout=(20,1800))
                     response.raise_for_status()
+                return index
+            # WAV stems are large. Upload a small, bounded group concurrently so
+            # network latency does not make the final 90–99% stage serial.
+            with ThreadPoolExecutor(max_workers=min(3,len(uploads))) as pool:
+                futures=[pool.submit(upload_file,index,name,upload) for index,(name,upload) in enumerate(uploads.items())]
+                for future in as_completed(futures):
+                    index=future.result()
+                    progress["progress"]=max(progress["progress"],90+int(9*(index+1)/len(uploads)))
             stopped.set();monitor.join(25)
             api("POST",{**identity,"action":"complete",**result["metadata"]})
             print(f"Concluído: {row['id']}",flush=True)
