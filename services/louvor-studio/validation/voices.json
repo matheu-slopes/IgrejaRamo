@@ -1,0 +1,200 @@
+[
+  {
+    "voice": "male",
+    "semitones": -3,
+    "channels": 2,
+    "rate": 44100,
+    "frames": 529200,
+    "duration_difference_samples": 0,
+    "seconds": 1.297,
+    "peak": 0.70264,
+    "stereo_difference_rms": 0.080684
+  },
+  {
+    "voice": "male",
+    "semitones": -2,
+    "channels": 2,
+    "rate": 44100,
+    "frames": 529200,
+    "duration_difference_samples": 0,
+    "seconds": 1.33,
+    "peak": 0.72976,
+    "stereo_difference_rms": 0.081768
+  },
+  {
+    "voice": "male",
+    "semitones": -1,
+    "channels": 2,
+    "rate": 44100,
+    "frames": 529200,
+    "duration_difference_samples": 0,
+    "seconds": 1.352,
+    "peak": 0.65182,
+    "stereo_difference_rms": 0.08284
+  },
+  {
+    "voice": "male",
+    "semitones": 1,
+    "channels": 2,
+    "rate": 44100,
+    "frames": 529200,
+    "duration_difference_samples": 0,
+    "seconds": 1.447,
+    "peak": 0.61331,
+    "stereo_difference_rms": 0.085695
+  },
+  {
+    "voice": "male",
+    "semitones": 2,
+    "channels": 2,
+    "rate": 44100,
+    "frames": 529200,
+    "duration_difference_samples": 0,
+    "seconds": 1.52,
+    "peak": 0.68351,
+    "stereo_difference_rms": 0.087124
+  },
+  {
+    "voice": "male",
+    "semitones": 3,
+    "channels": 2,
+    "rate": 44100,
+    "frames": 529200,
+    "duration_difference_samples": 0,
+    "seconds": 1.559,
+    "peak": 0.70969,
+    "stereo_difference_rms": 0.088359
+  },
+  {
+    "voice": "female",
+    "semitones": -3,
+    "channels": 2,
+    "rate": 44100,
+    "frames": 529200,
+    "duration_difference_samples": 0,
+    "seconds": 1.239,
+    "peak": 0.75969,
+    "stereo_difference_rms": 0.040452
+  },
+  {
+    "voice": "female",
+    "semitones": -2,
+    "channels": 2,
+    "rate": 44100,
+    "frames": 529200,
+    "duration_difference_samples": 0,
+    "seconds": 1.288,
+    "peak": 0.71917,
+    "stereo_difference_rms": 0.038054
+  },
+  {
+    "voice": "female",
+    "semitones": -1,
+    "channels": 2,
+    "rate": 44100,
+    "frames": 529200,
+    "duration_difference_samples": 0,
+    "seconds": 1.295,
+    "peak": 0.65854,
+    "stereo_difference_rms": 0.03626
+  },
+  {
+    "voice": "female",
+    "semitones": 1,
+    "channels": 2,
+    "rate": 44100,
+    "frames": 529200,
+    "duration_difference_samples": 0,
+    "seconds": 1.393,
+    "peak": 0.59498,
+    "stereo_difference_rms": 0.035156
+  },
+  {
+    "voice": "female",
+    "semitones": 2,
+    "channels": 2,
+    "rate": 44100,
+    "frames": 529200,
+    "duration_difference_samples": 0,
+    "seconds": 1.515,
+    "peak": 0.54663,
+    "stereo_difference_rms": 0.035563
+  },
+  {
+    "voice": "female",
+    "semitones": 3,
+    "channels": 2,
+    "rate": 44100,
+    "frames": 529200,
+    "duration_difference_samples": 0,
+    "seconds": 1.565,
+    "peak": 0.54916,
+    "stereo_difference_rms": 0.036269
+  },
+  {
+    "voice": "choir",
+    "semitones": -3,
+    "channels": 2,
+    "rate": 44100,
+    "frames": 529200,
+    "duration_difference_samples": 0,
+    "seconds": 1.44,
+    "peak": 0.46912,
+    "stereo_difference_rms": 0.040141
+  },
+  {
+    "voice": "choir",
+    "semitones": -2,
+    "channels": 2,
+    "rate": 44100,
+    "frames": 529200,
+    "duration_difference_samples": 0,
+    "seconds": 1.391,
+    "peak": 0.44517,
+    "stereo_difference_rms": 0.039012
+  },
+  {
+    "voice": "choir",
+    "semitones": -1,
+    "channels": 2,
+    "rate": 44100,
+    "frames": 529200,
+    "duration_difference_samples": 0,
+    "seconds": 1.337,
+    "peak": 0.43776,
+    "stereo_difference_rms": 0.038117
+  },
+  {
+    "voice": "choir",
+    "semitones": 1,
+    "channels": 2,
+    "rate": 44100,
+    "frames": 529200,
+    "duration_difference_samples": 0,
+    "seconds": 1.419,
+    "peak": 0.41686,
+    "stereo_difference_rms": 0.036887
+  },
+  {
+    "voice": "choir",
+    "semitones": 2,
+    "channels": 2,
+    "rate": 44100,
+    "frames": 529200,
+    "duration_difference_samples": 0,
+    "seconds": 1.537,
+    "peak": 0.50176,
+    "stereo_difference_rms": 0.036367
+  },
+  {
+    "voice": "choir",
+    "semitones": 3,
+    "channels": 2,
+    "rate": 44100,
+    "frames": 529200,
+    "duration_difference_samples": 0,
+    "seconds": 1.609,
+    "peak": 0.51682,
+    "stereo_difference_rms": 0.035854
+  }
+]

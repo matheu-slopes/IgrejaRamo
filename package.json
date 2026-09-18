@@ -21,6 +21,7 @@
     "next": "^16.2.3",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "signalsmith-stretch": "1.3.2",
     "tone": "^15.1.22",
     "web-push": "^3.6.7"
   },

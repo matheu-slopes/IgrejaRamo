@@ -1,0 +1,106 @@
+import { NextRequest, NextResponse } from "next/server";
+import {
+  getLouvorStudioAccess,
+  getLouvorStudioUser,
+  louvorStudioAdmin as db,
+} from "@/lib/louvorStudioServer";
+
+type Context = { params: Promise<{ id: string }> };
+const validId = (id: string) =>
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    id,
+  );
+
+export async function DELETE(req: NextRequest, context: Context) {
+  const user = await getLouvorStudioUser(req);
+  if (!user)
+    return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
+  if (!(await getLouvorStudioAccess(user.id)).podeGerenciar)
+    return NextResponse.json(
+      { error: "Somente líderes podem excluir músicas." },
+      { status: 403 },
+    );
+  const { id } = await context.params;
+  if (!validId(id))
+    return NextResponse.json({ error: "Música inválida." }, { status: 400 });
+  const { data: project, error: lookupError } = await db
+    .from("louvor_studio_projetos")
+    .select("id,status")
+    .eq("id", id)
+    .maybeSingle();
+  if (lookupError || !project)
+    return NextResponse.json({ error: "Música não encontrada." }, { status: 404 });
+  if (!["concluido", "erro"].includes(project.status))
+    return NextResponse.json(
+      { error: "Aguarde o processamento terminar antes de excluir." },
+      { status: 409 },
+    );
+  const { data: objects, error: listError } = await db.storage
+    .from("louvor-studio")
+    .list(id, { limit: 1000 });
+  if (listError)
+    return NextResponse.json(
+      { error: "Não foi possível localizar os arquivos da música." },
+      { status: 500 },
+    );
+  const paths = (objects ?? [])
+    .map((object) => object.name)
+    .filter((name) => name && !name.includes(".."))
+    .map((name) => `${id}/${name}`);
+  if (paths.length) {
+    const { error } = await db.storage.from("louvor-studio").remove(paths);
+    if (error)
+      return NextResponse.json(
+        { error: "Não foi possível remover os arquivos da música." },
+        { status: 500 },
+      );
+  }
+  const { error: deleteError } = await db
+    .from("louvor_studio_projetos")
+    .delete()
+    .eq("id", id);
+  if (deleteError)
+    return NextResponse.json(
+      { error: "Os arquivos foram removidos, mas não foi possível excluir a música." },
+      { status: 500 },
+    );
+  return NextResponse.json({ ok: true });
+}
+
+/**
+ * Confirma a análise automática como a configuração oficial daquele culto.
+ * Não é aplicado automaticamente: o ministro continua com a palavra final.
+ */
+export async function PATCH(req: NextRequest, context: Context) {
+  const user = await getLouvorStudioUser(req);
+  if (!user)
+    return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
+  if (!(await getLouvorStudioAccess(user.id)).podeGerenciar)
+    return NextResponse.json({ error: "Somente ministros e líderes podem confirmar a análise." }, { status: 403 });
+  const { id } = await context.params;
+  if (!validId(id))
+    return NextResponse.json({ error: "Música inválida." }, { status: 400 });
+
+  const { data: projeto, error } = await db
+    .from("louvor_studio_projetos")
+    .select("id,status,escala_id,musica_id,tom_original,bpm")
+    .eq("id", id)
+    .maybeSingle();
+  if (error || !projeto)
+    return NextResponse.json({ error: "Música não encontrada." }, { status: 404 });
+  if (projeto.status !== "concluido")
+    return NextResponse.json({ error: "Aguarde a análise terminar." }, { status: 409 });
+  if (!projeto.escala_id || !projeto.musica_id)
+    return NextResponse.json({ error: "Esta preparação não foi iniciada a partir de uma música da escala." }, { status: 409 });
+  if (!projeto.tom_original && !projeto.bpm)
+    return NextResponse.json({ error: "O Studio não conseguiu identificar tom ou BPM nesta gravação." }, { status: 409 });
+
+  const { error: updateError } = await db
+    .from("escala_musicas")
+    .update({ tom: projeto.tom_original ?? null, bpm: projeto.bpm ?? null })
+    .eq("escala_id", projeto.escala_id)
+    .eq("musica_id", projeto.musica_id);
+  if (updateError)
+    return NextResponse.json({ error: updateError.message }, { status: 500 });
+  return NextResponse.json({ ok: true, tom: projeto.tom_original, bpm: projeto.bpm });
+}

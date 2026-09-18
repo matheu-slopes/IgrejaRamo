@@ -9,12 +9,14 @@ export async function GET(req: NextRequest) {
   await louvorStudioAdmin.from("louvor_studio_projetos")
     .update({ status: "aguardando", progresso: 0, processando_em: null, worker_id: null })
     .in("status", ["baixando", "analisando", "separando"])
+    .eq("pipeline_version", 1)
     .lt("processando_em", limiteTravado);
 
   const { data: candidato, error } = await louvorStudioAdmin
     .from("louvor_studio_projetos")
     .select("id, youtube_url, titulo, artista, tom_alvo, escala_id")
     .eq("status", "aguardando")
+    .eq("pipeline_version", 1)
     .order("criado_em")
     .limit(1)
     .maybeSingle();
@@ -27,6 +29,7 @@ export async function GET(req: NextRequest) {
     .update({ status: "baixando", progresso: 2, processando_em: new Date().toISOString(), worker_id: workerId, erro: null })
     .eq("id", candidato.id)
     .eq("status", "aguardando")
+    .eq("pipeline_version", 1)
     .select("id, youtube_url, titulo, artista, tom_alvo, escala_id")
     .maybeSingle();
   return NextResponse.json({ job: job ?? null });

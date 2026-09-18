@@ -1,0 +1,44 @@
+[
+  {
+    "mode": "bs_roformer",
+    "seconds": 130.0,
+    "stems": {
+      "vocals": {
+        "channels": 2,
+        "rate": 44100,
+        "frames": 529200
+      },
+      "instrumental": {
+        "channels": 2,
+        "rate": 44100,
+        "frames": 529200
+      }
+    }
+  },
+  {
+    "mode": "htdemucs_ft",
+    "seconds": 33.71,
+    "stems": {
+      "vocals": {
+        "channels": 2,
+        "rate": 44100,
+        "frames": 529200
+      },
+      "drums": {
+        "channels": 2,
+        "rate": 44100,
+        "frames": 529200
+      },
+      "bass": {
+        "channels": 2,
+        "rate": 44100,
+        "frames": 529200
+      },
+      "other": {
+        "channels": 2,
+        "rate": 44100,
+        "frames": 529200
+      }
+    }
+  }
+]

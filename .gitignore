@@ -44,3 +44,9 @@ __pycache__/
 .env*.local
 .env.worker
 .venv/
+
+# Louvor Studio: installed tools, models and audio cache
+services/louvor-studio/.tools/
+services/louvor-studio/.models/
+services/louvor-studio/.audio-cache/
+services/louvor-studio/.hq-worker.lock

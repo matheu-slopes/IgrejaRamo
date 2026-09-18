@@ -5,5 +5,6 @@ if not exist ".venv\Scripts\python.exe" (
   pause
   exit /b 1
 )
-".venv\Scripts\python.exe" app.py
+if /I "%~1"=="local" set "LOUVOR_STUDIO_SITE_URL=http://localhost:3000"
+".venv\Scripts\python.exe" hq_worker.py
 pause

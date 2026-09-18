@@ -6,3 +6,6 @@ numpy>=1.26,<3
 requests>=2.32,<3
 python-dotenv>=1.0,<2
 imageio-ffmpeg>=0.6,<1
+
+audio-separator[cpu]==0.47.0
+filelock>=3.13,<4

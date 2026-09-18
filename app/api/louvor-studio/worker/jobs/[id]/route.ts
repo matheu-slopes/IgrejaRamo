@@ -32,7 +32,7 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
     progresso: Math.max(0, Math.min(100, Number(body.progresso ?? 0))),
     atualizado_em: new Date().toISOString(),
   };
-  for (const key of ["titulo", "artista", "thumbnail_url", "tom_original", "bpm", "duracao_segundos", "erro"]) {
+  for (const key of ["titulo", "artista", "thumbnail_url", "tom_original", "bpm", "beat_offset_seg", "duracao_segundos", "erro"]) {
     if (key in body) update[key] = body[key];
   }
   if (status === "concluido") {
