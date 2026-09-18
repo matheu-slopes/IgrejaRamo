@@ -21,6 +21,14 @@ function toSlug(text: string) {
     .replace(/-+/g, "-");
 }
 
+function inferirTomDaCifra(cifra: string) {
+  // Fallback honesto para páginas cujo HTML não expõe o metadado de tom.
+  // A primeira linha de acordes costuma indicar a tonalidade da cifra.
+  const primeirasLinhas = cifra.split("\n").slice(0, 16).join(" ");
+  const encontrado = primeirasLinhas.match(/(?:^|\s)([A-G](?:#|b)?m?)(?=(?:\s|\||$))/);
+  return encontrado?.[1] ?? "";
+}
+
 /** GET /api/buscar-cifra?artista=hillsong&musica=oceans  → busca cifra */
 /** GET /api/buscar-cifra?q=oceans hillsong               → sugestões de busca */
 export async function GET(req: NextRequest) {
@@ -28,6 +36,7 @@ export async function GET(req: NextRequest) {
   const q       = searchParams.get("q")?.trim();
   const artista = searchParams.get("artista")?.trim();
   const musica  = searchParams.get("musica")?.trim();
+  const versao = searchParams.get("versao") === "simplificada" ? "simplificada" : "principal";
 
   // ── Modo busca de sugestões ───────────────────────────────────────
   if (q) {
@@ -44,6 +53,45 @@ export async function GET(req: NextRequest) {
       return { titulo, artista: artistaNome,
         url: `https://www.cifraclub.com.br/${artistaSlug}/${musicaSlug}/`,
         artistaSlug, musicaSlug };
+    }
+
+    /** Fonte usada pelo próprio Cifra Club. Ela encontra também trechos da letra. */
+    async function cifraClubSearch(query: string): Promise<Sugestao[]> {
+      const res = await fetch(
+        `https://solr.sscdn.co/cc/c7/?q=${encodeURIComponent(query)}&limit=20`,
+        {
+          headers: {
+            "User-Agent": HEADERS["User-Agent"],
+            Origin: "https://www.cifraclub.com.br",
+            Referer: "https://www.cifraclub.com.br/",
+            Accept: "application/json, text/plain, */*",
+          },
+          signal: AbortSignal.timeout(8000),
+        },
+      );
+      if (!res.ok) return [];
+      const data = await res.json() as {
+        response?: { docs?: Array<{ art?: string; dns?: string; txt?: string; url?: string }> };
+      };
+      const results: Sugestao[] = [];
+      const seen = new Set<string>();
+      for (const doc of data.response?.docs ?? []) {
+        const artistaSlug = String(doc.dns ?? "").trim();
+        const musicaSlug = String(doc.url ?? "").trim();
+        if (!artistaSlug || !musicaSlug || IGNORAR.has(artistaSlug) || IGNORAR.has(musicaSlug)) continue;
+        if (SUFIXOS_IGNORAR.test(musicaSlug)) continue;
+        const key = `${artistaSlug}/${musicaSlug}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        results.push({
+          titulo: String(doc.txt ?? musicaSlug.replace(/-/g, " ")).trim(),
+          artista: String(doc.art ?? artistaSlug.replace(/-/g, " ")).trim(),
+          url: `https://www.cifraclub.com.br/${artistaSlug}/${musicaSlug}/`,
+          artistaSlug,
+          musicaSlug,
+        });
+      }
+      return results;
     }
 
     /** DuckDuckGo HTML search — melhor indexação, pode bloquear sob carga */
@@ -221,21 +269,23 @@ export async function GET(req: NextRequest) {
       }
 
       // Prioridade: Serper (Google real) → Brave → Google CSE → DDG + Bing
-      if (SERPER_KEY) {
+      addAll(await cifraClubSearch(q));
+
+      if (merged.length < 8 && SERPER_KEY) {
         const [s1, s2] = await Promise.all([
           serperSearch(`site:cifraclub.com.br ${q}`),
           serperSearch(`${q} cifra cifraclub`),
         ]);
         addAll(s1);
         addAll(s2);
-      } else if (BRAVE_KEY) {
+      } else if (merged.length < 8 && BRAVE_KEY) {
         const [b1, b2] = await Promise.all([
           braveSearch(`site:cifraclub.com.br ${q}`),
           braveSearch(`${q} site:cifraclub.com.br cifra`),
         ]);
         addAll(b1);
         addAll(b2);
-      } else if (GOOGLE_CSE_KEY) {
+      } else if (merged.length < 8 && GOOGLE_CSE_KEY) {
         const [cse1, cse2] = await Promise.all([
           googleCSE(q),
           googleCSE(`${q} cifra`),
@@ -282,7 +332,7 @@ export async function GET(req: NextRequest) {
 
   const artistaSlug = toSlug(artista);
   const musicaSlug  = toSlug(musica);
-  const cifraUrl    = `https://www.cifraclub.com.br/${artistaSlug}/${musicaSlug}/`;
+  const cifraUrl    = `https://www.cifraclub.com.br/${artistaSlug}/${musicaSlug}/${versao === "simplificada" ? "simplificada/" : ""}`;
 
   const CIFRACLUB_API_URL = process.env.CIFRACLUB_API_URL;
   let res: Response | null = null;
@@ -317,6 +367,9 @@ export async function GET(req: NextRequest) {
             youtube_url:  data.youtube_url || null,
             cifraclub_url: cifraUrl,
             cifra:        data.cifra,
+            versao,
+            versoes: [{ id: "principal", label: "Principal" }],
+            tom_origem: data.tom_original ? "cifraclub" : null,
           });
         }
       }
@@ -370,7 +423,9 @@ export async function GET(req: NextRequest) {
   let tomOriginal = "";
   const scripts = $("script:not([src])").map((_, el) => $(el).html() ?? "").get().join("\n");
 
-  const ytMatch = scripts.match(/"(?:youtube_id|youtubeId)"\s*:\s*"([A-Za-z0-9_-]{10,12})"/);
+  // O Cifra Club hoje envia o id em payloads React Server Components como
+  // `youtubeID` (e com aspas escapadas); as versões antigas usam youtubeId.
+  const ytMatch = scripts.match(/(?:youtube_id|youtubeId|youtubeID)\\?["']?\s*:\s*\\?["']([A-Za-z0-9_-]{10,12})/i);
   if (ytMatch) youtubeUrl = `https://www.youtube.com/watch?v=${ytMatch[1]}`;
 
   // Tom: tenta extrair do HTML (vários seletores + variáveis JS)
@@ -390,6 +445,10 @@ export async function GET(req: NextRequest) {
     if (tomMatch) tomOriginal = tomMatch[1].replace(/[0-9]+$/, "");
   }
 
+  const temSimplificada = versao === "simplificada" || $("a[href*='/simplificada']").length > 0;
+  const tomInferido = tomOriginal ? "" : inferirTomDaCifra(cifraTexto);
+  if (!tomOriginal && tomInferido) tomOriginal = tomInferido;
+
   return NextResponse.json({
     artist:       artistaNome,
     name:         titulo,
@@ -397,5 +456,10 @@ export async function GET(req: NextRequest) {
     youtube_url:  youtubeUrl || null,
     cifraclub_url: cifraUrl,
     cifra:        cifraTexto.split("\n"),
+    versao,
+    versoes: temSimplificada
+      ? [{ id: "principal", label: "Principal" }, { id: "simplificada", label: "Simplificada" }]
+      : [{ id: "principal", label: "Principal" }],
+    tom_origem: tomOriginal ? (tomInferido ? "inferido" : "cifraclub") : null,
   });
 }

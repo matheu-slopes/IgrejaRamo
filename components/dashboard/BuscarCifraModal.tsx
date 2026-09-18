@@ -1,10 +1,9 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { X, Search, Music2, Check, ExternalLink, Loader2, AlertCircle, ChevronRight, EyeOff, Eye } from "lucide-react";
 import clsx from "clsx";
 import { supabase } from "@/lib/supabase";
-import { TONS } from "@/components/dashboard/EscalasTab";
 
 // ── Transposição de cifra ──────────────────────────────────────────────────
 const NOTES_S = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
@@ -71,26 +70,44 @@ interface CifraResult {
   youtube_url?: string;
   cifraclub_url?: string;
   cifra: string[];
+  versao?: "principal" | "simplificada";
+  versoes?: { id: "principal" | "simplificada"; label: string }[];
+  tom_origem?: "cifraclub" | "inferido" | null;
 }
 
 interface Props {
   onClose: () => void;
-  onSalva: (musica: { titulo: string; artista: string; tom: string; artistaSlug: string; musicaSlug: string }) => void;
+  onSalva: (musica: {
+    titulo: string;
+    artista: string;
+    tom: string;
+    artistaSlug: string;
+    musicaSlug: string;
+    cifraUrl?: string;
+    youtubeUrl?: string;
+    cifra: string[];
+  }) => void | Promise<void>;
+  buscaInicial?: string;
 }
 
-export default function BuscarCifraModal({ onClose, onSalva }: Props) {
-  const [query, setQuery] = useState("");
+export default function BuscarCifraModal({ onClose, onSalva, buscaInicial = "" }: Props) {
+  const [query, setQuery] = useState(buscaInicial.trim());
   const [sugestoes, setSugestoes] = useState<Sugestao[]>([]);
   const [resultado, setResultado] = useState<CifraResult | null>(null);
   const [tomOriginal, setTomOriginal] = useState(""); // tom detectado da página
-  const [tom, setTom] = useState("");                  // tom escolhido pelo usuário
-  const [estilo, setEstilo] = useState("");
+  const [tomPrevia, setTomPrevia] = useState("");
   const [erro, setErro] = useState("");
   const [loadingBusca, setLoadingBusca] = useState(false);
   const [loadingCifra, setLoadingCifra] = useState(false);
-  const [salvo, setSalvo] = useState(false);
+  const [salvando, setSalvando] = useState(false);
   const [esconderTabs, setEsconderTabs] = useState(false);
   const [sugestaoSelecionada, setSugestaoSelecionada] = useState<Sugestao | null>(null);
+
+  useEffect(() => {
+    if (buscaInicial.trim()) void buscarSugestoes(buscaInicial.trim());
+  // A janela é remontada a cada abertura; a busca inicial só deve disparar uma vez.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Linha de tablatura: começa com nome de corda + | OU é cabeçalho/rodapé de bloco de tab
   function isTabLine(line: string) {
@@ -105,14 +122,14 @@ export default function BuscarCifraModal({ onClose, onSalva }: Props) {
   const cifraExibida = useMemo(() => {
     if (!resultado) return [];
     const orig = tomOriginal;
-    const dest = tom;
+    const dest = tomPrevia;
     if (!orig || !dest || orig === dest) return resultado.cifra;
     const fromIdx = tomIdx(orig);
     const toIdx2  = tomIdx(dest);
     if (fromIdx === -1 || toIdx2 === -1) return resultado.cifra;
     const semis = (toIdx2 - fromIdx + 12) % 12;
     return transposeCifra(resultado.cifra, semis);
-  }, [resultado, tom, tomOriginal]);
+  }, [resultado, tomPrevia, tomOriginal]);
 
   // Cifra com tabs opcionalmente removidas (só para exibição)
   const cifraFiltrada = useMemo(() => {
@@ -125,33 +142,33 @@ export default function BuscarCifraModal({ onClose, onSalva }: Props) {
     }, []);
   }, [cifraExibida, esconderTabs]);
 
-  async function buscarSugestoes() {
-    if (!query.trim()) return;
+  async function buscarSugestoes(termo = query) {
+    if (!termo.trim()) return;
     setLoadingBusca(true);
     setErro("");
     setSugestoes([]);
     setResultado(null);
-    setSalvo(false);
+    setSalvando(false);
 
-    const res = await fetch(`/api/buscar-cifra?q=${encodeURIComponent(query.trim())}`);
+    const res = await fetch(`/api/buscar-cifra?q=${encodeURIComponent(termo.trim())}`);
     const data = await res.json();
 
     if (!res.ok || !data.results?.length) {
-      setErro("Nenhum resultado encontrado. Tente outro nome.");
+      setErro("Nenhum resultado encontrado no Cifra Club. Tente outro trecho da letra, título ou artista.");
     } else {
       setSugestoes(data.results);
     }
     setLoadingBusca(false);
   }
 
-  async function buscarCifra(s: Sugestao) {
+  async function buscarCifra(s: Sugestao, versao: "principal" | "simplificada" = "principal") {
     setLoadingCifra(true);
     setErro("");
     setSugestoes([]);
-    setSalvo(false);
+    setSalvando(false);
     setSugestaoSelecionada(s);
 
-    const params = new URLSearchParams({ artista: s.artistaSlug, musica: s.musicaSlug });
+    const params = new URLSearchParams({ artista: s.artistaSlug, musica: s.musicaSlug, versao });
     const res = await fetch(`/api/buscar-cifra?${params}`);
     const data = await res.json();
 
@@ -162,21 +179,33 @@ export default function BuscarCifraModal({ onClose, onSalva }: Props) {
       setResultado(data);
       const orig = data.tom_original ?? "";
       setTomOriginal(orig);
-      setTom(orig); // começa no tom original
+      setTomPrevia(orig);
     }
     setLoadingCifra(false);
   }
 
-  function salvar() {
+  async function salvar() {
     if (!resultado || !sugestaoSelecionada) return;
-    setSalvo(true);
-    onSalva({
-      titulo: resultado.name,
-      artista: resultado.artist,
-      tom: tom || "",
-      artistaSlug: sugestaoSelecionada.artistaSlug,
-      musicaSlug: sugestaoSelecionada.musicaSlug,
-    });
+    setErro("");
+    setSalvando(true);
+    try {
+      await onSalva({
+        titulo: resultado.name,
+        artista: resultado.artist,
+        tom: tomOriginal || "",
+        artistaSlug: sugestaoSelecionada.artistaSlug,
+        musicaSlug: sugestaoSelecionada.musicaSlug,
+        cifraUrl: resultado.cifraclub_url,
+        youtubeUrl: resultado.youtube_url,
+        cifra: resultado.cifra,
+      });
+      // O cadastro já terminou neste ponto. Fechar imediatamente evita deixar a
+      // pessoa presa em “Adicionado!” se a tela pai atualizar o set do culto.
+      onClose();
+    } catch (error) {
+      setSalvando(false);
+      setErro(error instanceof Error ? error.message : "Não foi possível adicionar a música ao Repertório.");
+    }
   }
 
   return (
@@ -206,7 +235,7 @@ export default function BuscarCifraModal({ onClose, onSalva }: Props) {
               autoFocus
             />
             <button
-              onClick={buscarSugestoes}
+              onClick={() => void buscarSugestoes()}
               disabled={loadingBusca || loadingCifra}
               className="flex items-center gap-1.5 bg-grape-700 text-white text-sm font-semibold px-4 py-2 rounded-xl hover:bg-grape-800 transition disabled:opacity-60 shrink-0"
             >
@@ -272,31 +301,54 @@ export default function BuscarCifraModal({ onClose, onSalva }: Props) {
                 </div>
                 <div className="flex items-center gap-2 shrink-0 self-start sm:self-auto w-full sm:w-auto justify-between sm:justify-end mt-1 sm:mt-0">
                   <div className="flex flex-col items-start sm:items-end gap-0.5">
-                    {tomOriginal && tom !== tomOriginal && (
-                      <span className="text-[10px] text-gray-400 leading-none">original: {tomOriginal}</span>
-                    )}
-                    <select
-                      value={tom}
-                      onChange={(e) => setTom(e.target.value)}
-                      className="text-sm border border-gray-200 rounded-lg px-2 py-1.5 outline-none bg-white font-semibold"
-                    >
-                      <option value="">Tom...</option>
-                      {TONS.map((t) => <option key={t}>{t}</option>)}
-                    </select>
+                    <span className="rounded-lg border border-grape-100 bg-grape-50 px-2.5 py-1.5 text-sm font-semibold text-grape-800">
+                      {tomOriginal
+                        ? `Tom da cifra: ${tomOriginal}${resultado.tom_origem === "inferido" ? " (estimado)" : ""}`
+                        : "Tom não informado"}
+                    </span>
                   </div>
-                  <input
-                    value={estilo}
-                    onChange={(e) => setEstilo(e.target.value)}
-                    placeholder="Estilo..."
-                    className="text-sm border border-gray-200 rounded-lg px-2 py-1.5 outline-none w-24"
-                  />
                 </div>
+              </div>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                {(resultado.versoes ?? [{ id: "principal", label: "Principal" }]).map((versao) => (
+                  <button
+                    key={versao.id}
+                    type="button"
+                    onClick={() => sugestaoSelecionada && void buscarCifra(sugestaoSelecionada, versao.id)}
+                    disabled={loadingCifra}
+                    className={clsx(
+                      "rounded-lg border px-3 py-1.5 text-xs font-semibold transition disabled:opacity-50",
+                      (resultado.versao ?? "principal") === versao.id
+                        ? "border-grape-600 bg-grape-700 text-white"
+                        : "border-gray-200 bg-white text-gray-600 hover:border-grape-300 hover:text-grape-700",
+                    )}
+                  >
+                    {versao.label}
+                  </button>
+                ))}
+                {resultado.versoes && resultado.versoes.length > 1 && (
+                  <span className="text-xs text-gray-400">A versão simplificada é outra cifra da mesma música.</span>
+                )}
               </div>
             </div>
 
             {/* Preview da cifra */}
             <div className="flex-1 overflow-y-auto bg-gray-50 flex flex-col">
               <div className="flex items-center justify-end px-5 py-1.5 border-b border-gray-100 bg-white shrink-0">
+                {tomOriginal && (
+                  <details className="mr-auto text-xs text-gray-500">
+                    <summary className="cursor-pointer hover:text-grape-700">Transpor apenas esta prévia</summary>
+                    <select
+                      value={tomPrevia}
+                      onChange={(e) => setTomPrevia(e.target.value)}
+                      className="mt-1 rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs outline-none"
+                    >
+                      {[tomOriginal, ...NOTES_S, ...NOTES_S.map((nota) => `${nota}m`)]
+                        .filter((tom, indice, lista) => lista.indexOf(tom) === indice)
+                        .map((tom) => <option key={tom}>{tom}</option>)}
+                    </select>
+                  </details>
+                )}
                 <button
                   onClick={() => setEsconderTabs(v => !v)}
                   className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-grape-700 transition"
@@ -326,15 +378,15 @@ export default function BuscarCifraModal({ onClose, onSalva }: Props) {
                   Cancelar
                 </button>
                 <button
-                  onClick={salvar}
-                  disabled={salvo}
+                  onClick={() => void salvar()}
+                  disabled={salvando}
                   className={clsx(
                     "flex items-center gap-2 text-sm font-semibold px-4 sm:px-5 py-2 rounded-xl transition whitespace-nowrap",
-                    salvo ? "bg-green-600 text-white" : "bg-grape-700 text-white hover:bg-grape-800 disabled:opacity-60"
+                    salvando ? "bg-grape-700 text-white disabled:opacity-60" : "bg-grape-700 text-white hover:bg-grape-800"
                   )}
                 >
-                  {salvo ? <Check className="w-4 h-4 shrink-0" /> : null}
-                  <span>{salvo ? "Adicionado!" : "Adicionar à escala"}</span>
+                  {salvando ? <Loader2 className="w-4 h-4 shrink-0 animate-spin" /> : <Check className="w-4 h-4 shrink-0" />}
+                  <span>{salvando ? "Adicionando…" : "Adicionar ao Repertório"}</span>
                 </button>
               </div>
             </div>

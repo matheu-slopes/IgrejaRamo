@@ -161,6 +161,10 @@ CREATE TABLE musicas (
   estilo       TEXT,
   link_youtube TEXT,
   cifra        TEXT,
+  cifra_url    TEXT,
+  cifra_artista_slug TEXT,
+  cifra_musica_slug TEXT,
+  arquivada    BOOLEAN     NOT NULL DEFAULT FALSE,
   created_at   TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -202,6 +206,9 @@ CREATE TABLE escala_musicas (
   titulo    TEXT NOT NULL,
   artista   TEXT NOT NULL,
   tom       TEXT,
+  bpm       NUMERIC(7,2),
+  artista_slug TEXT,
+  musica_slug TEXT,
   ordem     INT  DEFAULT 0
 );
 
@@ -440,11 +447,28 @@ CREATE POLICY "escala_musicas_select" ON escala_musicas FOR SELECT USING (auth.u
 CREATE POLICY "escala_musicas_insert" ON escala_musicas FOR INSERT WITH CHECK (auth.uid() IS NOT NULL);
 CREATE POLICY "escala_musicas_delete" ON escala_musicas FOR DELETE USING (auth.uid() IS NOT NULL);
 
--- Músicas: leitura + CRUD para autenticados
+-- Músicas: integrantes leem; a gestão do catálogo do Louvor é de líderes/admin.
+CREATE OR REPLACE FUNCTION pode_gerenciar_repertorio_louvor(p_user UUID)
+RETURNS BOOLEAN LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
+  SELECT p_user IS NOT NULL AND (
+    EXISTS (
+      SELECT 1 FROM perfis p
+      WHERE p.id = p_user AND p.ativo = TRUE AND (
+        p.role::text IN ('admin', 'pastor')
+        OR COALESCE(p.lider_ministerios, ARRAY[]::text[]) @> ARRAY['Louvor']::text[]
+        OR COALESCE(p.permissoes, ARRAY[]::text[]) @> ARRAY['gerenciar_repertorio']::text[]
+      )
+    )
+    OR EXISTS (
+      SELECT 1 FROM membros_ministerio mm
+      WHERE mm.usuario_id = p_user AND mm.ministerio::text = 'Louvor' AND mm.funcao::text = 'Líder'
+    )
+  );
+$$;
 CREATE POLICY "musicas_select" ON musicas FOR SELECT USING (auth.uid() IS NOT NULL);
-CREATE POLICY "musicas_insert" ON musicas FOR INSERT WITH CHECK (auth.uid() IS NOT NULL);
-CREATE POLICY "musicas_update" ON musicas FOR UPDATE USING (auth.uid() IS NOT NULL);
-CREATE POLICY "musicas_delete" ON musicas FOR DELETE USING (auth.uid() IS NOT NULL);
+CREATE POLICY "musicas_insert" ON musicas FOR INSERT WITH CHECK (pode_gerenciar_repertorio_louvor(auth.uid()));
+CREATE POLICY "musicas_update" ON musicas FOR UPDATE USING (pode_gerenciar_repertorio_louvor(auth.uid())) WITH CHECK (pode_gerenciar_repertorio_louvor(auth.uid()));
+CREATE POLICY "musicas_delete" ON musicas FOR DELETE USING (pode_gerenciar_repertorio_louvor(auth.uid()));
 
 -- ──────────────────────────────────────────────────────────────
 -- BUSCA CACHE (resultados de busca no Cifra Club por 30 dias)

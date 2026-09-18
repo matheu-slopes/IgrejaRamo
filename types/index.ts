@@ -14,6 +14,7 @@ export type Permissao =
   | "criar_evento"                // criar eventos no sistema
   | "editar_evento"               // editar e remover eventos
   | "criar_escala"                // criar e editar escalas de serviço
+  | "gerenciar_repertorio"         // cadastrar, editar, arquivar e excluir músicas do Louvor
   | "gerenciar_membros_ministerio"// adicionar/remover/editar membros de um ministério
   | "bloquear_chat"               // bloquear/desbloquear chat do canal
   | "enviar_chat"                 // enviar mensagens no chat do canal
@@ -118,10 +119,19 @@ export interface Musica {
   tom?: string;       // "C", "D#", "Bbm" etc.
   estilo?: string;    // "Contemporâneo", "Tradicional", "Gospel Pop" etc.
   linkYoutube?: string;
+  /** Fonte e conteúdo-base da cifra, independentes do tom de cada culto. */
+  cifra?: string;
+  cifraUrl?: string;
+  cifraArtistaSlug?: string;
+  cifraMusicaSlug?: string;
+  /** Arquivada não aparece para novos sets, mas preserva o histórico das escalas. */
+  arquivada?: boolean;
 }
 
 // Música dentro de uma escala (pode ter tom diferente do padrão)
 export interface EscalaMusica {
+  /** Identificador do item no set daquele culto. */
+  id?: string;
   musicaId: string;
   titulo: string;
   artista: string;
@@ -129,6 +139,7 @@ export interface EscalaMusica {
   bpm?: number;       // batidas por minuto
   artistaSlug?: string; // slug do Cifra Club para buscar cifra on-demand
   musicaSlug?: string;
+  linkYoutube?: string;
 }
 
 export interface Escala {
