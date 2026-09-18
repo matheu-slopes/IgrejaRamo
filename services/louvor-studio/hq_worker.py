@@ -28,6 +28,12 @@ def api(method,payload=None):
     if not response.ok:raise RuntimeError(f"API HQ HTTP {response.status_code}: {response.text[:180]}")
     return response.json()
 
+def public_failure(exc):
+    response=getattr(exc,"response",None)
+    if getattr(response,"status_code",None)==400:
+        return "O Storage recusou uma faixa grande. Configure o bucket louvor-studio para permitir arquivos de até 512 MiB."
+    return "O processamento falhou. Tente novamente; detalhes no registro do processador."
+
 def process(job):
     kind=job["kind"];row=job["version"] if kind=="pitch" else job["project"]
     identity={"kind":kind,"id":row["id"],"claimToken":row["claim_token"]}
@@ -87,8 +93,9 @@ def process(job):
         except Exception as exc:
             stopped.set();monitor.join(25)
             detail=log.read_text(encoding="utf-8",errors="replace")[-5000:] if log.exists() else ""
-            print(f"Falha {row['id']}: {exc}\n{detail}",flush=True)
-            api("POST",{**identity,"action":"fail","configuration":"RUBBERBAND_PATH" in detail})
+            message=public_failure(exc)
+            print(f"Falha {row['id']}: {message}\n{detail}",flush=True)
+            api("POST",{**identity,"action":"fail","configuration":"RUBBERBAND_PATH" in detail,"detail":message})
         finally:
             stopped.set();monitor.join(25)
 

@@ -159,11 +159,16 @@ export async function POST(req: NextRequest) {
         update.model_version = body.model.slice(0, 160);
     }
   } else if (body.action === "fail") {
+    const workerDetail =
+      typeof body.detail === "string" &&
+      body.detail.startsWith("O Storage recusou uma faixa grande.")
+        ? body.detail.slice(0, 300)
+        : null;
     update.status = "erro";
     update.erro =
       body.configuration === true
         ? "Verifique a instalação do Audio Separator e Rubber Band R3 no processador."
-        : "O processamento falhou. Tente novamente; detalhes no registro do processador.";
+        : workerDetail ?? "O processamento falhou. Tente novamente; detalhes no registro do processador.";
     update.claim_token = null;
     update.progresso = 0;
     // Remove only incomplete outputs belonging to this attempt.
