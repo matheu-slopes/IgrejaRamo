@@ -113,6 +113,7 @@ export function LouvorStudioTab({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [preparando, setPreparando] = useState(false);
+  const [retryingId, setRetryingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [applyingId, setApplyingId] = useState<string | null>(null);
   const [indiceDaFila, setIndiceDaFila] = useState(0);
@@ -272,6 +273,25 @@ export function LouvorStudioTab({
       setMessage(error instanceof Error ? error.message : "Não foi possível excluir.");
     } finally {
       setDeletingId(null);
+    }
+  }
+
+  async function tentarNovamente(project: Projeto) {
+    if (retryingId || project.status !== "erro") return;
+    setRetryingId(project.id);
+    setMessage(null);
+    try {
+      const response = await studioFetch(`/api/louvor-studio/projects/${project.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ action: "retry" }),
+      });
+      const data = await response.json().catch(() => ({})) as { error?: string };
+      if (!response.ok) throw new Error(data.error ?? "Não foi possível tentar novamente.");
+      await loadProjects();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Não foi possível tentar novamente.");
+    } finally {
+      setRetryingId(null);
     }
   }
 
@@ -649,6 +669,17 @@ export function LouvorStudioTab({
                 <p className="mt-2 max-w-md text-xs text-gray-500">A separação analisa a música inteira e pode levar vários minutos, dependendo da duração e do computador. O progresso avança conforme os trechos ficam prontos.</p>
               )}
               {selected.status !== "erro" && <p className="mt-3 text-xs font-medium text-rose-700" role="status" aria-live="polite">{selected.progresso}%</p>}
+              {selected.status === "erro" && podeGerenciar && (
+                <button
+                  type="button"
+                  disabled={!workerConfigurado || retryingId === selected.id}
+                  onClick={() => void tentarNovamente(selected)}
+                  className="mt-4 inline-flex items-center gap-2 rounded-xl bg-rose-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-rose-600 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {retryingId === selected.id ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                  {retryingId === selected.id ? "Colocando na fila…" : "Tentar novamente"}
+                </button>
+              )}
             </div>
           )}
           {selected?.status === "concluido" && (

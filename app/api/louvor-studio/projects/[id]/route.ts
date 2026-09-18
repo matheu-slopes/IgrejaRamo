@@ -80,6 +80,7 @@ export async function PATCH(req: NextRequest, context: Context) {
   const { id } = await context.params;
   if (!validId(id))
     return NextResponse.json({ error: "Música inválida." }, { status: 400 });
+  const body = await req.json().catch(() => ({})) as { action?: string };
 
   const { data: projeto, error } = await db
     .from("louvor_studio_projetos")
@@ -88,6 +89,28 @@ export async function PATCH(req: NextRequest, context: Context) {
     .maybeSingle();
   if (error || !projeto)
     return NextResponse.json({ error: "Música não encontrada." }, { status: 404 });
+
+  if (body.action === "retry") {
+    if (projeto.status !== "erro")
+      return NextResponse.json({ error: "Somente uma preparação com falha pode ser tentada novamente." }, { status: 409 });
+    const { error: retryError } = await db
+      .from("louvor_studio_projetos")
+      .update({
+        status: "aguardando",
+        progresso: 0,
+        erro: null,
+        worker_id: null,
+        claim_token: null,
+        tentativas: 0,
+        atualizado_em: new Date().toISOString(),
+      })
+      .eq("id", id)
+      .eq("status", "erro");
+    if (retryError)
+      return NextResponse.json({ error: "Não foi possível colocar a preparação na fila novamente." }, { status: 500 });
+    return NextResponse.json({ ok: true, status: "aguardando" });
+  }
+
   if (projeto.status !== "concluido")
     return NextResponse.json({ error: "Aguarde a análise terminar." }, { status: 409 });
   if (!projeto.escala_id || !projeto.musica_id)
