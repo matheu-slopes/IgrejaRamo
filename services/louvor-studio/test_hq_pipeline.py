@@ -45,6 +45,7 @@ class PipelineTests(unittest.TestCase):
                             self.assertEqual(set(received),{'/'+n for n in expected.values()})
                             out=root/'mix.flac';out.write_bytes(received['/mix.flac'])
                             self.assertEqual(info(out).frames,3*RATE)
+                            self.assertEqual(info(out).subtype,'PCM_16')
                             if attempt==0:original=received['/mix.flac']
                             else:self.assertEqual(original,received['/mix.flac'])
                             received.clear()

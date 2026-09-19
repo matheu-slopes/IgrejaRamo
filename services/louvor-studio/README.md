@@ -8,7 +8,7 @@
 4. Feche o worker antigo após sua tarefa terminar e execute `iniciar_worker.bat`. O novo launcher usa `hq_worker.py`. Reinicie após alterar código Python.
 5. Para produção, publique também as novas rotas e a alteração da fila legada antes de iniciar novas tarefas. Um worker antigo consultando uma API antiga pode capturar tarefas novas se compartilhar o mesmo banco; não mantenha esse processo ativo durante o teste local.
 
-O download do YouTube continua usando yt-dlp `bestaudio/best`. Pesquisa por nome continua sem baixar áudio e sem precisar do PC ligado. A preparação baixa o arquivo nativo e converte uma vez para WAV estéreo float32 a 44,1 kHz. As exportações finais oferecem MP3 320 kbps e FLAC sem perda; o FLAC reduz o tamanho para caber no limite por arquivo do Storage. A análise de tom/BPM usa uma cópia mono curta e não altera os canais do áudio de processamento.
+O download do YouTube continua usando yt-dlp `bestaudio/best`. Pesquisa por nome continua sem baixar áudio e sem precisar do PC ligado. A preparação baixa o arquivo nativo e converte uma vez para WAV estéreo float32 a 44,1 kHz. As exportações finais oferecem MP3 320 kbps e FLAC estéreo 16-bit em qualidade de CD; o FLAC reduz o tamanho para caber no limite por arquivo do Storage. A análise de tom/BPM usa uma cópia mono curta e não altera os canais do áudio de processamento.
 
 ## Separação e transposição
 

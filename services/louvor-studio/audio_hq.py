@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parent
 RATE = 44100
 MODELS = {"bs_roformer": "model_bs_roformer_ep_317_sdr_12.9755.ckpt", "htdemucs_ft": "htdemucs_ft.yaml"}
 STEMS = {"bs_roformer": ("vocals", "instrumental"), "htdemucs_ft": ("vocals", "drums", "bass", "other")}
-VERSION = "separator-0.47.0-r3-stereo-v1"
+VERSION = "separator-0.47.0-r3-stereo-v2-flac16"
 
 def cpu_thread_count():
     """Return a safe, configurable CPU limit for local separation."""
@@ -110,9 +110,9 @@ def export_mp3(source, target):
          "-af",f"volume={gain:.12g}","-c:a","libmp3lame","-b:a","320k","-ar",str(RATE),"-ac","2",target],180)
 
 def export_flac(source, target):
-    """Export a compressed lossless download for Storage's per-file limit."""
+    """Export a compact 16-bit FLAC suited to Storage's per-file limit."""
     run([ffmpeg_path(),"-nostdin","-v","error","-y","-i",source,
-         "-c:a","flac","-compression_level","8","-sample_fmt","s32",
+         "-c:a","flac","-compression_level","8","-sample_fmt","s16",
          "-ar",str(RATE),"-ac","2",target],180)
 
 def mix(stems, target):
