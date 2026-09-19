@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertCircle, CheckCircle2, Clock3, Disc3, Download, LibraryBig, LoaderCircle, Music2, Search, Sparkles, Trash2 } from "lucide-react";
+import { AlertCircle, CheckCircle2, Disc3, Download, LibraryBig, LoaderCircle, Music2, Search, Sparkles, Trash2 } from "lucide-react";
 import { LouvorStudioPlayer } from "./LouvorStudioPlayer";
 import { SeparationMode } from "@/lib/louvorStudioMusic";
 import { supabase } from "@/lib/supabase";
@@ -111,6 +111,7 @@ export function LouvorStudioTab({
   const [videoConfirmado, setVideoConfirmado] = useState<SearchResult | null>(null);
   const [buscandoOutraVersao, setBuscandoOutraVersao] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [mostrarPreparacao, setMostrarPreparacao] = useState(false);
   const [buscaNaBiblioteca, setBuscaNaBiblioteca] = useState("");
   const [filtroDaBiblioteca, setFiltroDaBiblioteca] = useState<"todas" | "prontas" | "processando">("todas");
   const [message, setMessage] = useState<string | null>(null);
@@ -236,6 +237,7 @@ export function LouvorStudioTab({
       setQuery("");
       setVideoConfirmado(null);
       setBuscandoOutraVersao(false);
+      setMostrarPreparacao(false);
       setSelectedId(data.projeto?.id ?? null);
       await loadProjects();
       if (fluxoDaEscala && indiceDaFila < filaDaEscala.length - 1) {
@@ -355,18 +357,26 @@ export function LouvorStudioTab({
 
   return (
     <div className="space-y-6">
-      <div className="rounded-2xl border border-rose-100 bg-gradient-to-br from-rose-50 via-white to-white p-5 shadow-sm md:p-6">
+      <div className={fluxoDaEscala || mostrarPreparacao ? "rounded-2xl border border-rose-100 bg-gradient-to-br from-rose-50 via-white to-white p-5 shadow-sm md:p-6" : "flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm"}>
         <div>
-          <div>
-            <div className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-rose-700" />
-              <h2 className="text-lg font-semibold text-gray-900">Louvor Studio</h2>
-            </div>
-            <p className="mt-1 max-w-2xl text-sm text-gray-500">
-              Pesquise uma música autorizada, detecte o tom e o BPM, separe as faixas e ensaie em outro tom.
-            </p>
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-5 w-5 text-rose-700" />
+            <h2 className="text-lg font-semibold text-gray-900">Louvor Studio</h2>
           </div>
+          <p className="mt-1 max-w-2xl text-sm text-gray-500">
+            Prepare músicas quando precisar e use a biblioteca para abrir os ensaios da equipe.
+          </p>
         </div>
+
+        {podeGerenciar && !fluxoDaEscala && (
+          <button
+            type="button"
+            onClick={() => setMostrarPreparacao((aberto) => !aberto)}
+            className="inline-flex items-center gap-2 rounded-xl bg-rose-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-rose-600"
+          >
+            <Download className="h-4 w-4" /> {mostrarPreparacao ? "Fechar preparação" : "Preparar música"}
+          </button>
+        )}
 
         {podeGerenciar && !workerConfigurado && (
           <div className="mt-4 flex gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
@@ -465,7 +475,7 @@ export function LouvorStudioTab({
                 </div>
               )}
             </section>
-          ) : <form onSubmit={pesquisar} className="mt-5 space-y-4">
+          ) : mostrarPreparacao ? <form onSubmit={pesquisar} className="mt-5 space-y-4">
           {videoSugeridoDoRepertorio && (
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">
               <div>
@@ -595,7 +605,7 @@ export function LouvorStudioTab({
           <p className="text-xs text-gray-500" role="status" aria-live="polite">
             {searching ? "Buscando os vídeos no YouTube. Aguarde alguns segundos…" : "Escolha o vídeo e clique em Preparar. O tom será identificado automaticamente; depois você pode ouvir e ajustar."}
           </p>
-        </form>) : (
+        </form> : null) : (
           <p className="mt-4 rounded-xl bg-white p-3 text-sm text-gray-600 ring-1 ring-gray-100">
             As músicas preparadas pelos ministros aparecem abaixo para toda a equipe ensaiar.
           </p>
@@ -637,21 +647,8 @@ export function LouvorStudioTab({
         </section>
       )}
 
-      <div className={fluxoDaEscala ? "" : "overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm"}>
-        {!fluxoDaEscala && (
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 px-4 py-3 md:px-5">
-            <div className="flex items-center gap-2">
-              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-rose-50 text-rose-700"><Disc3 className="h-4 w-4" /></span>
-              <div>
-                <h3 className="text-sm font-semibold text-gray-900">Área de ensaio</h3>
-                <p className="text-xs text-gray-500">Biblioteca, faixas e downloads no mesmo lugar</p>
-              </div>
-            </div>
-            <span className="text-xs font-medium text-gray-500">{projects.length} música{projects.length === 1 ? "" : "s"} preparada{projects.length === 1 ? "" : "s"}</span>
-          </div>
-        )}
-      <div className={fluxoDaEscala ? "" : "grid xl:grid-cols-[minmax(320px,360px)_minmax(0,1fr)] xl:items-start"}>
-        {!fluxoDaEscala && <aside className="border-b border-gray-100 bg-gray-50/60 p-4 xl:border-b-0 xl:border-r">
+      <div className={fluxoDaEscala ? "" : "space-y-5"}>
+        {!fluxoDaEscala && <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm md:p-5">
           <div className="mb-4 flex items-start justify-between gap-3">
             <div className="flex min-w-0 items-center gap-3">
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-rose-50 text-rose-700"><LibraryBig className="h-5 w-5" /></span>
@@ -691,7 +688,7 @@ export function LouvorStudioTab({
             ))}
           </div>
 
-          <div className="mt-4 flex flex-col gap-2 xl:max-h-[calc(100vh-16rem)] xl:overflow-y-auto xl:pr-1">
+          <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
             {!projects.length && <p className="w-full rounded-xl bg-gray-50 p-5 text-center text-xs text-gray-400">Nenhuma música preparada ainda.</p>}
             {projects.length > 0 && !projetosDaBiblioteca.length && <p className="w-full rounded-xl bg-gray-50 p-5 text-center text-xs text-gray-500">Nenhuma música encontrada nesta busca.</p>}
             {projetosDaBiblioteca.map((project) => (
@@ -737,15 +734,13 @@ export function LouvorStudioTab({
               </div>
             ))}
           </div>
-        </aside>}
+        </section>}
 
-        <main className="min-w-0 p-4 md:p-5">
-          {!selected && !fluxoDaEscala && (
-            <div className="flex min-h-80 flex-col items-center justify-center rounded-2xl border border-dashed border-gray-200 bg-gradient-to-br from-gray-50 to-white px-6 text-center">
-              <span className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-rose-600 shadow-sm"><Disc3 className="h-7 w-7" /></span>
-              <p className="text-base font-semibold text-gray-800">Seu ensaio aparece aqui</p>
-              <p className="mt-1 max-w-sm text-sm text-gray-500">Pesquise uma música acima ou selecione uma música pronta na biblioteca para abrir as faixas, controles e downloads.</p>
-              {projetosEmProcessamento > 0 && <p className="mt-4 inline-flex items-center gap-2 rounded-full bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-800"><Clock3 className="h-3.5 w-3.5" /> {projetosEmProcessamento} em processamento</p>}
+        <main className={selected || fluxoDaEscala ? "min-w-0" : "hidden"}>
+          {selected && !fluxoDaEscala && (
+            <div className="flex items-center gap-2 border-b border-gray-100 pb-3">
+              <Disc3 className="h-4 w-4 text-rose-700" />
+              <p className="text-sm font-semibold text-gray-900">Ensaio: <span className="font-medium text-gray-600">{selected.titulo}</span></p>
             </div>
           )}
           {selected && selected.status !== "concluido" && (
@@ -803,7 +798,6 @@ export function LouvorStudioTab({
             </>
           )}
         </main>
-      </div>
       </div>
     </div>
   );
