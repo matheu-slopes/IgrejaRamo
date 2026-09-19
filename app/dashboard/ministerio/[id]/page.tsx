@@ -9,7 +9,7 @@ import {
   Pin, ChevronDown, ShieldCheck, ChevronUp,
   Star, Mic, Square, Image as ImageIcon, Grid3x3, Link2,
   MoreVertical,
-  Music2, ChevronUp as ArrowUp, ChevronDown as ArrowDown, Save, Eye, EyeOff, UserCheck,
+  AudioLines, LibraryBig, ChevronUp as ArrowUp, ChevronDown as ArrowDown, Save, Eye, EyeOff, UserCheck,
   Reply,
 } from "lucide-react";
 import clsx from "clsx";
@@ -196,10 +196,10 @@ export default function CanalMinisterioPage() {
               { id: "chat",    label: "Chat",    icon: MessageSquare },
               { id: "eventos", label: "Eventos", icon: Calendar      },
               ...(slug === "Louvor" && studioAccess.autorizado
-                ? [{ id: "studio" as const, label: "Studio", icon: Music2 }]
+                ? [{ id: "studio" as const, label: "Studio", icon: AudioLines }]
                 : []),
               ...(slug === "Louvor" && studioAccess.autorizado
-                ? [{ id: "repertorio" as const, label: "Repertório", icon: Music2 }]
+                ? [{ id: "repertorio" as const, label: "Repertório", icon: LibraryBig }]
                 : []),
               { id: "membros", label: "Membros", icon: Users         },
             ] as { id: Tab; label: string; icon: React.ElementType }[]).map(({ id, label, icon: Icon }) => (
