@@ -74,6 +74,8 @@ export async function PATCH(req: NextRequest, context: Context) {
     action?: string;
     tom?: string;
     bpm?: number;
+    escalaId?: string;
+    musicaId?: string;
   };
 
   const { data: projeto, error } = await db
@@ -107,7 +109,13 @@ export async function PATCH(req: NextRequest, context: Context) {
 
   if (projeto.status !== "concluido")
     return NextResponse.json({ error: "Aguarde a análise terminar." }, { status: 409 });
-  if (!projeto.escala_id || !projeto.musica_id)
+  const escalaId = typeof body.escalaId === "string" && validId(body.escalaId)
+    ? body.escalaId
+    : projeto.escala_id;
+  const musicaId = typeof body.musicaId === "string" && validId(body.musicaId)
+    ? body.musicaId
+    : projeto.musica_id;
+  if (!escalaId || !musicaId)
     return NextResponse.json({ error: "Esta preparação não foi iniciada a partir de uma música da escala." }, { status: 409 });
   if (!projeto.tom_original && !projeto.bpm)
     return NextResponse.json({ error: "O Studio não conseguiu identificar tom ou BPM nesta gravação." }, { status: 409 });
@@ -119,11 +127,23 @@ export async function PATCH(req: NextRequest, context: Context) {
     ? Number(body.bpm.toFixed(2))
     : projeto.bpm ?? null;
 
+  if (escalaId !== projeto.escala_id || musicaId !== projeto.musica_id) {
+    const { data: vinculo } = await db
+      .from("escala_musicas")
+      .select("id")
+      .eq("escala_id", escalaId)
+      .eq("musica_id", musicaId)
+      .eq("studio_projeto_id", projeto.id)
+      .maybeSingle();
+    if (!vinculo)
+      return NextResponse.json({ error: "Esta base não está vinculada à música desta escala." }, { status: 409 });
+  }
+
   const { error: updateError } = await db
     .from("escala_musicas")
     .update({ tom: tomEscolhido, bpm: bpmEscolhido })
-    .eq("escala_id", projeto.escala_id)
-    .eq("musica_id", projeto.musica_id);
+    .eq("escala_id", escalaId)
+    .eq("musica_id", musicaId);
   if (updateError)
     return NextResponse.json({ error: updateError.message }, { status: 500 });
   return NextResponse.json({ ok: true, tom: tomEscolhido, bpm: bpmEscolhido });

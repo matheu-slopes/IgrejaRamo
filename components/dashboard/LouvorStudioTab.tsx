@@ -35,6 +35,7 @@ type Projeto = {
   criado_em: string;
   musica_id?: string | null;
   escalas?: { id: string; culto: string; data: string; horario: string } | null;
+  escala_usos?: { escala_id: string; musica_id: string | null }[];
 };
 
 type EscalaOption = { id: string; culto: string; data: string; horario: string };
@@ -169,7 +170,10 @@ export function LouvorStudioTab({
         if (!analiseAtual) return null;
         return data.projetos?.find((project) =>
           project.musica_id === analiseAtual.musicaId &&
-          project.escalas?.id === analiseInicial?.escalaId,
+          (project.escalas?.id === analiseInicial?.escalaId ||
+            project.escala_usos?.some((uso) =>
+              uso.escala_id === analiseInicial?.escalaId && uso.musica_id === analiseAtual.musicaId,
+            )),
         )?.id ?? null;
       });
     } else {
@@ -307,13 +311,15 @@ export function LouvorStudioTab({
   }
 
   async function confirmarTomNaEscala(project: Projeto, escolha: { tom: string; bpm?: number }) {
-    if (applyingId || !project.escalas || !project.musica_id) return;
+    const escalaIdDaEscolha = analiseInicial?.escalaId ?? project.escalas?.id;
+    const musicaIdDaEscolha = analiseAtual?.musicaId ?? project.musica_id;
+    if (applyingId || !escalaIdDaEscolha || !musicaIdDaEscolha) return;
     setApplyingId(project.id);
     setMessage(null);
     try {
       const response = await studioFetch(`/api/louvor-studio/projects/${project.id}`, {
         method: "PATCH",
-        body: JSON.stringify({ action: "definir_tom_da_escala", tom: escolha.tom, bpm: escolha.bpm }),
+        body: JSON.stringify({ action: "definir_tom_da_escala", tom: escolha.tom, bpm: escolha.bpm, escalaId: escalaIdDaEscolha, musicaId: musicaIdDaEscolha }),
       });
       const data = await response.json().catch(() => ({})) as { tom?: string | null; bpm?: number | null; error?: string };
       if (!response.ok) throw new Error(data.error ?? "Não foi possível confirmar o tom.");
@@ -330,7 +336,10 @@ export function LouvorStudioTab({
     ? projects.find((project) =>
       project.id === selectedId &&
       project.musica_id === analiseAtual?.musicaId &&
-      project.escalas?.id === analiseInicial?.escalaId,
+      (project.escalas?.id === analiseInicial?.escalaId ||
+        project.escala_usos?.some((uso) =>
+          uso.escala_id === analiseInicial?.escalaId && uso.musica_id === analiseAtual?.musicaId,
+        )),
     ) ?? null
     : projects.find((project) => project.id === selectedId) ?? null;
 

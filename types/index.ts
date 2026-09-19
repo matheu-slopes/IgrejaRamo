@@ -140,6 +140,8 @@ export interface EscalaMusica {
   artistaSlug?: string; // slug do Cifra Club para buscar cifra on-demand
   musicaSlug?: string;
   linkYoutube?: string;
+  /** Base de áudio do Studio reutilizada por esta música da escala. */
+  studioProjetoId?: string;
 }
 
 export interface Escala {

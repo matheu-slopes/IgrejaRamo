@@ -578,6 +578,7 @@ type ProjetoStudioResumo = {
   escala_id?: string | null;
   musica_id?: string | null;
   status?: "aguardando" | "baixando" | "analisando" | "separando" | "concluido" | "erro";
+  escala_usos?: { escala_id: string; musica_id?: string | null }[];
 };
 
 export type PedidoAnaliseStudio = MusicaParaPreparacaoStudio & {
@@ -702,6 +703,7 @@ export function EscalasTab({
             bpm: (m.bpm as number) ?? undefined,
             artistaSlug: (m.artista_slug as string) ?? undefined,
             musicaSlug: (m.musica_slug as string) ?? undefined,
+            studioProjetoId: (m.studio_projeto_id as string) ?? undefined,
           })),
       }));
       setEscalas(escalasParseadas.filter((e) => !escalasExcluidasRef.current.has(e.id)));
@@ -725,15 +727,22 @@ export function EscalasTab({
 
     const proximosStatus: Record<string, StatusStudioMusica> = {};
     for (const projeto of projetosStudio) {
-      if (!projeto.escala_id || !projeto.musica_id) continue;
-      const chave = `${projeto.escala_id}:${projeto.musica_id}`;
-      // A API devolve os mais recentes primeiro: o primeiro projeto é o estado atual.
-      if (proximosStatus[chave]) continue;
-      proximosStatus[chave] = projeto.status === "concluido"
-        ? "pronto"
-        : projeto.status === "erro"
-          ? "falhou"
-          : "preparando";
+      const usos = projeto.escala_usos?.length
+        ? projeto.escala_usos
+        : projeto.escala_id && projeto.musica_id
+          ? [{ escala_id: projeto.escala_id, musica_id: projeto.musica_id }]
+          : [];
+      for (const uso of usos) {
+        if (!uso.musica_id) continue;
+        const chave = `${uso.escala_id}:${uso.musica_id}`;
+        // A API devolve os mais recentes primeiro: o primeiro projeto é o estado atual.
+        if (proximosStatus[chave]) continue;
+        proximosStatus[chave] = projeto.status === "concluido"
+          ? "pronto"
+          : projeto.status === "erro"
+            ? "falhou"
+            : "preparando";
+      }
     }
     setStatusStudioPorMusica(proximosStatus);
   }, [isLoading, ministerio, user?.id]);
@@ -1159,7 +1168,7 @@ export function EscalasTab({
             form.musicas.map((m, idx) => ({
               escala_id: editId, musica_id: m.musicaId || null,
               titulo: m.titulo, artista: m.artista, tom: m.tom, bpm: m.bpm ?? null, ordem: idx,
-              artista_slug: m.artistaSlug ?? null, musica_slug: m.musicaSlug ?? null,
+              artista_slug: m.artistaSlug ?? null, musica_slug: m.musicaSlug ?? null, studio_projeto_id: m.studioProjetoId ?? null,
             }))
           );
           if (insMus) throw new Error(insMus.message);
@@ -1201,7 +1210,7 @@ export function EscalasTab({
                 form.musicas.map((m, idx) => ({
                   escala_id: inserted.id, musica_id: m.musicaId || null,
                   titulo: m.titulo, artista: m.artista, tom: m.tom, bpm: m.bpm ?? null, ordem: idx,
-                  artista_slug: m.artistaSlug ?? null, musica_slug: m.musicaSlug ?? null,
+                  artista_slug: m.artistaSlug ?? null, musica_slug: m.musicaSlug ?? null, studio_projeto_id: m.studioProjetoId ?? null,
                 }))
               );
               if (insMus) throw new Error(insMus.message);

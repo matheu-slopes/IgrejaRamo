@@ -16,6 +16,8 @@ type ProjetoRow = {
   [key: string]: unknown;
 };
 
+type UsoDaEscala = { escala_id: string; musica_id: string | null; studio_projeto_id: string };
+
 function youtubeUrlValida(value: string) {
   try {
     const host = new URL(value).hostname.toLowerCase().replace(/^www\./, "");
@@ -61,6 +63,24 @@ export async function GET(req: NextRequest) {
     .limit(40);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
+  const ids = (data ?? []).map((projeto) => projeto.id);
+  let usosPorProjeto = new Map<string, UsoDaEscala[]>();
+  if (ids.length) {
+    const { data: usos, error: usosError } = await louvorStudioAdmin
+      .from("escala_musicas")
+      .select("escala_id,musica_id,studio_projeto_id")
+      .in("studio_projeto_id", ids);
+    // A tela continua atendendo projetos legados enquanto a migration ainda
+    // não foi aplicada. Os novos passam a ter uma ligação reutilizável.
+    if (!usosError) {
+      for (const uso of (usos ?? []) as UsoDaEscala[]) {
+        const lista = usosPorProjeto.get(uso.studio_projeto_id) ?? [];
+        lista.push(uso);
+        usosPorProjeto.set(uso.studio_projeto_id, lista);
+      }
+    }
+  }
+
   let escalas: unknown[] = [];
   if (acesso.podeGerenciar) {
     const hoje = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date());
@@ -76,7 +96,10 @@ export async function GET(req: NextRequest) {
   }
 
   return NextResponse.json({
-    projetos: await Promise.all((data ?? []).map((p) => assinarProjeto(p as ProjetoRow))),
+    projetos: await Promise.all((data ?? []).map(async (p) => ({
+      ...(await assinarProjeto(p as ProjetoRow)),
+      escala_usos: usosPorProjeto.get(p.id) ?? [],
+    }))),
     escalas,
   });
 }
@@ -124,6 +147,33 @@ export async function POST(req: NextRequest) {
     ? expiracaoDaEscala(escala.data)
     : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
 
+  if (escala && musicaId) {
+    const { data: existente } = await louvorStudioAdmin
+      .from("louvor_studio_projetos")
+      .select("*")
+      .eq("musica_id", musicaId)
+      .eq("status", "concluido")
+      .gt("expira_em", new Date().toISOString())
+      .order("criado_em", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (existente) {
+      const { error: vinculoError } = await louvorStudioAdmin
+        .from("escala_musicas")
+        .update({ studio_projeto_id: existente.id })
+        .eq("escala_id", escala.id)
+        .eq("musica_id", musicaId);
+      if (!vinculoError) {
+        if (new Date(existente.expira_em) < new Date(expiraEm)) {
+          await louvorStudioAdmin.from("louvor_studio_projetos")
+            .update({ expira_em: expiraEm })
+            .eq("id", existente.id);
+        }
+        return NextResponse.json({ projeto: existente, reutilizado: true });
+      }
+    }
+  }
+
   const { data: projeto, error } = await louvorStudioAdmin
     .from("louvor_studio_projetos")
     .insert({
@@ -152,6 +202,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: migration }, { status: 503 });
   }
   if (error || !projeto) return NextResponse.json({ error: error?.message ?? "Não foi possível criar a tarefa." }, { status: 500 });
+  if (escala && musicaId) {
+    await louvorStudioAdmin
+      .from("escala_musicas")
+      .update({ studio_projeto_id: projeto.id })
+      .eq("escala_id", escala.id)
+      .eq("musica_id", musicaId);
+  }
   // Este é o momento de confirmação humana do vídeo. A partir daqui ele vira
   // a sugestão reutilizável do Repertório para os próximos cultos.
   if (musicaId) {
