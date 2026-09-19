@@ -7,7 +7,7 @@ from pathlib import Path
 import requests
 import yt_dlp
 from audio_hq import (ROOT, RATE, MODELS, STEMS, VERSION, clean_cache, emit, ffmpeg_path, run,
-    convert_wav, file_hash, cache_key, cached, separate, store_cache, export_mp3,
+    convert_wav, file_hash, cache_key, cached, separate, store_cache, export_mp3, export_flac,
     info, rubberband_path, transpose, mix)
 
 def download(url,path,max_bytes=536870912):
@@ -65,9 +65,11 @@ def execute(job,work):
         stems=STEMS[mode]
         for index,stem in enumerate(stems):
             export_mp3(output/(stem+".wav"),output/(stem+".mp3"))
+            export_flac(output/(stem+".wav"),output/(stem+".flac"))
             emit(82+int(8*(index+1)/len(stems)))
         files={stem:stem+".mp3" for stem in stems}
-        files.update({stem+"_wav":stem+".wav" for stem in stems})
+        # Keep the legacy key so existing database columns and API clients work.
+        files.update({stem+"_wav":stem+".flac" for stem in stems})
     else:
         version=job["version"];semitones=version["semitones"];speed=float(version["speed"])
         mode="bs_roformer" if project["separation_mode"]=="bs_roformer" else "htdemucs_ft"
@@ -81,7 +83,7 @@ def execute(job,work):
         if len({info(source_dir/(s+".wav")).frames for s in stems})!=1:raise ValueError("Faixas originais sem sincronização.")
         rubberband_path()
         key=cache_key(VERSION,fingerprints,mode,semitones,speed)
-        names=[s+".mp3" for s in stems]+["mix.wav","mix.mp3"]
+        names=[s+".mp3" for s in stems]+["mix.flac","mix.mp3"]
         hit=cached(cache,key,names)
         if hit:
             for name in names:shutil.copy2(hit/name,output/name)
@@ -95,10 +97,12 @@ def execute(job,work):
             emit(75)
             mix([output/(s+".wav") for s in stems],output/"mix.wav")
             export_mp3(output/"mix.wav",output/"mix.mp3")
+            export_flac(output/"mix.wav",output/"mix.flac")
+            (output/"mix.wav").unlink()
             store_cache(cache,key,output,names)
             emit(90)
         files={stem:stem+".mp3" for stem in stems}
-        files.update({"mix_wav":"mix.wav","mix_mp3":"mix.mp3"})
+        files.update({"mix_wav":"mix.flac","mix_mp3":"mix.mp3"})
         metadata={}
     (work/"result.json").write_text(json.dumps({"files":files,"metadata":metadata}),encoding="utf-8")
 

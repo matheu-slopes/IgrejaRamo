@@ -31,7 +31,7 @@ def api(method,payload=None):
 def public_failure(exc):
     response=getattr(exc,"response",None)
     if getattr(response,"status_code",None)==400:
-        return "O Storage recusou uma faixa grande. Configure o bucket louvor-studio para permitir arquivos de até 512 MiB."
+        return "O Storage recusou uma faixa por tamanho. Tente uma música menor; no plano grátis cada arquivo pode ter até 50 MB."
     return "O processamento falhou. Tente novamente; detalhes no registro do processador."
 
 def process(job):
@@ -77,10 +77,10 @@ def process(job):
                 if path.resolve().parent!=(work/"output").resolve():raise ValueError("Caminho inválido.")
                 with path.open("rb") as audio:
                     response=requests.put(upload["signedUrl"],data=audio,
-                        headers={"Content-Type":"audio/wav" if path.suffix==".wav" else "audio/mpeg","x-upsert":"true"},timeout=(20,1800))
+                        headers={"Content-Type":"audio/flac" if path.suffix==".flac" else "audio/mpeg","x-upsert":"true"},timeout=(20,1800))
                     response.raise_for_status()
                 return index
-            # WAV stems are large. Upload a small, bounded group concurrently so
+            # Lossless stems can still be large. Upload a small, bounded group concurrently so
             # network latency does not make the final 90–99% stage serial.
             with ThreadPoolExecutor(max_workers=min(3,len(uploads))) as pool:
                 futures=[pool.submit(upload_file,index,name,upload) for index,(name,upload) in enumerate(uploads.items())]

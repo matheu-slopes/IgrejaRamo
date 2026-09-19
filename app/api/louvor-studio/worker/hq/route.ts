@@ -69,11 +69,11 @@ export async function POST(req: NextRequest) {
     expected[n] = projectId + "/" + prefix + "_" + n + ".mp3";
   });
   if (body.kind === "pitch") {
-    expected.mix_wav = projectId + "/" + prefix + "_mix.wav";
+    expected.mix_wav = projectId + "/" + prefix + "_mix.flac";
     expected.mix_mp3 = projectId + "/" + prefix + "_mix.mp3";
   } else
     names.forEach((n) => {
-      expected[n + "_wav"] = projectId + "/" + prefix + "_" + n + ".wav";
+      expected[n + "_wav"] = projectId + "/" + prefix + "_" + n + ".flac";
     });
   if (body.action === "uploads") {
     const uploads: Record<string, unknown> = {};
@@ -161,7 +161,7 @@ export async function POST(req: NextRequest) {
   } else if (body.action === "fail") {
     const workerDetail =
       typeof body.detail === "string" &&
-      body.detail.startsWith("O Storage recusou uma faixa grande.")
+      body.detail.startsWith("O Storage recusou uma faixa")
         ? body.detail.slice(0, 300)
         : null;
     update.status = "erro";

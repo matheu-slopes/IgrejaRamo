@@ -1602,11 +1602,11 @@ function DesktopStudioPlayer({ project }: { project: Project }) {
                   </a>
                   <a
                     className={pill}
-                    href={downloadUrl(version.mix_wav_url, "mix.wav")}
+                    href={downloadUrl(version.mix_wav_url, "mix.flac")}
                     download
                   >
                     <Download size={14} />
-                    Mix WAV
+                    Mix FLAC
                   </a>
                 </div>
               )}

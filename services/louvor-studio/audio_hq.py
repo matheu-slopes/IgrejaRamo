@@ -109,6 +109,12 @@ def export_mp3(source, target):
     run([ffmpeg_path(),"-nostdin","-v","error","-y","-i",source,
          "-af",f"volume={gain:.12g}","-c:a","libmp3lame","-b:a","320k","-ar",str(RATE),"-ac","2",target],180)
 
+def export_flac(source, target):
+    """Export a compressed lossless download for Storage's per-file limit."""
+    run([ffmpeg_path(),"-nostdin","-v","error","-y","-i",source,
+         "-c:a","flac","-compression_level","8","-sample_fmt","s32",
+         "-ar",str(RATE),"-ac","2",target],180)
+
 def mix(stems, target):
     metas=[info(path) for path in stems]
     if len({m.frames for m in metas}) != 1:

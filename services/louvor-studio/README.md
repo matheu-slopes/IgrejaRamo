@@ -8,7 +8,7 @@
 4. Feche o worker antigo após sua tarefa terminar e execute `iniciar_worker.bat`. O novo launcher usa `hq_worker.py`. Reinicie após alterar código Python.
 5. Para produção, publique também as novas rotas e a alteração da fila legada antes de iniciar novas tarefas. Um worker antigo consultando uma API antiga pode capturar tarefas novas se compartilhar o mesmo banco; não mantenha esse processo ativo durante o teste local.
 
-O download do YouTube continua usando yt-dlp `bestaudio/best`. Pesquisa por nome continua sem baixar áudio e sem precisar do PC ligado. A preparação baixa o arquivo nativo e converte uma vez para WAV estéreo float32 a 44,1 kHz. MP3 320 kbps só é criado nas exportações finais. A análise de tom/BPM usa uma cópia mono curta e não altera os canais do áudio de processamento.
+O download do YouTube continua usando yt-dlp `bestaudio/best`. Pesquisa por nome continua sem baixar áudio e sem precisar do PC ligado. A preparação baixa o arquivo nativo e converte uma vez para WAV estéreo float32 a 44,1 kHz. As exportações finais oferecem MP3 320 kbps e FLAC sem perda; o FLAC reduz o tamanho para caber no limite por arquivo do Storage. A análise de tom/BPM usa uma cópia mono curta e não altera os canais do áudio de processamento.
 
 ## Separação e transposição
 
@@ -19,7 +19,7 @@ O download do YouTube continua usando yt-dlp `bestaudio/best`. Pesquisa por nome
 - No avançado, voz/baixo/outros recebem o mesmo intervalo; bateria a 1× é copiada sem modificar nenhuma amostra. Ao alterar velocidade, todas as faixas mudam de duração igualmente; a altura da bateria fica preservada.
 - FFmpeg faz conversão, soma das faixas e exportação. WAV float32 estéreo é usado nos intermediários. Uma validação rejeita canais/taxas incorretos, amostras inválidas e divergências de duração maiores que 2048 amostras; pequenas diferenças finais são alinhadas.
 - O player usa Web Audio com o mesmo instante de início para todas as faixas. Os botões `−/+` fazem prévia imediata usando Signalsmith Stretch (WASM/AudioWorklet), em estéreo; voz usa compensação de formantes e bateria permanece sem mudança de altura. Essa prévia não baixa nem cria uma tarefa no PC local. Navegadores sem AudioWorklet continuam reproduzindo o original e mostram a indisponibilidade da prévia.
-- Em **Mais opções**, `Preparar download neste tom` mantém a versão Rubber Band R3 no servidor local para MP3/WAV. A correção manual do tom original também fica ali. Maior/menor é preservado; trocar de modo exige reharmonização e é rejeitado pela API.
+- Em **Mais opções**, `Preparar download neste tom` mantém a versão Rubber Band R3 no servidor local para MP3/FLAC. A correção manual do tom original também fica ali. Maior/menor é preservado; trocar de modo exige reharmonização e é rejeitado pela API.
 - Projetos antigos continuam tocando e aceitam versões R3 usando seus stems MP3 existentes. A compressão antiga não pode ser desfeita: prepare novamente para obter stems novos sem perdas.
 
 ## Fila, cache e arquivos

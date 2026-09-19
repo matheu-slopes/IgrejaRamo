@@ -33,7 +33,7 @@ class PipelineTests(unittest.TestCase):
                 for mode in ("bs_roformer","htdemucs_ft"):
                     names=("vocals","instrumental") if mode=="bs_roformer" else ("vocals","drums","bass","other")
                     job={"kind":"pitch","project":{"id":str(uuid.uuid4()),"separation_mode":mode},"version":{"id":str(uuid.uuid4()),"claim_token":str(uuid.uuid4()),"semitones":2,"speed":1},"inputs":{s:base+'/'+s+'.wav' for s in names}}
-                    expected={s:s+'.mp3' for s in names};expected.update(mix_wav='mix.wav',mix_mp3='mix.mp3')
+                    expected={s:s+'.mp3' for s in names};expected.update(mix_wav='mix.flac',mix_mp3='mix.mp3')
                     def api(method,payload):
                         events.append(payload['action'])
                         if payload['action']=='uploads':return {'uploads':{s:{'signedUrl':base+'/'+name} for s,name in expected.items()}}
@@ -43,10 +43,10 @@ class PipelineTests(unittest.TestCase):
                             hq_worker.process(job)
                             self.assertEqual(events[-1],'complete');self.assertNotIn('fail',events)
                             self.assertEqual(set(received),{'/'+n for n in expected.values()})
-                            out=root/'mix.wav';out.write_bytes(received['/mix.wav'])
+                            out=root/'mix.flac';out.write_bytes(received['/mix.flac'])
                             self.assertEqual(info(out).frames,3*RATE)
-                            if attempt==0:original=received['/mix.wav']
-                            else:self.assertEqual(original,received['/mix.wav'])
+                            if attempt==0:original=received['/mix.flac']
+                            else:self.assertEqual(original,received['/mix.flac'])
                             received.clear()
             finally:server.shutdown();server.server_close();thread.join()
 if __name__=='__main__':unittest.main()
