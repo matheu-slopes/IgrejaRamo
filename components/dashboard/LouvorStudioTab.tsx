@@ -637,8 +637,21 @@ export function LouvorStudioTab({
         </section>
       )}
 
-      <div className={fluxoDaEscala ? "" : "grid gap-5 xl:grid-cols-[minmax(320px,360px)_minmax(0,1fr)] xl:items-start"}>
-        {!fluxoDaEscala && <aside className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm xl:sticky xl:top-4">
+      <div className={fluxoDaEscala ? "" : "overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm"}>
+        {!fluxoDaEscala && (
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 px-4 py-3 md:px-5">
+            <div className="flex items-center gap-2">
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-rose-50 text-rose-700"><Disc3 className="h-4 w-4" /></span>
+              <div>
+                <h3 className="text-sm font-semibold text-gray-900">Área de ensaio</h3>
+                <p className="text-xs text-gray-500">Biblioteca, faixas e downloads no mesmo lugar</p>
+              </div>
+            </div>
+            <span className="text-xs font-medium text-gray-500">{projects.length} música{projects.length === 1 ? "" : "s"} preparada{projects.length === 1 ? "" : "s"}</span>
+          </div>
+        )}
+      <div className={fluxoDaEscala ? "" : "grid xl:grid-cols-[minmax(320px,360px)_minmax(0,1fr)] xl:items-start"}>
+        {!fluxoDaEscala && <aside className="border-b border-gray-100 bg-gray-50/60 p-4 xl:border-b-0 xl:border-r">
           <div className="mb-4 flex items-start justify-between gap-3">
             <div className="flex min-w-0 items-center gap-3">
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-rose-50 text-rose-700"><LibraryBig className="h-5 w-5" /></span>
@@ -678,13 +691,13 @@ export function LouvorStudioTab({
             ))}
           </div>
 
-          <div className="mt-4 flex gap-2 overflow-x-auto pb-2 xl:max-h-[calc(100vh-15rem)] xl:block xl:space-y-2 xl:overflow-x-visible xl:overflow-y-auto xl:pb-0">
+          <div className="mt-4 flex flex-col gap-2 xl:max-h-[calc(100vh-16rem)] xl:overflow-y-auto xl:pr-1">
             {!projects.length && <p className="w-full rounded-xl bg-gray-50 p-5 text-center text-xs text-gray-400">Nenhuma música preparada ainda.</p>}
             {projects.length > 0 && !projetosDaBiblioteca.length && <p className="w-full rounded-xl bg-gray-50 p-5 text-center text-xs text-gray-500">Nenhuma música encontrada nesta busca.</p>}
             {projetosDaBiblioteca.map((project) => (
               <div
                 key={project.id}
-                className={`relative w-[min(82vw,280px)] shrink-0 rounded-xl border transition xl:w-auto ${selectedId === project.id ? "border-rose-200 bg-rose-50" : "border-gray-100 hover:bg-gray-50"}`}
+                className={`relative w-full rounded-xl border transition ${selectedId === project.id ? "border-rose-200 bg-rose-50" : "border-gray-100 bg-white hover:bg-gray-50"}`}
               >
                 <button
                   type="button"
@@ -726,7 +739,7 @@ export function LouvorStudioTab({
           </div>
         </aside>}
 
-        <main className="min-w-0">
+        <main className="min-w-0 p-4 md:p-5">
           {!selected && !fluxoDaEscala && (
             <div className="flex min-h-80 flex-col items-center justify-center rounded-2xl border border-dashed border-gray-200 bg-gradient-to-br from-gray-50 to-white px-6 text-center">
               <span className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-rose-600 shadow-sm"><Disc3 className="h-7 w-7" /></span>
@@ -790,6 +803,7 @@ export function LouvorStudioTab({
             </>
           )}
         </main>
+      </div>
       </div>
     </div>
   );
