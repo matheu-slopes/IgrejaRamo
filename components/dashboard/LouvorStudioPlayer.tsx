@@ -127,11 +127,19 @@ async function api(url: string, body?: unknown, signal?: AbortSignal) {
     signal?.removeEventListener("abort", abort);
   }
 }
-function downloadUrl(url: string | undefined, name: string) {
-  if (!url) return undefined;
-  const address = new URL(url);
-  address.searchParams.set("download", name);
-  return address.toString();
+async function baixarArquivo(url: string | undefined, name: string) {
+  if (!url) throw new Error("Arquivo indisponível.");
+  const response = await fetch(url);
+  if (!response.ok) throw new Error("Não foi possível baixar o arquivo.");
+  const blob = await response.blob();
+  const link = document.createElement("a");
+  const objectUrl = URL.createObjectURL(blob);
+  link.href = objectUrl;
+  link.download = name;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
 }
 function secondsText(value: number) {
   return (
@@ -1012,14 +1020,14 @@ function DesktopStudioPlayer({ project }: { project: Project }) {
                     >
                       {solo === stem ? "Desativar solo" : "Ouvir só esta faixa"}
                     </button>
-                    <a
+                    <button
+                      type="button"
                       className={pill}
-                      href={downloadUrl(urls[stem] ?? undefined, stem + ".mp3")}
-                      download
+                      onClick={() => void baixarArquivo(urls[stem] ?? undefined, stem + ".mp3")}
                     >
                       <Download size={13} />
                       Baixar
-                    </a>
+                    </button>
                   </div>
                 )}
               </div>
@@ -1592,22 +1600,22 @@ function DesktopStudioPlayer({ project }: { project: Project }) {
               )}
               {version?.status === "concluido" && (
                 <div className="mt-4 flex flex-wrap gap-2">
-                  <a
+                  <button
+                    type="button"
                     className={pill}
-                    href={downloadUrl(version.mix_mp3_url, "mix.mp3")}
-                    download
+                    onClick={() => void baixarArquivo(version.mix_mp3_url, "mix.mp3")}
                   >
                     <Download size={14} />
                     Mix MP3
-                  </a>
-                  <a
+                  </button>
+                  <button
+                    type="button"
                     className={pill}
-                    href={downloadUrl(version.mix_wav_url, "mix.flac")}
-                    download
+                    onClick={() => void baixarArquivo(version.mix_wav_url, "mix.flac")}
                   >
                     <Download size={14} />
                     Mix FLAC
-                  </a>
+                  </button>
                 </div>
               )}
               <p className="mt-3 text-xs leading-relaxed text-white/40">
