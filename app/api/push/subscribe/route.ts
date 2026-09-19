@@ -42,6 +42,9 @@ export async function POST(req: NextRequest) {
   );
 
   if (error) {
+    // Browser focus, a second tab and the automatic renewal can reach this
+    // endpoint together. A duplicate means the device is already registered.
+    if (error.code === "23505") return NextResponse.json({ ok: true });
     console.error("push/subscribe error:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
