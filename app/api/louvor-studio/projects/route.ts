@@ -7,6 +7,7 @@ import {
   louvorStudioAdmin,
   workerConfigurado,
 } from "@/lib/louvorStudioServer";
+import { criarUrlDeLeitura } from "@/lib/louvorStudioStorage";
 
 type ProjetoRow = {
   id: string;
@@ -35,8 +36,7 @@ async function assinarProjeto(projeto: ProjetoRow) {
   const paths = Object.values(projeto.stems ?? {}).filter(Boolean) as string[];
   const urls: Record<string, string> = {};
   await Promise.all(paths.map(async (path) => {
-    const { data } = await louvorStudioAdmin.storage.from("louvor-studio").createSignedUrl(path, 6 * 60 * 60);
-    if (data?.signedUrl) urls[path] = data.signedUrl;
+    try { urls[path] = await criarUrlDeLeitura(path); } catch { /* stale file */ }
   }));
 
   return {

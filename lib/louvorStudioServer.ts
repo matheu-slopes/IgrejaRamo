@@ -74,6 +74,7 @@ export function validarWorker(req: NextRequest): boolean {
 }
 
 export async function limparProjetosExpirados(): Promise<number> {
+  const { listarAudios, removerAudios } = await import("@/lib/louvorStudioStorage");
   const { data } = await louvorStudioAdmin
     .from("louvor_studio_projetos")
     .select("id")
@@ -82,13 +83,8 @@ export async function limparProjetosExpirados(): Promise<number> {
 
   let removidos = 0;
   for (const projeto of data ?? []) {
-    const { data: objetos, error: listError } = await louvorStudioAdmin.storage.from("louvor-studio").list(projeto.id, { limit: 1000 });
-    if (listError) continue;
-    const paths = (objetos ?? []).map((objeto) => projeto.id + "/" + objeto.name);
-    if (paths.length) {
-      const {error: storageError}=await louvorStudioAdmin.storage.from("louvor-studio").remove(paths);
-      if(storageError || paths.length === 1000) continue;
-    }
+    const paths = await listarAudios(projeto.id);
+    try { await removerAudios(paths); } catch { continue; }
     const { error } = await louvorStudioAdmin.from("louvor_studio_projetos").delete().eq("id", projeto.id);
     if (!error) removidos += 1;
   }

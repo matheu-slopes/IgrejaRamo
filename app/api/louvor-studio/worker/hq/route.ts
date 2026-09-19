@@ -5,6 +5,7 @@ import {
 } from "@/lib/louvorStudioServer";
 import { signedPaths, uuidValid } from "@/lib/louvorStudioHqServer";
 import { stemNames } from "@/lib/louvorStudioMusic";
+import { criarUrlDeEnvio, existeAudio, removerAudios } from "@/lib/louvorStudioStorage";
 export async function GET(req: NextRequest) {
   if (!validarWorker(req))
     return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
@@ -78,15 +79,14 @@ export async function POST(req: NextRequest) {
   if (body.action === "uploads") {
     const uploads: Record<string, unknown> = {};
     for (const [name, path] of Object.entries(expected)) {
-      const { data, error } = await db.storage
-        .from("louvor-studio")
-        .createSignedUploadUrl(path, { upsert: true });
-      if (error)
+      try {
+        uploads[name] = { path, signedUrl: await criarUrlDeEnvio(path) };
+      } catch {
         return NextResponse.json(
           { error: "Falha ao preparar envio." },
           { status: 502 },
         );
-      uploads[name] = { path, signedUrl: data!.signedUrl };
+      }
     }
     return NextResponse.json({ uploads });
   }
@@ -105,20 +105,7 @@ export async function POST(req: NextRequest) {
     )
       update.status = body.stage;
   } else if (body.action === "complete") {
-    const { data: objects, error } = await db.storage
-      .from("louvor-studio")
-      .list(projectId, { limit: 20, search: prefix + "_" });
-    if (
-      error ||
-      Object.values(expected).some(
-        (path) =>
-          !objects?.some(
-            (o) =>
-              o.name === path.slice(projectId.length + 1) &&
-              Number(o.metadata?.size) > 0,
-          ),
-      )
-    )
+    if (!(await Promise.all(Object.values(expected).map(existeAudio))).every(Boolean))
       return NextResponse.json({ error: "Envio incompleto." }, { status: 409 });
     update.status = "concluido";
     update.progresso = 100;
@@ -172,7 +159,7 @@ export async function POST(req: NextRequest) {
     update.claim_token = null;
     update.progresso = 0;
     // Remove only incomplete outputs belonging to this attempt.
-    await db.storage.from("louvor-studio").remove(Object.values(expected));
+    await removerAudios(Object.values(expected));
   } else return NextResponse.json({ error: "Ação inválida." }, { status: 400 });
   const { data: changed, error } = await db
     .from(table)

@@ -1,5 +1,5 @@
 ﻿import "server-only";
-import { louvorStudioAdmin as db } from "@/lib/louvorStudioServer";
+import { criarUrlDeLeitura } from "@/lib/louvorStudioStorage";
 export const uuidValid = (value: string) =>
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
     value,
@@ -17,11 +17,7 @@ export async function signedPaths(
         path.includes("..")
       )
         return;
-      const { data, error } = await db.storage
-        .from("louvor-studio")
-        .createSignedUrl(path, 3600);
-      if (error) throw error;
-      result[name] = data.signedUrl;
+      result[name] = await criarUrlDeLeitura(path, 3600);
     }),
   );
   return result;

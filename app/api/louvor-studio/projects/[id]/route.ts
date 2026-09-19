@@ -4,6 +4,7 @@ import {
   getLouvorStudioUser,
   louvorStudioAdmin as db,
 } from "@/lib/louvorStudioServer";
+import { listarAudios, removerAudios } from "@/lib/louvorStudioStorage";
 
 type Context = { params: Promise<{ id: string }> };
 const validId = (id: string) =>
@@ -35,25 +36,17 @@ export async function DELETE(req: NextRequest, context: Context) {
       { error: "Aguarde o processamento terminar antes de excluir." },
       { status: 409 },
     );
-  const { data: objects, error: listError } = await db.storage
-    .from("louvor-studio")
-    .list(id, { limit: 1000 });
-  if (listError)
-    return NextResponse.json(
-      { error: "Não foi possível localizar os arquivos da música." },
-      { status: 500 },
-    );
-  const paths = (objects ?? [])
-    .map((object) => object.name)
-    .filter((name) => name && !name.includes(".."))
-    .map((name) => `${id}/${name}`);
+  let paths: string[];
+  try { paths = await listarAudios(id); } catch {
+    return NextResponse.json({ error: "Não foi possível localizar os arquivos da música." }, { status: 500 });
+  }
   if (paths.length) {
-    const { error } = await db.storage.from("louvor-studio").remove(paths);
-    if (error)
+    try { await removerAudios(paths); } catch {
       return NextResponse.json(
         { error: "Não foi possível remover os arquivos da música." },
         { status: 500 },
       );
+    }
   }
   const { error: deleteError } = await db
     .from("louvor_studio_projetos")
