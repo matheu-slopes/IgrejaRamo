@@ -57,6 +57,12 @@ type Project = {
   separation_mode?: string;
   stem_urls?: Partial<Record<Stem, string | null>>;
 };
+type EscolhaParaEscala = { tom: string; bpm?: number };
+type PlayerProps = {
+  project: Project;
+  onEscolherTomDaEscala?: (escolha: EscolhaParaEscala) => void;
+  salvandoTomDaEscala?: boolean;
+};
 type Version = {
   id: string;
   semitones: number;
@@ -338,7 +344,7 @@ function MobileStudioPlayer({ project }: { project: Project }) {
   );
 }
 
-export function LouvorStudioPlayer({ project }: { project: Project }) {
+export function LouvorStudioPlayer({ project, onEscolherTomDaEscala, salvandoTomDaEscala }: PlayerProps) {
   const [mobile, setMobile] = useState<boolean | null>(null);
   useEffect(() => {
     const media = window.matchMedia("(max-width: 767px), (pointer: coarse)");
@@ -349,7 +355,7 @@ export function LouvorStudioPlayer({ project }: { project: Project }) {
   }, []);
   if (mobile == null)
     return <section aria-busy="true" className="flex min-h-48 items-center justify-center rounded-2xl bg-[#203138] p-4 text-sm text-white/65"><LoaderCircle className="mr-2 h-5 w-5 animate-spin" />Carregando player…</section>;
-  return mobile ? <MobileStudioPlayer project={project} /> : <DesktopStudioPlayer project={project} />;
+  return mobile ? <MobileStudioPlayer project={project} /> : <DesktopStudioPlayer project={project} onEscolherTomDaEscala={onEscolherTomDaEscala} salvandoTomDaEscala={salvandoTomDaEscala} />;
 }
 function tempoName(bpm: number) {
   if (bpm < 60) return "Largo";
@@ -359,7 +365,7 @@ function tempoName(bpm: number) {
   if (bpm < 168) return "Allegro";
   return "Presto";
 }
-function DesktopStudioPlayer({ project }: { project: Project }) {
+function DesktopStudioPlayer({ project, onEscolherTomDaEscala, salvandoTomDaEscala = false }: PlayerProps) {
   const initial = keyAt(project.tom_original || "C", 0);
   const analyzedBeatOffset =
     typeof project.beat_offset_seg === "number" &&
@@ -932,6 +938,23 @@ function DesktopStudioPlayer({ project }: { project: Project }) {
           </button>
         )}
       </div>
+
+      {onEscolherTomDaEscala && (
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-emerald-200/25 bg-emerald-300/10 p-3">
+          <div>
+            <p className="text-xs font-semibold text-emerald-100">Tom escolhido para este culto</p>
+            <p className="mt-0.5 text-xs text-white/60">Teste no player e confirme somente quando a equipe estiver confortável.</p>
+          </div>
+          <button
+            type="button"
+            disabled={!keyConfirmed || salvandoTomDaEscala}
+            onClick={() => onEscolherTomDaEscala({ tom: currentKey, bpm: currentBpm ?? undefined })}
+            className="rounded-xl bg-emerald-300 px-3.5 py-2.5 text-xs font-bold text-emerald-950 transition hover:bg-emerald-200 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {salvandoTomDaEscala ? "Salvando tom…" : `Usar tom ${currentKey} nesta escala`}
+          </button>
+        </div>
+      )}
 
       <div className="my-6 space-y-1 sm:my-8" aria-label="Faixas de áudio">
         {(Object.keys(urls) as Stem[])

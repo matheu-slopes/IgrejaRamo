@@ -60,10 +60,7 @@ export async function DELETE(req: NextRequest, context: Context) {
   return NextResponse.json({ ok: true });
 }
 
-/**
- * Confirma a análise automática como a configuração oficial daquele culto.
- * Não é aplicado automaticamente: o ministro continua com a palavra final.
- */
+/** Confirma no culto o tom que o ministro testou no player do Studio. */
 export async function PATCH(req: NextRequest, context: Context) {
   const user = await getLouvorStudioUser(req);
   if (!user)
@@ -73,7 +70,11 @@ export async function PATCH(req: NextRequest, context: Context) {
   const { id } = await context.params;
   if (!validId(id))
     return NextResponse.json({ error: "Música inválida." }, { status: 400 });
-  const body = await req.json().catch(() => ({})) as { action?: string };
+  const body = await req.json().catch(() => ({})) as {
+    action?: string;
+    tom?: string;
+    bpm?: number;
+  };
 
   const { data: projeto, error } = await db
     .from("louvor_studio_projetos")
@@ -111,12 +112,19 @@ export async function PATCH(req: NextRequest, context: Context) {
   if (!projeto.tom_original && !projeto.bpm)
     return NextResponse.json({ error: "O Studio não conseguiu identificar tom ou BPM nesta gravação." }, { status: 409 });
 
+  const tomEscolhido = typeof body.tom === "string" ? body.tom.trim() : projeto.tom_original;
+  if (!/^[A-G](?:#|b)?m?$/.test(tomEscolhido ?? ""))
+    return NextResponse.json({ error: "Escolha uma tonalidade válida no player." }, { status: 400 });
+  const bpmEscolhido = typeof body.bpm === "number" && Number.isFinite(body.bpm) && body.bpm > 0
+    ? Number(body.bpm.toFixed(2))
+    : projeto.bpm ?? null;
+
   const { error: updateError } = await db
     .from("escala_musicas")
-    .update({ tom: projeto.tom_original ?? null, bpm: projeto.bpm ?? null })
+    .update({ tom: tomEscolhido, bpm: bpmEscolhido })
     .eq("escala_id", projeto.escala_id)
     .eq("musica_id", projeto.musica_id);
   if (updateError)
     return NextResponse.json({ error: updateError.message }, { status: 500 });
-  return NextResponse.json({ ok: true, tom: projeto.tom_original, bpm: projeto.bpm });
+  return NextResponse.json({ ok: true, tom: tomEscolhido, bpm: bpmEscolhido });
 }

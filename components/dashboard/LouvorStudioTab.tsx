@@ -162,13 +162,20 @@ export function LouvorStudioTab({
     if (response.ok) {
       setProjects(data.projetos ?? []);
       setEscalas(data.escalas ?? []);
-      // A biblioteca é uma lista de escolha: não deve abrir uma música sem que
-      // alguém tenha clicado nela. Mantém apenas uma seleção ainda existente.
-      setSelectedId((current) => data.projetos?.some((project) => project.id === current) ? current : null);
+      // A biblioteca comum só abre sob ação da pessoa. Já o fluxo vindo da
+      // escala volta direto para a preparação daquela música, se ela existir.
+      setSelectedId((current) => {
+        if (data.projetos?.some((project) => project.id === current)) return current;
+        if (!analiseAtual) return null;
+        return data.projetos?.find((project) =>
+          project.musica_id === analiseAtual.musicaId &&
+          project.escalas?.id === analiseInicial?.escalaId,
+        )?.id ?? null;
+      });
     } else {
       setMessage(data.error ?? "Não foi possível carregar o Studio.");
     }
-  }, []);
+  }, [analiseAtual, analiseInicial?.escalaId]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => void loadProjects(), 0);
@@ -299,17 +306,21 @@ export function LouvorStudioTab({
     }
   }
 
-  async function usarSugestaoNaEscala(project: Projeto) {
+  async function confirmarTomNaEscala(project: Projeto, escolha: { tom: string; bpm?: number }) {
     if (applyingId || !project.escalas || !project.musica_id) return;
     setApplyingId(project.id);
     setMessage(null);
     try {
-      const response = await studioFetch(`/api/louvor-studio/projects/${project.id}`, { method: "PATCH" });
+      const response = await studioFetch(`/api/louvor-studio/projects/${project.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ action: "definir_tom_da_escala", tom: escolha.tom, bpm: escolha.bpm }),
+      });
       const data = await response.json().catch(() => ({})) as { tom?: string | null; bpm?: number | null; error?: string };
-      if (!response.ok) throw new Error(data.error ?? "Não foi possível aplicar a sugestão.");
-      setMessage(`Sugestão aplicada ao culto: tom ${data.tom ?? "a definir"} · ${data.bpm ? `${Math.round(data.bpm)} BPM` : "BPM a definir"}.`);
+      if (!response.ok) throw new Error(data.error ?? "Não foi possível confirmar o tom.");
+      setMessage(`Tom ${data.tom ?? ""} confirmado nesta escala${data.bpm ? ` · ${Math.round(data.bpm)} BPM` : ""}.`);
+      await loadProjects();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Não foi possível aplicar a sugestão.");
+      setMessage(error instanceof Error ? error.message : "Não foi possível confirmar o tom.");
     } finally {
       setApplyingId(null);
     }
@@ -387,6 +398,13 @@ export function LouvorStudioTab({
 
         {podeGerenciar ? (
           fluxoDaEscala ? (
+            selected?.status === "concluido" ? (
+              <section className="mt-4 rounded-xl border border-emerald-100 bg-emerald-50/60 p-4" aria-label="Música pronta para definir tom">
+                <p className="text-xs font-bold uppercase tracking-widest text-emerald-700">Base pronta para esta escala</p>
+                <h3 className="mt-1 text-base font-semibold text-gray-900">{selected.titulo}</h3>
+                <p className="mt-1 text-sm text-gray-600">Ouça no player abaixo, teste os tons e confirme o que a equipe usará neste culto.</p>
+              </section>
+            ) : (
             <section className="mt-4 space-y-4" aria-label="Preparar música da escala">
               <div className="rounded-xl border border-rose-100 bg-white p-4">
                 <p className="text-xs font-bold uppercase tracking-widest text-rose-700">Preparação para a escala</p>
@@ -425,12 +443,12 @@ export function LouvorStudioTab({
                 ) : videoSugeridoDoRepertorio && videoDiretoDoRepertorio && !buscandoOutraVersao ? (
                   <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-950">
                     <div className="min-w-0">
-                      <strong className="block">Vídeo indicado na página do Cifra Club</strong>
+                      <strong className="block">Vídeo de referência do Repertório</strong>
                       <span className="block truncate text-xs text-emerald-800">{videoSugeridoDoRepertorio.titulo} · {videoSugeridoDoRepertorio.artista}</span>
                     </div>
                     <div className="flex flex-wrap gap-2">
                       <a href={videoSugeridoDoRepertorio.url} target="_blank" rel="noopener noreferrer" className="rounded-lg border border-emerald-300 bg-white px-3 py-2 text-xs font-semibold text-emerald-800 hover:bg-emerald-100">Abrir e conferir</a>
-                      <button type="button" onClick={() => selecionarVideo(videoSugeridoDoRepertorio)} className="rounded-lg bg-emerald-700 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-600">Confirmar este vídeo</button>
+                      <button type="button" disabled={!workerConfigurado || preparando || Boolean(selected)} onClick={() => void processar(videoSugeridoDoRepertorio)} className="rounded-lg bg-emerald-700 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-40">{selected ? "Análise iniciada" : preparando ? "Preparando…" : "Preparar análise"}</button>
                       <button type="button" onClick={() => setBuscandoOutraVersao(true)} className="rounded-lg border border-emerald-300 bg-white px-3 py-2 text-xs font-semibold text-emerald-800 hover:bg-emerald-100">Buscar outra versão</button>
                     </div>
                   </div>
@@ -475,6 +493,7 @@ export function LouvorStudioTab({
                 </div>
               )}
             </section>
+            )
           ) : mostrarPreparacao ? <form onSubmit={pesquisar} className="mt-5 space-y-4">
           {videoSugeridoDoRepertorio && (
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">
@@ -769,21 +788,13 @@ export function LouvorStudioTab({
             <>
               {selected.escalas && (
                 <section className="mb-4 rounded-2xl border border-emerald-100 bg-emerald-50/60 p-4">
-                  <p className="text-xs font-bold uppercase tracking-widest text-emerald-700">Sugestão do Studio para este culto</p>
+                  <p className="text-xs font-bold uppercase tracking-widest text-emerald-700">Dados detectados na gravação</p>
                   <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-gray-700">
                     <span className="rounded-full bg-white px-3 py-1 font-semibold shadow-sm">Tom detectado: {selected.tom_original || "não identificado"}</span>
                     <span className="rounded-full bg-white px-3 py-1 font-semibold shadow-sm">BPM detectado: {selected.bpm ? Math.round(selected.bpm) : "não identificado"}</span>
                   </div>
-                  <p className="mt-2 text-xs text-gray-600">A análise é uma referência da gravação. Confirme com os vocais antes de usá-la como tom oficial.</p>
+                  <p className="mt-2 text-xs text-gray-600">Use o player abaixo para testar. O tom do culto só muda quando você confirmar a escolha.</p>
                   <div className="mt-3 flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={() => void usarSugestaoNaEscala(selected)}
-                      disabled={applyingId === selected.id || !selected.musica_id || (!selected.tom_original && !selected.bpm)}
-                      className="rounded-lg bg-emerald-700 px-3 py-2 text-xs font-semibold text-white transition hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                      {applyingId === selected.id ? "Aplicando…" : "Usar sugestão no culto"}
-                    </button>
                     <button
                       type="button"
                       onClick={onAjustarNaEscala}
@@ -794,7 +805,14 @@ export function LouvorStudioTab({
                   </div>
                 </section>
               )}
-              <LouvorStudioPlayer key={selected.id} project={selected} />
+              <LouvorStudioPlayer
+                key={selected.id}
+                project={selected}
+                salvandoTomDaEscala={applyingId === selected.id}
+                onEscolherTomDaEscala={selected.escalas && selected.musica_id && podeGerenciar
+                  ? (escolha) => void confirmarTomNaEscala(selected, escolha)
+                  : undefined}
+              />
             </>
           )}
         </main>

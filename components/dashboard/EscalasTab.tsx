@@ -1458,6 +1458,14 @@ export function EscalasTab({
     return statusStudioPorMusica[`${editId}:${musica.musicaId}`] ?? "nao_preparado";
   }
 
+  function abrirMusicaNoStudio(musica: EscalaMusica) {
+    if (!editId) {
+      setSalvarErro("Salve a escala antes de abrir a música no Studio.");
+      return;
+    }
+    onAnalisarNoStudio?.({ escalaId: editId, ...dadosDaMusicaParaStudio(musica) });
+  }
+
   const musicasParaPrepararStudio = form.musicas.filter((musica) => {
     const status = statusDoStudio(musica);
     return status === "nao_preparado" || status === "falhou";
@@ -2773,7 +2781,7 @@ export function EscalasTab({
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold text-gray-800">{em.titulo}</p>
                       <p className="text-xs text-gray-400">
-                        {em.artista} · Tom {em.tom || "—"} · BPM {em.bpm ?? "—"}
+                        {em.artista} · {em.tom ? `Tom ${em.tom}` : statusDoStudio(em) === "pronto" ? "Tom: escolher no Studio" : "Tom: a definir"} · BPM {em.bpm ?? "—"}
                       </p>
                     </div>
                     <a
@@ -2824,6 +2832,15 @@ export function EscalasTab({
                     </button>
                   </div>
                   <div className="flex flex-wrap items-center justify-end gap-2 border-t border-gray-100 bg-gray-50/40 px-4 py-2.5">
+                    {statusDoStudio(em) === "pronto" && !em.tom && onAnalisarNoStudio && (
+                      <button
+                        type="button"
+                        onClick={() => abrirMusicaNoStudio(em)}
+                        className="rounded-lg bg-rose-700 px-2.5 py-1.5 text-xs font-semibold text-white transition hover:bg-rose-600"
+                      >
+                        Ouvir e escolher tom
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={() => setEditandoDadosMusica((aberta) => aberta === i ? null : i)}
