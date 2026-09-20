@@ -192,12 +192,14 @@ export default function BuscarCifraModal({ onClose, onSalva, buscaInicial = "" }
       await onSalva({
         titulo: resultado.name,
         artista: resultado.artist,
-        tom: tomOriginal || "",
+        tom: tomPrevia || tomOriginal || "",
         artistaSlug: sugestaoSelecionada.artistaSlug,
         musicaSlug: sugestaoSelecionada.musicaSlug,
         cifraUrl: resultado.cifraclub_url,
         youtubeUrl: resultado.youtube_url,
-        cifra: resultado.cifra,
+        // Salva a cifra no tom escolhido pelo líder, enquanto a URL continua
+        // apontando para a fonte original no Cifra Club.
+        cifra: cifraExibida,
       });
       // O cadastro já terminou neste ponto. Fechar imediatamente evita deixar a
       // pessoa presa em “Adicionado!” se a tela pai atualizar o set do culto.
@@ -303,7 +305,7 @@ export default function BuscarCifraModal({ onClose, onSalva, buscaInicial = "" }
                   <div className="flex flex-col items-start sm:items-end gap-0.5">
                     <span className="rounded-lg border border-grape-100 bg-grape-50 px-2.5 py-1.5 text-sm font-semibold text-grape-800">
                       {tomOriginal
-                        ? `Tom da cifra: ${tomOriginal}${resultado.tom_origem === "inferido" ? " (estimado)" : ""}`
+                        ? `Tom original: ${tomOriginal}${resultado.tom_origem === "inferido" ? " (estimado)" : ""}`
                         : "Tom não informado"}
                     </span>
                   </div>
@@ -336,18 +338,18 @@ export default function BuscarCifraModal({ onClose, onSalva, buscaInicial = "" }
             <div className="flex-1 overflow-y-auto bg-gray-50 flex flex-col">
               <div className="flex items-center justify-end px-5 py-1.5 border-b border-gray-100 bg-white shrink-0">
                 {tomOriginal && (
-                  <details className="mr-auto text-xs text-gray-500">
-                    <summary className="cursor-pointer hover:text-grape-700">Transpor apenas esta prévia</summary>
+                  <label className="mr-auto flex items-center gap-2 text-xs text-gray-500">
+                    <span className="font-medium text-gray-700">Tom da cifra</span>
                     <select
                       value={tomPrevia}
                       onChange={(e) => setTomPrevia(e.target.value)}
-                      className="mt-1 rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs outline-none"
+                      className="rounded-lg border border-grape-200 bg-grape-50 px-2 py-1 font-semibold text-grape-800 outline-none"
                     >
-                      {[tomOriginal, ...NOTES_S, ...NOTES_S.map((nota) => `${nota}m`)]
-                        .filter((tom, indice, lista) => lista.indexOf(tom) === indice)
+                      {NOTES_S.map((nota) => `${nota}${/m$/.test(tomOriginal) ? "m" : ""}`)
                         .map((tom) => <option key={tom}>{tom}</option>)}
                     </select>
-                  </details>
+                    {tomPrevia !== tomOriginal && <span className="text-grape-700">Será salvo neste tom</span>}
+                  </label>
                 )}
                 <button
                   onClick={() => setEsconderTabs(v => !v)}
