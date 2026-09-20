@@ -51,6 +51,7 @@ export default function CanalMinisterioPage() {
   const [studioAccess, setStudioAccess] = useState({
     autorizado: false,
     podeGerenciar: false,
+    podePrepararEnsaio: false,
     workerConfigurado: false,
     youtubeConfigurado: false,
   });
@@ -103,7 +104,7 @@ export default function CanalMinisterioPage() {
   useEffect(() => {
     let ativo = true;
     if (slug !== "Louvor" || !user?.id) {
-      setStudioAccess({ autorizado: false, podeGerenciar: false, workerConfigurado: false, youtubeConfigurado: false });
+      setStudioAccess({ autorizado: false, podeGerenciar: false, podePrepararEnsaio: false, workerConfigurado: false, youtubeConfigurado: false });
       return;
     }
     supabase.auth.getSession().then(({ data }) => {
@@ -118,6 +119,7 @@ export default function CanalMinisterioPage() {
           if (ativo) setStudioAccess({
             autorizado: Boolean(result.autorizado),
             podeGerenciar: Boolean(result.podeGerenciar),
+            podePrepararEnsaio: Boolean(result.podePrepararEnsaio),
             workerConfigurado: Boolean(result.workerConfigurado),
             youtubeConfigurado: Boolean(result.youtubeConfigurado),
           });
@@ -229,6 +231,7 @@ export default function CanalMinisterioPage() {
       {tab === "studio" && studioAccess.autorizado && (
         <LouvorStudioTab
           podeGerenciar={studioAccess.podeGerenciar}
+          podePrepararEnsaio={studioAccess.podePrepararEnsaio}
           workerConfigurado={studioAccess.workerConfigurado}
           analiseInicial={analiseStudioInicial}
           onAjustarNaEscala={() => setTab("escalas")}

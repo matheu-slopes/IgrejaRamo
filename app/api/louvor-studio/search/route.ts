@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getLouvorStudioUser, podeGerenciarLouvorStudio } from "@/lib/louvorStudioServer";
+import { getLouvorStudioAccess, getLouvorStudioUser } from "@/lib/louvorStudioServer";
 import { searchYoutube, youtubeId, youtubeLinkResult } from "@/lib/youtubeSearch";
 import { withDeadline } from "@/lib/withDeadline";
 
@@ -11,7 +11,7 @@ export async function POST(req: NextRequest) {
       const user = await getLouvorStudioUser(req);
       signal.throwIfAborted();
       if (!user) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
-      if (!(await podeGerenciarLouvorStudio(user.id))) {
+      if (!(await getLouvorStudioAccess(user.id)).podeVer) {
         return NextResponse.json({ error: "Somente ministros e líderes podem adicionar músicas." }, { status: 403 });
       }
       signal.throwIfAborted();

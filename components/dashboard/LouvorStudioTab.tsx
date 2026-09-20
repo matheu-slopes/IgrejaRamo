@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertCircle, CheckCircle2, Disc3, Download, LibraryBig, LoaderCircle, Music2, Search, Sparkles, Trash2 } from "lucide-react";
 import { LouvorStudioPlayer } from "./LouvorStudioPlayer";
-import { SeparationMode } from "@/lib/louvorStudioMusic";
 import { supabase } from "@/lib/supabase";
 import { withDeadline } from "@/lib/withDeadline";
 
@@ -31,6 +30,7 @@ type Projeto = {
   audio_url?: string | null;
   stem_urls?: Partial<Record<StemName, string | null>>;
   separation_mode?: string;
+  visibilidade?: "equipe" | "pessoal";
   erro?: string | null;
   criado_em: string;
   musica_id?: string | null;
@@ -92,17 +92,18 @@ function formatDuration(seconds?: number | null) {
 
 export function LouvorStudioTab({
   podeGerenciar,
+  podePrepararEnsaio,
   workerConfigurado,
   analiseInicial,
   onAjustarNaEscala,
 }: {
   podeGerenciar: boolean;
+  podePrepararEnsaio: boolean;
   workerConfigurado: boolean;
   analiseInicial?: AnaliseStudioInicial | null;
   onAjustarNaEscala?: () => void;
 }) {
   const [query, setQuery] = useState("");
-  const [mode, setMode] = useState<SeparationMode>("bs_roformer");
   const [searching, setSearching] = useState(false);
   const [results, setResults] = useState<SearchResult[]>([]);
   const [projects, setProjects] = useState<Projeto[]>([]);
@@ -121,6 +122,7 @@ export function LouvorStudioTab({
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [applyingId, setApplyingId] = useState<string | null>(null);
   const [indiceDaFila, setIndiceDaFila] = useState(0);
+  const podePreparar = podeGerenciar || podePrepararEnsaio;
 
   useEffect(() => {
     if (!analiseInicial) return;
@@ -195,7 +197,7 @@ export function LouvorStudioTab({
 
   async function pesquisar(event: React.FormEvent) {
     event.preventDefault();
-    if (query.trim().length < 2 || !podeGerenciar || searching) return;
+    if (query.trim().length < 2 || !podePreparar || searching) return;
     setSearching(true);
     setMessage(null);
     setResults([]);
@@ -236,7 +238,6 @@ export function LouvorStudioTab({
             // enquanto a lista de cultos ainda estiver carregando.
             escalaId: analiseInicial?.escalaId ?? (vincularCulto ? escalaId : undefined),
             musicaId: analiseAtual?.musicaId,
-            mode,
           }),
           signal,
         });
@@ -264,6 +265,17 @@ export function LouvorStudioTab({
       setPreparando(false);
     }
   }
+
+  function abrirProjeto(project: Projeto) {
+    setSelectedId(project.id);
+    if (project.status === "concluido") {
+      void studioFetch(`/api/louvor-studio/projects/${project.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ action: "usar" }),
+      });
+    }
+  }
+
   async function excluir(project: Projeto) {
     if (
       !window.confirm(
@@ -388,24 +400,24 @@ export function LouvorStudioTab({
           </p>
         </div>
 
-        {podeGerenciar && !fluxoDaEscala && (
+        {podePreparar && !fluxoDaEscala && (
           <button
             type="button"
             onClick={() => setMostrarPreparacao((aberto) => !aberto)}
             className="inline-flex items-center gap-2 rounded-xl bg-rose-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-rose-600"
           >
-            <Download className="h-4 w-4" /> {mostrarPreparacao ? "Fechar preparação" : "Preparar música"}
+            <Download className="h-4 w-4" /> {mostrarPreparacao ? "Fechar preparação" : podeGerenciar ? "Preparar música" : "Novo ensaio"}
           </button>
         )}
 
-        {podeGerenciar && !workerConfigurado && (
+        {podePreparar && !workerConfigurado && (
           <div className="mt-4 flex gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
             <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
             <span>Configure o segredo do processador na Vercel. Depois, o PC local buscará as tarefas sem ficar exposto na internet.</span>
           </div>
         )}
 
-        {podeGerenciar ? (
+        {podePreparar ? (
           fluxoDaEscala ? (
             selected?.status === "concluido" ? (
               <section className="mt-4 rounded-xl border border-emerald-100 bg-emerald-50/60 p-4" aria-label="Música pronta para definir tom">
@@ -484,17 +496,14 @@ export function LouvorStudioTab({
                   <div className="flex items-start gap-3">
                     <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-rose-700 text-xs font-bold text-white">2</span>
                     <div>
-                      <h3 className="font-semibold text-gray-900">Escolha a preparação</h3>
-                      <p className="mt-1 text-xs text-gray-500">A configuração padrão separa voz e instrumental.</p>
+                      <h3 className="font-semibold text-gray-900">Preparação completa</h3>
+                      <p className="mt-1 text-xs text-gray-500">A música será separada em voz, bateria, baixo e outros instrumentos.</p>
                     </div>
                   </div>
-                  <details className="mt-3 rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-600">
-                    <summary className="cursor-pointer font-medium text-gray-700">Opções avançadas</summary>
-                    <label className="mt-2 flex cursor-pointer items-start gap-2">
-                      <input type="checkbox" checked={mode === "htdemucs_ft"} onChange={(event) => setMode(event.target.checked ? "htdemucs_ft" : "bs_roformer")} className="mt-0.5 h-4 w-4 rounded border-gray-300 text-rose-600 focus:ring-rose-400" />
-                      <span><strong className="block text-gray-800">Separar bateria e baixo individualmente</strong>Demora mais e libera controles separados no player.</span>
-                    </label>
-                  </details>
+                  <div className="mt-3 rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-600">
+                    <strong className="block text-gray-800">Preparação completa</strong>
+                    Voz, bateria, baixo e outros instrumentos serão separados para a equipe ensaiar.
+                  </div>
                   <button type="button" disabled={!workerConfigurado || preparando} onClick={() => void processar(videoConfirmado)} className="mt-4 inline-flex items-center gap-2 rounded-xl bg-rose-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-rose-600 disabled:cursor-not-allowed disabled:opacity-40">
                     {preparando ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />} {preparando ? "Criando análise…" : "Preparar para análise"}
                   </button>
@@ -525,16 +534,17 @@ export function LouvorStudioTab({
               <p className="text-xs font-bold uppercase tracking-widest text-gray-500">Onde usar</p>
               <p className="text-xs text-gray-400">Etapa 1 de 3</p>
             </div>
-          <div className="grid grid-cols-2 gap-2">
+          <div className={`grid gap-2 ${podeGerenciar ? "grid-cols-2" : "grid-cols-1"}`}>
             <button
               type="button"
               aria-pressed={!vincularCulto}
               onClick={() => setVincularCulto(false)}
               className={`rounded-xl border p-3 text-left text-sm transition ${!vincularCulto ? "border-rose-300 bg-rose-50 text-rose-900" : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"}`}
             >
-              <strong className="block">Ensaio livre</strong>
-              <span className="mt-0.5 block text-xs opacity-75">Para praticar a qualquer momento</span>
+              <strong className="block">{podeGerenciar ? "Biblioteca da equipe" : "Meu ensaio"}</strong>
+              <span className="mt-0.5 block text-xs opacity-75">{podeGerenciar ? "Disponível para a equipe de Louvor" : "Privado e disponível por 7 dias"}</span>
             </button>
+            {podeGerenciar && (
             <button
               type="button"
               aria-pressed={vincularCulto}
@@ -544,8 +554,9 @@ export function LouvorStudioTab({
               <strong className="block">Usar em um culto</strong>
               <span className="mt-0.5 block text-xs opacity-75">Vincula a música à escala</span>
             </button>
+            )}
           </div>
-          {vincularCulto && (
+          {podeGerenciar && vincularCulto && (
             <label className="block text-xs font-medium text-gray-600">
               Selecione o culto
               <select
@@ -563,46 +574,24 @@ export function LouvorStudioTab({
             </label>
           )}
           <p className="px-1 text-xs text-gray-500" aria-live="polite">
-            {vincularCulto
+            {!podeGerenciar
+              ? "Este ensaio é privado e será removido automaticamente após 7 dias."
+              : vincularCulto
               ? "A música ficará disponível para a equipe que participa desse culto."
-              : "O ensaio livre fica disponível por 30 dias e pode ser usado por toda a equipe de Louvor."}
+              : "A base ficará disponível na biblioteca da equipe por 90 dias desde o último uso."}
           </p>
           </section>
           <div className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="text-xs font-bold uppercase tracking-widest text-gray-500">Como preparar</p>
-                <p className="mt-1 font-medium text-gray-800">Preparação padrão: voz e instrumental</p>
+                <p className="mt-1 font-medium text-gray-800">Preparação completa para a equipe</p>
               </div>
               <span className="shrink-0 rounded-full bg-rose-50 px-2.5 py-1 text-[11px] font-semibold text-rose-700">Etapa 2 de 3</span>
             </div>
             <p className="mt-1 text-xs text-gray-500" aria-live="polite">
-              {mode === "htdemucs_ft"
-                ? "Esta música terá Voz, Bateria, Baixo e Outros instrumentos para controlar separadamente no player."
-                : "Esta música terá Voz e Instrumental, ideal para ensaiar ou tirar a voz."}
+              Esta música terá Voz, Bateria, Baixo e Outros instrumentos para controlar separadamente no player.
             </p>
-            <details className="mt-3 border-t border-gray-100 pt-2 text-xs text-gray-600">
-              <summary className="cursor-pointer py-1 font-medium text-gray-700">
-                Opções avançadas
-              </summary>
-              <label className="mt-2 flex cursor-pointer items-start gap-2 rounded-lg bg-gray-50 p-2.5">
-                <input
-                  type="checkbox"
-                  checked={mode === "htdemucs_ft"}
-                  onChange={(event) =>
-                    setMode(event.target.checked ? "htdemucs_ft" : "bs_roformer")
-                  }
-                  className="mt-0.5 h-4 w-4 rounded border-gray-300 text-rose-600 focus:ring-rose-400"
-                />
-                <span>
-                  <strong className="block text-gray-800">
-                    Separar bateria e baixo individualmente
-                  </strong>
-                  Demora mais e libera controles separados de voz, bateria,
-                  baixo e outros instrumentos.
-                </span>
-              </label>
-            </details>
           </div>
           <div>
             <div className="mb-2 flex items-center justify-between px-1">
@@ -726,11 +715,14 @@ export function LouvorStudioTab({
               >
                 <button
                   type="button"
-                  onClick={() => setSelectedId(project.id)}
+                  onClick={() => abrirProjeto(project)}
                   className="w-full p-2.5 pr-10 text-left"
                 >
                 <p className="truncate text-sm font-semibold text-gray-900">{project.titulo}</p>
                 <p className="mt-0.5 truncate text-xs text-gray-400">{project.artista || "YouTube"}</p>
+                {project.visibilidade === "pessoal" && (
+                  <p className="mt-1 text-[11px] font-semibold text-amber-700">Meu ensaio · expira em 7 dias</p>
+                )}
                 {project.escalas && (
                   <p className="mt-1 truncate text-[11px] text-gray-500">
                     {new Date(project.escalas.data + "T12:00:00").toLocaleDateString("pt-BR")} · tom {project.tom_alvo || project.tom_original || "a identificar"}
@@ -748,7 +740,7 @@ export function LouvorStudioTab({
                   </div>
                 )}
                 </button>
-                {podeGerenciar && ["concluido", "erro"].includes(project.status) && (
+                {(podeGerenciar || project.visibilidade === "pessoal") && ["concluido", "erro"].includes(project.status) && (
                   <button
                     type="button"
                     aria-label={`Excluir ${project.titulo}`}
@@ -780,7 +772,7 @@ export function LouvorStudioTab({
                 <p className="mt-2 max-w-md text-xs text-gray-500">A separação analisa a música inteira e pode levar vários minutos, dependendo da duração e do computador. O progresso avança conforme os trechos ficam prontos.</p>
               )}
               {selected.status !== "erro" && <p className="mt-3 text-xs font-medium text-rose-700" role="status" aria-live="polite">{selected.progresso}%</p>}
-              {selected.status === "erro" && podeGerenciar && (
+              {selected.status === "erro" && (podeGerenciar || selected.visibilidade === "pessoal") && (
                 <button
                   type="button"
                   disabled={!workerConfigurado || retryingId === selected.id}
