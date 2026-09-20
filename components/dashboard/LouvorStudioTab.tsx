@@ -357,6 +357,8 @@ export function LouvorStudioTab({
 
   const projetosProntos = projects.filter((project) => project.status === "concluido").length;
   const projetosEmProcessamento = projects.filter((project) => !["concluido", "erro"].includes(project.status)).length;
+  const ensaiosPessoais = projects.filter((project) => project.visibilidade === "pessoal");
+  const limiteDeEnsaiosAtingido = !podeGerenciar && ensaiosPessoais.length >= 3;
   const projetosDaBiblioteca = useMemo(() => {
     const termo = buscaNaBiblioteca
       .normalize("NFD")
@@ -403,8 +405,15 @@ export function LouvorStudioTab({
         {podePreparar && !fluxoDaEscala && (
           <button
             type="button"
-            onClick={() => setMostrarPreparacao((aberto) => !aberto)}
-            className="inline-flex items-center gap-2 rounded-xl bg-rose-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-rose-600"
+            disabled={limiteDeEnsaiosAtingido && !mostrarPreparacao}
+            onClick={() => {
+              if (limiteDeEnsaiosAtingido && !mostrarPreparacao) {
+                setMessage("Você atingiu o limite de 3 ensaios pessoais. Exclua um ou aguarde a expiração para preparar outra música.");
+                return;
+              }
+              setMostrarPreparacao((aberto) => !aberto);
+            }}
+            className="inline-flex items-center gap-2 rounded-xl bg-rose-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-rose-600 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <Download className="h-4 w-4" /> {mostrarPreparacao ? "Fechar preparação" : podeGerenciar ? "Preparar música" : "Novo ensaio"}
           </button>
@@ -672,6 +681,7 @@ export function LouvorStudioTab({
               <div>
                 <h3 className="text-sm font-semibold text-gray-900">Sua biblioteca</h3>
                 <p className="mt-0.5 text-xs text-gray-500">Escolha uma música para abrir o ensaio</p>
+                {!podeGerenciar && <p className="mt-1 text-[11px] text-gray-500">Meus ensaios: {ensaiosPessoais.length} de 3 · expiram em até 7 dias</p>}
               </div>
             </div>
             <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-600">{projects.length}</span>

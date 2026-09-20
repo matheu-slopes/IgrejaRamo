@@ -81,8 +81,6 @@ export async function POST(req: NextRequest) {
   const ensaioPessoal = !acesso.podeGerenciar;
   const visibilidade = ensaioPessoal ? "pessoal" : "equipe";
   const expiraEm = expiraEmDias(ensaioPessoal ? DIAS_ENSAIO_PESSOAL : DIAS_BIBLIOTECA);
-  const { count } = await louvorStudioAdmin.from("louvor_studio_projetos").select("id", { count: "exact", head: true }).eq("criado_por", user.id).eq("visibilidade", visibilidade).in("status", ["aguardando", "baixando", "analisando", "separando"]);
-  if ((count ?? 0) >= (ensaioPessoal ? 2 : 3)) return NextResponse.json({ error: ensaioPessoal ? "Voce ja tem dois ensaios pessoais em preparacao. Aguarde um terminar." : "Aguarde as musicas em processamento." }, { status: 429 });
   if (escala && musicaId) {
     const { data: existente } = await louvorStudioAdmin.from("louvor_studio_projetos").select("*").eq("musica_id", musicaId).eq("status", "concluido").eq("visibilidade", "equipe").gt("expira_em", new Date().toISOString()).order("criado_em", { ascending: false }).limit(1).maybeSingle();
     if (existente) {
@@ -101,6 +99,20 @@ export async function POST(req: NextRequest) {
   if (ensaioPessoal) {
     const { data: ensaioExistente } = await louvorStudioAdmin.from("louvor_studio_projetos").select("*").eq("youtube_url", url).eq("criado_por", user.id).eq("visibilidade", "pessoal").gt("expira_em", new Date().toISOString()).order("criado_em", { ascending: false }).limit(1).maybeSingle();
     if (ensaioExistente) return NextResponse.json({ projeto: ensaioExistente, reutilizado: true });
+  }
+  if (ensaioPessoal) {
+    const [total, processando] = await Promise.all([
+      louvorStudioAdmin.from("louvor_studio_projetos").select("id", { count: "exact", head: true })
+        .eq("criado_por", user.id).eq("visibilidade", "pessoal").gt("expira_em", new Date().toISOString()),
+      louvorStudioAdmin.from("louvor_studio_projetos").select("id", { count: "exact", head: true })
+        .eq("criado_por", user.id).eq("visibilidade", "pessoal").in("status", ["aguardando", "baixando", "analisando", "separando"]),
+    ]);
+    if ((total.count ?? 0) >= 3) return NextResponse.json({ error: "Voce atingiu o limite de 3 ensaios pessoais. Exclua um ou aguarde a expiracao para preparar outra musica." }, { status: 429 });
+    if ((processando.count ?? 0) >= 2) return NextResponse.json({ error: "Voce ja tem dois ensaios pessoais em preparacao. Aguarde um terminar." }, { status: 429 });
+  } else {
+    const { count } = await louvorStudioAdmin.from("louvor_studio_projetos").select("id", { count: "exact", head: true })
+      .eq("criado_por", user.id).eq("visibilidade", "equipe").in("status", ["aguardando", "baixando", "analisando", "separando"]);
+    if ((count ?? 0) >= 3) return NextResponse.json({ error: "Aguarde as musicas em processamento." }, { status: 429 });
   }
   const { data: projeto, error } = await louvorStudioAdmin.from("louvor_studio_projetos").insert({
     criado_por: user.id, separation_mode: MODELO_COMPLETO, visibilidade, ultimo_uso_em: new Date().toISOString(), pipeline_version: 2,
