@@ -234,7 +234,6 @@ export default function CanalMinisterioPage() {
           podePrepararEnsaio={studioAccess.podePrepararEnsaio}
           workerConfigurado={studioAccess.workerConfigurado}
           analiseInicial={analiseStudioInicial}
-          onAjustarNaEscala={() => setTab("escalas")}
         />
       )}
       {tab === "repertorio" && studioAccess.autorizado && <RepertorioTab podeGerenciar={podeGerenciarRepertorio} />}

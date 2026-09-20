@@ -97,13 +97,11 @@ export function LouvorStudioTab({
   podePrepararEnsaio,
   workerConfigurado,
   analiseInicial,
-  onAjustarNaEscala,
 }: {
   podeGerenciar: boolean;
   podePrepararEnsaio: boolean;
   workerConfigurado: boolean;
   analiseInicial?: AnaliseStudioInicial | null;
-  onAjustarNaEscala?: () => void;
 }) {
   const [query, setQuery] = useState("");
   const [searching, setSearching] = useState(false);
@@ -362,7 +360,7 @@ export function LouvorStudioTab({
       });
       const data = await response.json().catch(() => ({})) as { error?: string };
       if (!response.ok) throw new Error(data.error ?? "Não foi possível confirmar o tom-base.");
-      setMessage(`Tom-base ${tom} confirmado para este vídeo.`);
+      setMessage(null);
       await loadProjects();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Não foi possível confirmar o tom-base.");
@@ -824,59 +822,26 @@ export function LouvorStudioTab({
           )}
           {selected?.status === "concluido" && (
             <>
-              {selected.musicas?.tom && selected.tom_original && (
-                <section className={`mb-4 rounded-2xl border p-4 ${selected.musicas.tom === selected.tom_original ? "border-emerald-100 bg-emerald-50/60" : "border-amber-200 bg-amber-50/70"}`}>
-                  <p className="text-xs font-bold uppercase tracking-widest text-gray-700">Conferência do tom-base</p>
-                  <div className="mt-2 flex flex-wrap gap-2 text-sm">
-                    <span className="rounded-full bg-white px-3 py-1 font-semibold shadow-sm">Cifra: {selected.musicas.tom}</span>
-                    <span className="rounded-full bg-white px-3 py-1 font-semibold shadow-sm">Áudio detectado: {selected.tom_original}</span>
-                    {selected.musicas.tom === selected.tom_original
-                      ? <span className="rounded-full bg-emerald-700 px-3 py-1 font-semibold text-white">Tom confirmado</span>
-                      : <span className="rounded-full bg-amber-600 px-3 py-1 font-semibold text-white">Confirme qual tom corresponde ao vídeo</span>}
+              {(selected.musicas?.tom || selected.tom_original || selected.bpm) && (
+                <section className={`mb-4 rounded-2xl border p-4 ${selected.musicas?.tom && selected.tom_original && selected.musicas.tom !== selected.tom_original ? "border-amber-200 bg-amber-50/70" : "border-emerald-100 bg-emerald-50/60"}`}>
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div><p className="text-xs font-bold uppercase tracking-widest text-emerald-700">Tom e andamento</p><p className="mt-1 text-xs text-gray-600">Teste no player e confirme o tom que a equipe usará.</p></div>
+                    {selected.musicas?.tom && selected.tom_original && (selected.musicas.tom === selected.tom_original
+                      ? <span className="rounded-full bg-emerald-700 px-3 py-1 text-xs font-semibold text-white">Tom confirmado</span>
+                      : <span className="rounded-full bg-amber-600 px-3 py-1 text-xs font-semibold text-white">Confira a referência</span>)}
                   </div>
-                  {selected.musicas.tom !== selected.tom_original && podeGerenciar && (
+                  <div className="mt-3 flex flex-wrap gap-2 text-sm text-gray-700">
+                    {selected.musicas?.tom && <span className="rounded-full bg-white px-3 py-1 font-semibold shadow-sm">Cifra: {selected.musicas.tom}</span>}
+                    {selected.tom_original && <span className="rounded-full bg-white px-3 py-1 font-semibold shadow-sm">Áudio: {selected.tom_original}</span>}
+                    {selected.bpm && <span className="rounded-full bg-white px-3 py-1 font-semibold shadow-sm">{Math.round(selected.bpm)} BPM</span>}
+                  </div>
+                  {selected.musicas?.tom && selected.tom_original && selected.musicas.tom !== selected.tom_original && podeGerenciar && (
                     <div className="mt-3 flex flex-wrap items-center gap-2">
-                      <button
-                        type="button"
-                        disabled={confirmandoTomBaseId === selected.id}
-                        onClick={() => void confirmarTomBase(selected, selected.tom_original!)}
-                        className="rounded-lg bg-gray-900 px-3 py-2 text-xs font-semibold text-white hover:bg-gray-800 disabled:opacity-50"
-                      >
-                        Usar tom do áudio ({selected.tom_original})
-                      </button>
-                      <button
-                        type="button"
-                        disabled={confirmandoTomBaseId === selected.id}
-                        onClick={() => void confirmarTomBase(selected, selected.musicas!.tom!)}
-                        className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-                      >
-                        Usar tom da cifra ({selected.musicas.tom})
-                      </button>
-                      <p className="w-full text-xs text-gray-600">Teste no player e confirme o tom que realmente corresponde a esta gravação.</p>
+                      <button type="button" disabled={confirmandoTomBaseId === selected.id} onClick={() => void confirmarTomBase(selected, selected.tom_original!)} className="rounded-lg bg-gray-900 px-3 py-2 text-xs font-semibold text-white hover:bg-gray-800 disabled:opacity-50">Usar áudio ({selected.tom_original})</button>
+                      <button type="button" disabled={confirmandoTomBaseId === selected.id} onClick={() => void confirmarTomBase(selected, selected.musicas!.tom!)} className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50">Usar cifra ({selected.musicas.tom})</button>
                     </div>
                   )}
-                  {(tomBaseEmTeste[selected.id] || selected.tom_base_confirmado) && (
-                    <p className="mt-3 text-xs font-semibold text-emerald-800">Tom-base em uso no player: {tomBaseEmTeste[selected.id] || selected.tom_base_confirmado}</p>
-                  )}
-                </section>
-              )}
-              {selected.escalas && (
-                <section className="mb-4 rounded-2xl border border-emerald-100 bg-emerald-50/60 p-4">
-                  <p className="text-xs font-bold uppercase tracking-widest text-emerald-700">Dados detectados na gravação</p>
-                  <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-gray-700">
-                    <span className="rounded-full bg-white px-3 py-1 font-semibold shadow-sm">Tom detectado: {selected.tom_original || "não identificado"}</span>
-                    <span className="rounded-full bg-white px-3 py-1 font-semibold shadow-sm">BPM detectado: {selected.bpm ? Math.round(selected.bpm) : "não identificado"}</span>
-                  </div>
-                  <p className="mt-2 text-xs text-gray-600">Use o player abaixo para testar. O tom do culto só muda quando você confirmar a escolha.</p>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={onAjustarNaEscala}
-                      className="rounded-lg border border-emerald-200 bg-white px-3 py-2 text-xs font-semibold text-emerald-800 transition hover:bg-emerald-50"
-                    >
-                      Ajustar na escala
-                    </button>
-                  </div>
+                  {(tomBaseEmTeste[selected.id] || selected.tom_base_confirmado) && <p className="mt-3 text-xs font-semibold text-emerald-800">O player está usando {tomBaseEmTeste[selected.id] || selected.tom_base_confirmado} como tom-base.</p>}
                 </section>
               )}
               <LouvorStudioPlayer
