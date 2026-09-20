@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { X, Search, Music2, Check, ExternalLink, Loader2, AlertCircle, ChevronRight, EyeOff, Eye } from "lucide-react";
+import { X, Search, Music2, Check, ExternalLink, Loader2, AlertCircle, ChevronRight } from "lucide-react";
 import clsx from "clsx";
 import { supabase } from "@/lib/supabase";
 
@@ -100,7 +100,6 @@ export default function BuscarCifraModal({ onClose, onSalva, buscaInicial = "" }
   const [loadingBusca, setLoadingBusca] = useState(false);
   const [loadingCifra, setLoadingCifra] = useState(false);
   const [salvando, setSalvando] = useState(false);
-  const [esconderTabs, setEsconderTabs] = useState(false);
   const [sugestaoSelecionada, setSugestaoSelecionada] = useState<Sugestao | null>(null);
 
   useEffect(() => {
@@ -131,16 +130,16 @@ export default function BuscarCifraModal({ onClose, onSalva, buscaInicial = "" }
     return transposeCifra(resultado.cifra, semis);
   }, [resultado, tomPrevia, tomOriginal]);
 
-  // Cifra com tabs opcionalmente removidas (só para exibição)
+  // Na busca, a prévia fica focada em letra e acordes. A tablatura completa
+  // continua salva com a música e pode ser aberta depois no Repertório.
   const cifraFiltrada = useMemo(() => {
-    if (!esconderTabs) return cifraExibida;
     const filtered = cifraExibida.filter(line => !isTabLine(line));
     // Remove linhas em branco consecutivas que ficam após remover blocos de tab
     return filtered.reduce<string[]>((acc, line) => {
       if (line.trim() === "" && acc.length > 0 && acc[acc.length - 1].trim() === "") return acc;
       return [...acc, line];
     }, []);
-  }, [cifraExibida, esconderTabs]);
+  }, [cifraExibida]);
 
   async function buscarSugestoes(termo = query) {
     if (!termo.trim()) return;
@@ -351,14 +350,6 @@ export default function BuscarCifraModal({ onClose, onSalva, buscaInicial = "" }
                     {tomPrevia !== tomOriginal && <span className="text-grape-700">Será salvo neste tom</span>}
                   </label>
                 )}
-                <button
-                  onClick={() => setEsconderTabs(v => !v)}
-                  className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-grape-700 transition"
-                >
-                  {esconderTabs
-                    ? <><Eye className="w-3.5 h-3.5" /> Mostrar tabs</>
-                    : <><EyeOff className="w-3.5 h-3.5" /> Esconder tabs</>}
-                </button>
               </div>
               <div className="flex-1 overflow-y-auto px-5 py-3">
                 <pre className="text-xs font-mono text-gray-700 whitespace-pre-wrap leading-5">

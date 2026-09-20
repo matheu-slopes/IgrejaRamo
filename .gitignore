@@ -51,3 +51,4 @@ services/louvor-studio/.models/
 services/louvor-studio/.audio-cache/
 services/louvor-studio/.hq-worker.lock
 services/louvor-studio/hq-worker.*.log
+services/louvor-studio/worker-local*.log

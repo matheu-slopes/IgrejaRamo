@@ -33,7 +33,9 @@ import {
   stop,
   start,
   createRealtimeStem,
+  createRealtimeLiveStem,
   setRealtimePitch,
+  setRealtimeLivePitch,
   setRealtimeRate,
   type StudioEngine as Engine,
 } from "@/lib/louvorStudioRealtime";
@@ -52,6 +54,7 @@ type Project = {
   titulo: string;
   artista?: string | null;
   tom_original?: string | null;
+  tom_base_confirmado?: string | null;
   bpm?: number | null;
   beat_offset_seg?: number | null;
   separation_mode?: string;
@@ -62,6 +65,7 @@ type PlayerProps = {
   project: Project;
   onEscolherTomDaEscala?: (escolha: EscolhaParaEscala) => void;
   salvandoTomDaEscala?: boolean;
+  tomBaseOverride?: string | null;
 };
 type Version = {
   id: string;
@@ -163,9 +167,12 @@ function secondsText(value: number) {
  * streams the MP3s through native media elements instead, keeping the PWA
  * responsive while retaining the per-track volume, mute, solo and seek tools.
  */
-function MobileStudioPlayer({ project }: { project: Project }) {
+function MobileStudioPlayer({ project, onEscolherTomDaEscala, salvandoTomDaEscala = false, tomBaseOverride }: PlayerProps) {
   const urls = project.stem_urls ?? {};
+  const tomBase = tomBaseOverride || project.tom_base_confirmado || project.tom_original;
+  const initial = keyAt(tomBase || "C", 0);
   const [ready, setReady] = useState(false);
+  const [realtimeReady, setRealtimeReady] = useState(false);
   const [playing, setPlaying] = useState(false);
   const [position, setPosition] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -175,16 +182,28 @@ function MobileStudioPlayer({ project }: { project: Project }) {
   const [solo, setSolo] = useState<Stem | null>(null);
   const [master, setMaster] = useState(0.8);
   const tracksRef = useRef<Partial<Record<Stem, HTMLAudioElement>>>({});
+  const contextRef = useRef<AudioContext | null>(null);
+  const sourcesRef = useRef<Partial<Record<Stem, MediaElementAudioSourceNode>>>({});
+  const realtimeNodesRef = useRef<Partial<Record<Stem, import("signalsmith-stretch").StretchNode>>>({});
+  const [target, setTarget] = useState(initial);
 
   const stems = (Object.keys(urls) as Stem[]).filter((stem) => urls[stem]);
+  let semitones = 0;
+  try {
+    semitones = transposeSemitones(initial, target, "auto");
+  } catch {}
 
   useEffect(() => {
     let disposed = false;
     setReady(false);
+    setRealtimeReady(false);
     setPlaying(false);
     setPosition(0);
     setMessage("");
     const tracks: Partial<Record<Stem, HTMLAudioElement>> = {};
+    let context: AudioContext | null = null;
+    const sources: Partial<Record<Stem, MediaElementAudioSourceNode>> = {};
+    let nodes: Partial<Record<Stem, import("signalsmith-stretch").StretchNode>> = {};
     const waitForMetadata = (audio: HTMLAudioElement) =>
       new Promise<void>((resolve, reject) => {
         const done = () => {
@@ -209,6 +228,7 @@ function MobileStudioPlayer({ project }: { project: Project }) {
         const waiting = stems.map((stem) => {
           const audio = new Audio();
           audio.preload = "metadata";
+          audio.crossOrigin = "anonymous";
           audio.src = urls[stem]!;
           tracks[stem] = audio;
           return waitForMetadata(audio);
@@ -221,6 +241,33 @@ function MobileStudioPlayer({ project }: { project: Project }) {
         if (!durations.length) throw Error("A duração das faixas não foi encontrada.");
         tracksRef.current = tracks;
         setDuration(Math.min(...durations));
+        try {
+          context = new AudioContext({ latencyHint: "playback" });
+          for (const stem of stems) {
+            const source = context.createMediaElementSource(tracks[stem]!);
+            sources[stem] = source;
+            const node = await createRealtimeLiveStem(context, source);
+            node.connect(context.destination);
+            nodes[stem] = node;
+          }
+          if (disposed) return;
+          contextRef.current = context;
+          sourcesRef.current = sources;
+          realtimeNodesRef.current = nodes;
+          setRealtimeReady(true);
+        } catch {
+          // O navegador ainda pode tocar por streaming mesmo que o AudioWorklet
+          // não esteja disponível. Reconecta todas as faixas sem transposição.
+          for (const node of Object.values(nodes)) {
+            node?.disconnect();
+            node?.port.close();
+          }
+          for (const source of Object.values(sources)) {
+            try { source?.disconnect(); source?.connect(context!.destination); } catch {}
+          }
+          nodes = {};
+          if (!disposed) setMessage("A transposição ao vivo não é compatível com este navegador. A música continua disponível no tom original.");
+        }
         setReady(true);
       } catch (error) {
         if (!disposed)
@@ -235,7 +282,16 @@ function MobileStudioPlayer({ project }: { project: Project }) {
         audio?.removeAttribute("src");
         audio?.load();
       });
+      for (const node of Object.values(nodes)) {
+        node?.disconnect();
+        node?.port.close();
+      }
+      for (const source of Object.values(sources)) source?.disconnect();
+      void context?.close();
       tracksRef.current = {};
+      sourcesRef.current = {};
+      realtimeNodesRef.current = {};
+      contextRef.current = null;
     };
     // URLs identify a distinct prepared project; loading is intentionally once
     // per project, not once per volume or playback adjustment.
@@ -284,6 +340,7 @@ function MobileStudioPlayer({ project }: { project: Project }) {
       return;
     }
     try {
+      if (contextRef.current?.state === "suspended") await contextRef.current.resume();
       tracks.forEach((audio) => {
         audio.currentTime = position;
       });
@@ -295,6 +352,15 @@ function MobileStudioPlayer({ project }: { project: Project }) {
     }
   }
 
+  function stepTone(change: number) {
+    if (!realtimeReady || !tomBase) return;
+    const next = Math.max(-11, Math.min(11, semitones + change));
+    const context = contextRef.current;
+    if (!context) return;
+    setRealtimeLivePitch(context, realtimeNodesRef.current, next);
+    setTarget(keyAt(initial, next));
+  }
+
   return (
     <section aria-label="Player de ensaio no celular" className="overflow-hidden rounded-2xl border border-white/10 bg-[radial-gradient(ellipse_at_top_right,_#344b51_0%,_#202f35_50%,_#131d23_100%)] p-4 text-white shadow-xl">
       <header className="min-w-0">
@@ -302,7 +368,19 @@ function MobileStudioPlayer({ project }: { project: Project }) {
         <h3 className="truncate text-lg font-semibold">{project.titulo}</h3>
         {project.artista && <p className="mt-1 truncate text-sm text-white/50">{project.artista}</p>}
       </header>
-      <p className="mt-3 rounded-xl bg-white/5 px-3 py-2 text-xs leading-relaxed text-white/65">As faixas são transmitidas sem baixar a música inteira na memória do celular. Tom ao vivo e metrônomo avançado ficam disponíveis no computador.</p>
+      <p className="mt-3 rounded-xl bg-white/5 px-3 py-2 text-xs leading-relaxed text-white/65">As faixas são transmitidas sem baixar a música inteira na memória do celular. Você pode testar outro tom ao vivo; a bateria mantém o tom original.</p>
+
+      <div className="mt-4 rounded-xl border border-white/10 bg-black/15 p-3">
+        <div className="flex items-center justify-between gap-3">
+          <div><p className="text-xs font-semibold text-white/90">Tom para ensaiar</p><p className="mt-0.5 text-[11px] text-white/55">{tomBase ? (realtimeReady ? "Altera ao vivo neste celular." : "Indisponível neste navegador.") : "Confirme o tom-base no Studio."}</p></div>
+          <div className="flex items-center gap-2">
+            <button type="button" aria-label="Descer um semitom" disabled={!realtimeReady || !tomBase || semitones <= -11} onClick={() => stepTone(-1)} className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white disabled:opacity-25"><Minus size={19} /></button>
+            <span aria-live="polite" className="flex h-10 min-w-12 items-center justify-center rounded-lg bg-white text-sm font-bold text-[#203138]">{tomBase ? target : "—"}</span>
+            <button type="button" aria-label="Subir um semitom" disabled={!realtimeReady || !tomBase || semitones >= 11} onClick={() => stepTone(1)} className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white disabled:opacity-25"><Plus size={19} /></button>
+          </div>
+        </div>
+        {onEscolherTomDaEscala && <button type="button" disabled={!realtimeReady || !tomBase || salvandoTomDaEscala} onClick={() => onEscolherTomDaEscala({ tom: target, bpm: project.bpm ?? undefined })} className="mt-3 min-h-10 w-full rounded-lg bg-emerald-300 px-3 text-xs font-bold text-emerald-950 disabled:opacity-40">{salvandoTomDaEscala ? "Salvando tom…" : `Usar tom ${target} nesta escala`}</button>}
+      </div>
 
       <div className="mt-4 space-y-2" aria-label="Faixas de áudio">
         {stems.map((stem) => {
@@ -344,7 +422,7 @@ function MobileStudioPlayer({ project }: { project: Project }) {
   );
 }
 
-export function LouvorStudioPlayer({ project, onEscolherTomDaEscala, salvandoTomDaEscala }: PlayerProps) {
+export function LouvorStudioPlayer({ project, onEscolherTomDaEscala, salvandoTomDaEscala, tomBaseOverride }: PlayerProps) {
   const [mobile, setMobile] = useState<boolean | null>(null);
   useEffect(() => {
     const media = window.matchMedia("(max-width: 767px), (pointer: coarse)");
@@ -355,7 +433,9 @@ export function LouvorStudioPlayer({ project, onEscolherTomDaEscala, salvandoTom
   }, []);
   if (mobile == null)
     return <section aria-busy="true" className="flex min-h-48 items-center justify-center rounded-2xl bg-[#203138] p-4 text-sm text-white/65"><LoaderCircle className="mr-2 h-5 w-5 animate-spin" />Carregando player…</section>;
-  return mobile ? <MobileStudioPlayer project={project} /> : <DesktopStudioPlayer project={project} onEscolherTomDaEscala={onEscolherTomDaEscala} salvandoTomDaEscala={salvandoTomDaEscala} />;
+  return mobile
+    ? <MobileStudioPlayer project={project} onEscolherTomDaEscala={onEscolherTomDaEscala} salvandoTomDaEscala={salvandoTomDaEscala} tomBaseOverride={tomBaseOverride} />
+    : <DesktopStudioPlayer project={project} onEscolherTomDaEscala={onEscolherTomDaEscala} salvandoTomDaEscala={salvandoTomDaEscala} tomBaseOverride={tomBaseOverride} />;
 }
 function tempoName(bpm: number) {
   if (bpm < 60) return "Largo";
@@ -365,8 +445,9 @@ function tempoName(bpm: number) {
   if (bpm < 168) return "Allegro";
   return "Presto";
 }
-function DesktopStudioPlayer({ project, onEscolherTomDaEscala, salvandoTomDaEscala = false }: PlayerProps) {
-  const initial = keyAt(project.tom_original || "C", 0);
+function DesktopStudioPlayer({ project, onEscolherTomDaEscala, salvandoTomDaEscala = false, tomBaseOverride }: PlayerProps) {
+  const tomBase = tomBaseOverride || project.tom_base_confirmado || project.tom_original;
+  const initial = keyAt(tomBase || "C", 0);
   const analyzedBeatOffset =
     typeof project.beat_offset_seg === "number" &&
     Number.isFinite(project.beat_offset_seg) &&
@@ -374,7 +455,7 @@ function DesktopStudioPlayer({ project, onEscolherTomDaEscala, salvandoTomDaEsca
       ? project.beat_offset_seg
       : null;
   const [keyConfirmed, setKeyConfirmed] = useState(
-    Boolean(project.tom_original),
+    Boolean(tomBase),
   );
   const [metronome, setMetronome] = useState(false);
   const [metronomeVolume, setMetronomeVolume] = useState(0.7);

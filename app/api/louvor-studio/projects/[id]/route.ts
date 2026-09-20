@@ -14,7 +14,7 @@ async function projetoDoPedido(req: NextRequest, context: Context) {
   const { id } = await context.params;
   if (!validId(id)) return { response: NextResponse.json({ error: "Musica invalida." }, { status: 400 }) };
   const { data: projeto, error } = await db.from("louvor_studio_projetos")
-    .select("id,status,visibilidade,criado_por,escala_id,musica_id,tom_original,bpm")
+    .select("id,status,visibilidade,criado_por,escala_id,musica_id,tom_original,tom_base_confirmado,bpm")
     .eq("id", id).maybeSingle();
   if (error || !projeto) return { response: NextResponse.json({ error: "Musica nao encontrada." }, { status: 404 }) };
   const eDono = projeto.criado_por === user.id;
@@ -50,6 +50,16 @@ export async function PATCH(req: NextRequest, context: Context) {
       .update({ ultimo_uso_em: new Date().toISOString(), expira_em: expiraEmDias(dias) }).eq("id", projeto.id);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json({ ok: true });
+  }
+
+  if (body.action === "confirmar_tom_base") {
+    if (!acesso.podeGerenciar) return NextResponse.json({ error: "Somente ministros e lideres podem confirmar o tom-base." }, { status: 403 });
+    if (projeto.status !== "concluido") return NextResponse.json({ error: "Aguarde a analise terminar." }, { status: 409 });
+    const tom = typeof body.tom === "string" ? body.tom.trim() : "";
+    if (!/^[A-G](?:#|b)?m?$/.test(tom)) return NextResponse.json({ error: "Escolha uma tonalidade valida." }, { status: 400 });
+    const { error } = await db.from("louvor_studio_projetos").update({ tom_base_confirmado: tom }).eq("id", projeto.id);
+    if (error) return NextResponse.json({ error: error.code === "PGRST204" || error.code === "42703" ? "Aplique a migration 20260920_louvor_studio_confirma_tom_base.sql no Supabase." : error.message }, { status: 500 });
+    return NextResponse.json({ ok: true, tom });
   }
 
   if (body.action === "retry") {

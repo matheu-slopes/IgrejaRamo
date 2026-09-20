@@ -58,6 +58,65 @@ export async function createRealtimeStem(
   }
 }
 
+/**
+ * Aplica a mesma mudança de tom às faixas que chegam por streaming. Assim o
+ * celular não precisa baixar nem decodificar a música completa antes de tocar.
+ */
+export async function createRealtimeLiveStem(
+  context: BaseAudioContext,
+  source: AudioNode,
+) {
+  if (!context.audioWorklet)
+    throw Error("Áudio em tempo real indisponível neste navegador.");
+  const { default: create } = await import("signalsmith-stretch");
+  create.moduleUrl = "/audio/signalsmith-stretch-1.3.2.js";
+  const node = await create(context, {
+    numberOfInputs: 1,
+    numberOfOutputs: 1,
+    outputChannelCount: [2],
+  });
+  try {
+    // Configuração com pouco atraso, adequada ao processador dos celulares.
+    await node.configure({ blockMs: 90, intervalMs: 30, splitComputation: true });
+    source.connect(node);
+    const when = context.currentTime + 0.05;
+    await node.schedule({
+      active: true,
+      output: when,
+      outputTime: when,
+      semitones: 0,
+      formantCompensation: false,
+      formantBaseHz: 0,
+    });
+    return node;
+  } catch (error) {
+    source.disconnect();
+    node.disconnect();
+    node.port.close();
+    throw error;
+  }
+}
+
+export function setRealtimeLivePitch(
+  context: BaseAudioContext,
+  nodes: Partial<Record<StudioStem, StretchNode>>,
+  semitones: number,
+) {
+  const when = context.currentTime + 0.04;
+  for (const [name, node] of Object.entries(nodes)) {
+    if (!node) continue;
+    const stem = name as StudioStem;
+    void node.schedule({
+      active: true,
+      output: when,
+      outputTime: when,
+      semitones: stem === "drums" ? 0 : semitones,
+      formantCompensation: stem === "vocals",
+      formantBaseHz: 0,
+    });
+  }
+}
+
 export function at(engine: StudioEngine) {
   return (
     engine.offset +

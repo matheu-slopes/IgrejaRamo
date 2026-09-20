@@ -31,10 +31,10 @@ export async function GET(req: NextRequest) {
   if (!acesso.podeVer) return NextResponse.json({ error: "Acesso restrito ao ministerio de Louvor." }, { status: 403 });
   await limparProjetosExpirados();
   let { data, error } = await louvorStudioAdmin.from("louvor_studio_projetos")
-    .select("*, escalas(id, culto, data, horario)").or(`visibilidade.eq.equipe,criado_por.eq.${user.id}`).order("criado_em", { ascending: false }).limit(40);
+    .select("*, escalas(id, culto, data, horario), musicas(tom)").or(`visibilidade.eq.equipe,criado_por.eq.${user.id}`).order("criado_em", { ascending: false }).limit(40);
   if (error && ["PGRST204", "42703"].includes(error.code)) {
     ({ data, error } = await louvorStudioAdmin.from("louvor_studio_projetos")
-      .select("*, escalas(id, culto, data, horario)").order("criado_em", { ascending: false }).limit(40));
+      .select("*, escalas(id, culto, data, horario), musicas(tom)").order("criado_em", { ascending: false }).limit(40));
   }
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   const ids = (data ?? []).map((projeto) => projeto.id);

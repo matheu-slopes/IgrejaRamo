@@ -18,12 +18,30 @@ function normalizar(valor: string | undefined) {
   return String(valor ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("pt-BR");
 }
 
+function isLinhaDeTab(line: string) {
+  return /^\s*[EBGDAe]\s*\|/.test(line)
+    || /^\s*\[Tab[\s\-]/i.test(line)
+    || /^\s*Parte\s+\d+\s+de\s+\d+/i.test(line);
+}
+
+function cifraSemTabs(cifra: string) {
+  return cifra.split("\n")
+    .filter((linha) => !isLinhaDeTab(linha))
+    .reduce<string[]>((linhas, linha) => {
+      if (linha.trim() === "" && linhas.at(-1)?.trim() === "") return linhas;
+      linhas.push(linha);
+      return linhas;
+    }, [])
+    .join("\n");
+}
+
 export function RepertorioTab({ podeGerenciar }: { podeGerenciar: boolean }) {
   const [musicas, setMusicas] = useState<MusicaRepertorio[]>([]);
   const [usoPorMusica, setUsoPorMusica] = useState<Map<string, number>>(new Map());
   const [busca, setBusca] = useState("");
   const [mostrarArquivadas, setMostrarArquivadas] = useState(false);
   const [selecionadaId, setSelecionadaId] = useState<string | null>(null);
+  const [tabsVisiveisDaMusica, setTabsVisiveisDaMusica] = useState<string | null>(null);
   const [editando, setEditando] = useState<MusicaRepertorio | null>(null);
   const [form, setForm] = useState<FormMusica>(FORM_VAZIO);
   const [salvando, setSalvando] = useState(false);
@@ -157,7 +175,7 @@ export function RepertorioTab({ podeGerenciar }: { podeGerenciar: boolean }) {
           const usos = usoPorMusica.get(musica.id) ?? 0;
           return <article key={musica.id} className={clsx(musica.arquivada && "bg-gray-50/70 opacity-70")}>
             <div className="flex items-center gap-3 px-4 py-3">
-              <button onClick={() => setSelecionadaId(aberta ? null : musica.id)} className="min-w-0 flex-1 text-left"><p className="truncate text-sm font-semibold text-gray-900">{musica.titulo}</p><p className="truncate text-xs text-gray-500">{musica.artista}{musica.tom ? ` · tom original ${musica.tom}` : ""}{usos ? ` · usada em ${usos} escala${usos === 1 ? "" : "s"}` : ""}</p></button>
+              <button onClick={() => { setSelecionadaId(aberta ? null : musica.id); if (aberta) setTabsVisiveisDaMusica(null); }} className="min-w-0 flex-1 text-left"><p className="truncate text-sm font-semibold text-gray-900">{musica.titulo}</p><p className="truncate text-xs text-gray-500">{musica.artista}{musica.tom ? ` · tom original ${musica.tom}` : ""}{usos ? ` · usada em ${usos} escala${usos === 1 ? "" : "s"}` : ""}</p></button>
               {musica.arquivada && <span className="rounded-full bg-gray-200 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-gray-600">Arquivada</span>}
               <ChevronDown className={clsx("h-4 w-4 text-gray-400 transition", aberta && "rotate-180")} />
             </div>
@@ -167,7 +185,7 @@ export function RepertorioTab({ podeGerenciar }: { podeGerenciar: boolean }) {
               {podeGerenciar && <button onClick={() => abrirEdicao(musica)} className="inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-100"><Pencil className="h-3.5 w-3.5" /> Editar</button>}
               {podeGerenciar && <button onClick={() => void arquivar(musica, !musica.arquivada)} className="inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-100">{musica.arquivada ? <RotateCcw className="h-3.5 w-3.5" /> : <Archive className="h-3.5 w-3.5" />}{musica.arquivada ? "Restaurar" : "Arquivar"}</button>}
               {podeGerenciar && <button disabled={usos > 0} title={usos > 0 ? "Não é possível excluir uma música que já foi usada em escala" : "Excluir definitivamente"} onClick={() => void excluir(musica)} className="inline-flex items-center gap-1 rounded-lg border border-red-100 bg-white px-2.5 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"><Trash2 className="h-3.5 w-3.5" /> Excluir</button>}
-            </div>{musica.cifra && <pre className="mt-3 max-h-64 overflow-auto rounded-xl border border-gray-100 bg-white p-3 whitespace-pre-wrap font-mono text-xs leading-5 text-gray-700">{musica.cifra}</pre>}{!musica.cifra && <p className="mt-3 text-xs text-gray-400">Cifra ainda não cadastrada.</p>}</div>}
+            </div>{musica.cifra && <><div className="mt-3 flex items-center justify-between gap-3"><p className="text-xs text-gray-500">Letra e acordes</p><button type="button" onClick={() => setTabsVisiveisDaMusica((atual) => atual === musica.id ? null : musica.id)} className="text-xs font-medium text-rose-700 hover:text-rose-800">{tabsVisiveisDaMusica === musica.id ? "Ocultar tabs" : "Ver tabs"}</button></div><pre className="mt-1.5 max-h-64 overflow-auto rounded-xl border border-gray-100 bg-white p-3 whitespace-pre-wrap font-mono text-xs leading-5 text-gray-700">{tabsVisiveisDaMusica === musica.id ? musica.cifra : cifraSemTabs(musica.cifra)}</pre></>}{!musica.cifra && <p className="mt-3 text-xs text-gray-400">Cifra ainda não cadastrada.</p>}</div>}
           </article>;
         })}</div>}
       </section>
