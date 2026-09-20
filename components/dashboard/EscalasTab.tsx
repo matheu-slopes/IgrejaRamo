@@ -817,8 +817,6 @@ export function EscalasTab({
   const [novaObs, setNovaObs] = useState("");
   const [buscaMusica, setBuscaMusica] = useState("");
   const [modalCifra, setModalCifra] = useState(false);
-  const [addingNova, setAddingNova] = useState(false);
-  const [novaMusica, setNovaMusica] = useState({ titulo: "", artista: "", tom: "" });
   const [savingNova, setSavingNova] = useState(false);
   const [saving, setSaving] = useState(false);
   const [salvarErro, setSalvarErro] = useState("");
@@ -1574,33 +1572,6 @@ export function EscalasTab({
 
   function linkYoutubeDaMusica(musica: Pick<EscalaMusica, "musicaId" | "titulo" | "artista" | "linkYoutube">) {
     return musica.linkYoutube ?? musicas.find((item) => item.id === musica.musicaId)?.linkYoutube ?? youtubeUrl(musica.titulo, musica.artista);
-  }
-
-  async function salvarNovaMusica() {
-    if (!novaMusica.titulo.trim() || !novaMusica.artista.trim()) return;
-    const duplicada = musicas.find((musica) => mesmaMusica(musica, novaMusica));
-    if (duplicada) {
-      setSalvarErro(`“${duplicada.titulo}” — ${duplicada.artista} já está no Repertório.`);
-      return;
-    }
-    setSavingNova(true);
-    try {
-      const { data, error } = await supabase
-        .from("musicas")
-        .insert({ titulo: novaMusica.titulo.trim(), artista: novaMusica.artista.trim(), tom: novaMusica.tom || null })
-        .select()
-        .single();
-      if (error) throw error;
-      const nova = data as Musica;
-      setMusicas((prev) => [...prev, nova].sort((a, b) => a.titulo.localeCompare(b.titulo, "pt-BR")));
-      addMusica(nova);
-      setNovaMusica({ titulo: "", artista: "", tom: "" });
-      setAddingNova(false);
-    } catch (err) {
-      console.error("Erro ao salvar música:", err);
-    } finally {
-      setSavingNova(false);
-    }
   }
 
   async function adicionarCifraAoRepertorio(nova: {
@@ -2752,53 +2723,6 @@ export function EscalasTab({
               })}
             </div>
           </div>
-
-          {/* Nova música */}
-          {podeGerenciarRepertorio && <div className="border border-dashed border-gray-200 rounded-xl overflow-hidden">
-            <button
-              type="button"
-              onClick={() => setAddingNova((v) => !v)}
-              className="w-full flex items-center justify-between px-3 py-2.5 text-sm font-semibold text-gray-900 hover:bg-gray-50 transition"
-            >
-              <span className="flex items-center gap-2"><Plus className="w-4 h-4" /> Adicionar música nova ao repertório</span>
-              {addingNova ? <X className="w-4 h-4 text-gray-400" /> : null}
-            </button>
-            {addingNova && (
-              <div className="px-3 pb-3 pt-1 space-y-2 bg-gray-50/40">
-                <div className="flex gap-2">
-                  <input
-                    value={novaMusica.titulo}
-                    onChange={(e) => setNovaMusica((n) => ({ ...n, titulo: e.target.value }))}
-                    placeholder="Título da música"
-                    className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-gray-400 bg-white"
-                  />
-                  <select
-                    value={novaMusica.tom}
-                    onChange={(e) => setNovaMusica((n) => ({ ...n, tom: e.target.value }))}
-                    className="border border-gray-200 rounded-lg px-2 py-2 text-sm outline-none bg-white w-20"
-                  >
-                    <option value="">Tom</option>
-                    {TONS.map((t) => <option key={t}>{t}</option>)}
-                  </select>
-                </div>
-                <div className="flex gap-2">
-                  <input
-                    value={novaMusica.artista}
-                    onChange={(e) => setNovaMusica((n) => ({ ...n, artista: e.target.value }))}
-                    placeholder="Artista / Banda"
-                    className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-gray-400 bg-white"
-                  />
-                  <button
-                    onClick={salvarNovaMusica}
-                    disabled={savingNova || !novaMusica.titulo.trim() || !novaMusica.artista.trim()}
-                    className="px-4 py-2 text-sm font-bold text-white bg-black rounded-lg hover:bg-gray-900 transition disabled:opacity-40"
-                  >
-                    {savingNova ? "..." : "+ Add"}
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>}
 
           {form.musicas.length > 0 && (
             <div className="space-y-2">
