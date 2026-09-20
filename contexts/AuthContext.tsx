@@ -90,7 +90,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const cached = loadUserCache();
     if (cached) {
       setUser(cached);
-      setIsLoading(false); // dados em cache → sem spinner
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

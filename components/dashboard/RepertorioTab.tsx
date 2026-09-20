@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlertCircle, Archive, Check, ChevronDown, ExternalLink, LoaderCircle,
   Music2, Pencil, Plus, RotateCcw, Search, Trash2, X,
@@ -8,6 +8,7 @@ import {
 import clsx from "clsx";
 import { supabase } from "@/lib/supabase";
 import { Musica } from "@/types";
+import { useAppRefresh } from "@/hooks/useAppRefresh";
 
 type MusicaRepertorio = Musica & { arquivada?: boolean; created_at?: string };
 type FormMusica = Pick<Musica, "titulo" | "artista" | "tom" | "linkYoutube" | "cifra" | "cifraUrl">;
@@ -46,10 +47,12 @@ export function RepertorioTab({ podeGerenciar }: { podeGerenciar: boolean }) {
   const [form, setForm] = useState<FormMusica>(FORM_VAZIO);
   const [salvando, setSalvando] = useState(false);
   const [carregando, setCarregando] = useState(true);
+  const [dadosCarregados, setDadosCarregados] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
-  async function carregar() {
+  const carregar = useCallback(async () => {
     setCarregando(true);
+    setErro(null);
     const [{ data: repertorio, error: erroRepertorio }, { data: escalasMusicas, error: erroUso }] = await Promise.all([
       supabase.from("musicas").select("*").order("titulo"),
       supabase.from("escala_musicas").select("musica_id"),
@@ -63,12 +66,14 @@ export function RepertorioTab({ podeGerenciar }: { podeGerenciar: boolean }) {
         if (id) usos.set(id, (usos.get(id) ?? 0) + 1);
       }
       setUsoPorMusica(usos);
+      setDadosCarregados(true);
       if (erroUso) console.warn("Não foi possível contar usos do repertório:", erroUso.message);
     }
     setCarregando(false);
-  }
+  }, []);
 
-  useEffect(() => { void carregar(); }, []);
+  useEffect(() => { void carregar(); }, [carregar]);
+  useAppRefresh(() => { void carregar(); }, [carregar], { minIntervalMs: 2500 });
 
   const visiveis = useMemo(() => {
     const termo = normalizar(busca).trim();
@@ -170,7 +175,7 @@ export function RepertorioTab({ podeGerenciar }: { podeGerenciar: boolean }) {
 
       <section className="overflow-hidden rounded-2xl border border-gray-100 bg-white">
         <div className="border-b border-gray-100 px-4 py-3 text-sm text-gray-500">{carregando ? "Carregando repertório…" : `${visiveis.length} música${visiveis.length === 1 ? "" : "s"}${mostrarArquivadas ? " (incluindo arquivadas)" : ""}`}</div>
-        {carregando ? <div className="flex justify-center p-10"><LoaderCircle className="h-5 w-5 animate-spin text-rose-700" /></div> : visiveis.length === 0 ? <p className="p-10 text-center text-sm text-gray-400">Nenhuma música encontrada.</p> : <div className="divide-y divide-gray-100">{visiveis.map((musica) => {
+        {carregando ? <div className="flex justify-center p-10"><LoaderCircle className="h-5 w-5 animate-spin text-rose-700" /></div> : !dadosCarregados ? <div className="flex flex-col items-center gap-2 p-10 text-center"><p className="text-sm text-gray-500">Não foi possível abrir o repertório.</p><button type="button" onClick={() => void carregar()} className="text-sm font-semibold text-rose-700 hover:underline">Tentar novamente</button></div> : visiveis.length === 0 ? <p className="p-10 text-center text-sm text-gray-400">Nenhuma música encontrada.</p> : <div className="divide-y divide-gray-100">{visiveis.map((musica) => {
           const aberta = selecionadaId === musica.id;
           const usos = usoPorMusica.get(musica.id) ?? 0;
           return <article key={musica.id} className={clsx(musica.arquivada && "bg-gray-50/70 opacity-70")}>

@@ -5,7 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import {
   Plus, Trash2, Pencil, X, Save, Music2, Users, Eye, EyeOff, UserCheck,
   ChevronUp as ArrowUp, ChevronDown as ArrowDown, Star, Filter, Search, Youtube, ClipboardCopy, Check, ChevronLeft,
-  CheckCircle2, XCircle, Clock3,
+  CheckCircle2, XCircle, Clock3, LoaderCircle, RotateCcw,
 } from "lucide-react";
 import clsx from "clsx";
 import {
@@ -602,6 +602,8 @@ export function EscalasTab({
   const [escalas, setEscalas] = useState<Escala[]>([]);
   const [musicas, setMusicas] = useState<Musica[]>([]);
   const [statusStudioPorMusica, setStatusStudioPorMusica] = useState<Record<string, StatusStudioMusica>>({});
+  const [dadosCarregados, setDadosCarregados] = useState(false);
+  const [erroCarregamento, setErroCarregamento] = useState<string | null>(null);
   const fetchSeqRef = useRef(0);
   const escalasExcluidasRef = useRef<Set<string>>(new Set());
   const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
@@ -626,6 +628,7 @@ export function EscalasTab({
     if (isLoading || !user?.id) return;
 
     const reqSeq = ++fetchSeqRef.current;
+    setErroCarregamento(null);
     const projetosStudioPromise: Promise<ProjetoStudioResumo[]> = ministerio === "Louvor"
       ? supabase.auth.getSession().then(async ({ data }) => {
         if (!data.session?.access_token) return [];
@@ -657,7 +660,9 @@ export function EscalasTab({
     // Evita sobrescrever com respostas antigas quando há múltiplos eventos em sequência.
     if (reqSeq !== fetchSeqRef.current) return;
 
-    if (perfisRes.data) {
+    if (perfisRes.error) {
+      console.error("Erro ao carregar membros do ministério:", perfisRes.error.message);
+    } else if (perfisRes.data) {
       setMembros(ordenarMembrosPorNome(perfisRes.data.map((p: Record<string, unknown>) => ({
         id: p.id as string,
         nome: p.nome as string,
@@ -672,6 +677,7 @@ export function EscalasTab({
 
     if (escalasRes.error) {
       console.error("Erro ao carregar escalas do ministério:", escalasRes.error.message);
+      setErroCarregamento("Não foi possível carregar as escalas agora.");
     } else {
       const escalasParseadas = (escalasRes.data ?? []).map((e: Record<string, unknown>) => ({
         id: e.id as string,
@@ -707,9 +713,12 @@ export function EscalasTab({
           })),
       }));
       setEscalas(escalasParseadas.filter((e) => !escalasExcluidasRef.current.has(e.id)));
+      setDadosCarregados(true);
     }
 
-    if (musicasRes.data) {
+    if (musicasRes.error) {
+      console.error("Erro ao carregar repertório:", musicasRes.error.message);
+    } else if (musicasRes.data) {
       setMusicas(musicasRes.data.map((m: Record<string, unknown>) => ({
         id: m.id as string,
         titulo: m.titulo as string,
@@ -753,6 +762,11 @@ export function EscalasTab({
     if (isLoading || !user?.id) return;
     void carregarDados();
   }, [carregarDados, isLoading, user?.id]);
+
+  useEffect(() => {
+    setDadosCarregados(false);
+    setErroCarregamento(null);
+  }, [ministerio, user?.id]);
 
   useEffect(() => {
     if (isLoading || !user?.id) return;
@@ -1860,7 +1874,20 @@ export function EscalasTab({
 
           {/* Lista */}
           <div className={clsx("flex flex-col gap-3 min-w-0", selectedEscala ? "hidden lg:flex lg:w-72 shrink-0" : "w-full")}>
-            {escalasVisiveis.length === 0 ? (
+            {!dadosCarregados || isLoading ? (
+              <div className="flex flex-col items-center justify-center py-16 gap-3 bg-gray-50 rounded-2xl border border-dashed border-gray-200 text-center">
+                <LoaderCircle className="w-6 h-6 animate-spin text-gray-400" />
+                <p className="text-sm text-gray-400">Carregando escalas…</p>
+              </div>
+            ) : erroCarregamento && escalas.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16 gap-3 bg-gray-50 rounded-2xl border border-dashed border-gray-200 text-center">
+                <XCircle className="w-7 h-7 text-rose-300" />
+                <p className="text-sm text-gray-500">{erroCarregamento}</p>
+                <button onClick={() => void carregarDados()} className="inline-flex items-center gap-1.5 text-sm text-gray-900 font-semibold hover:underline">
+                  <RotateCcw className="w-3.5 h-3.5" /> Tentar novamente
+                </button>
+              </div>
+            ) : escalasVisiveis.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 gap-2 bg-gray-50 rounded-2xl border border-dashed border-gray-200 text-center">
                 <Users className="w-7 h-7 text-gray-300" />
                 <p className="text-sm text-gray-400">

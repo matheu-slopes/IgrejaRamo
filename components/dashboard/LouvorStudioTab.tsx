@@ -5,6 +5,7 @@ import { AlertCircle, CheckCircle2, Disc3, Download, LibraryBig, LoaderCircle, M
 import { LouvorStudioPlayer } from "./LouvorStudioPlayer";
 import { supabase } from "@/lib/supabase";
 import { withDeadline } from "@/lib/withDeadline";
+import { useAppRefresh } from "@/hooks/useAppRefresh";
 
 type SearchResult = {
   id: string;
@@ -187,6 +188,8 @@ export function LouvorStudioTab({
     const timer = window.setTimeout(() => void loadProjects(), 0);
     return () => window.clearTimeout(timer);
   }, [loadProjects]);
+
+  useAppRefresh(() => { void loadProjects(); }, [loadProjects], { minIntervalMs: 2500 });
 
   const pending = projects.some((project) => !["concluido", "erro"].includes(project.status));
   useEffect(() => {

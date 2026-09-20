@@ -42,7 +42,7 @@ const corMap: Record<string, string> = {
 export default function CanalMinisterioPage() {
   const params = useParams();
   const slug = decodeURIComponent(params.id as string) as Ministerio;
-  const { user, temPermissao, temPermissaoNoMinisterio } = useAuth();
+  const { user, isLoading, temPermissao, temPermissaoNoMinisterio } = useAuth();
 
   // ── estado global ─────────────────────────────────────────────────────
   const [tab, setTab] = useState<Tab>(() => slug === "Ensino" ? "chat" : "escalas");
@@ -103,6 +103,7 @@ export default function CanalMinisterioPage() {
 
   useEffect(() => {
     let ativo = true;
+    if (isLoading) return () => { ativo = false; };
     if (slug !== "Louvor" || !user?.id) {
       setStudioAccess({ autorizado: false, podeGerenciar: false, podePrepararEnsaio: false, workerConfigurado: false, youtubeConfigurado: false });
       return;
@@ -127,17 +128,17 @@ export default function CanalMinisterioPage() {
         .catch(() => {});
     });
     return () => { ativo = false; };
-  }, [slug, user?.id]);
+  }, [isLoading, slug, user?.id]);
 
   useEffect(() => {
     // Ao trocar de ministério, abre sua área principal. Ensino não possui escalas.
     setTab(temEscalas ? "escalas" : "chat");
   }, [slug, temEscalas]);
 
-  if (!canalBase) {
+  if (isLoading || !canalBase) {
     return (
       <div className="flex items-center justify-center h-60 text-gray-400">
-        Carregando canal...
+        {isLoading ? "Restaurando seu acesso..." : "Carregando canal..."}
       </div>
     );
   }
