@@ -22,7 +22,7 @@ def sample_windows(duration: float | None) -> list[tuple[float, float]]:
             for fraction in (0.2, 0.5, 0.75)]
 
 
-def estimate(excerpts: list, sr: int = SAMPLE_RATE) -> tuple[str | None, float | None]:
+def estimate(excerpts: list, sr: int = SAMPLE_RATE, include_key: bool = True) -> tuple[str | None, float | None]:
     import librosa
     import numpy as np
 
@@ -34,10 +34,10 @@ def estimate(excerpts: list, sr: int = SAMPLE_RATE) -> tuple[str | None, float |
             continue
         # Reuse the same spectrum for key and tempo; analysis remains bounded.
         spectrum = np.abs(librosa.stft(y, n_fft=4096, hop_length=HOP_LENGTH)) ** 2
-        chroma = librosa.feature.chroma_stft(S=spectrum, sr=sr, n_fft=4096, hop_length=HOP_LENGTH)
+        chroma = librosa.feature.chroma_stft(S=spectrum, sr=sr, n_fft=4096, hop_length=HOP_LENGTH) if include_key else None
         energy = spectrum.sum(axis=0)
         active = energy > energy.max() * 0.01
-        if active.any():
+        if chroma is not None and active.any():
             chromas.append(chroma[:, active].mean(axis=1))
         mel = librosa.feature.melspectrogram(S=spectrum, sr=sr, n_fft=4096, n_mels=64)
         onset = librosa.onset.onset_strength(S=librosa.power_to_db(mel), sr=sr, hop_length=HOP_LENGTH)
@@ -103,7 +103,7 @@ def estimate_beat_offset(
     return round((math.atan2(mean.imag, mean.real) % (2 * np.pi)) * period / (2 * np.pi), 3)
 
 
-def analyze(path: Path, ffmpeg: str, duration: float | None = None) -> dict:
+def analyze(path: Path, ffmpeg: str, duration: float | None = None, include_key: bool = True) -> dict:
     import numpy as np
     started = time.perf_counter()
     if not path.is_file():
@@ -124,7 +124,7 @@ def analyze(path: Path, ffmpeg: str, duration: float | None = None) -> dict:
         samples = np.frombuffer(decoded.stdout, dtype='<f4')
         if samples.size:
             excerpts.append((start, samples))
-    key, bpm = estimate([samples for _, samples in excerpts])
+    key, bpm = estimate([samples for _, samples in excerpts], include_key=include_key)
     beat_offset = estimate_beat_offset(excerpts, bpm)
     return {'tom': key, 'bpm': bpm, 'beat_offset_seg': beat_offset,
             'sampled_seconds': round(sum(len(y) for _, y in excerpts) / SAMPLE_RATE, 2),
@@ -136,5 +136,6 @@ if __name__ == '__main__':
     parser.add_argument('audio', type=Path)
     parser.add_argument('--ffmpeg', required=True)
     parser.add_argument('--duration', type=float)
+    parser.add_argument('--skip-key', action='store_true')
     args = parser.parse_args()
-    print(json.dumps(analyze(args.audio, args.ffmpeg, args.duration), ensure_ascii=True, allow_nan=False))
+    print(json.dumps(analyze(args.audio, args.ffmpeg, args.duration, include_key=not args.skip_key), ensure_ascii=True, allow_nan=False))

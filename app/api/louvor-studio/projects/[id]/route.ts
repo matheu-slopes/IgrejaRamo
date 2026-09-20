@@ -77,8 +77,11 @@ export async function PATCH(req: NextRequest, context: Context) {
   const escalaId = typeof body.escalaId === "string" && validId(body.escalaId) ? body.escalaId : projeto.escala_id;
   const musicaId = typeof body.musicaId === "string" && validId(body.musicaId) ? body.musicaId : projeto.musica_id;
   if (!escalaId || !musicaId) return NextResponse.json({ error: "Esta preparacao nao foi iniciada a partir de uma musica da escala." }, { status: 409 });
-  if (!projeto.tom_original && !projeto.bpm) return NextResponse.json({ error: "O Studio nao conseguiu identificar tom ou BPM nesta gravacao." }, { status: 409 });
-  const tomEscolhido = typeof body.tom === "string" ? body.tom.trim() : projeto.tom_original;
+  const { data: musica } = await db.from("musicas").select("tom").eq("id", musicaId).maybeSingle();
+  const tomDaCifra = typeof musica?.tom === "string" && /^[A-G](?:#|b)?m?$/.test(musica.tom) ? musica.tom : null;
+  const tomBase = tomDaCifra ?? projeto.tom_original;
+  if (!tomBase && !projeto.bpm) return NextResponse.json({ error: "Defina o tom da cifra ou aguarde o BPM da gravacao." }, { status: 409 });
+  const tomEscolhido = typeof body.tom === "string" ? body.tom.trim() : tomBase;
   if (!/^[A-G](?:#|b)?m?$/.test(tomEscolhido ?? "")) return NextResponse.json({ error: "Escolha uma tonalidade valida no player." }, { status: 400 });
   const bpmEscolhido = typeof body.bpm === "number" && Number.isFinite(body.bpm) && body.bpm > 0 ? Number(body.bpm.toFixed(2)) : projeto.bpm ?? null;
   if (escalaId !== projeto.escala_id || musicaId !== projeto.musica_id) {

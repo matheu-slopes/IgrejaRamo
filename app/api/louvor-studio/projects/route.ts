@@ -68,6 +68,11 @@ export async function POST(req: NextRequest) {
   const musicaId = typeof body.musicaId === "string" ? body.musicaId.trim() : "";
   if (!acesso.podeGerenciar && (escalaId || musicaId)) return NextResponse.json({ error: "Somente ministros e lideres podem preparar musicas para uma escala." }, { status: 403 });
   if (musicaId && !uuidValido(musicaId)) return NextResponse.json({ error: "Musica do Repertorio invalida." }, { status: 400 });
+  let tomDaCifra: string | null = null;
+  if (musicaId) {
+    const { data: musica } = await louvorStudioAdmin.from("musicas").select("tom").eq("id", musicaId).maybeSingle();
+    if (typeof musica?.tom === "string" && /^[A-G](?:#|b)?m?$/.test(musica.tom)) tomDaCifra = musica.tom;
+  }
   let escala: { id: string; ministerio: string } | null = null;
   if (escalaId) {
     const { data: escalaEncontrada } = await louvorStudioAdmin.from("escalas").select("id, ministerio").eq("id", escalaId).maybeSingle();
@@ -119,6 +124,9 @@ export async function POST(req: NextRequest) {
     escala_id: escala?.id ?? null, musica_id: musicaId || null, youtube_url: url,
     titulo: (typeof body.titulo === "string" ? body.titulo.trim() : "") || "Processando musica",
     artista: (typeof body.artista === "string" ? body.artista.trim() : "") || null, thumbnail_url: body.thumbnailUrl || null,
+    // A cifra confirmada no Repertório é a referência musical da preparação.
+    // A análise automática fica apenas com BPM/grade de batidas.
+    tom_original: tomDaCifra,
     tom_alvo: typeof body.tomAlvo === "string" ? body.tomAlvo.trim() || null : null, expira_em: expiraEm, status: "aguardando", progresso: 0, erro: null,
   }).select("*").single();
   if (error && ["PGRST204", "42703"].includes(error.code)) return NextResponse.json({ error: "Aplique a migration 20260920_louvor_studio_ensaios_pessoais.sql no Supabase." }, { status: 503 });

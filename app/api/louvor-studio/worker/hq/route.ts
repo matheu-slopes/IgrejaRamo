@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
   const projectId = body.kind === "pitch" ? row.projeto_id : row.id;
   const { data: project } = await db
     .from("louvor_studio_projetos")
-    .select("id,separation_mode,expira_em")
+    .select("id,separation_mode,expira_em,tom_original")
     .eq("id", projectId)
     .maybeSingle();
   if (!project || new Date(project.expira_em) <= new Date())
@@ -128,7 +128,9 @@ export async function POST(req: NextRequest) {
       update.lossless_stems = Object.fromEntries(
         names.map((n) => [n, expected[n + "_wav"]]),
       );
-      if (typeof body.key === "string" && /^[A-G][#b]?m?$/.test(body.key))
+      // Quando a música veio do Repertório, tom_original já é a tonalidade
+      // confirmada na cifra. Não a substitua por uma estimativa do áudio.
+      if (!project.tom_original && typeof body.key === "string" && /^[A-G][#b]?m?$/.test(body.key))
         update.tom_original = body.key;
       if (Number.isFinite(body.bpm) && body.bpm > 0 && body.bpm < 400)
         update.bpm = body.bpm;

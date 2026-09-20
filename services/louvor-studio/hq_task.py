@@ -46,7 +46,13 @@ def execute(job,work):
         source=work/"source.wav";metadata_wav=convert_wav(downloaded,source)
         emit(22,"analisando")
         try:
-            analysis=json.loads(run([sys.executable,ROOT/"analysis.py",source,"--ffmpeg",ffmpeg_path(),"--duration",str(duration)],45).stdout)
+            analysis_command=[sys.executable,ROOT/"analysis.py",source,"--ffmpeg",ffmpeg_path(),"--duration",str(duration)]
+            # O tom salvo no Repertório vem da referência principal do Cifra
+            # Club e é a fonte de verdade. Neste caso só calculamos BPM e a
+            # grade de batidas, sem tentar estimar a tonalidade pelo áudio.
+            if project.get("tom_original"):
+                analysis_command.append("--skip-key")
+            analysis=json.loads(run(analysis_command,45).stdout)
         except Exception:
             analysis={"tom":None,"bpm":None,"beat_offset_seg":None}
         digest=file_hash(source);key=cache_key(VERSION,digest,mode,MODELS[mode])

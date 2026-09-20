@@ -121,8 +121,6 @@ export function LouvorStudioTab({
   const [retryingId, setRetryingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [applyingId, setApplyingId] = useState<string | null>(null);
-  const [confirmandoTomBaseId, setConfirmandoTomBaseId] = useState<string | null>(null);
-  const [tomBaseEmTeste, setTomBaseEmTeste] = useState<Record<string, string>>({});
   const [indiceDaFila, setIndiceDaFila] = useState(0);
   const podePreparar = podeGerenciar || podePrepararEnsaio;
 
@@ -343,29 +341,6 @@ export function LouvorStudioTab({
       setMessage(error instanceof Error ? error.message : "Não foi possível confirmar o tom.");
     } finally {
       setApplyingId(null);
-    }
-  }
-
-  async function confirmarTomBase(project: Projeto, tom: string) {
-    if (confirmandoTomBaseId) return;
-    // Atualiza o player imediatamente para o líder ouvir o resultado, mesmo
-    // antes da resposta do servidor chegar.
-    setTomBaseEmTeste((atual) => ({ ...atual, [project.id]: tom }));
-    setConfirmandoTomBaseId(project.id);
-    setMessage(null);
-    try {
-      const response = await studioFetch(`/api/louvor-studio/projects/${project.id}`, {
-        method: "PATCH",
-        body: JSON.stringify({ action: "confirmar_tom_base", tom }),
-      });
-      const data = await response.json().catch(() => ({})) as { error?: string };
-      if (!response.ok) throw new Error(data.error ?? "Não foi possível confirmar o tom-base.");
-      setMessage(null);
-      await loadProjects();
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Não foi possível confirmar o tom-base.");
-    } finally {
-      setConfirmandoTomBaseId(null);
     }
   }
 
@@ -822,32 +797,10 @@ export function LouvorStudioTab({
           )}
           {selected?.status === "concluido" && (
             <>
-              {(selected.musicas?.tom || selected.tom_original || selected.bpm) && (
-                <section className={`mb-4 rounded-2xl border p-4 ${selected.musicas?.tom && selected.tom_original && selected.musicas.tom !== selected.tom_original ? "border-amber-200 bg-amber-50/70" : "border-emerald-100 bg-emerald-50/60"}`}>
-                  <div className="flex flex-wrap items-start justify-between gap-2">
-                    <div><p className="text-xs font-bold uppercase tracking-widest text-emerald-700">Tom e andamento</p><p className="mt-1 text-xs text-gray-600">Teste no player e confirme o tom que a equipe usará.</p></div>
-                    {selected.musicas?.tom && selected.tom_original && (selected.musicas.tom === selected.tom_original
-                      ? <span className="rounded-full bg-emerald-700 px-3 py-1 text-xs font-semibold text-white">Tom confirmado</span>
-                      : <span className="rounded-full bg-amber-600 px-3 py-1 text-xs font-semibold text-white">Confira a referência</span>)}
-                  </div>
-                  <div className="mt-3 flex flex-wrap gap-2 text-sm text-gray-700">
-                    {selected.musicas?.tom && <span className="rounded-full bg-white px-3 py-1 font-semibold shadow-sm">Cifra: {selected.musicas.tom}</span>}
-                    {selected.tom_original && <span className="rounded-full bg-white px-3 py-1 font-semibold shadow-sm">Áudio: {selected.tom_original}</span>}
-                    {selected.bpm && <span className="rounded-full bg-white px-3 py-1 font-semibold shadow-sm">{Math.round(selected.bpm)} BPM</span>}
-                  </div>
-                  {selected.musicas?.tom && selected.tom_original && selected.musicas.tom !== selected.tom_original && podeGerenciar && (
-                    <div className="mt-3 flex flex-wrap items-center gap-2">
-                      <button type="button" disabled={confirmandoTomBaseId === selected.id} onClick={() => void confirmarTomBase(selected, selected.tom_original!)} className="rounded-lg bg-gray-900 px-3 py-2 text-xs font-semibold text-white hover:bg-gray-800 disabled:opacity-50">Usar áudio ({selected.tom_original})</button>
-                      <button type="button" disabled={confirmandoTomBaseId === selected.id} onClick={() => void confirmarTomBase(selected, selected.musicas!.tom!)} className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50">Usar cifra ({selected.musicas.tom})</button>
-                    </div>
-                  )}
-                  {(tomBaseEmTeste[selected.id] || selected.tom_base_confirmado) && <p className="mt-3 text-xs font-semibold text-emerald-800">O player está usando {tomBaseEmTeste[selected.id] || selected.tom_base_confirmado} como tom-base.</p>}
-                </section>
-              )}
               <LouvorStudioPlayer
-                key={`${selected.id}-${tomBaseEmTeste[selected.id] || selected.tom_base_confirmado || selected.tom_original || "sem-tom"}`}
+                key={`${selected.id}-${selected.musicas?.tom || selected.tom_original || "sem-tom"}`}
                 project={selected}
-                tomBaseOverride={tomBaseEmTeste[selected.id]}
+                tomBaseOverride={selected.musicas?.tom || undefined}
                 salvandoTomDaEscala={applyingId === selected.id}
                 onEscolherTomDaEscala={selected.escalas && selected.musica_id && podeGerenciar
                   ? (escolha) => void confirmarTomNaEscala(selected, escolha)
