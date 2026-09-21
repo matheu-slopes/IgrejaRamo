@@ -634,6 +634,9 @@ export function EscalasTab({
         if (!data.session?.access_token) return [];
         const resposta = await fetch("/api/louvor-studio/projects", {
           cache: "no-store",
+          // Studio status is optional and must not block the schedules list.
+          // It may be slow while storage URLs are being signed.
+          signal: AbortSignal.timeout(5_000),
           headers: { Authorization: `Bearer ${data.session.access_token}` },
         });
         if (!resposta.ok) return [];
@@ -647,13 +650,15 @@ export function EscalasTab({
         .from("perfis")
         .select("id, nome, email, telefone, role, data_ingresso")
         .contains("ministerios", [ministerio])
-        .eq("ativo", true),
+        .eq("ativo", true)
+        .abortSignal(AbortSignal.timeout(12_000)),
       supabase
         .from("escalas")
         .select("*, escala_itens(*), escala_musicas(*)")
         .eq("ministerio", ministerio)
-        .order("data", { ascending: false }),
-      supabase.from("musicas").select().order("titulo"),
+        .order("data", { ascending: false })
+        .abortSignal(AbortSignal.timeout(12_000)),
+      supabase.from("musicas").select().order("titulo").abortSignal(AbortSignal.timeout(12_000)),
       projetosStudioPromise,
     ]);
 
@@ -676,6 +681,8 @@ export function EscalasTab({
     }
 
     if (escalasRes.error) {
+      // Stop the spinner so the retry action is available after a network failure.
+      setDadosCarregados(true);
       console.error("Erro ao carregar escalas do ministério:", escalasRes.error.message);
       setErroCarregamento("Não foi possível carregar as escalas agora.");
     } else {
@@ -756,7 +763,7 @@ export function EscalasTab({
     setStatusStudioPorMusica(proximosStatus);
   }, [isLoading, ministerio, user?.id]);
 
-  useAppRefresh(() => { void carregarDados(); }, [carregarDados], { minIntervalMs: 2000 });
+  useAppRefresh(() => { void carregarDados(); }, [carregarDados], { runOnMount: false, minIntervalMs: 2000 });
 
   useEffect(() => {
     if (isLoading || !user?.id) return;
@@ -1845,7 +1852,7 @@ export function EscalasTab({
 
           {/* Lista */}
           <div className={clsx("flex flex-col gap-3 min-w-0", selectedEscala ? "hidden lg:flex lg:w-72 shrink-0" : "w-full")}>
-            {!dadosCarregados || isLoading ? (
+            {isLoading || (!dadosCarregados && !erroCarregamento) ? (
               <div className="flex flex-col items-center justify-center py-16 gap-3 bg-gray-50 rounded-2xl border border-dashed border-gray-200 text-center">
                 <LoaderCircle className="w-6 h-6 animate-spin text-gray-400" />
                 <p className="text-sm text-gray-400">Carregando escalas…</p>
