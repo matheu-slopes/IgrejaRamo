@@ -134,7 +134,8 @@ function route(overrides = {}) {
   return loadTs('app/api/louvor-studio/search/route.ts', {
     'next/server': { NextResponse: { json: (body, init) => Response.json(body, init) } },
     '@/lib/louvorStudioServer': {
-      getLouvorStudioUser: async () => ({ id: 'user' }), podeGerenciarLouvorStudio: async () => true,
+      getLouvorStudioUser: async () => ({ id: 'user' }),
+      getLouvorStudioAccess: async () => ({ podeVer: true, podeGerenciar: true }),
       ...overrides,
     },
     '@/lib/youtubeSearch': search,
@@ -148,7 +149,7 @@ const request = (query) => new Request('http://localhost/api/louvor-studio/searc
 test('route preserves authentication and manager-only access', async (t) => {
   mockFetch(t, () => assert.fail('unauthorized search must not fetch'));
   assert.equal((await route({ getLouvorStudioUser: async () => null })(request('musica'))).status, 401);
-  assert.equal((await route({ podeGerenciarLouvorStudio: async () => false })(request('musica'))).status, 403);
+  assert.equal((await route({ getLouvorStudioAccess: async () => ({ podeVer: false, podeGerenciar: false }) })(request('musica'))).status, 403);
 });
 
 test('route rejects malformed queries and non-YouTube links', async (t) => {
@@ -189,7 +190,8 @@ function projectRoute({ authorized = true, manager = true, worker = true, validS
       return query;
     }
     assert.equal(table, 'louvor_studio_projetos');
-    return { select() { return this; }, eq() { return this; }, async in() { return { count: 0 }; }, insert(value) {
+    return { select() { return this; }, eq() { return this; }, gt() { return this; }, order() { return this; }, limit() { return this; },
+      async maybeSingle() { return { data: null }; }, async in() { return { count: 0 }; }, insert(value) {
       inserted = value;
       return { select() { return { async single() { return { data: { id: 'project', ...value } }; } }; } };
     } };
@@ -202,6 +204,7 @@ function projectRoute({ authorized = true, manager = true, worker = true, validS
       getLouvorStudioAccess: async () => ({ podeVer: true, podeGerenciar: manager }),
       workerConfigurado: () => worker, louvorStudioAdmin: admin,
     },
+    '@/lib/louvorStudioStorage': { criarUrlDeLeitura: async () => '' },
   });
   return { POST, inserted: () => inserted };
 }
@@ -219,7 +222,7 @@ test('preparing without a chosen key creates a queued project with no target key
     assert.equal(project.tom_alvo, null);
     assert.equal(project.status, 'aguardando');
     assert.equal(project.escala_id, 'scale');
-    assert.equal(handler.inserted().tom_original, undefined);
+    assert.equal(handler.inserted().tom_original, null);
   }
 });
 
