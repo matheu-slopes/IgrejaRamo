@@ -73,6 +73,47 @@ export function validarWorker(req: NextRequest): boolean {
   return timingSafeEqual(Buffer.from(esperado), Buffer.from(recebido));
 }
 
+/**
+ * Turns abandoned HQ jobs into visible, retryable failures.
+ *
+ * The worker normally performs this cleanup while claiming its next job. That
+ * is not sufficient when the computer running it is switched off: no one is
+ * left to claim a job, so the UI would otherwise keep showing a spinner
+ * forever. This function is safe to call on every library read because a
+ * healthy worker heartbeat wins the timestamp predicate.
+ */
+export async function recuperarProcessamentosLouvorTravados(): Promise<void> {
+  const limite = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+  const mensagem = "O processador de áudio parou de responder. Inicie o worker e tente novamente.";
+  const atualizadoEm = new Date().toISOString();
+
+  await Promise.all([
+    louvorStudioAdmin
+      .from("louvor_studio_projetos")
+      .update({
+        status: "erro",
+        erro: mensagem,
+        claim_token: null,
+        worker_id: null,
+        atualizado_em: atualizadoEm,
+      })
+      .eq("pipeline_version", 2)
+      .in("status", ["baixando", "analisando", "separando"])
+      .lt("atualizado_em", limite),
+    louvorStudioAdmin
+      .from("louvor_studio_versions")
+      .update({
+        status: "erro",
+        erro: mensagem,
+        claim_token: null,
+        worker_id: null,
+        atualizado_em: atualizadoEm,
+      })
+      .eq("status", "processando")
+      .lt("atualizado_em", limite),
+  ]);
+}
+
 export async function limparProjetosExpirados(): Promise<number> {
   const { listarAudios, removerAudios } = await import("@/lib/louvorStudioStorage");
   const { data } = await louvorStudioAdmin

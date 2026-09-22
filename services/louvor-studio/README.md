@@ -24,7 +24,7 @@ O download do YouTube continua usando yt-dlp `bestaudio/best`. Pesquisa por nome
 
 ## Fila, cache e arquivos
 
-A função SQL `claim_louvor_hq` faz reserva atômica com token por tentativa. O worker publica progresso/heartbeat a cada cinco segundos. Reservas sem heartbeat por cinco minutos viram erro visível; versões admitem até três tentativas. Há limites de tarefas pendentes por usuário e um bloqueio de instância local do worker. Na etapa final, até três arquivos são enviados em paralelo para reduzir a espera de upload dos stems WAV/MP3.
+A função SQL `claim_louvor_hq` faz reserva atômica com token por tentativa. O worker publica progresso/heartbeat a cada cinco segundos. Reservas sem heartbeat por cinco minutos viram erro visível na próxima atualização da biblioteca, mesmo que nenhum outro worker esteja ligado; versões admitem até três tentativas. Há limites de tarefas pendentes por usuário e um bloqueio de instância local do worker. Na etapa final, até três arquivos são enviados em paralelo para reduzir a espera de upload dos stems WAV/MP3.
 
 O cache local usa hash do áudio, modelo/versão do processamento, semitons e velocidade; não usa apenas o título. Escritas são finalizadas atomicamente e entradas sem uso por sete dias são apagadas. Os temporários de cada tarefa são removidos ao terminar ou falhar. Limite total de uma tarefa: `HQ_TIMEOUT_SECONDS`, padrão 7200 segundos. No encerramento por timeout, os processos filhos também são finalizados.
 

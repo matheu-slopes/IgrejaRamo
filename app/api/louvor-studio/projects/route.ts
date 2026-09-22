@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { youtubeId } from "@/lib/youtubeSearch";
-import { getLouvorStudioAccess, getLouvorStudioUser, limparProjetosExpirados, louvorStudioAdmin, workerConfigurado } from "@/lib/louvorStudioServer";
+import { getLouvorStudioAccess, getLouvorStudioUser, limparProjetosExpirados, louvorStudioAdmin, recuperarProcessamentosLouvorTravados, workerConfigurado } from "@/lib/louvorStudioServer";
 import { criarUrlDeLeitura } from "@/lib/louvorStudioStorage";
 
 type ProjetoRow = { id: string; audio_path?: string | null; stems?: Record<string, string> | null; [key: string]: unknown };
@@ -29,7 +29,9 @@ export async function GET(req: NextRequest) {
   if (!user) return NextResponse.json({ error: "Nao autorizado" }, { status: 401 });
   const acesso = await getLouvorStudioAccess(user.id);
   if (!acesso.podeVer) return NextResponse.json({ error: "Acesso restrito ao ministerio de Louvor." }, { status: 403 });
-  await limparProjetosExpirados();
+  // A biblioteca atualiza enquanto há uma tarefa pendente. Aproveite a leitura
+  // para revelar uma queda do worker, sem esperar outro worker consultar a fila.
+  await Promise.all([limparProjetosExpirados(), recuperarProcessamentosLouvorTravados()]);
   let { data, error } = await louvorStudioAdmin.from("louvor_studio_projetos")
     .select("*, escalas(id, culto, data, horario), musicas(tom)").or(`visibilidade.eq.equipe,criado_por.eq.${user.id}`).order("criado_em", { ascending: false }).limit(40);
   if (error && ["PGRST204", "42703"].includes(error.code)) {

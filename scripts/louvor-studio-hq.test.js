@@ -86,6 +86,11 @@ function workerRoute({authorized=true,missing=false}={}){
   '@/lib/louvorStudioMusic':music,
   '@/lib/louvorStudioServer':{validarWorker:()=>authorized,louvorStudioAdmin:db},
   '@/lib/louvorStudioHqServer':{uuidValid:value=>/^[a-f0-9-]{36}$/.test(value)},
+  '@/lib/louvorStudioStorage':{
+   criarUrlDeEnvio:async path=>{uploads.push(path);return 'https://storage.example/'+path;},
+   existeAudio:async()=>!missing,
+   removerAudios:async()=>{},
+  },
  });
  return {call:(action,extra={},kind='pitch')=>POST(new Request('http://localhost/worker/hq',{method:'POST',headers:{'x-worker-id':'worker'},body:JSON.stringify({kind,id:versionId,claimToken,action,...extra})})),uploads,update:()=>update};
 }
