@@ -23,6 +23,16 @@ WORKER=os.environ.get("LOUVOR_STUDIO_WORKER_ID",socket.gethostname())+"-hq"
 HEADERS={"X-Worker-Secret":SECRET,"X-Worker-Id":WORKER}
 TIMEOUT=int(os.environ.get("HQ_TIMEOUT_SECONDS","7200"))
 
+def terminate_tree(child):
+    """Stop the task and every process it started, including Demucs and FFmpeg."""
+    if child.poll() is not None:
+        return
+    if os.name=="nt":
+        subprocess.run(["taskkill","/PID",str(child.pid),"/T","/F"],capture_output=True,timeout=15)
+    else:
+        os.killpg(child.pid,signal.SIGKILL)
+    child.wait(timeout=15)
+
 def api(method,payload=None):
     response=requests.request(method,SITE+"/api/louvor-studio/worker/hq",headers=HEADERS,json=payload,timeout=20)
     if not response.ok:raise RuntimeError(f"API HQ HTTP {response.status_code}: {response.text[:180]}")
@@ -59,6 +69,15 @@ def process(job):
                 child=subprocess.Popen([sys.executable,"-u",str(ROOT/"hq_task.py"),str(manifest)],
                     stdout=output,stderr=subprocess.STDOUT,start_new_session=os.name!="nt",
                     creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if os.name=="nt" else 0)
+                # Popen.wait(timeout=...) is normally sufficient, but some
+                # Windows audio backends create a nested Python process that
+                # can leave the parent wait blocked. The independent daemon
+                # guarantees that the full process tree is stopped at the
+                # configured deadline.
+                def enforce_deadline():
+                    if not stopped.wait(TIMEOUT):
+                        terminate_tree(child)
+                threading.Thread(target=enforce_deadline,daemon=True).start()
                 try:
                     if child.wait(timeout=TIMEOUT):raise RuntimeError("O processamento de áudio falhou.")
                 except BaseException:

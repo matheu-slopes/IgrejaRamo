@@ -83,7 +83,11 @@ export function validarWorker(req: NextRequest): boolean {
  * healthy worker heartbeat wins the timestamp predicate.
  */
 export async function recuperarProcessamentosLouvorTravados(): Promise<void> {
-  const limite = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+  const agora = Date.now();
+  const limite = new Date(agora - 5 * 60 * 1000).toISOString();
+  // A heartbeat proves that a process exists, not that the audio engine is
+  // advancing. Never let it keep one task alive beyond the worker time limit.
+  const limiteMaximo = new Date(agora - 2 * 60 * 60 * 1000).toISOString();
   const mensagem = "O processador de áudio parou de responder. Inicie o worker e tente novamente.";
   const atualizadoEm = new Date().toISOString();
 
@@ -99,7 +103,7 @@ export async function recuperarProcessamentosLouvorTravados(): Promise<void> {
       })
       .eq("pipeline_version", 2)
       .in("status", ["baixando", "analisando", "separando"])
-      .lt("atualizado_em", limite),
+      .or(`atualizado_em.lt.${limite},processando_em.lt.${limiteMaximo}`),
     louvorStudioAdmin
       .from("louvor_studio_versions")
       .update({
