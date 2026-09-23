@@ -16,7 +16,10 @@ import requests
 from dotenv import load_dotenv
 from filelock import FileLock, Timeout
 ROOT=Path(__file__).resolve().parent
-load_dotenv(ROOT/".env.worker")
+# On Windows this launcher may inherit values from an old terminal session.
+# The worker-specific file is the source of truth, especially after rotating
+# the Vercel secret.
+load_dotenv(ROOT/".env.worker",override=True)
 SITE=os.environ.get("LOUVOR_STUDIO_SITE_URL","").rstrip("/")
 SECRET=os.environ.get("LOUVOR_STUDIO_WORKER_SECRET","")
 WORKER=os.environ.get("LOUVOR_STUDIO_WORKER_ID",socket.gethostname())+"-hq"
