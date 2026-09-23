@@ -10,15 +10,9 @@ const HEADERS = {
   "Cache-Control": "no-cache",
 };
 
-function toSlug(text: string) {
-  return text
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9\s-]/g, "")
-    .replace(/\s+/g, "-")
-    .replace(/-+/g, "-");
+function slugOficial(text: string) {
+  // Preserve the canonical route returned by Cifra Club, including `--`.
+  return text.trim().toLowerCase();
 }
 
 function inferirTomDaCifra(cifra: string) {
@@ -330,8 +324,14 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const artistaSlug = toSlug(artista);
-  const musicaSlug  = toSlug(musica);
+  const artistaSlug = slugOficial(artista);
+  const musicaSlug  = slugOficial(musica);
+  if (!/^[a-z0-9-]+$/.test(artistaSlug) || !/^[a-z0-9-]+$/.test(musicaSlug)) {
+    return NextResponse.json(
+      { error: "Link de cifra invalido. Pesquise a musica novamente." },
+      { status: 400 },
+    );
+  }
   const cifraUrl    = `https://www.cifraclub.com.br/${artistaSlug}/${musicaSlug}/${versao === "simplificada" ? "simplificada/" : ""}`;
 
   const CIFRACLUB_API_URL = process.env.CIFRACLUB_API_URL;
