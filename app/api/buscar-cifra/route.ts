@@ -429,12 +429,15 @@ export async function GET(req: NextRequest) {
   if (ytMatch) youtubeUrl = `https://www.youtube.com/watch?v=${ytMatch[1]}`;
 
   // Tom: tenta extrair do HTML (vários seletores + variáveis JS)
+  const tomNoTexto = $("body").text().match(/Tom\s*:\s*([A-G][#b]?m?)\b/i);
   const tomEl = $(
     ".cifra_tom a, .tom_atual, [data-cy='cifra-tom'] a, " +
     "#cifra_tom, .g-song-key, [class*='tom'] a, " +
     "[class*='key'] a, [data-key], .cifra-tom"
   ).first().text().trim().replace(/^tom:?\s*/i, "");
-  if (tomEl && /^[A-G][#b]?m?$/.test(tomEl)) {
+  if (tomNoTexto) {
+    tomOriginal = tomNoTexto[1];
+  } else if (tomEl && /^[A-G][#b]?m?$/.test(tomEl)) {
     tomOriginal = tomEl;
   } else {
     // Tenta regex no JSON embutido no HTML
