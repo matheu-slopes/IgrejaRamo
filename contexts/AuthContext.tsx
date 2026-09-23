@@ -200,12 +200,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setIsLoading(false);
     })();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       // Ignora o disparo inicial que ocorre junto com getSession
       if (!initialLoadDone) return;
       if (session?.user) {
-        await carregarPerfil(session.user.id).catch(() => {});
-        carregarTodosUsuarios();
+        const userId = session.user.id;
+        setTimeout(() => {
+          void carregarPerfil(userId).catch(() => {});
+          void carregarTodosUsuarios();
+        }, 0);
       } else if (event === "SIGNED_OUT") {
         clearUserCache();
         setUser(null);
