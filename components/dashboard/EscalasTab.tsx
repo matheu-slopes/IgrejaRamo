@@ -1602,7 +1602,8 @@ export function EscalasTab({
     setSavingNova(true);
     setAvisoMusica("");
     try {
-      const dadosComFonte = {
+      const musicaId = crypto.randomUUID();
+      const dadosComFonte = { id: musicaId,
         titulo,
         artista,
         tom: nova.tom || null,
@@ -1612,26 +1613,24 @@ export function EscalasTab({
         cifra_artista_slug: nova.artistaSlug,
         cifra_musica_slug: nova.musicaSlug,
       };
-      let { data, error } = await supabase
+      let { error } = await supabase
         .from("musicas")
         .insert(dadosComFonte)
-        .select()
-        .abortSignal(AbortSignal.timeout(15_000))
-        .single();
+        .abortSignal(AbortSignal.timeout(10_000));
       if (erroColunasFonteRepertorioAusentes(error)) {
         const retry = await supabase
           .from("musicas")
-          .insert({ titulo, artista, tom: nova.tom || null })
-          .select()
-          .abortSignal(AbortSignal.timeout(15_000))
-          .single();
-        data = retry.data;
+          .insert({ id: musicaId, titulo, artista, tom: nova.tom || null })
+          .abortSignal(AbortSignal.timeout(10_000));
         error = retry.error;
         setAvisoMusica("Música adicionada. Aplique a migration de fontes do Repertório para também guardar o link e a identificação do Cifra Club.");
       }
       if (error) throw error;
       const musica: Musica = {
-        ...(data as Musica),
+        id: musicaId,
+        titulo,
+        artista,
+        tom: nova.tom || undefined,
         linkYoutube: nova.youtubeUrl,
         cifra: nova.cifra.join("\n"),
         cifraUrl: nova.cifraUrl,
