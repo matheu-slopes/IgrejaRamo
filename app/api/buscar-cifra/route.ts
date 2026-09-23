@@ -365,6 +365,8 @@ export async function GET(req: NextRequest) {
             name:         data.name || musica,
             tom_original: data.tom_original || null,
             youtube_url:  data.youtube_url || null,
+            forma_da_cifra: data.forma_da_cifra || null,
+            capotraste: data.capotraste || null,
             cifraclub_url: cifraUrl,
             cifra:        data.cifra,
             versao,
@@ -421,7 +423,10 @@ export async function GET(req: NextRequest) {
   // YouTube e Tom (vêm em JSON embutido no HTML)
   let youtubeUrl = "";
   let tomOriginal = "";
+  let formaDaCifra = "";
+  let capotraste = "";
   const scripts = $("script:not([src])").map((_, el) => $(el).html() ?? "").get().join("\n");
+  const textoDaPagina = $("body").text().replace(/\s+/g, " ");
 
   // O Cifra Club hoje envia o id em payloads React Server Components como
   // `youtubeID` (e com aspas escapadas); as versões antigas usam youtubeId.
@@ -429,7 +434,8 @@ export async function GET(req: NextRequest) {
   if (ytMatch) youtubeUrl = `https://www.youtube.com/watch?v=${ytMatch[1]}`;
 
   // Tom: tenta extrair do HTML (vários seletores + variáveis JS)
-  const tomNoTexto = $("body").text().match(/Tom\s*:\s*([A-G][#b]?m?)\b/i);
+  const tomNoTexto = textoDaPagina.match(/Tom\s*:\s*([A-G][#b]?m?)(?:\s*\(com forma de\s*([A-G][#b]?m?)\))?/i);
+  const capoNoTexto = textoDaPagina.match(/Capotraste\s*:\s*(\d+)\D*?casa/i);
   const tomEl = $(
     ".cifra_tom a, .tom_atual, [data-cy='cifra-tom'] a, " +
     "#cifra_tom, .g-song-key, [class*='tom'] a, " +
@@ -437,6 +443,7 @@ export async function GET(req: NextRequest) {
   ).first().text().trim().replace(/^tom:?\s*/i, "");
   if (tomNoTexto) {
     tomOriginal = tomNoTexto[1];
+    formaDaCifra = tomNoTexto[2] ?? "";
   } else if (tomEl && /^[A-G][#b]?m?$/.test(tomEl)) {
     tomOriginal = tomEl;
   } else {
@@ -448,6 +455,8 @@ export async function GET(req: NextRequest) {
     if (tomMatch) tomOriginal = tomMatch[1].replace(/[0-9]+$/, "");
   }
 
+  if (capoNoTexto) capotraste = `${capoNoTexto[1]}\u00AA casa`;
+
   const temSimplificada = versao === "simplificada" || $("a[href*='/simplificada']").length > 0;
   const tomInferido = tomOriginal ? "" : inferirTomDaCifra(cifraTexto);
   if (!tomOriginal && tomInferido) tomOriginal = tomInferido;
@@ -456,6 +465,8 @@ export async function GET(req: NextRequest) {
     artist:       artistaNome,
     name:         titulo,
     tom_original: tomOriginal || null,
+    forma_da_cifra: formaDaCifra || null,
+    capotraste: capotraste || null,
     youtube_url:  youtubeUrl || null,
     cifraclub_url: cifraUrl,
     cifra:        cifraTexto.split("\n"),

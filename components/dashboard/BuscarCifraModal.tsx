@@ -8,6 +8,7 @@ import { supabase } from "@/lib/supabase";
 // ── Transposição de cifra ──────────────────────────────────────────────────
 const NOTES_S = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
 const NOTES_F = ["C","Db","D","Eb","E","F","Gb","G","Ab","A","Bb","B"];
+const NOTES_PARA_SELECAO = ["C","C#","Db","D","D#","Eb","E","F","F#","Gb","G","G#","Ab","A","A#","Bb","B"];
 
 function noteIdx(n: string) {
   let i = NOTES_S.indexOf(n);
@@ -67,6 +68,8 @@ interface CifraResult {
   artist: string;
   name: string;
   tom_original?: string | null;
+  forma_da_cifra?: string | null;
+  capotraste?: string | null;
   youtube_url?: string;
   cifraclub_url?: string;
   cifra: string[];
@@ -307,6 +310,14 @@ export default function BuscarCifraModal({ onClose, onSalva, buscaInicial = "" }
                         ? `Tom original: ${tomOriginal}${resultado.tom_origem === "inferido" ? " (estimado)" : ""}`
                         : "Tom não informado"}
                     </span>
+                    {(resultado.forma_da_cifra || resultado.capotraste) && (
+                      <span className="text-xs text-gray-500">
+                        {[
+                          resultado.forma_da_cifra ? `Forma: ${resultado.forma_da_cifra}` : "",
+                          resultado.capotraste ? `Capotraste: ${resultado.capotraste}` : "",
+                        ].filter(Boolean).join(" | ")}
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -344,7 +355,7 @@ export default function BuscarCifraModal({ onClose, onSalva, buscaInicial = "" }
                       onChange={(e) => setTomPrevia(e.target.value)}
                       className="rounded-lg border border-grape-200 bg-grape-50 px-2 py-1 font-semibold text-grape-800 outline-none"
                     >
-                      {NOTES_S.map((nota) => `${nota}${/m$/.test(tomOriginal) ? "m" : ""}`)
+                      {NOTES_PARA_SELECAO.map((nota) => `${nota}${/m$/.test(tomOriginal) ? "m" : ""}`)
                         .map((tom) => <option key={tom}>{tom}</option>)}
                     </select>
                     {tomPrevia !== tomOriginal && <span className="text-grape-700">Será salvo neste tom</span>}
