@@ -1806,12 +1806,12 @@ export function EscalasTab({
     return (
       <div className="flex flex-col w-full gap-4">
         {/* Header: tabs + botão */}
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex gap-1 bg-gray-100 p-1 rounded-xl shrink-0">
+        <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex min-w-0 gap-1 bg-gray-100 p-1 rounded-xl sm:w-auto shrink-0">
             <button
               onClick={() => setViewMode("minhas")}
               className={clsx(
-                "flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold rounded-lg transition",
+                "flex flex-1 items-center justify-center gap-1.5 px-2 sm:px-3 py-1.5 text-xs sm:text-sm font-semibold rounded-lg transition",
                 viewMode === "minhas" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
               )}
             >
@@ -1820,7 +1820,7 @@ export function EscalasTab({
             <button
               onClick={() => setViewMode("culto")}
               className={clsx(
-                "flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold rounded-lg transition",
+                "flex flex-1 items-center justify-center gap-1.5 px-2 sm:px-3 py-1.5 text-xs sm:text-sm font-semibold rounded-lg transition",
                 viewMode === "culto" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
               )}
             >
@@ -1830,7 +1830,7 @@ export function EscalasTab({
           {isLider && viewMode === "culto" && (
             <button
               onClick={abrirNova}
-              className="flex items-center gap-1.5 bg-black text-white text-sm font-semibold px-4 py-2 rounded-xl hover:bg-gray-900 transition shrink-0"
+              className="flex items-center justify-center gap-1.5 bg-black text-white text-sm font-semibold px-4 py-2 rounded-xl hover:bg-gray-900 transition shrink-0 sm:self-auto"
             >
               <Plus className="w-4 h-4" /> Nova escala
             </button>
@@ -1992,8 +1992,8 @@ export function EscalasTab({
                     {isLider && selectedEscala.confirmacaoParticipantes && (
                       <ResumoConfirmacoes itens={selectedEscala.itens} />
                     )}
-                    <div className="rounded-xl border border-gray-100 overflow-hidden">
-                      <table className="w-full text-sm">
+                    <div className="table-scroll rounded-xl border border-gray-100">
+                      <table className="w-full min-w-[420px] text-sm">
                         <thead>
                           <tr className="bg-gray-50 border-b border-gray-100">
                             <th className="text-left text-xs font-semibold text-gray-500 px-3 py-2">Função</th>
@@ -2065,8 +2065,8 @@ export function EscalasTab({
                     <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">
                       Músicas · {(selectedEscala.musicas ?? []).length}
                     </p>
-                    <div className="rounded-xl border border-gray-100 overflow-hidden">
-                      <table className="w-full text-sm">
+                    <div className="table-scroll rounded-xl border border-gray-100">
+                      <table className="w-full min-w-[520px] text-sm">
                         <thead>
                           <tr className="bg-gray-50 border-b border-gray-100">
                             <th className="text-center text-xs font-semibold text-gray-400 px-2 py-2 w-7">#</th>
@@ -2658,17 +2658,17 @@ export function EscalasTab({
             </p>
           )}
           <div className="space-y-2">
-            <div className="flex gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row">
               <input
                 value={buscaMusica}
                 onChange={(e) => setBuscaMusica(e.target.value)}
                 placeholder="Título, artista ou trecho da cifra..."
-                className="flex-1 border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-gray-400"
+                className="min-w-0 flex-1 border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-gray-400"
               />
               {podeGerenciarRepertorio && <button
                 onClick={() => setModalCifra(true)}
                 title="Buscar no Cifra Club por título, artista ou trecho da letra"
-                className="flex items-center gap-1.5 bg-grape-700 text-white text-xs font-semibold px-3 py-2 rounded-xl hover:bg-grape-800 transition shrink-0"
+                className="flex w-full sm:w-auto items-center justify-center gap-1.5 bg-grape-700 text-white text-xs font-semibold px-3 py-2.5 rounded-xl hover:bg-grape-800 transition shrink-0"
               >
                 <Music2 className="w-3.5 h-3.5" />
                 Buscar no Cifra Club

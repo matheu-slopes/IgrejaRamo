@@ -170,8 +170,8 @@ export default function AdminPage() {
               ))}
             </div>
 
-            <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-              <table className="w-full text-sm">
+            <div className="table-scroll bg-white rounded-2xl border border-gray-100">
+              <table className="w-full min-w-[640px] text-sm">
                 <thead>
                   <tr className="border-b border-gray-100 bg-gray-50 text-xs uppercase tracking-wider text-gray-400">
                     <th className="text-left px-4 py-3">Usuário</th>
@@ -577,7 +577,7 @@ function EditarUsuarioPanel({
         </button>
       </div>
 
-      <div className="p-5 space-y-5 max-h-[calc(100vh-200px)] overflow-y-auto">
+      <div className="p-5 space-y-5 max-h-[calc(100dvh-200px)] overflow-y-auto">
         {euSouEle && (
           <div className="flex items-center gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
             <AlertCircle className="w-3.5 h-3.5 shrink-0" />
@@ -1579,8 +1579,8 @@ function DevocionalPreviewModal({ dev, onClose }: { dev: Devocional | Devocional
   const titulo = dev.titulo.trim() || "Título do devocional";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-gray-950/60 px-4 py-6 backdrop-blur-sm">
-      <div className="w-full max-w-3xl overflow-hidden rounded-2xl bg-cream shadow-2xl">
+    <div className="app-modal-backdrop fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto bg-gray-950/60 backdrop-blur-sm">
+      <div className="app-modal-panel w-full max-w-3xl overflow-y-auto rounded-2xl bg-cream shadow-2xl">
         <div className="sticky top-0 z-10 flex items-center justify-between bg-black px-4 py-4 text-white">
           <div className="flex items-center gap-2">
             <BookOpen className="w-5 h-5 text-gold-400" />

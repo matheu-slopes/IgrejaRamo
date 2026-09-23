@@ -417,7 +417,7 @@ export default function DashboardLayout({
     // Skeleton em vez de spinner — mesma estrutura do layout real
     return (
       <div
-        className="fixed inset-0 flex bg-gray-50"
+        className="fixed inset-0 h-[100dvh] flex bg-gray-50"
       >
         {/* Sidebar skeleton — desktop only */}
         <div className="hidden md:flex w-60 shrink-0 bg-vine-900" />
@@ -448,12 +448,12 @@ export default function DashboardLayout({
     <NotificationsProvider>
     <PushSubscriber />
     <div
-      className="fixed inset-0 flex flex-col md:flex-row overflow-hidden bg-gray-50"
+      className="fixed inset-0 h-[100dvh] flex flex-col md:flex-row overflow-hidden bg-gray-50"
     >
       {/* Sidebar — apenas desktop */}
       <Sidebar />
 
-      <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+      <div className="flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden">
         {/* Top bar */}
         <header
           className="sticky top-0 z-20 bg-white border-b border-gray-100 shadow-sm dashboard-header shrink-0"
@@ -465,9 +465,9 @@ export default function DashboardLayout({
         >
           <div className="h-14 px-4 md:px-6 flex items-center justify-between">
             {/* Mobile: logo + nome da igreja */}
-            <div className="flex items-center gap-2 md:hidden">
+            <div className="flex min-w-0 items-center gap-2 md:hidden">
               <Image src="/logo.png" alt="Logo Ramo da Vida" width={28} height={28} className="w-7 h-7 object-contain" />
-              <span className="font-bold text-black text-base">Ramo da Vida</span>
+              <span className="truncate font-bold text-black text-base">Ramo da Vida</span>
             </div>
             {/* Desktop: espaço vazio (título fica no conteúdo) */}
             <div className="hidden md:block" />
@@ -484,7 +484,7 @@ export default function DashboardLayout({
 
         {/* Conteúdo principal */}
         <main
-          className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-4 md:p-6 pb-4 md:pb-6 scroll-container"
+          className="dashboard-content flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-hidden scroll-container"
           style={{ overscrollBehaviorY: "contain" }}
         >
           {children}
@@ -495,8 +495,8 @@ export default function DashboardLayout({
       </div>
 
       {senhaModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-7 space-y-5 max-h-[95vh] overflow-y-auto">
+        <div className="app-modal-backdrop fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="app-modal-panel bg-white rounded-2xl shadow-2xl w-full max-w-sm p-5 sm:p-7 space-y-5 overflow-y-auto">
             <div className="text-center space-y-1">
               <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
                 <KeyRound className="w-6 h-6 text-gray-700" />

@@ -38,7 +38,7 @@ export default function HeroSection() {
   return (
     <section
       ref={sectionRef}
-      className="relative min-h-screen flex flex-col items-center justify-center text-center px-6 overflow-hidden bg-black"
+      className="relative min-h-[100svh] flex flex-col items-center justify-center text-center px-6 overflow-hidden bg-black"
     >
       {/* Vídeo de fundo em loop */}
       <video

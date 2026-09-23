@@ -206,7 +206,7 @@ export default function ConversasPage() {
   const temMidia = !!imagemPreview || !!audioUrl;
 
   return (
-    <div className="max-w-4xl mx-auto flex flex-col h-[calc(100vh-8rem)]">
+    <div className="max-w-4xl mx-auto flex h-full min-h-0 flex-col">
       {/* Header */}
       <div className="mb-4">
         <h1 className="text-2xl font-sans font-semibold text-black">Conversas</h1>
@@ -235,7 +235,7 @@ export default function ConversasPage() {
       </div>
 
       {/* Messages area */}
-      <div className="flex-1 overflow-y-auto bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-3">
+      <div className="flex-1 min-h-0 overflow-y-auto bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-3">
         {filtradas.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full text-gray-300">
             <p className="text-sm">Nenhuma mensagem neste canal ainda.</p>
@@ -292,7 +292,7 @@ export default function ConversasPage() {
                   )}
                   {msg.tipo === "audio" && msg.mediaUrl && (
                     <div className="px-3 py-2">
-                      <audio controls preload="metadata" src={msg.mediaUrl} className="h-9 w-56" />
+                      <audio controls preload="metadata" src={msg.mediaUrl} className="h-9 w-full min-w-0" />
                     </div>
                   )}
                 </div>
@@ -336,7 +336,7 @@ export default function ConversasPage() {
 
       {audioUrl && (
         <div className="mt-2 bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 flex items-center gap-3">
-          <audio controls preload="metadata" src={audioUrl} className="h-9 flex-1" />
+          <audio controls preload="metadata" src={audioUrl} className="h-9 min-w-0 flex-1" />
           <button onClick={cancelarAudio} className="text-gray-400 hover:text-red-400 transition"><X className="w-4 h-4" /></button>
           <button
             onClick={enviarAudio}
@@ -364,14 +364,14 @@ export default function ConversasPage() {
 
       {/* Compose */}
       {!temMidia && !gravando && (
-        <div className="mt-3 flex gap-2">
+        <div className="mt-3 flex min-w-0 gap-2">
           <input
             type="text"
             value={texto}
             onChange={(e) => setTexto(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && (e.preventDefault(), enviar())}
             placeholder={`Mensagem para ${activeMin}…`}
-            className="flex-1 bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gray-300 shadow-sm"
+            className="min-w-0 flex-1 bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gray-300 shadow-sm"
           />
 
           {/* Imagem */}

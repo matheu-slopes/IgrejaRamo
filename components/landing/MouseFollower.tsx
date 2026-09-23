@@ -51,7 +51,7 @@ export default function MouseFollower() {
   return (
     <motion.div
       ref={ref}
-      className="fixed top-0 left-0 z-[9999] pointer-events-none mix-blend-difference"
+      className="fixed top-0 left-0 z-[70] pointer-events-none mix-blend-difference"
       style={{
         x: springX,
         y: springY,

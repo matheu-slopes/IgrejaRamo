@@ -452,10 +452,9 @@ export function EscalaModal({ escala, podeEditar, onClose, onUpdate, onDelete }:
     <div
       ref={backdropRef}
       onClick={handleBackdropClick}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+      className="app-modal-backdrop fixed inset-0 z-[60] flex items-center justify-center bg-black/40 backdrop-blur-sm"
     >
-      <div className="relative w-full max-w-2xl max-h-[90vh] flex flex-col bg-white rounded-2xl shadow-2xl overflow-hidden"
-        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+      <div className="app-modal-panel relative w-full max-w-2xl flex flex-col bg-white rounded-2xl shadow-2xl overflow-hidden"
       >
         {/* Drag handle — mobile only */}
         <div className="md:hidden flex justify-center pt-2.5 pb-1 shrink-0">
@@ -603,8 +602,8 @@ export function EscalaModal({ escala, podeEditar, onClose, onUpdate, onDelete }:
                   <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">
                     Participantes · {escala.itens.length}
                   </p>
-                  <div className="rounded-xl border border-gray-100 overflow-hidden">
-                    <table className="w-full text-sm">
+                  <div className="table-scroll rounded-xl border border-gray-100">
+                    <table className="w-full min-w-[420px] text-sm">
                       <thead>
                         <tr className="bg-gray-50 border-b border-gray-100">
                           <th className="text-left text-xs font-semibold text-gray-500 px-3 py-2">Função</th>
@@ -644,8 +643,8 @@ export function EscalaModal({ escala, podeEditar, onClose, onUpdate, onDelete }:
                   <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">
                     Músicas · {(escala.musicas ?? []).length}
                   </p>
-                  <div className="rounded-xl border border-gray-100 overflow-hidden">
-                    <table className="w-full text-sm">
+                  <div className="table-scroll rounded-xl border border-gray-100">
+                    <table className="w-full min-w-[420px] text-sm">
                       <thead>
                         <tr className="bg-gray-50 border-b border-gray-100">
                           <th className="text-center text-xs font-semibold text-gray-400 px-2 py-2 w-7">#</th>
@@ -875,8 +874,8 @@ export function EscalaModal({ escala, podeEditar, onClose, onUpdate, onDelete }:
                   {form.itens.length === 0 ? (
                     <p className="text-sm text-gray-400 text-center py-4">Nenhum participante adicionado.</p>
                   ) : (
-                    <div className="rounded-xl border border-gray-100 overflow-hidden">
-                      <table className="w-full text-sm">
+                    <div className="table-scroll rounded-xl border border-gray-100">
+                      <table className="w-full min-w-[420px] text-sm">
                         <thead>
                           <tr className="bg-gray-50 border-b border-gray-100">
                             <th className="text-left text-xs font-semibold text-gray-500 px-3 py-2">Função</th>
@@ -1064,17 +1063,17 @@ export function EscalaModal({ escala, podeEditar, onClose, onUpdate, onDelete }:
             {salvarErro && (
               <p className="text-xs text-red-600 text-right font-medium">{salvarErro}</p>
             )}
-             <div className="flex items-center justify-end gap-2 shrink-0">
+              <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end shrink-0">
                <button
                  onClick={() => { setMode("view"); setSalvarErro(""); }}
-                 className="px-4 py-2 text-sm font-semibold text-gray-600 hover:text-gray-800 bg-gray-100 rounded-xl hover:bg-gray-200 transition whitespace-nowrap"
+                  className="w-full sm:w-auto px-4 py-2 text-sm font-semibold text-gray-600 hover:text-gray-800 bg-gray-100 rounded-xl hover:bg-gray-200 transition"
                >
                  Cancelar
                </button>
                <button
                  onClick={salvar}
                  disabled={saving || !form.culto || !form.data || !form.horario}
-                 className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-white bg-black rounded-xl hover:bg-gray-900 transition disabled:opacity-50 whitespace-nowrap shrink-0"
+                  className="flex w-full sm:w-auto items-center justify-center gap-1.5 px-4 py-2 text-sm font-semibold text-white bg-black rounded-xl hover:bg-gray-900 transition disabled:opacity-50 shrink-0"
                >
                  <Save className="w-4 h-4 shrink-0" />
                  <span>{saving ? "Salvando..." : "Salvar"}</span>

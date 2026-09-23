@@ -143,7 +143,7 @@ export default function PushDiagPage() {
   const delivery = result?.delivery;
 
   return (
-    <main className="min-h-screen bg-gray-50 px-4 py-5 md:px-8 md:py-8">
+    <main className="min-h-[100dvh] bg-gray-50 px-4 py-5 md:px-8 md:py-8">
       <div className="mx-auto max-w-3xl space-y-4">
         <div className="flex items-center justify-between gap-3">
           <div>

@@ -39,7 +39,7 @@ export default function LoginPage() {
     "w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gray-400 bg-gray-50 placeholder:text-gray-400";
 
   return (
-    <main className="min-h-screen flex items-center justify-center bg-cream px-4 py-12">
+    <main className="min-h-[100dvh] flex items-center justify-center bg-cream px-4 py-12">
       <div className="w-full max-w-sm">
         {/* Logo */}
         <div className="text-center mb-8">

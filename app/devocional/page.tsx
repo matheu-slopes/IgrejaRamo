@@ -198,7 +198,7 @@ export default function DevocionalPage() {
   }
 
   return (
-    <main className="min-h-screen bg-cream">
+    <main className="min-h-[100dvh] bg-cream">
       {/* Header */}
       <div className="bg-black text-white px-4 py-4 flex items-center gap-3">
         <Link href="/" className="p-2 hover:bg-white/10 rounded-xl transition">

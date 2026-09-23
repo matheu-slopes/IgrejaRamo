@@ -145,7 +145,7 @@ export default function BottomNav() {
           </button>
         </div>
 
-        <div className="overflow-y-auto max-h-[60vh] px-4 py-3 space-y-4">
+        <div className="min-h-0 overflow-y-auto max-h-[60dvh] px-4 py-3 space-y-4">
           {/* Meus Ministérios */}
           {meusMinisterios.length > 0 && (
             <div>
@@ -235,7 +235,7 @@ export default function BottomNav() {
 
       {/* Bottom bar */}
       <nav
-        className="bottom-nav relative z-[9999] md:hidden bg-white border-t border-gray-100 flex items-stretch shrink-0 min-h-16 overflow-visible shadow-[0_-8px_24px_rgba(15,23,42,0.05)]"
+        className="bottom-nav relative z-30 md:hidden bg-white border-t border-gray-100 flex items-stretch shrink-0 min-h-16 overflow-visible shadow-[0_-8px_24px_rgba(15,23,42,0.05)]"
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       >
         {navItems.map(({ href, label, icon: Icon }) => {

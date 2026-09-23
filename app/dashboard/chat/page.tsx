@@ -577,10 +577,7 @@ function ComposeBar({
   }
 
   return (
-    <div
-      className="border-t border-gray-100 bg-white px-3 pt-3 shrink-0"
-      style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}
-    >
+    <div className="border-t border-gray-100 bg-white px-3 py-3 shrink-0">
       {/* Preview da imagem */}
       {imgPreview && (
         <div className="relative mb-2 inline-block">
@@ -1312,8 +1309,8 @@ function NewDmModal({
     dms.flatMap((dm) => dm.participantes).filter((id) => id !== currentUserId)
   );
   return (
-    <div className="fixed inset-0 bg-slate-700/40 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden" onClick={(e) => e.stopPropagation()}>
+    <div className="app-modal-backdrop fixed inset-0 bg-slate-700/40 z-[60] flex items-center justify-center" onClick={onClose}>
+      <div className="app-modal-panel bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
           <h3 className="font-semibold text-gray-800">Nova Conversa</h3>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition"><X className="w-4 h-4" /></button>
@@ -1384,8 +1381,8 @@ function NewGroupModal({
   }
 
   return (
-    <div className="fixed inset-0 bg-slate-700/40 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden" onClick={(e) => e.stopPropagation()}>
+    <div className="app-modal-backdrop fixed inset-0 bg-slate-700/40 z-[60] flex items-center justify-center" onClick={onClose}>
+      <div className="app-modal-panel bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
           <h3 className="font-semibold text-gray-800">Criar Grupo</h3>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition"><X className="w-4 h-4" /></button>
@@ -1481,8 +1478,8 @@ function AddGroupMembersModal({
   }
 
   return (
-    <div className="fixed inset-0 bg-slate-700/40 z-50 flex items-center justify-center p-4" onClick={saving ? undefined : onClose}>
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden" onClick={(e) => e.stopPropagation()}>
+    <div className="app-modal-backdrop fixed inset-0 bg-slate-700/40 z-[60] flex items-center justify-center" onClick={saving ? undefined : onClose}>
+      <div className="app-modal-panel bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
           <div className="min-w-0">
             <h3 className="font-semibold text-gray-800 truncate">Adicionar pessoas</h3>

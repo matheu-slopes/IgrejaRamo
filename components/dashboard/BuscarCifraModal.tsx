@@ -213,14 +213,14 @@ export default function BuscarCifraModal({ onClose, onSalva, buscaInicial = "" }
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className="w-full max-w-2xl max-h-[90vh] flex flex-col bg-white rounded-2xl shadow-2xl overflow-hidden">
+    <div className="app-modal-backdrop fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm">
+      <div className="app-modal-panel w-full max-w-2xl flex flex-col bg-white rounded-2xl shadow-2xl overflow-hidden">
 
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 shrink-0">
-          <div className="flex items-center gap-2">
+          <div className="flex min-w-0 items-center gap-2">
             <Music2 className="w-5 h-5 text-grape-700" />
-            <h2 className="text-base font-bold text-gray-900">Buscar no Cifra Club</h2>
+            <h2 className="truncate text-base font-bold text-gray-900">Buscar no Cifra Club</h2>
           </div>
           <button onClick={onClose} className="p-1.5 hover:bg-gray-100 rounded-full transition">
             <X className="w-4 h-4 text-gray-500" />
@@ -229,13 +229,13 @@ export default function BuscarCifraModal({ onClose, onSalva, buscaInicial = "" }
 
         {/* Campo de busca */}
         <div className="px-5 pt-4 pb-3 border-b border-gray-100 shrink-0 space-y-2">
-          <div className="flex gap-2">
+          <div className="flex min-w-0 gap-2">
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && buscarSugestoes()}
               placeholder="Ex: Bondade de Deus, Oceans Hillsong..."
-              className="flex-1 border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-grape-400"
+              className="min-w-0 flex-1 border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-grape-400"
               autoFocus
             />
             <button
@@ -258,7 +258,7 @@ export default function BuscarCifraModal({ onClose, onSalva, buscaInicial = "" }
 
         {/* Sugestões */}
         {sugestoes.length > 0 && !resultado && (
-          <div className="flex-1 overflow-y-auto px-5 py-4 space-y-1">
+          <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4 space-y-1">
             <p className="text-xs text-gray-400 font-semibold uppercase tracking-widest mb-2">Selecione a música</p>
             {sugestoes.map((s, i) => (
               <button
@@ -282,7 +282,7 @@ export default function BuscarCifraModal({ onClose, onSalva, buscaInicial = "" }
 
         {/* Loading cifra */}
         {loadingCifra && !resultado && sugestoes.length === 0 && (
-          <div className="flex-1 flex items-center justify-center gap-2 text-gray-400">
+          <div className="flex-1 min-h-0 flex items-center justify-center gap-2 text-gray-400">
             <Loader2 className="w-5 h-5 animate-spin" />
             Carregando cifra...
           </div>
@@ -345,7 +345,7 @@ export default function BuscarCifraModal({ onClose, onSalva, buscaInicial = "" }
             </div>
 
             {/* Preview da cifra */}
-            <div className="flex-1 overflow-y-auto bg-gray-50 flex flex-col">
+            <div className="flex-1 min-h-0 bg-gray-50 flex flex-col">
               <div className="flex items-center justify-end px-5 py-1.5 border-b border-gray-100 bg-white shrink-0">
                 {tomOriginal && (
                   <label className="mr-auto flex items-center gap-2 text-xs text-gray-500">
@@ -362,30 +362,30 @@ export default function BuscarCifraModal({ onClose, onSalva, buscaInicial = "" }
                   </label>
                 )}
               </div>
-              <div className="flex-1 overflow-y-auto px-5 py-3">
-                <pre className="text-xs font-mono text-gray-700 whitespace-pre-wrap leading-5">
+              <div className="flex-1 min-h-0 overflow-auto px-5 py-3">
+                <pre className="min-w-full w-max text-xs font-mono text-gray-700 whitespace-pre leading-5">
                   {cifraFiltrada.join("\n")}
                 </pre>
               </div>
             </div>
 
             {/* Footer */}
-            <div className="px-5 py-4 border-t border-gray-100 shrink-0 flex items-center justify-between gap-2">
+            <div className="px-5 py-3 sm:py-4 border-t border-gray-100 shrink-0 flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between">
               <button
                 onClick={() => setResultado(null)}
-                className="text-sm text-gray-400 hover:text-gray-600 transition whitespace-nowrap"
+                className="self-start text-sm text-gray-400 hover:text-gray-600 transition sm:self-auto"
               >
                 ← Voltar
               </button>
-              <div className="flex gap-2 shrink-0">
-                <button onClick={onClose} className="text-sm text-gray-500 px-3 sm:px-4 py-2 rounded-xl hover:bg-gray-100 transition whitespace-nowrap">
+              <div className="flex w-full gap-2 sm:w-auto sm:shrink-0">
+                <button onClick={onClose} className="flex-1 sm:flex-none text-xs sm:text-sm text-gray-500 px-3 sm:px-4 py-2 rounded-xl hover:bg-gray-100 transition">
                   Cancelar
                 </button>
                 <button
                   onClick={() => void salvar()}
                   disabled={salvando}
                   className={clsx(
-                    "flex items-center gap-2 text-sm font-semibold px-4 sm:px-5 py-2 rounded-xl transition whitespace-nowrap",
+                    "flex flex-1 sm:flex-none items-center justify-center gap-1.5 sm:gap-2 text-xs sm:text-sm font-semibold px-3 sm:px-5 py-2 rounded-xl transition",
                     salvando ? "bg-grape-700 text-white disabled:opacity-60" : "bg-grape-700 text-white hover:bg-grape-800"
                   )}
                 >

@@ -42,7 +42,7 @@ export default function MembroPortalPage() {
 
   if (isLoading || !user) {
     return (
-      <div className="flex items-center justify-center h-screen bg-black">
+      <div className="flex min-h-[100dvh] items-center justify-center bg-black">
         <div className="w-8 h-8 border-4 border-gray-400 border-t-transparent rounded-full animate-spin" />
       </div>
     );
@@ -79,7 +79,7 @@ export default function MembroPortalPage() {
   const iniciais = user.nome.split(" ").slice(0, 2).map((n) => n[0]).join("").toUpperCase();
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div className="min-h-[100dvh] bg-gray-50 flex flex-col">
       {/* Header */}
       <header className="bg-black text-white px-6 py-4 flex items-center justify-between shadow-md">
         <div className="flex items-center gap-3">

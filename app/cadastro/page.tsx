@@ -42,8 +42,8 @@ export default function CadastroPage() {
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl shadow overflow-hidden">
-          <table className="w-full text-sm">
+        <div className="table-scroll bg-white rounded-2xl shadow">
+          <table className="w-full min-w-[560px] text-sm">
             <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
               <tr>
                 <th className="px-4 py-3 text-left">Nome</th>

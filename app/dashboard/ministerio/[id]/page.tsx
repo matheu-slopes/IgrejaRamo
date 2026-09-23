@@ -697,7 +697,7 @@ function ChatTab({
   const temMidia = !!imagemPreview || !!audioUrl;
 
   return (
-    <div className="flex gap-4 h-[calc(100vh-300px)] min-h-[400px]">
+    <div className="flex h-full min-h-0 flex-col gap-4 lg:flex-row">
       {/* ── Área principal do chat ── */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Mensagem fixada */}
@@ -930,9 +930,9 @@ function ChatTab({
 
                     {/* Áudio — player com fundo neutro visível */}
                     {m.tipo === "audio" && m.mediaUrl && (
-                      <div className={clsx("px-3 py-2 rounded-2xl border", isMe ? "bg-vine-50 border-vine-200" : "bg-gray-100 border-gray-200")} style={{ minWidth: 280 }}>
+                      <div className={clsx("min-w-0 max-w-full px-3 py-2 rounded-2xl border", isMe ? "bg-vine-50 border-vine-200" : "bg-gray-100 border-gray-200")}>
                         {!isMe && <p className="text-xs font-semibold text-vine-600 mb-1">{m.autorNome}</p>}
-                        <audio controls preload="metadata" src={m.mediaUrl} className="h-7 w-full rounded-full" style={{ minWidth: 260 }} />
+                        <audio controls preload="metadata" src={m.mediaUrl} className="h-7 w-full min-w-0 rounded-full" />
                         <p className={clsx("text-xs text-right mt-0.5", isMe ? "text-vine-400" : "text-gray-400")}>
                           {new Date(m.criadoEm).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
                         </p>
@@ -1070,7 +1070,7 @@ function ChatTab({
 
       {/* ── Painel lateral: Mídia / Links / Favoritos ── */}
       {infoPanel && (
-        <div className="w-72 shrink-0 bg-white rounded-2xl border border-gray-100 shadow-sm flex flex-col overflow-hidden">
+        <div className="w-full min-h-0 lg:w-72 lg:shrink-0 bg-white rounded-2xl border border-gray-100 shadow-sm flex flex-col overflow-hidden">
           <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
             <p className="text-sm font-semibold text-gray-800">
               {infoPanel === "midia" && "Galeria de Mídia"}
@@ -1422,8 +1422,8 @@ function MembrosTab({
       )}
 
       {/* Tabela */}
-      <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-        <table className="w-full text-sm">
+      <div className="table-scroll bg-white rounded-2xl border border-gray-100">
+        <table className="w-full min-w-[640px] text-sm">
           <thead>
             <tr className="border-b border-gray-100 bg-gray-50 text-gray-500 text-xs uppercase tracking-wider">
               <th className="text-left px-4 py-3">
