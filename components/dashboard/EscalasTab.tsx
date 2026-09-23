@@ -1616,12 +1616,14 @@ export function EscalasTab({
         .from("musicas")
         .insert(dadosComFonte)
         .select()
+        .abortSignal(AbortSignal.timeout(15_000))
         .single();
       if (erroColunasFonteRepertorioAusentes(error)) {
         const retry = await supabase
           .from("musicas")
           .insert({ titulo, artista, tom: nova.tom || null })
           .select()
+          .abortSignal(AbortSignal.timeout(15_000))
           .single();
         data = retry.data;
         error = retry.error;
