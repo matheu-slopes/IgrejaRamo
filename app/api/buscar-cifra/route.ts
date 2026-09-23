@@ -384,7 +384,11 @@ export async function GET(req: NextRequest) {
     const status = res?.status || 500;
     if (status === 403 || status === 503) {
       return NextResponse.json(
-        { error: "O Cifra Club bloqueou a requisição do servidor (Cloudflare). Tente configurar a API local ou pesquise novamente mais tarde." },
+        {
+          code: "CIFRACLUB_BLOCKED",
+          error: "O Cifra Club bloqueou a requisição do servidor. Abra a cifra no navegador e importe o conteúdo copiado.",
+          cifraUrl,
+        },
         { status: 403 }
       );
     }

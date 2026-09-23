@@ -923,8 +923,17 @@ export function EscalasTab({
     setCifraInline(null);
     setLoadingCifraInline(true);
     try {
-      const res = await fetch(`/api/buscar-cifra?artista=${m.artistaSlug}&musica=${m.musicaSlug}`);
-      const data = await res.json();
+      const musicaDoRepertorio = musicas.find((musica) => musica.id === m.musicaId);
+      let data: { cifra?: string[]; tom_original?: string | null };
+      if (musicaDoRepertorio?.cifra) {
+        data = {
+          cifra: musicaDoRepertorio.cifra.split("\n"),
+          tom_original: musicaDoRepertorio.tom ?? "",
+        };
+      } else {
+        const res = await fetch(`/api/buscar-cifra?artista=${m.artistaSlug}&musica=${m.musicaSlug}`);
+        data = await res.json();
+      }
       if (data.cifra) {
         const cifra: string[] = data.cifra;
         const tomOrig: string = data.tom_original ?? "";
@@ -1567,13 +1576,23 @@ export function EscalasTab({
     if (cifraFormCache[idx]) return;
     setLoadingCifraForm(idx);
     try {
-      const res = await fetch(`/api/buscar-cifra?artista=${m.artistaSlug}&musica=${m.musicaSlug}`);
-      const data = await res.json();
+      const musicaDoRepertorio = musicas.find((musica) => musica.id === m.musicaId);
+      let data: { cifra?: string[]; tom_original?: string | null };
+      if (musicaDoRepertorio?.cifra) {
+        data = {
+          cifra: musicaDoRepertorio.cifra.split("\n"),
+          tom_original: musicaDoRepertorio.tom ?? "",
+        };
+      } else {
+        const res = await fetch(`/api/buscar-cifra?artista=${m.artistaSlug}&musica=${m.musicaSlug}`);
+        data = await res.json();
+      }
       if (data.cifra) {
+        const cifra = data.cifra;
         setCifraFormCache(prev => ({
           ...prev,
           [idx]: {
-            lines: data.cifra,
+            lines: cifra,
             tomOrig: data.tom_original ?? "",
             tomAtFetch: form.musicas[idx]?.tom ?? "",
           },

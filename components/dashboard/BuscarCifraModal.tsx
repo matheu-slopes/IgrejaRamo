@@ -8,6 +8,7 @@ import clsx from "clsx";
 const NOTES_S = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
 const NOTES_F = ["C","Db","D","Eb","E","F","Gb","G","Ab","A","Bb","B"];
 const NOTES_PARA_SELECAO = ["C","C#","Db","D","D#","Eb","E","F","F#","Gb","G","G#","Ab","A","A#","Bb","B"];
+const TONS_IMPORTACAO = [...NOTES_PARA_SELECAO, ...NOTES_PARA_SELECAO.map((nota) => nota + "m")];
 
 function noteIdx(n: string) {
   let i = NOTES_S.indexOf(n);
@@ -104,6 +105,11 @@ export default function BuscarCifraModal({ onClose, onSalva, buscaInicial = "" }
   const [loadingCifra, setLoadingCifra] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [sugestaoSelecionada, setSugestaoSelecionada] = useState<Sugestao | null>(null);
+  const [importacaoManual, setImportacaoManual] = useState<Sugestao | null>(null);
+  const [cifraManual, setCifraManual] = useState("");
+  const [tomManual, setTomManual] = useState("");
+  const [tituloManual, setTituloManual] = useState("");
+  const [artistaManual, setArtistaManual] = useState("");
   const salvandoRef = useRef(false);
   const salvamentoIdRef = useRef<string | null>(null);
 
@@ -153,6 +159,7 @@ export default function BuscarCifraModal({ onClose, onSalva, buscaInicial = "" }
     setSugestoes([]);
     setResultado(null);
     setSalvando(false);
+    setImportacaoManual(null);
     salvamentoIdRef.current = null;
 
     const res = await fetch(`/api/buscar-cifra?q=${encodeURIComponent(termo.trim())}`);
@@ -172,6 +179,7 @@ export default function BuscarCifraModal({ onClose, onSalva, buscaInicial = "" }
     setSugestoes([]);
     setSalvando(false);
     setSugestaoSelecionada(s);
+    setImportacaoManual(null);
     salvamentoIdRef.current = null;
 
     const params = new URLSearchParams({ artista: s.artistaSlug, musica: s.musicaSlug, versao });
@@ -179,8 +187,19 @@ export default function BuscarCifraModal({ onClose, onSalva, buscaInicial = "" }
     const data = await res.json();
 
     if (!res.ok) {
-      setErro(data.error ?? "Erro ao buscar cifra.");
-      setSugestoes([s]);
+      if (data.code === "CIFRACLUB_BLOCKED") {
+        setErro("");
+        setResultado(null);
+        setImportacaoManual(s);
+        setTituloManual(s.titulo || s.musicaSlug.replace(/-/g, " "));
+        setArtistaManual(s.artista || s.artistaSlug.replace(/-/g, " "));
+        setTomManual("");
+        setCifraManual("");
+        setSugestoes([]);
+      } else {
+        setErro(data.error ?? "Erro ao buscar cifra.");
+        setSugestoes([s]);
+      }
     } else {
       setResultado(data);
       const orig = data.tom_original ?? "";
@@ -188,6 +207,37 @@ export default function BuscarCifraModal({ onClose, onSalva, buscaInicial = "" }
       setTomPrevia(orig);
     }
     setLoadingCifra(false);
+  }
+
+  function confirmarImportacaoManual() {
+    if (!importacaoManual) return;
+    const texto = cifraManual.replace(/\r\n?/g, "\n").trim();
+    const linhas = texto.split("\n").map((linha) => linha.replace(/\s+$/, ""));
+    if (texto.length < 30 || linhas.filter((linha) => linha.trim()).length < 3) {
+      setErro("Cole pelo menos algumas linhas da cifra, incluindo acordes e letra.");
+      return;
+    }
+    const titulo = tituloManual.trim();
+    const artista = artistaManual.trim();
+    if (!titulo || !artista) {
+      setErro("Informe o título e o artista antes de continuar.");
+      return;
+    }
+
+    setSugestaoSelecionada(importacaoManual);
+    setResultado({
+      artist: artista,
+      name: titulo,
+      tom_original: tomManual || null,
+      cifraclub_url: importacaoManual.url,
+      cifra: linhas,
+      versao: "principal",
+      versoes: [{ id: "principal", label: "Principal" }],
+      tom_origem: null,
+    });
+    setTomOriginal(tomManual);
+    setTomPrevia(tomManual);
+    setErro("");
   }
 
   async function salvar() {
@@ -278,6 +328,89 @@ export default function BuscarCifraModal({ onClose, onSalva, buscaInicial = "" }
             </div>
           )}
         </div>
+
+        {importacaoManual && !resultado && (
+          <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4">
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
+              <p className="font-semibold">Importar pelo navegador</p>
+              <p className="mt-1 text-xs leading-5 text-amber-800">
+                Abra a página oficial, selecione somente a cifra com acordes e letra, copie e cole abaixo.
+                Depois de salva, o sistema usará a cópia do Repertório sem consultar o site novamente.
+              </p>
+              <a
+                href={importacaoManual.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-amber-900 px-3 py-2 text-xs font-semibold text-white hover:bg-amber-800"
+              >
+                <ExternalLink className="h-3.5 w-3.5" />
+                Abrir no Cifra Club
+              </a>
+            </div>
+
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <label className="text-xs font-medium text-gray-600">
+                Título
+                <input
+                  value={tituloManual}
+                  onChange={(e) => setTituloManual(e.target.value)}
+                  className="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2 text-base outline-none focus:border-grape-400 sm:text-sm"
+                />
+              </label>
+              <label className="text-xs font-medium text-gray-600">
+                Artista
+                <input
+                  value={artistaManual}
+                  onChange={(e) => setArtistaManual(e.target.value)}
+                  className="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2 text-base outline-none focus:border-grape-400 sm:text-sm"
+                />
+              </label>
+              <label className="text-xs font-medium text-gray-600 sm:max-w-48">
+                Tom mostrado na página
+                <select
+                  value={tomManual}
+                  onChange={(e) => setTomManual(e.target.value)}
+                  className="mt-1 block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-base outline-none focus:border-grape-400 sm:text-sm"
+                >
+                  <option value="">Não informado</option>
+                  {TONS_IMPORTACAO.map((tom) => <option key={tom}>{tom}</option>)}
+                </select>
+              </label>
+            </div>
+
+            <label className="mt-4 block text-xs font-medium text-gray-600">
+              Cifra copiada
+              <textarea
+                value={cifraManual}
+                onChange={(e) => setCifraManual(e.target.value)}
+                placeholder={"[Intro] C  G  Am  F\n\nC                 G\nTrecho da letra..."}
+                className="mt-1 min-h-64 w-full resize-y rounded-xl border border-gray-200 bg-gray-50 p-3 font-mono text-base leading-6 outline-none focus:border-grape-400 sm:text-sm"
+              />
+            </label>
+
+            <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={() => {
+                  const selecionada = importacaoManual;
+                  setImportacaoManual(null);
+                  setSugestoes(selecionada ? [selecionada] : []);
+                  setErro("");
+                }}
+                className="rounded-xl px-4 py-2 text-sm text-gray-500 hover:bg-gray-100"
+              >
+                Voltar
+              </button>
+              <button
+                type="button"
+                onClick={confirmarImportacaoManual}
+                className="rounded-xl bg-grape-700 px-5 py-2 text-sm font-semibold text-white hover:bg-grape-800"
+              >
+                Conferir cifra copiada
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Sugestões */}
         {sugestoes.length > 0 && !resultado && (
