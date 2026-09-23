@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { X, Search, Music2, Check, ExternalLink, Loader2, AlertCircle, ChevronRight } from "lucide-react";
 import clsx from "clsx";
-import { supabase } from "@/lib/supabase";
 
 // ── Transposição de cifra ──────────────────────────────────────────────────
 const NOTES_S = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
@@ -81,6 +80,7 @@ interface CifraResult {
 interface Props {
   onClose: () => void;
   onSalva: (musica: {
+    requestId: string;
     titulo: string;
     artista: string;
     tom: string;
@@ -104,6 +104,8 @@ export default function BuscarCifraModal({ onClose, onSalva, buscaInicial = "" }
   const [loadingCifra, setLoadingCifra] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [sugestaoSelecionada, setSugestaoSelecionada] = useState<Sugestao | null>(null);
+  const salvandoRef = useRef(false);
+  const salvamentoIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (buscaInicial.trim()) void buscarSugestoes(buscaInicial.trim());
@@ -151,6 +153,7 @@ export default function BuscarCifraModal({ onClose, onSalva, buscaInicial = "" }
     setSugestoes([]);
     setResultado(null);
     setSalvando(false);
+    salvamentoIdRef.current = null;
 
     const res = await fetch(`/api/buscar-cifra?q=${encodeURIComponent(termo.trim())}`);
     const data = await res.json();
@@ -169,6 +172,7 @@ export default function BuscarCifraModal({ onClose, onSalva, buscaInicial = "" }
     setSugestoes([]);
     setSalvando(false);
     setSugestaoSelecionada(s);
+    salvamentoIdRef.current = null;
 
     const params = new URLSearchParams({ artista: s.artistaSlug, musica: s.musicaSlug, versao });
     const res = await fetch(`/api/buscar-cifra?${params}`);
@@ -187,11 +191,17 @@ export default function BuscarCifraModal({ onClose, onSalva, buscaInicial = "" }
   }
 
   async function salvar() {
-    if (!resultado || !sugestaoSelecionada) return;
+    if (!resultado || !sugestaoSelecionada || salvandoRef.current) return;
+    const requestId = salvamentoIdRef.current ?? crypto.randomUUID();
+    salvamentoIdRef.current = requestId;
+    salvandoRef.current = true;
+
     setErro("");
     setSalvando(true);
+    let timer: ReturnType<typeof setTimeout> | undefined;
     try {
-      await onSalva({
+      const operacao = onSalva({
+        requestId,
         titulo: resultado.name,
         artista: resultado.artist,
         tom: tomPrevia || tomOriginal || "",
@@ -203,12 +213,25 @@ export default function BuscarCifraModal({ onClose, onSalva, buscaInicial = "" }
         // apontando para a fonte original no Cifra Club.
         cifra: cifraExibida,
       });
+      await Promise.race([
+        operacao,
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(
+            () => reject(new Error("A grava\u00e7\u00e3o demorou al\u00e9m do esperado. Verifique a conex\u00e3o e tente novamente.")),
+            30_000,
+          );
+        }),
+      ]);
+      salvamentoIdRef.current = null;
       // O cadastro já terminou neste ponto. Fechar imediatamente evita deixar a
       // pessoa presa em “Adicionado!” se a tela pai atualizar o set do culto.
       onClose();
     } catch (error) {
-      setSalvando(false);
       setErro(error instanceof Error ? error.message : "Não foi possível adicionar a música ao Repertório.");
+    } finally {
+      if (timer) clearTimeout(timer);
+      salvandoRef.current = false;
+      setSalvando(false);
     }
   }
 

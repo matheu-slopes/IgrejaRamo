@@ -17,6 +17,7 @@ import { useAppRefresh } from "@/hooks/useAppRefresh";
 import BuscarCifraModal from "@/components/dashboard/BuscarCifraModal";
 import { notificarEscala } from "@/lib/notificarEscala";
 import { analisarAlteracoesEscala, prepararConfirmacoes } from "@/lib/escalaChanges";
+import { fetchWithTimeout } from "@/lib/network";
 
 // --- Constantes ---------------------------------------------------------------
 
@@ -426,12 +427,22 @@ function pontuacaoBuscaMusica(musica: Musica, consulta: string) {
   return todosTermosReconhecidos ? 100 : 0;
 }
 
-function erroColunasFonteRepertorioAusentes(error: unknown): boolean {
-  const err = error as { message?: string; code?: string } | null;
-  const texto = String(err?.message ?? "").toLowerCase();
-  const colunas = ["cifra", "link_youtube", "cifra_url", "cifra_artista_slug", "cifra_musica_slug"];
-  return (err?.code === "PGRST204" || err?.code === "42703" || texto.includes("schema cache")) &&
-    colunas.some((coluna) => texto.includes(coluna));
+async function comPrazo<T>(
+  promise: PromiseLike<T>,
+  timeoutMs: number,
+  mensagem: string,
+): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      Promise.resolve(promise),
+      new Promise<T>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(mensagem)), timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 }
 
 function mensagemDoErro(error: unknown): string {
@@ -1582,6 +1593,7 @@ export function EscalasTab({
   }
 
   async function adicionarCifraAoRepertorio(nova: {
+    requestId: string;
     titulo: string;
     artista: string;
     tom: string;
@@ -1593,17 +1605,49 @@ export function EscalasTab({
   }) {
     const titulo = nova.titulo.trim();
     const artista = nova.artista.trim();
+
+    const adicionarAoSet = (musica: Musica) => {
+      setMusicas((prev) => (
+        prev.some((item) => item.id === musica.id)
+          ? prev
+          : [...prev, musica].sort((a, b) => a.titulo.localeCompare(b.titulo, "pt-BR"))
+      ));
+      setForm((atual) => ({
+        ...atual,
+        musicas: atual.musicas.some((item) => item.musicaId === musica.id)
+          ? atual.musicas
+          : [...atual.musicas, {
+            musicaId: musica.id,
+            titulo: musica.titulo,
+            artista: musica.artista,
+            artistaSlug: musica.cifraArtistaSlug ?? nova.artistaSlug,
+            musicaSlug: musica.cifraMusicaSlug ?? nova.musicaSlug,
+            linkYoutube: musica.linkYoutube ?? nova.youtubeUrl,
+          }],
+      }));
+    };
+
     const existente = musicas.find((musica) => mesmaMusica(musica, { titulo, artista }));
     if (existente) {
+      adicionarAoSet(existente);
       setBuscaMusica(existente.titulo);
-      setAvisoMusica(`“${existente.titulo}” — ${existente.artista} já existe no Repertório. Escolha-a na lista para adicioná-la ao set deste culto.`);
-      throw new Error(`Esta música já existe no Repertório. Feche esta janela e selecione “${existente.titulo}” na busca acima.`);
+      setAvisoMusica(`“${existente.titulo}” já estava no Repertório e foi adicionada ao set deste culto.`);
+      return;
     }
+
     setSavingNova(true);
     setAvisoMusica("");
     try {
-      const musicaId = crypto.randomUUID();
-      const dadosComFonte = { id: musicaId,
+      const sessao = await comPrazo(
+        supabase.auth.getSession(),
+        6_000,
+        "A sessão demorou para responder. Verifique a conexão e tente novamente.",
+      );
+      let token = sessao.data.session?.access_token;
+      if (!token) throw new Error("Sua sessão expirou. Entre novamente no sistema.");
+
+      const payload = {
+        id: nova.requestId,
         titulo,
         artista,
         tom: nova.tom || null,
@@ -1613,49 +1657,75 @@ export function EscalasTab({
         cifra_artista_slug: nova.artistaSlug,
         cifra_musica_slug: nova.musicaSlug,
       };
-      let { error } = await supabase
-        .from("musicas")
-        .insert(dadosComFonte)
-        .abortSignal(AbortSignal.timeout(10_000));
-      if (erroColunasFonteRepertorioAusentes(error)) {
-        const retry = await supabase
-          .from("musicas")
-          .insert({ id: musicaId, titulo, artista, tom: nova.tom || null })
-          .abortSignal(AbortSignal.timeout(10_000));
-        error = retry.error;
-        setAvisoMusica("Música adicionada. Aplique a migration de fontes do Repertório para também guardar o link e a identificação do Cifra Club.");
+
+      const enviar = (bearer: string) => fetchWithTimeout("/api/repertorio/musicas", {
+        method: "POST",
+        cache: "no-store",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${bearer}`,
+          "X-Request-Id": nova.requestId,
+        },
+        body: JSON.stringify(payload),
+      }, 10_000);
+
+      let resposta: Response;
+      try {
+        resposta = await enviar(token);
+      } catch (primeiroErro) {
+        console.warn("[repertorio] repetindo gravacao", nova.requestId, mensagemDoErro(primeiroErro));
+        resposta = await enviar(token);
       }
-      if (error) throw error;
+
+      if (resposta.status === 401) {
+        const renovacao = await comPrazo(
+          supabase.auth.refreshSession(),
+          6_000,
+          "Não foi possível renovar sua sessão. Entre novamente no sistema.",
+        );
+        token = renovacao.data.session?.access_token;
+        if (!token) throw new Error("Sua sessão expirou. Entre novamente no sistema.");
+        resposta = await enviar(token);
+      }
+
+      const dados = await resposta.json().catch(() => null) as {
+        ok?: boolean;
+        error?: string;
+        requestId?: string;
+        created?: boolean;
+        musica?: Record<string, unknown>;
+      } | null;
+
+      if (!resposta.ok || !dados?.ok || !dados.musica) {
+        const protocolo = dados?.requestId ? ` (referência: ${dados.requestId})` : "";
+        throw new Error(`${dados?.error ?? "O servidor não confirmou a gravação."}${protocolo}`);
+      }
+
+      const row = dados.musica;
       const musica: Musica = {
-        id: musicaId,
-        titulo,
-        artista,
-        tom: nova.tom || undefined,
-        linkYoutube: nova.youtubeUrl,
-        cifra: nova.cifra.join("\n"),
-        cifraUrl: nova.cifraUrl,
-        cifraArtistaSlug: nova.artistaSlug,
-        cifraMusicaSlug: nova.musicaSlug,
+        id: row.id as string,
+        titulo: row.titulo as string,
+        artista: row.artista as string,
+        tom: (row.tom as string) || undefined,
+        estilo: (row.estilo as string) || undefined,
+        linkYoutube: (row.link_youtube as string) || nova.youtubeUrl,
+        cifra: (row.cifra as string) || nova.cifra.join("\n"),
+        cifraUrl: (row.cifra_url as string) || nova.cifraUrl,
+        cifraArtistaSlug: (row.cifra_artista_slug as string) || nova.artistaSlug,
+        cifraMusicaSlug: (row.cifra_musica_slug as string) || nova.musicaSlug,
+        arquivada: Boolean(row.arquivada),
       };
-      setMusicas((prev) => [...prev, musica].sort((a, b) => a.titulo.localeCompare(b.titulo, "pt-BR")));
-      setForm((atual) => ({
-        ...atual,
-        musicas: atual.musicas.some((item) => item.musicaId === musica.id)
-          ? atual.musicas
-          : [...atual.musicas, {
-            musicaId: musica.id,
-            titulo: musica.titulo,
-            artista: musica.artista,
-            artistaSlug: nova.artistaSlug,
-            musicaSlug: nova.musicaSlug,
-            linkYoutube: nova.youtubeUrl,
-          }],
-      }));
+
+      adicionarAoSet(musica);
+      if (dados.created === false) {
+        setAvisoMusica(`“${musica.titulo}” já estava no Repertório e foi adicionada ao set deste culto.`);
+      }
     } catch (erro) {
       const detalhe = mensagemDoErro(erro);
-      console.error("Erro ao incluir música do Cifra Club no repertório:", detalhe, erro);
-      setSalvarErro(`Não foi possível cadastrar a música no Repertório: ${detalhe}`);
-      throw new Error("Não foi possível cadastrar a música no Repertório. Tente novamente.");
+      console.error("Erro ao incluir música do Cifra Club no repertório:", nova.requestId, detalhe, erro);
+      const mensagem = `Não foi possível cadastrar a música no Repertório: ${detalhe}`;
+      setSalvarErro(mensagem);
+      throw new Error(mensagem);
     } finally {
       setSavingNova(false);
     }
