@@ -120,13 +120,13 @@ export default function BuscarCifraModal({ onClose, onSalva, buscaInicial = "" }
   const [tomManual, setTomManual] = useState("");
   const [tituloManual, setTituloManual] = useState(buscaInicial.trim());
   const [artistaManual, setArtistaManual] = useState("");
-  const [youtubeManual, setYoutubeManual] = useState("");
   const salvandoRef = useRef(false);
   const salvamentoIdRef = useRef<string | null>(null);
+  const temMusicaIdentificada = Boolean(tituloManual.trim() && artistaManual.trim());
   const urlCifraClubManual = useMemo(() => {
-    const pesquisa = [tituloManual.trim(), artistaManual.trim()].filter(Boolean).join(" ");
-    return `https://www.cifraclub.com.br/?q=${encodeURIComponent(pesquisa || "cifras gospel")}`;
-  }, [tituloManual, artistaManual]);
+    if (!temMusicaIdentificada) return "";
+    return `https://www.cifraclub.com.br/${slugManual(artistaManual)}/${slugManual(tituloManual)}/`;
+  }, [temMusicaIdentificada, tituloManual, artistaManual]);
 
 
 
@@ -178,12 +178,10 @@ export default function BuscarCifraModal({ onClose, onSalva, buscaInicial = "" }
     setTituloManual(pesquisa);
     setArtistaManual("");
     setTomManual("");
-    setYoutubeManual("");
     setCifraManual("");
   }
   function confirmarImportacaoManual() {
     if (!importacaoManual) return;
-    const youtube = youtubeManual.trim();
     const texto = cifraManual.replace(/\r\n?/g, "\n").trim();
     const linhas = texto.split("\n").map((linha) => linha.replace(/\s+$/, ""));
     if (texto.length < 30 || linhas.filter((linha) => linha.trim()).length < 3) {
@@ -197,15 +195,6 @@ export default function BuscarCifraModal({ onClose, onSalva, buscaInicial = "" }
       return;
     }
 
-    if (youtube) {
-      try {
-        const host = new URL(youtube).hostname.replace(/^www\./, "");
-        if (!["youtube.com", "m.youtube.com", "music.youtube.com", "youtu.be"].includes(host)) throw new Error();
-      } catch {
-        setErro("Cole um link válido do YouTube ou deixe esse campo vazio.");
-        return;
-      }
-    }
     const selecionada = { ...importacaoManual, titulo, artista, artistaSlug: slugManual(artista), musicaSlug: slugManual(titulo) };
     setSugestaoSelecionada(selecionada);
     setResultado({
@@ -213,7 +202,6 @@ export default function BuscarCifraModal({ onClose, onSalva, buscaInicial = "" }
       name: titulo,
       tom_original: tomManual || null,
       cifraclub_url: urlCifraClubManual,
-      youtube_url: youtube || undefined,
       cifra: linhas,
       versao: "principal",
       versoes: [{ id: "principal", label: "Principal" }],
@@ -298,17 +286,24 @@ export default function BuscarCifraModal({ onClose, onSalva, buscaInicial = "" }
             <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
               <p className="font-semibold">Confira e cole a versão que sua equipe usará</p>
               <p className="mt-1 text-xs leading-5 text-amber-800">
-                Preencha título e artista, abra o Cifra Club e confira tom, letra e acordes da versão escolhida abaixo.
+                Preencha título e artista abaixo. O botão abrirá diretamente a página dessa música no Cifra Club.
                 Depois de salva, a cópia fica no Repertório; o sistema não tentará consultar sites de cifras.
               </p>
               <a
-                href={urlCifraClubManual}
+                href={urlCifraClubManual || undefined}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-amber-900 px-3 py-2 text-xs font-semibold text-white hover:bg-amber-800"
+                aria-disabled={!temMusicaIdentificada}
+                onClick={(event) => {
+                  if (!temMusicaIdentificada) event.preventDefault();
+                }}
+                className={clsx(
+                  "mt-3 inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold text-white",
+                  temMusicaIdentificada ? "bg-amber-900 hover:bg-amber-800" : "cursor-not-allowed bg-amber-900/50",
+                )}
               >
                 <ExternalLink className="h-3.5 w-3.5" />
-                Abrir Cifra Club
+                {temMusicaIdentificada ? "Abrir cifra no Cifra Club" : "Informe título e artista abaixo"}
               </a>
             </div>
 
@@ -339,12 +334,6 @@ export default function BuscarCifraModal({ onClose, onSalva, buscaInicial = "" }
                   <option value="">Não informado</option>
                   {TONS_IMPORTACAO.map((tom) => <option key={tom}>{tom}</option>)}
                 </select>
-              </label>
-              <label className="text-xs font-medium text-gray-600 sm:col-span-2">
-                Link do YouTube <span className="font-normal text-gray-400">(opcional, para o Louvor Studio)</span>
-                <input value={youtubeManual} onChange={(e) => setYoutubeManual(e.target.value)}
-                  placeholder="https://www.youtube.com/watch?v=..."
-                  className="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2 text-base outline-none focus:border-grape-400 sm:text-sm" />
               </label>
             </div>
 
