@@ -951,10 +951,7 @@ export function EscalasTab({
         const salva = await carregarCifraDoRepertorio(m.musicaId);
         if (salva) {
           data = salva;
-        } else {
-          const res = await fetch(`/api/buscar-cifra?artista=${m.artistaSlug}&musica=${m.musicaSlug}`);
-          data = await res.json();
-        }
+        } else return;
       }
       if (data.cifra) {
         const cifra: string[] = data.cifra;
@@ -1609,10 +1606,7 @@ export function EscalasTab({
         const salva = await carregarCifraDoRepertorio(m.musicaId);
         if (salva) {
           data = salva;
-        } else {
-          const res = await fetch(`/api/buscar-cifra?artista=${m.artistaSlug}&musica=${m.musicaSlug}`);
-          data = await res.json();
-        }
+        } else return;
       }
       if (data.cifra) {
         const cifra = data.cifra;
@@ -2789,11 +2783,11 @@ export function EscalasTab({
               />
               {podeGerenciarRepertorio && <button
                 onClick={() => setModalCifra(true)}
-                title="Buscar no Cifra Club por título, artista ou trecho da letra"
+                title="Adicionar uma cifra conferida manualmente"
                 className="flex w-full sm:w-auto items-center justify-center gap-1.5 bg-grape-700 text-white text-xs font-semibold px-3 py-2.5 rounded-xl hover:bg-grape-800 transition shrink-0"
               >
                 <Music2 className="w-3.5 h-3.5" />
-                Buscar no Cifra Club
+                Adicionar cifra
               </button>}
             </div>
             {!buscaMusica.trim() && (
@@ -2804,8 +2798,8 @@ export function EscalasTab({
             {buscaMusica.trim() && (
               <p className="px-1 text-xs text-gray-500">
                 {temResultadoNoRepertorio
-                  ? "Encontramos opções no Repertório. Você pode selecioná-las abaixo ou buscar outra versão no Cifra Club."
-                  : "Busca inteligente: entende acentos, trechos da cifra e pequenos erros de digitação. O Cifra Club também encontra título, artista ou trecho da letra."}
+                  ? "Encontramos opções no Repertório. Você pode selecioná-las abaixo ou adicionar outra versão conferida manualmente."
+                  : "A busca encontra músicas já salvas no Repertório. Para uma nova música, adicione a cifra conferida manualmente."}
               </p>
             )}
             <div className="max-h-52 overflow-y-auto space-y-1 border border-gray-100 rounded-xl p-1 bg-gray-50">

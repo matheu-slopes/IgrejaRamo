@@ -34,16 +34,9 @@ WAV float32 estéreo pode ocupar cerca de 424 MB em uma gravação de 20 minutos
 
 Docker instala `rubberband-cli` e usa o mesmo worker; preserve `/app/.models` e `/app/.audio-cache` em volumes. `app.py`, `separate.py` e `separation_progress.py` permanecem para tarefas legadas (`pipeline_version=1`); não são o caminho de novas preparações HQ.
 
-## Coletor residencial de cifras
+## Cifras do Repertório
 
-Quando a Vercel recebe bloqueio do Cifra Club, a aplicação cria uma tarefa temporária em `cifra_jobs`. A mesma instância de `hq_worker.py` no Lenovo consulta essa fila em uma thread leve, abre a página pela conexão residencial e devolve cifra, tom, forma, capotraste e, quando disponível, o vídeo. A tentativa HTTP é rápida; em bloqueios, o coletor tenta automaticamente o Edge/Chrome real instalado, com perfil local persistente em `.tools`. Se a página não informar o vídeo, a API reutiliza a busca de YouTube do Studio.
-
-A fila guarda somente JSON pequeno e é limpa automaticamente. A cifra definitiva permanece na tabela `musicas` e só é carregada quando o usuário abre a cifra; áudio e stems continuam no Cloudflare R2. Não execute um segundo worker: a trava `.hq-worker.lock` continua protegendo a instância inteira.
-
-Depois de atualizar o Lenovo, execute novamente `instalar_windows.ps1` para instalar `beautifulsoup4` e reinicie `iniciar_worker.bat`. No log devem aparecer `Louvor Studio HQ` e `Coletor local de cifras ativo.` Se Edge/Chrome estiver em um caminho incomum, configure `CIFRA_BROWSER_PATH` no `.env.worker`.
-
-A importação manual permanece como contingência legítima se o próprio acesso residencial receber bloqueio, captcha ou mudança de HTML. O coletor não tenta contornar captcha nem garante acesso ilimitado.
-
+A importação de cifras é manual: a pessoa abre a fonte desejada no navegador, confere tom, letra e acordes, e cola a versão aprovada no Repertório. O link do YouTube é opcional e também é informado manualmente quando a música será usada no Louvor Studio. Depois de salvar, a cifra fica no catálogo e não depende de consulta externa.
 ## Validação
 
 Na raiz do repositório:

@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { X, Search, Music2, Check, ExternalLink, Loader2, AlertCircle, ChevronRight } from "lucide-react";
+import { useMemo, useRef, useState } from "react";
+import { X, Music2, Check, ExternalLink, Loader2, AlertCircle, ChevronRight } from "lucide-react";
 import clsx from "clsx";
-import { supabase } from "@/lib/supabase";
 
 // ── Transposição de cifra ──────────────────────────────────────────────────
 const NOTES_S = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
@@ -57,6 +56,10 @@ function transposeCifra(lines: string[], semis: number): string[] {
 }
 // ──────────────────────────────────────────────────────────────────────────
 
+function slugManual(value: string) {
+  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "manual";
+}
+
 interface Sugestao {
   titulo: string;
   artista: string;
@@ -104,27 +107,24 @@ export default function BuscarCifraModal({ onClose, onSalva, buscaInicial = "" }
   const [tomOriginal, setTomOriginal] = useState(""); // tom detectado da página
   const [tomPrevia, setTomPrevia] = useState("");
   const [erro, setErro] = useState("");
-  const [loadingBusca, setLoadingBusca] = useState(false);
-  const [loadingCifra, setLoadingCifra] = useState(false);
-  const [statusCifra, setStatusCifra] = useState("Carregando cifra...");
+  const loadingCifra = false;
+  const statusCifra = "Carregando cifra...";
   const [salvando, setSalvando] = useState(false);
   const [sugestaoSelecionada, setSugestaoSelecionada] = useState<Sugestao | null>(null);
-  const [importacaoManual, setImportacaoManual] = useState<Sugestao | null>(null);
+  const [importacaoManual, setImportacaoManual] = useState<Sugestao | null>(() => ({
+    titulo: buscaInicial.trim(), artista: "",
+    url: `https://www.cifraclub.com.br/?q=${encodeURIComponent(buscaInicial.trim() || "cifras gospel")}`,
+    artistaSlug: "manual", musicaSlug: "manual",
+  }));
   const [cifraManual, setCifraManual] = useState("");
   const [tomManual, setTomManual] = useState("");
-  const [tituloManual, setTituloManual] = useState("");
+  const [tituloManual, setTituloManual] = useState(buscaInicial.trim());
   const [artistaManual, setArtistaManual] = useState("");
+  const [youtubeManual, setYoutubeManual] = useState("");
   const salvandoRef = useRef(false);
   const salvamentoIdRef = useRef<string | null>(null);
-  const buscaAbortRef = useRef<AbortController | null>(null);
 
-  useEffect(() => () => buscaAbortRef.current?.abort(), []);
 
-  useEffect(() => {
-    if (buscaInicial.trim()) void buscarSugestoes(buscaInicial.trim());
-  // A janela é remontada a cada abertura; a busca inicial só deve disparar uma vez.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   // Linha de tablatura: começa com nome de corda + | OU é cabeçalho/rodapé de bloco de tab
   function isTabLine(line: string) {
@@ -160,90 +160,26 @@ export default function BuscarCifraModal({ onClose, onSalva, buscaInicial = "" }
   }, [cifraExibida]);
 
   async function buscarSugestoes(termo = query) {
-    if (!termo.trim()) return;
-    setLoadingBusca(true);
+    const pesquisa = termo.trim();
     setErro("");
     setSugestoes([]);
     setResultado(null);
     setSalvando(false);
-    setImportacaoManual(null);
     salvamentoIdRef.current = null;
-
-    const res = await fetch(`/api/buscar-cifra?q=${encodeURIComponent(termo.trim())}`);
-    const data = await res.json();
-
-    if (!res.ok || !data.results?.length) {
-      setErro("Nenhum resultado encontrado no Cifra Club. Tente outro trecho da letra, título ou artista.");
-    } else {
-      setSugestoes(data.results);
-    }
-    setLoadingBusca(false);
+    setImportacaoManual({
+      titulo: pesquisa, artista: "",
+      url: `https://www.cifraclub.com.br/?q=${encodeURIComponent(pesquisa || "cifras gospel")}`,
+      artistaSlug: "manual", musicaSlug: "manual",
+    });
+    setTituloManual(pesquisa);
+    setArtistaManual("");
+    setTomManual("");
+    setYoutubeManual("");
+    setCifraManual("");
   }
-
-  async function buscarCifra(s: Sugestao, versao: "principal" | "simplificada" = "principal") {
-    buscaAbortRef.current?.abort();
-    const controller = new AbortController();
-    buscaAbortRef.current = controller;
-    setLoadingCifra(true);
-    setStatusCifra("Carregando cifra...");
-    setErro("");
-    setSugestoes([]);
-    setSalvando(false);
-    setSugestaoSelecionada(s);
-    setImportacaoManual(null);
-    salvamentoIdRef.current = null;
-
-    try {
-      const { data: sessao } = await supabase.auth.getSession();
-      const token = sessao.session?.access_token ?? "";
-      const headers = token ? { Authorization: "Bearer " + token } : undefined;
-      const params = new URLSearchParams({ artista: s.artistaSlug, musica: s.musicaSlug, versao });
-      const res = await fetch("/api/buscar-cifra?" + params, { headers, signal: controller.signal });
-      let data = await res.json();
-
-      if (res.status === 202 && data.code === "CIFRA_QUEUED" && data.jobId) {
-        setStatusCifra("Buscando pelo Lenovo...");
-        for (let tentativa = 0; tentativa < 45; tentativa += 1) {
-          await new Promise<void>((resolve) => setTimeout(resolve, 2_000));
-          if (controller.signal.aborted) throw new DOMException("Busca cancelada", "AbortError");
-          const jobRes = await fetch("/api/buscar-cifra/jobs/" + data.jobId, {
-            headers, signal: controller.signal, cache: "no-store",
-          });
-          const job = await jobRes.json();
-          if (!jobRes.ok) throw new Error(job.error ?? "Nao foi possivel acompanhar a busca local.");
-          if (job.status === "concluido" && job.result) { data = job.result; break; }
-          if (job.status === "erro") throw new Error(job.error ?? "O Lenovo nao conseguiu obter esta cifra.");
-          setStatusCifra(job.status === "processando"
-            ? "Lenovo acessando o Cifra Club..."
-            : "Aguardando o Lenovo...");
-          if (tentativa === 44) throw new Error("O Lenovo nao respondeu a tempo.");
-        }
-      }
-
-      if (!res.ok && res.status !== 202) throw new Error(data.error ?? "Erro ao buscar cifra.");
-      if (!Array.isArray(data.cifra)) throw new Error(data.error ?? "A cifra nao foi encontrada.");
-      setResultado(data);
-      const orig = data.tom_original ?? "";
-      setTomOriginal(orig);
-      setTomPrevia(orig);
-    } catch (error) {
-      if (error instanceof DOMException && error.name === "AbortError") return;
-      setErro(error instanceof Error ? error.message : "Nao foi possivel buscar a cifra.");
-      setResultado(null);
-      setImportacaoManual(s);
-      setTituloManual(s.titulo || s.musicaSlug.replace(/-/g, " "));
-      setArtistaManual(s.artista || s.artistaSlug.replace(/-/g, " "));
-      setTomManual("");
-      setCifraManual("");
-      setSugestoes([]);
-    } finally {
-      if (buscaAbortRef.current === controller) buscaAbortRef.current = null;
-      setLoadingCifra(false);
-    }
-  }
-
   function confirmarImportacaoManual() {
     if (!importacaoManual) return;
+    const youtube = youtubeManual.trim();
     const texto = cifraManual.replace(/\r\n?/g, "\n").trim();
     const linhas = texto.split("\n").map((linha) => linha.replace(/\s+$/, ""));
     if (texto.length < 30 || linhas.filter((linha) => linha.trim()).length < 3) {
@@ -257,12 +193,23 @@ export default function BuscarCifraModal({ onClose, onSalva, buscaInicial = "" }
       return;
     }
 
-    setSugestaoSelecionada(importacaoManual);
+    if (youtube) {
+      try {
+        const host = new URL(youtube).hostname.replace(/^www\./, "");
+        if (!["youtube.com", "m.youtube.com", "music.youtube.com", "youtu.be"].includes(host)) throw new Error();
+      } catch {
+        setErro("Cole um link válido do YouTube ou deixe esse campo vazio.");
+        return;
+      }
+    }
+    const selecionada = { ...importacaoManual, titulo, artista, artistaSlug: slugManual(artista), musicaSlug: slugManual(titulo) };
+    setSugestaoSelecionada(selecionada);
     setResultado({
       artist: artista,
       name: titulo,
       tom_original: tomManual || null,
       cifraclub_url: importacaoManual.url,
+      youtube_url: youtube || undefined,
       cifra: linhas,
       versao: "principal",
       versoes: [{ id: "principal", label: "Principal" }],
@@ -328,7 +275,7 @@ export default function BuscarCifraModal({ onClose, onSalva, buscaInicial = "" }
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 shrink-0">
           <div className="flex min-w-0 items-center gap-2">
             <Music2 className="w-5 h-5 text-grape-700" />
-            <h2 className="truncate text-base font-bold text-gray-900">Buscar no Cifra Club</h2>
+            <h2 className="truncate text-base font-bold text-gray-900">Adicionar cifra manualmente</h2>
           </div>
           <button onClick={onClose} className="p-1.5 hover:bg-gray-100 rounded-full transition">
             <X className="w-4 h-4 text-gray-500" />
@@ -342,17 +289,17 @@ export default function BuscarCifraModal({ onClose, onSalva, buscaInicial = "" }
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && buscarSugestoes()}
-              placeholder="Ex: Bondade de Deus, Oceans Hillsong..."
+              placeholder="Título para pesquisar no Cifra Club (opcional)"
               className="min-w-0 flex-1 border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-grape-400"
               autoFocus
             />
             <button
               onClick={() => void buscarSugestoes()}
-              disabled={loadingBusca || loadingCifra}
+              disabled={loadingCifra}
               className="flex items-center gap-1.5 bg-grape-700 text-white text-sm font-semibold px-4 py-2 rounded-xl hover:bg-grape-800 transition disabled:opacity-60 shrink-0"
             >
-              {loadingBusca ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-              Buscar
+              <ExternalLink className="w-4 h-4" />
+              Abrir formulário
             </button>
           </div>
 
@@ -367,10 +314,10 @@ export default function BuscarCifraModal({ onClose, onSalva, buscaInicial = "" }
         {importacaoManual && !resultado && (
           <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4">
             <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
-              <p className="font-semibold">Importar pelo navegador</p>
+              <p className="font-semibold">Confira e cole a versão que sua equipe usará</p>
               <p className="mt-1 text-xs leading-5 text-amber-800">
-                Abra a página oficial, selecione somente a cifra com acordes e letra, copie e cole abaixo.
-                Depois de salva, o sistema usará a cópia do Repertório sem consultar o site novamente.
+                Abra o Cifra Club, confira tom, letra e acordes e cole somente a versão escolhida abaixo.
+                Depois de salva, a cópia fica no Repertório; o sistema não tentará consultar sites de cifras.
               </p>
               <a
                 href={importacaoManual.url}
@@ -379,7 +326,7 @@ export default function BuscarCifraModal({ onClose, onSalva, buscaInicial = "" }
                 className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-amber-900 px-3 py-2 text-xs font-semibold text-white hover:bg-amber-800"
               >
                 <ExternalLink className="h-3.5 w-3.5" />
-                Abrir no Cifra Club
+                Abrir Cifra Club
               </a>
             </div>
 
@@ -411,10 +358,16 @@ export default function BuscarCifraModal({ onClose, onSalva, buscaInicial = "" }
                   {TONS_IMPORTACAO.map((tom) => <option key={tom}>{tom}</option>)}
                 </select>
               </label>
+              <label className="text-xs font-medium text-gray-600 sm:col-span-2">
+                Link do YouTube <span className="font-normal text-gray-400">(opcional, para o Louvor Studio)</span>
+                <input value={youtubeManual} onChange={(e) => setYoutubeManual(e.target.value)}
+                  placeholder="https://www.youtube.com/watch?v=..."
+                  className="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2 text-base outline-none focus:border-grape-400 sm:text-sm" />
+              </label>
             </div>
 
             <label className="mt-4 block text-xs font-medium text-gray-600">
-              Cifra copiada
+              Cifra conferida
               <textarea
                 value={cifraManual}
                 onChange={(e) => setCifraManual(e.target.value)}
@@ -454,7 +407,7 @@ export default function BuscarCifraModal({ onClose, onSalva, buscaInicial = "" }
             {sugestoes.map((s, i) => (
               <button
                 key={i}
-                onClick={() => buscarCifra(s)}
+                onClick={() => void buscarSugestoes(s.titulo)}
                 disabled={loadingCifra}
                 className="w-full flex items-center justify-between gap-3 bg-gray-50 hover:bg-grape-50 border border-gray-100 hover:border-grape-200 rounded-xl px-4 py-3 transition text-left"
               >
@@ -517,7 +470,7 @@ export default function BuscarCifraModal({ onClose, onSalva, buscaInicial = "" }
                   <button
                     key={versao.id}
                     type="button"
-                    onClick={() => sugestaoSelecionada && void buscarCifra(sugestaoSelecionada, versao.id)}
+                    onClick={() => undefined}
                     disabled={loadingCifra}
                     className={clsx(
                       "rounded-lg border px-3 py-1.5 text-xs font-semibold transition disabled:opacity-50",

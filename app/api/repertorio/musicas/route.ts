@@ -93,7 +93,7 @@ export async function POST(req: NextRequest) {
   if (!artista || artista.length > 240) return respostaErro("Artista da musica invalido.", 400, requestId);
   if (tom && !TOM_RE.test(tom)) return respostaErro("Tom da musica invalido.", 400, requestId);
   if (!SLUG_RE.test(artistaSlug) || !SLUG_RE.test(musicaSlug)) {
-    return respostaErro("Referencia do Cifra Club invalida.", 400, requestId);
+    return respostaErro("Referencia da musica invalida.", 400, requestId);
   }
   if (cifra && cifra.length > 500_000) return respostaErro("A cifra excede o limite permitido.", 413, requestId);
   if (formaDaCifra && formaDaCifra.length > 30) return respostaErro("Forma da cifra invalida.", 400, requestId);
