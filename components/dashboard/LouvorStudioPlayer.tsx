@@ -2,6 +2,7 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type CSSProperties,
@@ -546,6 +547,11 @@ function DesktopStudioPlayer({ project, onEscolherTomDaEscala, salvandoTomDaEsca
   } catch {}
   const urls = project.stem_urls ?? {};
   const urlsKey = stemUrlsKey(urls);
+  // O token da URL assinada muda a cada atualização da API. Preservamos a
+  // primeira URL válida enquanto os caminhos das faixas continuam os mesmos,
+  // evitando reiniciar uma reprodução em andamento.
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- urlsKey remove apenas o token temporário da identidade da faixa.
+  const urlsForLoad = useMemo(() => urls, [urlsKey]);
   const pending = versions.find((v) => v.id === pendingId);
   const refresh = useCallback(
     async (signal?: AbortSignal) => {
@@ -646,9 +652,9 @@ function DesktopStudioPlayer({ project, onEscolherTomDaEscala, salvandoTomDaEsca
       setPosition(0);
       setLoop(null);
       try {
-        const entries = Object.entries(
-          JSON.parse(urlsKey) as Partial<Record<Stem, string>>,
-        ).filter(([, url]) => Boolean(url));
+        const entries = (
+          Object.entries(urlsForLoad) as [Stem, string | null][]
+        ).filter((entry): entry is [Stem, string] => Boolean(entry[1]));
         if (!entries.length) throw Error("Faixas indisponíveis.");
         await Promise.all(
           entries.map(async ([name, url]) => {
@@ -752,7 +758,7 @@ function DesktopStudioPlayer({ project, onEscolherTomDaEscala, salvandoTomDaEsca
       void context.close();
       if (engineRef.current === engine) engineRef.current = null;
     };
-  }, [urlsKey]);
+  }, [urlsForLoad]);
   useEffect(() => {
     mixSettings.current = { volumes, muted, solo, master };
     const engine = engineRef.current;
