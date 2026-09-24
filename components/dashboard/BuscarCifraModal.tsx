@@ -56,10 +56,6 @@ function transposeCifra(lines: string[], semis: number): string[] {
 }
 // ──────────────────────────────────────────────────────────────────────────
 
-function slugManual(value: string) {
-  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "manual";
-}
-
 interface Sugestao {
   titulo: string;
   artista: string;
@@ -101,32 +97,28 @@ interface Props {
 }
 
 export default function BuscarCifraModal({ onClose, onSalva, buscaInicial = "" }: Props) {
-  const [query] = useState(buscaInicial.trim());
+  const [query, setQuery] = useState(buscaInicial.trim());
   const [sugestoes, setSugestoes] = useState<Sugestao[]>([]);
   const [resultado, setResultado] = useState<CifraResult | null>(null);
-  const [tomOriginal, setTomOriginal] = useState(""); // tom detectado da página
+  const [tomOriginal, setTomOriginal] = useState("");
   const [tomPrevia, setTomPrevia] = useState("");
   const [erro, setErro] = useState("");
-  const loadingCifra = false;
-  const statusCifra = "Carregando cifra...";
+  const [loadingCifra, setLoadingCifra] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [sugestaoSelecionada, setSugestaoSelecionada] = useState<Sugestao | null>(null);
-  const [importacaoManual, setImportacaoManual] = useState<Sugestao | null>(() => ({
-    titulo: buscaInicial.trim(), artista: "",
-    url: `https://www.cifraclub.com.br/?q=${encodeURIComponent(buscaInicial.trim() || "cifras gospel")}`,
-    artistaSlug: "manual", musicaSlug: "manual",
-  }));
+  const [importacaoManual, setImportacaoManual] = useState<Sugestao | null>(null);
+  const [versaoManual, setVersaoManual] = useState<"principal" | "simplificada">("principal");
   const [cifraManual, setCifraManual] = useState("");
   const [tomManual, setTomManual] = useState("");
   const [tituloManual, setTituloManual] = useState(buscaInicial.trim());
   const [artistaManual, setArtistaManual] = useState("");
   const salvandoRef = useRef(false);
   const salvamentoIdRef = useRef<string | null>(null);
-  const temMusicaIdentificada = Boolean(tituloManual.trim() && artistaManual.trim());
   const urlCifraClubManual = useMemo(() => {
-    if (!temMusicaIdentificada) return "";
-    return `https://www.cifraclub.com.br/${slugManual(artistaManual)}/${slugManual(tituloManual)}/`;
-  }, [temMusicaIdentificada, tituloManual, artistaManual]);
+    const base = importacaoManual?.url ?? "";
+    if (!base || versaoManual === "principal") return base;
+    return `${base.replace(/\/$/, "")}/simplificada.html`;
+  }, [importacaoManual, versaoManual]);
 
 
 
@@ -165,20 +157,36 @@ export default function BuscarCifraModal({ onClose, onSalva, buscaInicial = "" }
 
   async function buscarSugestoes(termo = query) {
     const pesquisa = termo.trim();
+    if (!pesquisa) {
+      setErro("Informe o título da música para buscar as versões.");
+      return;
+    }
     setErro("");
     setSugestoes([]);
     setResultado(null);
-    setSalvando(false);
-    salvamentoIdRef.current = null;
-    setImportacaoManual({
-      titulo: pesquisa, artista: "",
-      url: `https://www.cifraclub.com.br/?q=${encodeURIComponent(pesquisa || "cifras gospel")}`,
-      artistaSlug: "manual", musicaSlug: "manual",
-    });
-    setTituloManual(pesquisa);
-    setArtistaManual("");
+    setImportacaoManual(null);
+    setLoadingCifra(true);
+    try {
+      const resposta = await fetch(`/api/buscar-cifra?q=${encodeURIComponent(pesquisa)}`);
+      const dados = await resposta.json();
+      const itens = Array.isArray(dados.results) ? dados.results as Sugestao[] : [];
+      setSugestoes(itens);
+      if (itens.length === 0) setErro("Não encontramos versões agora. Tente informar mais palavras no título.");
+    } catch {
+      setErro("Não foi possível buscar versões agora. Tente novamente.");
+    } finally {
+      setLoadingCifra(false);
+    }
+  }
+
+  function selecionarSugestao(sugestao: Sugestao) {
+    setImportacaoManual(sugestao);
+    setTituloManual(sugestao.titulo);
+    setArtistaManual(sugestao.artista);
+    setVersaoManual("principal");
     setTomManual("");
     setCifraManual("");
+    setErro("");
   }
   function confirmarImportacaoManual() {
     if (!importacaoManual) return;
@@ -195,7 +203,7 @@ export default function BuscarCifraModal({ onClose, onSalva, buscaInicial = "" }
       return;
     }
 
-    const selecionada = { ...importacaoManual, titulo, artista, artistaSlug: slugManual(artista), musicaSlug: slugManual(titulo) };
+    const selecionada = { ...importacaoManual, titulo, artista };
     setSugestaoSelecionada(selecionada);
     setResultado({
       artist: artista,
@@ -203,8 +211,8 @@ export default function BuscarCifraModal({ onClose, onSalva, buscaInicial = "" }
       tom_original: tomManual || null,
       cifraclub_url: urlCifraClubManual,
       cifra: linhas,
-      versao: "principal",
-      versoes: [{ id: "principal", label: "Principal" }],
+      versao: versaoManual,
+      versoes: [{ id: "principal", label: "Principal" }, { id: "simplificada", label: "Simplificada" }],
       tom_origem: null,
     });
     setTomOriginal(tomManual);
@@ -281,38 +289,41 @@ export default function BuscarCifraModal({ onClose, onSalva, buscaInicial = "" }
           </div>
         )}
 
+        {!importacaoManual && sugestoes.length === 0 && !loadingCifra && !resultado && (
+          <div className="px-5 py-5">
+            <p className="text-sm font-semibold text-gray-900">Qual música você quer adicionar?</p>
+            <p className="mt-1 text-xs text-gray-500">Buscaremos somente os nomes e links das versões. A letra e os acordes continuam manuais.</p>
+            <div className="mt-3 flex gap-2">
+              <input value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => event.key === "Enter" && void buscarSugestoes()} placeholder="Ex.: Pra Onde Eu Irei" className="min-w-0 flex-1 rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-grape-400" autoFocus />
+              <button type="button" onClick={() => void buscarSugestoes()} className="rounded-xl bg-grape-700 px-4 py-2 text-sm font-semibold text-white hover:bg-grape-800">Buscar versões</button>
+            </div>
+          </div>
+        )}
         {importacaoManual && !resultado && (
           <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4">
             <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
-              <p className="font-semibold">Confira e cole a versão que sua equipe usará</p>
+              <p className="font-semibold">Escolha a versão e copie a cifra</p>
               <p className="mt-1 text-xs leading-5 text-amber-800">
-                Preencha título e artista abaixo. O botão abrirá diretamente a página dessa música no Cifra Club.
-                Depois de salva, a cópia fica no Repertório; o sistema não tentará consultar sites de cifras.
+                Você escolheu <strong>{tituloManual}</strong> — {artistaManual}. Escolha Principal ou Simplificada e abra o link correto. A letra e os acordes serão colados manualmente.
               </p>
-              <a
-                href={urlCifraClubManual || undefined}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-disabled={!temMusicaIdentificada}
-                onClick={(event) => {
-                  if (!temMusicaIdentificada) event.preventDefault();
-                }}
-                className={clsx(
-                  "mt-3 inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold text-white",
-                  temMusicaIdentificada ? "bg-amber-900 hover:bg-amber-800" : "cursor-not-allowed bg-amber-900/50",
-                )}
-              >
+              <div className="mt-3 flex flex-wrap gap-2">
+                {(["principal", "simplificada"] as const).map((versao) => (
+                  <button key={versao} type="button" onClick={() => setVersaoManual(versao)} className={clsx("rounded-lg border px-3 py-1.5 text-xs font-semibold", versaoManual === versao ? "border-amber-900 bg-amber-900 text-white" : "border-amber-300 bg-white text-amber-950")}>
+                    {versao === "principal" ? "Principal" : "Simplificada"}
+                  </button>
+                ))}
+              </div>
+              <a href={urlCifraClubManual} target="_blank" rel="noopener noreferrer" className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-amber-900 px-3 py-2 text-xs font-semibold text-white hover:bg-amber-800">
                 <ExternalLink className="h-3.5 w-3.5" />
-                {temMusicaIdentificada ? "Abrir cifra no Cifra Club" : "Informe título e artista abaixo"}
+                Abrir {versaoManual === "principal" ? "cifra principal" : "cifra simplificada"} no Cifra Club
               </a>
             </div>
-
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               <label className="text-xs font-medium text-gray-600">
                 Título
                 <input
                   value={tituloManual}
-                  onChange={(e) => setTituloManual(e.target.value)}
+                  readOnly
                   className="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2 text-base outline-none focus:border-grape-400 sm:text-sm"
                 />
               </label>
@@ -320,7 +331,7 @@ export default function BuscarCifraModal({ onClose, onSalva, buscaInicial = "" }
                 Artista
                 <input
                   value={artistaManual}
-                  onChange={(e) => setArtistaManual(e.target.value)}
+                  readOnly
                   className="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2 text-base outline-none focus:border-grape-400 sm:text-sm"
                 />
               </label>
@@ -350,12 +361,7 @@ export default function BuscarCifraModal({ onClose, onSalva, buscaInicial = "" }
             <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
               <button
                 type="button"
-                onClick={() => {
-                  const selecionada = importacaoManual;
-                  setImportacaoManual(null);
-                  setSugestoes(selecionada ? [selecionada] : []);
-                  setErro("");
-                }}
+                onClick={() => { setImportacaoManual(null); setErro(""); }}
                 className="rounded-xl px-4 py-2 text-sm text-gray-500 hover:bg-gray-100"
               >
                 Voltar
@@ -378,7 +384,7 @@ export default function BuscarCifraModal({ onClose, onSalva, buscaInicial = "" }
             {sugestoes.map((s, i) => (
               <button
                 key={i}
-                onClick={() => void buscarSugestoes(s.titulo)}
+                onClick={() => selecionarSugestao(s)}
                 disabled={loadingCifra}
                 className="w-full flex items-center justify-between gap-3 bg-gray-50 hover:bg-grape-50 border border-gray-100 hover:border-grape-200 rounded-xl px-4 py-3 transition text-left"
               >
@@ -399,7 +405,7 @@ export default function BuscarCifraModal({ onClose, onSalva, buscaInicial = "" }
         {loadingCifra && !resultado && sugestoes.length === 0 && (
           <div className="flex-1 min-h-0 flex items-center justify-center gap-2 text-gray-400">
             <Loader2 className="w-5 h-5 animate-spin" />
-            {statusCifra}
+            Buscando versões...
           </div>
         )}
 
