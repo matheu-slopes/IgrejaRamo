@@ -99,6 +99,25 @@ const INITIAL: Record<Stem, number> = {
   bass: 1,
   other: 1,
 };
+
+// The API renews signed Storage URLs frequently. Their query tokens change,
+// but the audio object path does not. Using the full URL as a React effect key
+// would tear down a playing engine on every background refresh and reset it to
+// zero, so only the stable path identifies a different set of stems.
+function stemUrlsKey(urls: Partial<Record<Stem, string | null>>) {
+  return JSON.stringify(
+    Object.entries(urls)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([stem, url]) => {
+        if (!url) return [stem, null];
+        try {
+          return [stem, new URL(url).pathname];
+        } catch {
+          return [stem, url.split("?", 1)[0]];
+        }
+      }),
+  );
+}
 async function api(url: string, body?: unknown, signal?: AbortSignal) {
   const controller = new AbortController();
   const abort = () => controller.abort();
@@ -169,6 +188,7 @@ function secondsText(value: number) {
  */
 function MobileStudioPlayer({ project, onEscolherTomDaEscala, salvandoTomDaEscala = false, tomBaseOverride }: PlayerProps) {
   const urls = project.stem_urls ?? {};
+  const urlsKey = stemUrlsKey(urls);
   const tomBase = tomBaseOverride || project.tom_base_confirmado || project.tom_original;
   const initial = keyAt(tomBase || "C", 0);
   const [ready, setReady] = useState(false);
@@ -296,7 +316,7 @@ function MobileStudioPlayer({ project, onEscolherTomDaEscala, salvandoTomDaEscal
     // URLs identify a distinct prepared project; loading is intentionally once
     // per project, not once per volume or playback adjustment.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [project.id, JSON.stringify(urls)]);
+  }, [project.id, urlsKey]);
 
   useEffect(() => {
     for (const stem of stems) {
@@ -525,7 +545,7 @@ function DesktopStudioPlayer({ project, onEscolherTomDaEscala, salvandoTomDaEsca
     semitones = transposeSemitones(original, target, direction);
   } catch {}
   const urls = project.stem_urls ?? {};
-  const urlsKey = JSON.stringify(urls);
+  const urlsKey = stemUrlsKey(urls);
   const pending = versions.find((v) => v.id === pendingId);
   const refresh = useCallback(
     async (signal?: AbortSignal) => {
