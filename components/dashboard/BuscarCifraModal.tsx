@@ -101,7 +101,7 @@ interface Props {
 }
 
 export default function BuscarCifraModal({ onClose, onSalva, buscaInicial = "" }: Props) {
-  const [query, setQuery] = useState(buscaInicial.trim());
+  const [query] = useState(buscaInicial.trim());
   const [sugestoes, setSugestoes] = useState<Sugestao[]>([]);
   const [resultado, setResultado] = useState<CifraResult | null>(null);
   const [tomOriginal, setTomOriginal] = useState(""); // tom detectado da página
@@ -286,34 +286,12 @@ export default function BuscarCifraModal({ onClose, onSalva, buscaInicial = "" }
           </button>
         </div>
 
-        {/* Campo de busca */}
-        <div className="px-5 pt-4 pb-3 border-b border-gray-100 shrink-0 space-y-2">
-          <div className="flex min-w-0 gap-2">
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && buscarSugestoes()}
-              placeholder="Título para pesquisar no Cifra Club (opcional)"
-              className="min-w-0 flex-1 border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-grape-400"
-              autoFocus
-            />
-            <button
-              onClick={() => void buscarSugestoes()}
-              disabled={loadingCifra}
-              className="flex items-center gap-1.5 bg-grape-700 text-white text-sm font-semibold px-4 py-2 rounded-xl hover:bg-grape-800 transition disabled:opacity-60 shrink-0"
-            >
-              <ExternalLink className="w-4 h-4" />
-              Abrir formulário
-            </button>
+        {erro && (
+          <div className="mx-5 mt-3 flex items-center gap-2 rounded-xl bg-red-50 px-3 py-2 text-sm text-red-600">
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            {erro}
           </div>
-
-          {erro && (
-            <div className="flex items-center gap-2 text-red-600 bg-red-50 rounded-xl px-3 py-2 text-sm">
-              <AlertCircle className="w-4 h-4 shrink-0" />
-              {erro}
-            </div>
-          )}
-        </div>
+        )}
 
         {importacaoManual && !resultado && (
           <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4">
