@@ -123,6 +123,10 @@ export default function BuscarCifraModal({ onClose, onSalva, buscaInicial = "" }
   const [youtubeManual, setYoutubeManual] = useState("");
   const salvandoRef = useRef(false);
   const salvamentoIdRef = useRef<string | null>(null);
+  const urlCifraClubManual = useMemo(() => {
+    const pesquisa = [tituloManual.trim(), artistaManual.trim()].filter(Boolean).join(" ");
+    return `https://www.cifraclub.com.br/?q=${encodeURIComponent(pesquisa || "cifras gospel")}`;
+  }, [tituloManual, artistaManual]);
 
 
 
@@ -208,7 +212,7 @@ export default function BuscarCifraModal({ onClose, onSalva, buscaInicial = "" }
       artist: artista,
       name: titulo,
       tom_original: tomManual || null,
-      cifraclub_url: importacaoManual.url,
+      cifraclub_url: urlCifraClubManual,
       youtube_url: youtube || undefined,
       cifra: linhas,
       versao: "principal",
@@ -316,11 +320,11 @@ export default function BuscarCifraModal({ onClose, onSalva, buscaInicial = "" }
             <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
               <p className="font-semibold">Confira e cole a versão que sua equipe usará</p>
               <p className="mt-1 text-xs leading-5 text-amber-800">
-                Abra o Cifra Club, confira tom, letra e acordes e cole somente a versão escolhida abaixo.
+                Preencha título e artista, abra o Cifra Club e confira tom, letra e acordes da versão escolhida abaixo.
                 Depois de salva, a cópia fica no Repertório; o sistema não tentará consultar sites de cifras.
               </p>
               <a
-                href={importacaoManual.url}
+                href={urlCifraClubManual}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-amber-900 px-3 py-2 text-xs font-semibold text-white hover:bg-amber-800"
