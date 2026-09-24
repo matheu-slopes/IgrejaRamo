@@ -124,6 +124,8 @@ export interface Musica {
   cifraUrl?: string;
   cifraArtistaSlug?: string;
   cifraMusicaSlug?: string;
+  formaDaCifra?: string;
+  capotraste?: string;
   /** Arquivada não aparece para novos sets, mas preserva o histórico das escalas. */
   arquivada?: boolean;
 }

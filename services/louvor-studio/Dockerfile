@@ -11,7 +11,7 @@ RUN apt-get update \
 WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-COPY app.py analysis.py separate.py separation_progress.py audio_hq.py hq_task.py hq_worker.py .
+COPY app.py analysis.py separate.py separation_progress.py audio_hq.py hq_task.py hq_worker.py cifra_worker.py .
 RUN rubberband --help 2>&1 | grep -- --fine
 VOLUME ["/app/.models", "/app/.audio-cache"]
 

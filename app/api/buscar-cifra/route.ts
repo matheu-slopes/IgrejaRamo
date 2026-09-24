@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import * as cheerio from "cheerio";
-import { createClient } from "@supabase/supabase-js";
+import { getLouvorStudioUser, louvorStudioAdmin as supabaseAdmin } from "@/lib/louvorStudioServer";
 
 const HEADERS = {
   "User-Agent":
@@ -21,6 +21,44 @@ function inferirTomDaCifra(cifra: string) {
   const primeirasLinhas = cifra.split("\n").slice(0, 16).join(" ");
   const encontrado = primeirasLinhas.match(/(?:^|\s)([A-G](?:#|b)?m?)(?=(?:\s|\||$))/);
   return encontrado?.[1] ?? "";
+}
+
+async function criarOuReusarJob(
+  req: NextRequest,
+  artistaSlug: string,
+  musicaSlug: string,
+  versao: "principal" | "simplificada",
+  cifraUrl: string,
+) {
+  const user = await getLouvorStudioUser(req);
+  if (!user) {
+    return NextResponse.json({
+      code: "CIFRACLUB_BLOCKED",
+      error: "O Cifra Club bloqueou a consulta e sua sessao expirou. Entre novamente ou importe pelo navegador.",
+      cifraUrl,
+    }, { status: 403 });
+  }
+  const { data: existente } = await supabaseAdmin.from("cifra_jobs")
+    .select("id,status").eq("user_id", user.id).eq("artista_slug", artistaSlug)
+    .eq("musica_slug", musicaSlug).eq("versao", versao)
+    .in("status", ["aguardando", "processando", "concluido"])
+    .gt("expira_em", new Date().toISOString()).order("criado_em", { ascending: false })
+    .limit(1).maybeSingle();
+  if (existente) {
+    return NextResponse.json({ code: "CIFRA_QUEUED", jobId: existente.id, status: existente.status, cifraUrl }, { status: 202 });
+  }
+  const { data: job, error } = await supabaseAdmin.from("cifra_jobs").insert({
+    user_id: user.id, artista_slug: artistaSlug, musica_slug: musicaSlug, versao,
+  }).select("id").single();
+  if (error || !job) {
+    console.error("[buscar-cifra] fila", error?.message ?? "sem retorno");
+    return NextResponse.json({
+      code: "CIFRACLUB_BLOCKED",
+      error: "O Cifra Club bloqueou a consulta e a fila local ainda nao esta disponivel.",
+      cifraUrl,
+    }, { status: 503 });
+  }
+  return NextResponse.json({ code: "CIFRA_QUEUED", jobId: job.id, status: "aguardando", cifraUrl }, { status: 202 });
 }
 
 /** GET /api/buscar-cifra?artista=hillsong&musica=oceans  → busca cifra */
@@ -230,12 +268,13 @@ export async function GET(req: NextRequest) {
     }
 
     // ── Cache Supabase ────────────────────────────────────────────────
-    const supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
     const CACHE_TTL_DAYS = 30;
     const qNorm = q.toLowerCase().trim();
+    await supabaseAdmin.from("busca_cache").delete().lt(
+      "created_at",
+      new Date(Date.now() - CACHE_TTL_DAYS * 86_400_000).toISOString(),
+    );
+
 
     // Tenta retornar do cache primeiro
     const { data: cached } = await supabaseAdmin
@@ -333,65 +372,43 @@ export async function GET(req: NextRequest) {
     );
   }
   const cifraUrl    = `https://www.cifraclub.com.br/${artistaSlug}/${musicaSlug}/${versao === "simplificada" ? "simplificada/" : ""}`;
-
-  const CIFRACLUB_API_URL = process.env.CIFRACLUB_API_URL;
-  let res: Response | null = null;
-  let useFallback = false;
-
-  try {
-    res = await fetch(cifraUrl, { headers: HEADERS, signal: AbortSignal.timeout(15000) });
-    if (!res.ok) {
-      if (CIFRACLUB_API_URL) {
-        useFallback = true;
-      }
-    }
-  } catch (err) {
-    if (CIFRACLUB_API_URL) {
-      useFallback = true;
-    } else {
-      return NextResponse.json({ error: "Timeout ao acessar o Cifra Club." }, { status: 504 });
+  if (versao === "principal") {
+    const { data: salva } = await supabaseAdmin.from("musicas")
+      .select("titulo,artista,tom,link_youtube,cifra,cifra_url,forma_da_cifra,capotraste")
+      .eq("cifra_artista_slug", artistaSlug)
+      .eq("cifra_musica_slug", musicaSlug)
+      .not("cifra", "is", null)
+      .limit(1)
+      .maybeSingle();
+    if (salva?.cifra && salva.cifra.trim().length >= 20) {
+      return NextResponse.json({
+        artist: salva.artista || artista,
+        name: salva.titulo || musica,
+        tom_original: salva.tom || null,
+        youtube_url: salva.link_youtube || null,
+        forma_da_cifra: salva.forma_da_cifra || null,
+        capotraste: salva.capotraste || null,
+        cifraclub_url: salva.cifra_url || cifraUrl,
+        cifra: salva.cifra.split("\n"),
+        versao,
+        versoes: [{ id: "principal", label: "Principal" }],
+        tom_origem: salva.tom ? "cifraclub" : null,
+        cached: true,
+      });
     }
   }
 
-  if (useFallback && CIFRACLUB_API_URL) {
-    try {
-      const fallbackUrl = `${CIFRACLUB_API_URL}/artists/${artistaSlug}/songs/${musicaSlug}`;
-      const fallbackRes = await fetch(fallbackUrl, { signal: AbortSignal.timeout(20000) });
-      if (fallbackRes.ok) {
-        const data = await fallbackRes.json();
-        if (data && !data.error && data.cifra) {
-          return NextResponse.json({
-            artist:       data.artist || artista,
-            name:         data.name || musica,
-            tom_original: data.tom_original || null,
-            youtube_url:  data.youtube_url || null,
-            forma_da_cifra: data.forma_da_cifra || null,
-            capotraste: data.capotraste || null,
-            cifraclub_url: cifraUrl,
-            cifra:        data.cifra,
-            versao,
-            versoes: [{ id: "principal", label: "Principal" }],
-            tom_origem: data.tom_original ? "cifraclub" : null,
-          });
-        }
-      }
-    } catch (fallbackErr) {
-      console.error("Erro ao acessar a API fallback do Cifra Club:", fallbackErr);
-    }
+  let res: Response | null = null;
+  try {
+    res = await fetch(cifraUrl, { headers: HEADERS, signal: AbortSignal.timeout(15000) });
+  } catch {
+    return criarOuReusarJob(req, artistaSlug, musicaSlug, versao, cifraUrl);
   }
 
   if (!res || !res.ok) {
     const status = res?.status || 500;
-    if (status === 403 || status === 503) {
-      return NextResponse.json(
-        {
-          code: "CIFRACLUB_BLOCKED",
-          error: "O Cifra Club bloqueou a requisição do servidor. Abra a cifra no navegador e importe o conteúdo copiado.",
-          cifraUrl,
-        },
-        { status: 403 }
-      );
-    }
+    if (!res || status === 403 || status === 429 || status === 503)
+      return criarOuReusarJob(req, artistaSlug, musicaSlug, versao, cifraUrl);
     return NextResponse.json(
       { error: `Música não encontrada. Verifique o nome do artista ("${artista}") e da música ("${musica}").` },
       { status: 404 }

@@ -2,7 +2,7 @@
 
 ## Ativação
 
-1. Aplique as migrações existentes de Louvor Studio e depois `supabase/migrations/20260918_louvor_studio_hq.sql` no SQL Editor do Supabase. A migração é aditiva: preserva projetos e MP3 existentes.
+1. Aplique as migrações existentes de Louvor Studio, incluindo `supabase/migrations/20260918_louvor_studio_hq.sql` e `supabase/migrations/20260924_cifra_worker_queue.sql`, no SQL Editor do Supabase. As migrações são aditivas e preservam projetos, músicas e MP3 existentes.
 2. Atualize as dependências com `powershell -ExecutionPolicy Bypass -File .\instalar_windows.ps1`. O instalador prepara Python 3.11, Audio Separator e Rubber Band 4.0.0 (R3). Os pesos são baixados no primeiro uso e reutilizados em `.models`.
 3. Configure `.env.worker`: `LOUVOR_STUDIO_SITE_URL` deve apontar para a API atualizada. Para testar os arquivos locais, use `iniciar_worker.bat local` (sobrescreve a URL somente nessa execução), ou configure `http://localhost:3000`. Mantenha o mesmo `LOUVOR_STUDIO_WORKER_SECRET` do servidor. Nunca coloque a service role do Supabase no worker.
 4. Feche o worker antigo após sua tarefa terminar e execute `iniciar_worker.bat`. O novo launcher usa `hq_worker.py`. Reinicie após alterar código Python.
@@ -33,6 +33,16 @@ O banco reutiliza uma única versão por projeto/semitons/velocidade/engine. O b
 WAV float32 estéreo pode ocupar cerca de 424 MB em uma gravação de 20 minutos. A migração configura o bucket para 512 MiB por arquivo; o limite global do plano Supabase também precisa comportar esse tamanho. O cache e os pesos requerem espaço em disco. CPU processa os dois modelos, mas alta qualidade não implica separação mais rápida.
 
 Docker instala `rubberband-cli` e usa o mesmo worker; preserve `/app/.models` e `/app/.audio-cache` em volumes. `app.py`, `separate.py` e `separation_progress.py` permanecem para tarefas legadas (`pipeline_version=1`); não são o caminho de novas preparações HQ.
+
+## Coletor residencial de cifras
+
+Quando a Vercel recebe bloqueio do Cifra Club, a aplicação cria uma tarefa temporária em `cifra_jobs`. A mesma instância de `hq_worker.py` no Lenovo consulta essa fila em uma thread leve, abre a página pela conexão residencial e devolve cifra, tom, forma, capotraste e, quando disponível, o vídeo. A tentativa HTTP é rápida; em bloqueios, o coletor tenta automaticamente o Edge/Chrome real instalado, com perfil local persistente em `.tools`. Se a página não informar o vídeo, a API reutiliza a busca de YouTube do Studio.
+
+A fila guarda somente JSON pequeno e é limpa automaticamente. A cifra definitiva permanece na tabela `musicas` e só é carregada quando o usuário abre a cifra; áudio e stems continuam no Cloudflare R2. Não execute um segundo worker: a trava `.hq-worker.lock` continua protegendo a instância inteira.
+
+Depois de atualizar o Lenovo, execute novamente `instalar_windows.ps1` para instalar `beautifulsoup4` e reinicie `iniciar_worker.bat`. No log devem aparecer `Louvor Studio HQ` e `Coletor local de cifras ativo.` Se Edge/Chrome estiver em um caminho incomum, configure `CIFRA_BROWSER_PATH` no `.env.worker`.
+
+A importação manual permanece como contingência legítima se o próprio acesso residencial receber bloqueio, captcha ou mudança de HTML. O coletor não tenta contornar captcha nem garante acesso ilimitado.
 
 ## Validação
 

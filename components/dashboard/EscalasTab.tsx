@@ -669,7 +669,9 @@ export function EscalasTab({
         .eq("ministerio", ministerio)
         .order("data", { ascending: false })
         .abortSignal(AbortSignal.timeout(12_000)),
-      supabase.from("musicas").select().order("titulo").abortSignal(AbortSignal.timeout(12_000)),
+      supabase.from("musicas")
+        .select("id,titulo,artista,tom,estilo,link_youtube,cifra_url,cifra_artista_slug,cifra_musica_slug,arquivada")
+        .order("titulo").abortSignal(AbortSignal.timeout(12_000)),
       projetosStudioPromise,
     ]);
 
@@ -744,7 +746,6 @@ export function EscalasTab({
         tom: (m.tom as string) ?? undefined,
         estilo: (m.estilo as string) ?? undefined,
         linkYoutube: (m.link_youtube as string) ?? undefined,
-        cifra: (m.cifra as string) ?? undefined,
         cifraUrl: (m.cifra_url as string) ?? undefined,
         cifraArtistaSlug: (m.cifra_artista_slug as string) ?? undefined,
         cifraMusicaSlug: (m.cifra_musica_slug as string) ?? undefined,
@@ -914,6 +915,22 @@ export function EscalasTab({
     if (form.musicas.length > 0) setForm((f) => ({ ...f, musicas: [] }));
   }, [form.musicas.length, subTab, usaMusicas]);
 
+  async function carregarCifraDoRepertorio(musicaId: string) {
+    if (!musicaId) return null;
+    const { data, error } = await supabase
+      .from("musicas")
+      .select("cifra,tom")
+      .eq("id", musicaId)
+      .abortSignal(AbortSignal.timeout(8_000))
+      .maybeSingle();
+    if (error) throw new Error("Nao foi possivel carregar a cifra salva.");
+    if (!data?.cifra) return null;
+    return {
+      cifra: String(data.cifra).split("\n"),
+      tom_original: (data.tom as string | null) ?? "",
+    };
+  }
+
   async function abrirCifraInline(escalaId: string, idx: number, m: EscalaMusica) {
     if (cifraAberta?.escalaId === escalaId && cifraAberta?.idx === idx) {
       setCifraAberta(null); setCifraInline(null); return;
@@ -931,8 +948,13 @@ export function EscalasTab({
           tom_original: musicaDoRepertorio.tom ?? "",
         };
       } else {
-        const res = await fetch(`/api/buscar-cifra?artista=${m.artistaSlug}&musica=${m.musicaSlug}`);
-        data = await res.json();
+        const salva = await carregarCifraDoRepertorio(m.musicaId);
+        if (salva) {
+          data = salva;
+        } else {
+          const res = await fetch(`/api/buscar-cifra?artista=${m.artistaSlug}&musica=${m.musicaSlug}`);
+          data = await res.json();
+        }
       }
       if (data.cifra) {
         const cifra: string[] = data.cifra;
@@ -1584,8 +1606,13 @@ export function EscalasTab({
           tom_original: musicaDoRepertorio.tom ?? "",
         };
       } else {
-        const res = await fetch(`/api/buscar-cifra?artista=${m.artistaSlug}&musica=${m.musicaSlug}`);
-        data = await res.json();
+        const salva = await carregarCifraDoRepertorio(m.musicaId);
+        if (salva) {
+          data = salva;
+        } else {
+          const res = await fetch(`/api/buscar-cifra?artista=${m.artistaSlug}&musica=${m.musicaSlug}`);
+          data = await res.json();
+        }
       }
       if (data.cifra) {
         const cifra = data.cifra;
@@ -1620,6 +1647,8 @@ export function EscalasTab({
     musicaSlug: string;
     cifraUrl?: string;
     youtubeUrl?: string;
+    formaDaCifra?: string;
+    capotraste?: string;
     cifra: string[];
   }) {
     const titulo = nova.titulo.trim();
@@ -1675,6 +1704,8 @@ export function EscalasTab({
         cifra_url: nova.cifraUrl || null,
         cifra_artista_slug: nova.artistaSlug,
         cifra_musica_slug: nova.musicaSlug,
+        forma_da_cifra: nova.formaDaCifra || null,
+        capotraste: nova.capotraste || null,
       };
 
       const enviar = (bearer: string) => fetchWithTimeout("/api/repertorio/musicas", {
@@ -1732,6 +1763,8 @@ export function EscalasTab({
         cifraUrl: (row.cifra_url as string) || nova.cifraUrl,
         cifraArtistaSlug: (row.cifra_artista_slug as string) || nova.artistaSlug,
         cifraMusicaSlug: (row.cifra_musica_slug as string) || nova.musicaSlug,
+        formaDaCifra: (row.forma_da_cifra as string) || nova.formaDaCifra,
+        capotraste: (row.capotraste as string) || nova.capotraste,
         arquivada: Boolean(row.arquivada),
       };
 

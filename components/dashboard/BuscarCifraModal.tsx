@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { X, Search, Music2, Check, ExternalLink, Loader2, AlertCircle, ChevronRight } from "lucide-react";
 import clsx from "clsx";
+import { supabase } from "@/lib/supabase";
 
 // ── Transposição de cifra ──────────────────────────────────────────────────
 const NOTES_S = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
@@ -89,6 +90,8 @@ interface Props {
     musicaSlug: string;
     cifraUrl?: string;
     youtubeUrl?: string;
+    formaDaCifra?: string;
+    capotraste?: string;
     cifra: string[];
   }) => void | Promise<void>;
   buscaInicial?: string;
@@ -103,6 +106,7 @@ export default function BuscarCifraModal({ onClose, onSalva, buscaInicial = "" }
   const [erro, setErro] = useState("");
   const [loadingBusca, setLoadingBusca] = useState(false);
   const [loadingCifra, setLoadingCifra] = useState(false);
+  const [statusCifra, setStatusCifra] = useState("Carregando cifra...");
   const [salvando, setSalvando] = useState(false);
   const [sugestaoSelecionada, setSugestaoSelecionada] = useState<Sugestao | null>(null);
   const [importacaoManual, setImportacaoManual] = useState<Sugestao | null>(null);
@@ -112,6 +116,9 @@ export default function BuscarCifraModal({ onClose, onSalva, buscaInicial = "" }
   const [artistaManual, setArtistaManual] = useState("");
   const salvandoRef = useRef(false);
   const salvamentoIdRef = useRef<string | null>(null);
+  const buscaAbortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => () => buscaAbortRef.current?.abort(), []);
 
   useEffect(() => {
     if (buscaInicial.trim()) void buscarSugestoes(buscaInicial.trim());
@@ -174,7 +181,11 @@ export default function BuscarCifraModal({ onClose, onSalva, buscaInicial = "" }
   }
 
   async function buscarCifra(s: Sugestao, versao: "principal" | "simplificada" = "principal") {
+    buscaAbortRef.current?.abort();
+    const controller = new AbortController();
+    buscaAbortRef.current = controller;
     setLoadingCifra(true);
+    setStatusCifra("Carregando cifra...");
     setErro("");
     setSugestoes([]);
     setSalvando(false);
@@ -182,31 +193,53 @@ export default function BuscarCifraModal({ onClose, onSalva, buscaInicial = "" }
     setImportacaoManual(null);
     salvamentoIdRef.current = null;
 
-    const params = new URLSearchParams({ artista: s.artistaSlug, musica: s.musicaSlug, versao });
-    const res = await fetch(`/api/buscar-cifra?${params}`);
-    const data = await res.json();
+    try {
+      const { data: sessao } = await supabase.auth.getSession();
+      const token = sessao.session?.access_token ?? "";
+      const headers = token ? { Authorization: "Bearer " + token } : undefined;
+      const params = new URLSearchParams({ artista: s.artistaSlug, musica: s.musicaSlug, versao });
+      const res = await fetch("/api/buscar-cifra?" + params, { headers, signal: controller.signal });
+      let data = await res.json();
 
-    if (!res.ok) {
-      if (data.code === "CIFRACLUB_BLOCKED") {
-        setErro("");
-        setResultado(null);
-        setImportacaoManual(s);
-        setTituloManual(s.titulo || s.musicaSlug.replace(/-/g, " "));
-        setArtistaManual(s.artista || s.artistaSlug.replace(/-/g, " "));
-        setTomManual("");
-        setCifraManual("");
-        setSugestoes([]);
-      } else {
-        setErro(data.error ?? "Erro ao buscar cifra.");
-        setSugestoes([s]);
+      if (res.status === 202 && data.code === "CIFRA_QUEUED" && data.jobId) {
+        setStatusCifra("Buscando pelo Lenovo...");
+        for (let tentativa = 0; tentativa < 45; tentativa += 1) {
+          await new Promise<void>((resolve) => setTimeout(resolve, 2_000));
+          if (controller.signal.aborted) throw new DOMException("Busca cancelada", "AbortError");
+          const jobRes = await fetch("/api/buscar-cifra/jobs/" + data.jobId, {
+            headers, signal: controller.signal, cache: "no-store",
+          });
+          const job = await jobRes.json();
+          if (!jobRes.ok) throw new Error(job.error ?? "Nao foi possivel acompanhar a busca local.");
+          if (job.status === "concluido" && job.result) { data = job.result; break; }
+          if (job.status === "erro") throw new Error(job.error ?? "O Lenovo nao conseguiu obter esta cifra.");
+          setStatusCifra(job.status === "processando"
+            ? "Lenovo acessando o Cifra Club..."
+            : "Aguardando o Lenovo...");
+          if (tentativa === 44) throw new Error("O Lenovo nao respondeu a tempo.");
+        }
       }
-    } else {
+
+      if (!res.ok && res.status !== 202) throw new Error(data.error ?? "Erro ao buscar cifra.");
+      if (!Array.isArray(data.cifra)) throw new Error(data.error ?? "A cifra nao foi encontrada.");
       setResultado(data);
       const orig = data.tom_original ?? "";
       setTomOriginal(orig);
       setTomPrevia(orig);
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") return;
+      setErro(error instanceof Error ? error.message : "Nao foi possivel buscar a cifra.");
+      setResultado(null);
+      setImportacaoManual(s);
+      setTituloManual(s.titulo || s.musicaSlug.replace(/-/g, " "));
+      setArtistaManual(s.artista || s.artistaSlug.replace(/-/g, " "));
+      setTomManual("");
+      setCifraManual("");
+      setSugestoes([]);
+    } finally {
+      if (buscaAbortRef.current === controller) buscaAbortRef.current = null;
+      setLoadingCifra(false);
     }
-    setLoadingCifra(false);
   }
 
   function confirmarImportacaoManual() {
@@ -259,6 +292,8 @@ export default function BuscarCifraModal({ onClose, onSalva, buscaInicial = "" }
         musicaSlug: sugestaoSelecionada.musicaSlug,
         cifraUrl: resultado.cifraclub_url,
         youtubeUrl: resultado.youtube_url,
+        formaDaCifra: resultado.forma_da_cifra ?? undefined,
+        capotraste: resultado.capotraste ?? undefined,
         // Salva a cifra no tom escolhido pelo líder, enquanto a URL continua
         // apontando para a fonte original no Cifra Club.
         cifra: cifraExibida,
@@ -440,7 +475,7 @@ export default function BuscarCifraModal({ onClose, onSalva, buscaInicial = "" }
         {loadingCifra && !resultado && sugestoes.length === 0 && (
           <div className="flex-1 min-h-0 flex items-center justify-center gap-2 text-gray-400">
             <Loader2 className="w-5 h-5 animate-spin" />
-            Carregando cifra...
+            {statusCifra}
           </div>
         )}
 

@@ -164,6 +164,8 @@ CREATE TABLE musicas (
   cifra_url    TEXT,
   cifra_artista_slug TEXT,
   cifra_musica_slug TEXT,
+  forma_da_cifra TEXT,
+  capotraste TEXT,
   arquivada    BOOLEAN     NOT NULL DEFAULT FALSE,
   created_at   TIMESTAMPTZ DEFAULT NOW()
 );

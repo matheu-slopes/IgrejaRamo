@@ -18,6 +18,8 @@ type NovaMusica = {
   cifra_url?: string | null;
   cifra_artista_slug?: string;
   cifra_musica_slug?: string;
+  forma_da_cifra?: string | null;
+  capotraste?: string | null;
 };
 
 function erroDeColunaAusente(error: { code?: string; message?: string } | null) {
@@ -83,6 +85,8 @@ export async function POST(req: NextRequest) {
   const artistaSlug = String(body?.cifra_artista_slug ?? "").trim();
   const musicaSlug = String(body?.cifra_musica_slug ?? "").trim();
   const cifra = typeof body?.cifra === "string" ? body.cifra : null;
+  const formaDaCifra = body?.forma_da_cifra ? String(body.forma_da_cifra).trim() : null;
+  const capotraste = body?.capotraste ? String(body.capotraste).trim() : null;
 
   if (!UUID_RE.test(id)) return respostaErro("Identificador da musica invalido.", 400, requestId);
   if (!titulo || titulo.length > 240) return respostaErro("Titulo da musica invalido.", 400, requestId);
@@ -92,6 +96,8 @@ export async function POST(req: NextRequest) {
     return respostaErro("Referencia do Cifra Club invalida.", 400, requestId);
   }
   if (cifra && cifra.length > 500_000) return respostaErro("A cifra excede o limite permitido.", 413, requestId);
+  if (formaDaCifra && formaDaCifra.length > 30) return respostaErro("Forma da cifra invalida.", 400, requestId);
+  if (capotraste && capotraste.length > 30) return respostaErro("Capotraste invalido.", 400, requestId);
 
   const { data: porId, error: buscaIdError } = await admin
     .from("musicas")
@@ -126,6 +132,8 @@ export async function POST(req: NextRequest) {
     cifra_url: body?.cifra_url || null,
     cifra_artista_slug: artistaSlug,
     cifra_musica_slug: musicaSlug,
+    forma_da_cifra: formaDaCifra,
+    capotraste,
   };
 
   let { data: musica, error } = await admin

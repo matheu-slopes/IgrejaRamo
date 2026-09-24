@@ -13,6 +13,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 import requests
+import cifra_worker
 from dotenv import load_dotenv
 from filelock import FileLock, Timeout
 ROOT=Path(__file__).resolve().parent
@@ -128,6 +129,11 @@ def main():
     try:
         with FileLock(str(ROOT/".hq-worker.lock"),timeout=0):
             print("Louvor Studio HQ — aguardando músicas e tonalidades.",flush=True)
+            cifra_stop=threading.Event()
+            threading.Thread(
+                target=cifra_worker.run,args=(SITE,HEADERS,cifra_stop),daemon=True,
+                name="cifra-worker",
+            ).start()
             while True:
                 try:
                     job=api("GET").get("job")
