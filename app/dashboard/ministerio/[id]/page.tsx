@@ -56,6 +56,7 @@ export default function CanalMinisterioPage() {
     youtubeConfigurado: false,
   });
   const [analiseStudioInicial, setAnaliseStudioInicial] = useState<(PedidoAnaliseStudio & { id: string }) | null>(null);
+  const [escalaParaAbrir, setEscalaParaAbrir] = useState<string | null>(null);
 
   function abrirAnaliseNoStudio(pedido: PedidoAnaliseStudio) {
     setAnaliseStudioInicial({ id: crypto.randomUUID(), ...pedido });
@@ -208,7 +209,7 @@ export default function CanalMinisterioPage() {
             ] as { id: Tab; label: string; icon: React.ElementType }[]).map(({ id, label, icon: Icon }) => (
               <button
                 key={id}
-                onClick={() => setTab(id)}
+                onClick={() => { if (id === "studio") setAnaliseStudioInicial(null); setTab(id); }}
                 className={clsx(
                   "flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-medium transition shrink-0",
                   tab === id
@@ -228,13 +229,15 @@ export default function CanalMinisterioPage() {
       {tab === "chat"    && <ChatTab ministerio={slug} chatBloqueado={chatBloqueado} podeEnviar={temPermissaoNoMinisterio("enviar_chat", slug)} podeFixar={temPermissaoNoMinisterio("fixar_mensagem", slug)} user={user} />}
       {tab === "membros" && <MembrosTab ministerio={slug} isLider={podeGerenciarMembros} podeAtribuirPermissoes={podeAtribuirPermissoes} />}
       {tab === "eventos" && <EventosTab ministerio={slug} isLider={podeCriarEvento} podeEditar={podeEditarEvento} />}
-      {temEscalas && tab === "escalas" && <EscalasTab ministerio={slug} isLider={isAdmin || temPermissaoNoMinisterio("criar_escala", slug)} podeGerenciarRepertorio={slug === "Louvor" && podeGerenciarRepertorio} onAnalisarNoStudio={slug === "Louvor" && studioAccess.podeGerenciar ? abrirAnaliseNoStudio : undefined} />}
+      {temEscalas && tab === "escalas" && <EscalasTab ministerio={slug} isLider={isAdmin || temPermissaoNoMinisterio("criar_escala", slug)} podeGerenciarRepertorio={slug === "Louvor" && podeGerenciarRepertorio} escalaInicialId={escalaParaAbrir} onAbrirNoStudio={slug === "Louvor" && studioAccess.autorizado ? abrirAnaliseNoStudio : undefined} onAnalisarNoStudio={slug === "Louvor" && studioAccess.podeGerenciar ? abrirAnaliseNoStudio : undefined} />}
       {tab === "studio" && studioAccess.autorizado && (
-        <LouvorStudioTab
+        <LouvorStudioTab key={analiseStudioInicial?.id ?? "biblioteca"}
           podeGerenciar={studioAccess.podeGerenciar}
           podePrepararEnsaio={studioAccess.podePrepararEnsaio}
           workerConfigurado={studioAccess.workerConfigurado}
           analiseInicial={analiseStudioInicial}
+          onPrepararDaEscala={studioAccess.podeGerenciar ? abrirAnaliseNoStudio : undefined}
+          onVoltarParaEscalas={(escalaId) => { setEscalaParaAbrir(escalaId); setAnaliseStudioInicial(null); setTab("escalas"); }}
         />
       )}
       {tab === "repertorio" && studioAccess.autorizado && <RepertorioTab podeGerenciar={podeGerenciarRepertorio} />}

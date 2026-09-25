@@ -48,12 +48,19 @@ export async function GET(req: NextRequest) {
       lista.push(uso); usosPorProjeto.set(uso.studio_projeto_id, lista);
     }
   }
-  let escalas: unknown[] = [];
-  if (acesso.podeGerenciar) {
-    const hoje = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date());
-    const { data: proximas } = await louvorStudioAdmin.from("escalas").select("id, culto, data, horario").eq("ministerio", "Louvor").gte("data", hoje).order("data").order("horario").limit(30);
-    escalas = proximas ?? [];
-  }
+  const hoje = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date());
+  let consultaEscalas = louvorStudioAdmin.from("escalas")
+    .select("id, culto, data, horario, escala_itens(voluntario_id), escala_musicas(musica_id,titulo,artista,tom,bpm,ordem,studio_projeto_id)")
+    .eq("ministerio", "Louvor").gte("data", hoje).order("data").order("horario").limit(30);
+  if (!acesso.podeGerenciar) consultaEscalas = consultaEscalas.eq("visivel", true);
+  const { data: proximas, error: erroEscalas } = await consultaEscalas;
+  if (erroEscalas) console.error("Nao foi possivel carregar os proximos cultos do Studio:", erroEscalas.message);
+  const escalas = (proximas ?? [])
+    .filter((escala) => acesso.podeGerenciar || escala.escala_itens?.some((item) => item.voluntario_id === user.id))
+    .map((escala) => ({
+      id: escala.id, culto: escala.culto, data: escala.data, horario: escala.horario,
+      escala_musicas: [...(escala.escala_musicas ?? [])].sort((a, b) => a.ordem - b.ordem),
+    }));
   return NextResponse.json({ projetos: await Promise.all((data ?? []).map(async (p) => ({ ...(await assinarProjeto(p as ProjetoRow)), escala_usos: usosPorProjeto.get(p.id) ?? [] }))), escalas });
 }
 

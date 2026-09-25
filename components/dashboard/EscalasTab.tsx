@@ -586,6 +586,7 @@ export type MusicaParaPreparacaoStudio = {
 type StatusStudioMusica = "nao_preparado" | "preparando" | "pronto" | "falhou";
 
 type ProjetoStudioResumo = {
+  youtube_url?: string | null;
   escala_id?: string | null;
   musica_id?: string | null;
   status?: "aguardando" | "baixando" | "analisando" | "separando" | "concluido" | "erro";
@@ -594,6 +595,7 @@ type ProjetoStudioResumo = {
 
 export type PedidoAnaliseStudio = MusicaParaPreparacaoStudio & {
   escalaId: string;
+  escalaContexto?: { culto: string; data: string; horario: string; tom?: string; bpm?: number };
   fila?: MusicaParaPreparacaoStudio[];
 };
 
@@ -602,17 +604,22 @@ export function EscalasTab({
   isLider,
   podeGerenciarRepertorio = false,
   onAnalisarNoStudio,
+  onAbrirNoStudio,
+  escalaInicialId,
 }: {
   ministerio: Ministerio;
   isLider: boolean;
   podeGerenciarRepertorio?: boolean;
   onAnalisarNoStudio?: (pedido: PedidoAnaliseStudio) => void;
+  onAbrirNoStudio?: (pedido: PedidoAnaliseStudio) => void;
+  escalaInicialId?: string | null;
 }) {
   const { user, isLoading } = useAuth();
   const [membros, setMembros] = useState<MembroMinisterio[]>([]);
   const [escalas, setEscalas] = useState<Escala[]>([]);
   const [musicas, setMusicas] = useState<Musica[]>([]);
   const [statusStudioPorMusica, setStatusStudioPorMusica] = useState<Record<string, StatusStudioMusica>>({});
+  const [videoStudioPorMusica, setVideoStudioPorMusica] = useState<Record<string, string>>({});
   const [dadosCarregados, setDadosCarregados] = useState(false);
   const [erroCarregamento, setErroCarregamento] = useState<string | null>(null);
   const fetchSeqRef = useRef(0);
@@ -754,6 +761,7 @@ export function EscalasTab({
     }
 
     const proximosStatus: Record<string, StatusStudioMusica> = {};
+    const proximosVideos: Record<string, string> = {};
     for (const projeto of projetosStudio) {
       const usos = projeto.escala_usos?.length
         ? projeto.escala_usos
@@ -765,6 +773,7 @@ export function EscalasTab({
         const chave = `${uso.escala_id}:${uso.musica_id}`;
         // A API devolve os mais recentes primeiro: o primeiro projeto é o estado atual.
         if (proximosStatus[chave]) continue;
+        if (projeto.youtube_url) proximosVideos[chave] = projeto.youtube_url;
         proximosStatus[chave] = projeto.status === "concluido"
           ? "pronto"
           : projeto.status === "erro"
@@ -773,6 +782,7 @@ export function EscalasTab({
       }
     }
     setStatusStudioPorMusica(proximosStatus);
+    setVideoStudioPorMusica(proximosVideos);
   }, [isLoading, ministerio, user?.id]);
 
   useAppRefresh(() => { void carregarDados(); }, [carregarDados], { runOnMount: false, minIntervalMs: 2000 });
@@ -843,21 +853,21 @@ export function EscalasTab({
   const [avisoMusica, setAvisoMusica] = useState("");
   const [editandoKey, setEditandoKey] = useState<string | null>(null);
   const [adicionandoParticipante, setAdicionandoParticipante] = useState(false);
-  const [viewMode, setViewMode] = useState<"minhas" | "culto">("culto");
+  const [viewMode, setViewMode] = useState<"minhas" | "culto">(ministerio === "Louvor" && !isLider ? "minhas" : "culto");
   const [busca, setBusca] = useState("");
   const conflitosConfirmadosRef = useRef<Set<string>>(new Set());
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(escalaInicialId ?? null);
   const [editandoDadosMusica, setEditandoDadosMusica] = useState<number | null>(null);
 
   useEffect(() => {
-    if (selectedId && !escalas.some((e) => e.id === selectedId)) {
+    if (dadosCarregados && selectedId && !escalas.some((e) => e.id === selectedId)) {
       setSelectedId(null);
     }
     if (editId && !escalas.some((e) => e.id === editId)) {
       setEditId(null);
       setModo("lista");
     }
-  }, [editId, escalas, selectedId]);
+  }, [dadosCarregados, editId, escalas, selectedId]);
   // letras
   const [copyLetraIdx, setCopyLetraIdx] = useState<number | null>(null);
   const [copyLetraOk, setCopyLetraOk] = useState<number | null>(null);
@@ -1628,8 +1638,9 @@ export function EscalasTab({
     return `https://www.youtube.com/results?search_query=${encodeURIComponent(`${titulo} ${artista}`)}` ;
   }
 
-  function linkYoutubeDaMusica(musica: Pick<EscalaMusica, "musicaId" | "titulo" | "artista" | "linkYoutube">) {
-    return musica.linkYoutube ?? musicas.find((item) => item.id === musica.musicaId)?.linkYoutube ?? youtubeUrl(musica.titulo, musica.artista);
+  function linkYoutubeDaMusica(musica: Pick<EscalaMusica, "musicaId" | "titulo" | "artista" | "linkYoutube">, escalaId?: string) {
+    return (escalaId ? videoStudioPorMusica[`${escalaId}:${musica.musicaId}`] : undefined)
+      ?? musica.linkYoutube ?? musicas.find((item) => item.id === musica.musicaId)?.linkYoutube ?? youtubeUrl(musica.titulo, musica.artista);
   }
 
   async function adicionarCifraAoRepertorio(nova: {
@@ -2189,6 +2200,7 @@ export function EscalasTab({
                             <th className="text-left text-xs font-semibold text-gray-500 px-3 py-2">Música</th>
                             <th className="text-left text-xs font-semibold text-gray-500 px-3 py-2">Tom</th>
                             <th className="text-left text-xs font-semibold text-gray-500 px-3 py-2">BPM</th>
+                            <th className="text-left text-xs font-semibold text-gray-500 px-3 py-2">{ministerio === "Louvor" ? "Referência e ensaio" : "Letra"}</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-50">
@@ -2232,11 +2244,23 @@ export function EscalasTab({
                                       <><ClipboardCopy className="w-3 h-3" /> Copiar letra</>
                                     )}
                                   </button>
+                                  {ministerio === "Louvor" && <div className="mt-2 flex flex-wrap items-center gap-2">
+                                    <a href={linkYoutubeDaMusica(m, selectedEscala.id)} target="_blank" rel="noopener noreferrer" className="rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50">
+                                      {videoStudioPorMusica[`${selectedEscala.id}:${m.musicaId}`] || m.linkYoutube || musicas.some((item) => item.id === m.musicaId && item.linkYoutube) ? "Vídeo de referência" : "Buscar gravação"}
+                                    </a>
+                                    {m.musicaId && statusStudioPorMusica[`${selectedEscala.id}:${m.musicaId}`] === "pronto" && onAbrirNoStudio ? (
+                                      <button type="button" onClick={() => onAbrirNoStudio({ escalaId: selectedEscala.id, escalaContexto: { culto: selectedEscala.culto, data: selectedEscala.data, horario: selectedEscala.horario, tom: m.tom, bpm: m.bpm }, ...dadosDaMusicaParaStudio(m) })} className="rounded-lg bg-rose-700 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-rose-600">Ensaiar no Studio</button>
+                                    ) : m.musicaId && statusStudioPorMusica[`${selectedEscala.id}:${m.musicaId}`] === "preparando" ? (
+                                      <span className="text-xs font-medium text-amber-700">Studio preparando</span>
+                                    ) : m.musicaId && onAnalisarNoStudio ? (
+                                      <button type="button" onClick={() => onAnalisarNoStudio({ escalaId: selectedEscala.id, escalaContexto: { culto: selectedEscala.culto, data: selectedEscala.data, horario: selectedEscala.horario, tom: m.tom, bpm: m.bpm }, ...dadosDaMusicaParaStudio(m) })} className="rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-xs font-semibold text-rose-700">{statusStudioPorMusica[`${selectedEscala.id}:${m.musicaId}`] === "falhou" ? "Preparar novamente" : "Preparar no Studio"}</button>
+                                    ) : <span className="text-xs text-gray-500">{statusStudioPorMusica[`${selectedEscala.id}:${m.musicaId}`] === "pronto" ? "Studio pronto" : statusStudioPorMusica[`${selectedEscala.id}:${m.musicaId}`] === "falhou" ? "Falha na preparação" : "Ensaio ainda não preparado"}</span>}
+                                  </div>}
                                 </td>
                               </tr>
                               {cifraAberta?.escalaId === selectedEscala.id && cifraAberta?.idx === i && (
                                 <tr key={`cifra-${i}`}>
-                                  <td colSpan={3} className="px-3 py-3 bg-gray-50 border-t border-gray-100">
+                                  <td colSpan={5} className="px-3 py-3 bg-gray-50 border-t border-gray-100">
                                     {loadingCifraInline ? (
                                       <p className="text-xs text-gray-400 animate-pulse">Carregando cifra...</p>
                                     ) : cifraInline ? (

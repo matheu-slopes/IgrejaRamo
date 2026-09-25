@@ -36,6 +36,57 @@ test('all 12 keys preserve major/minor and obey all directions',()=>{
   assert.throws(()=>music.transposeSemitones('C','Cm'));
   assert.throws(()=>music.transposeSemitones('C','D','invalid'));
 });
+test('Studio lists only a member’s published assigned services and keeps song order', async () => {
+  const services = [
+    { id: 'assigned', culto: 'Domingo', data: '2099-01-01', horario: '18:30', visivel: true,
+      escala_itens: [{ voluntario_id: 'member' }],
+      escala_musicas: [
+        { musica_id: 'second', titulo: 'Segunda', artista: 'A', ordem: 2, tom: 'D', bpm: 120, studio_projeto_id: null },
+        { musica_id: 'first', titulo: 'Primeira', artista: 'B', ordem: 1, tom: 'E', bpm: 130, studio_projeto_id: 'base' },
+      ] },
+    { id: 'other', culto: 'Quinta', data: '2099-01-02', horario: '20:00', visivel: true,
+      escala_itens: [{ voluntario_id: 'other' }], escala_musicas: [] },
+    { id: 'draft', culto: 'Rascunho', data: '2099-01-03', horario: '20:00', visivel: false,
+      escala_itens: [{ voluntario_id: 'member' }], escala_musicas: [] },
+  ];
+  for (const manager of [false, true]) {
+    const db = { from(table) {
+      const filters = {};
+      return {
+        select() { return this; }, or() { return this; }, order() { return this; },
+        limit() { return this; }, in() { return this; }, gte() { return this; },
+        eq(key, value) { filters[key] = value; return this; },
+        then(resolve, reject) {
+          const data = table === 'louvor_studio_projetos'
+            ? [{ id: 'base', titulo: 'Primeira', stems: {}, visibilidade: 'equipe' }]
+            : table === 'escala_musicas'
+              ? [{ escala_id: 'assigned', musica_id: 'first', studio_projeto_id: 'base' }]
+              : services.filter((service) => filters.visivel !== true || service.visivel);
+          return Promise.resolve({ data, error: null }).then(resolve, reject);
+        },
+      };
+    } };
+    const { GET } = loadTs('app/api/louvor-studio/projects/route.ts', {
+      'next/server': { NextResponse: { json: (body, init) => Response.json(body, init) } },
+      '@/lib/youtubeSearch': { youtubeId: () => null },
+      '@/lib/louvorStudioServer': {
+        getLouvorStudioUser: async () => ({ id: 'member' }),
+        getLouvorStudioAccess: async () => ({ podeVer: true, podeGerenciar: manager }),
+        limparProjetosExpirados: async () => {},
+        recuperarProcessamentosLouvorTravados: async () => {},
+        louvorStudioAdmin: db,
+      },
+      '@/lib/louvorStudioStorage': { criarUrlDeLeitura: async () => '' },
+    });
+    const response = await GET(new Request('http://localhost/projects'));
+    assert.equal(response.status, 200);
+    const result = await response.json();
+    assert.deepEqual(result.escalas.map((service) => service.id), manager ? ['assigned', 'other', 'draft'] : ['assigned']);
+    assert.deepEqual(result.escalas[0].escala_musicas.map((song) => song.musica_id), ['first', 'second']);
+    assert.equal('escala_itens' in result.escalas[0], false);
+    assert.deepEqual(result.projetos[0].escala_usos, [{ escala_id: 'assigned', musica_id: 'first', studio_projeto_id: 'base' }]);
+  }
+});
 const projectId='a007fe56-8080-4924-b79d-b7fd429edddb';
 test('only users with Studio management permission can add a music processing job',async()=>{
  for(const [manager,status] of [[false,403],[true,503]]){
