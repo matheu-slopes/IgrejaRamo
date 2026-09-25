@@ -205,6 +205,8 @@ function MobileStudioPlayer({ project, onEscolherTomDaEscala, salvandoTomDaEscal
   const tracksRef = useRef<Partial<Record<Stem, HTMLAudioElement>>>({});
   const contextRef = useRef<AudioContext | null>(null);
   const sourcesRef = useRef<Partial<Record<Stem, MediaElementAudioSourceNode>>>({});
+  const gainsRef = useRef<Partial<Record<Stem, GainNode>>>({});
+  const masterGainRef = useRef<GainNode | null>(null);
   const realtimeNodesRef = useRef<Partial<Record<Stem, import("signalsmith-stretch").StretchNode>>>({});
   const [target, setTarget] = useState(initial);
 
@@ -224,6 +226,8 @@ function MobileStudioPlayer({ project, onEscolherTomDaEscala, salvandoTomDaEscal
     const tracks: Partial<Record<Stem, HTMLAudioElement>> = {};
     let context: AudioContext | null = null;
     const sources: Partial<Record<Stem, MediaElementAudioSourceNode>> = {};
+    const gains: Partial<Record<Stem, GainNode>> = {};
+    let masterGain: GainNode | null = null;
     let nodes: Partial<Record<Stem, import("signalsmith-stretch").StretchNode>> = {};
     const waitForMetadata = (audio: HTMLAudioElement) =>
       new Promise<void>((resolve, reject) => {
@@ -264,30 +268,60 @@ function MobileStudioPlayer({ project, onEscolherTomDaEscala, salvandoTomDaEscal
         setDuration(Math.min(...durations));
         try {
           context = new AudioContext({ latencyHint: "playback" });
+          masterGain = context.createGain();
+          masterGain.gain.value = master;
+          masterGain.connect(context.destination);
           for (const stem of stems) {
             const source = context.createMediaElementSource(tracks[stem]!);
             sources[stem] = source;
-            const node = await createRealtimeLiveStem(context, source);
-            node.connect(context.destination);
-            nodes[stem] = node;
+            const gain = context.createGain();
+            gain.gain.value = muted[stem] || (solo && solo !== stem)
+              ? 0
+              : volumes[stem];
+            gains[stem] = gain;
+            gain.connect(masterGain);
+          }
+          try {
+            for (const stem of stems) {
+              const source = sources[stem]!;
+              const node = await createRealtimeLiveStem(context, source);
+              node.connect(gains[stem]!);
+              nodes[stem] = node;
+            }
+          } catch {
+            // iOS pode não oferecer AudioWorklet no PWA. As faixas continuam
+            // passando pelos GainNodes, para que volume, mute e solo funcionem
+            // mesmo sem transposição ao vivo.
+            for (const node of Object.values(nodes)) {
+              node?.disconnect();
+              node?.port.close();
+            }
+            for (const [stem, source] of Object.entries(sources) as [Stem, MediaElementAudioSourceNode][]) {
+              source.disconnect();
+              source.connect(gains[stem]!);
+            }
+            nodes = {};
+            if (!disposed) setMessage("A transposição ao vivo não é compatível com este navegador. A música continua disponível no tom original.");
           }
           if (disposed) return;
           contextRef.current = context;
           sourcesRef.current = sources;
+          gainsRef.current = gains;
+          masterGainRef.current = masterGain;
           realtimeNodesRef.current = nodes;
-          setRealtimeReady(true);
+          setRealtimeReady(Object.keys(nodes).length === stems.length);
         } catch {
-          // O navegador ainda pode tocar por streaming mesmo que o AudioWorklet
-          // não esteja disponível. Reconecta todas as faixas sem transposição.
+          // O navegador ainda pode tocar por streaming se o Web Audio inteiro
+          // estiver indisponível. Em iOS, os controles de faixa precisam do
+          // Web Audio porque o volume de HTMLAudioElement é controlado pelo SO.
           for (const node of Object.values(nodes)) {
             node?.disconnect();
             node?.port.close();
           }
-          for (const source of Object.values(sources)) {
-            try { source?.disconnect(); source?.connect(context!.destination); } catch {}
-          }
+          for (const source of Object.values(sources)) source?.disconnect();
+          masterGain?.disconnect();
           nodes = {};
-          if (!disposed) setMessage("A transposição ao vivo não é compatível com este navegador. A música continua disponível no tom original.");
+          if (!disposed) setMessage("O navegador não permitiu carregar o mixer. A música continua disponível, mas os controles de faixa podem não funcionar.");
         }
         setReady(true);
       } catch (error) {
@@ -308,9 +342,13 @@ function MobileStudioPlayer({ project, onEscolherTomDaEscala, salvandoTomDaEscal
         node?.port.close();
       }
       for (const source of Object.values(sources)) source?.disconnect();
+      for (const gain of Object.values(gains)) gain?.disconnect();
+      masterGain?.disconnect();
       void context?.close();
       tracksRef.current = {};
       sourcesRef.current = {};
+      gainsRef.current = {};
+      masterGainRef.current = null;
       realtimeNodesRef.current = {};
       contextRef.current = null;
     };
@@ -322,10 +360,16 @@ function MobileStudioPlayer({ project, onEscolherTomDaEscala, salvandoTomDaEscal
   useEffect(() => {
     for (const stem of stems) {
       const audio = tracksRef.current[stem];
-      if (!audio) continue;
+      const gain = gainsRef.current[stem];
       const silent = Boolean(muted[stem] || (solo && solo !== stem));
-      audio.volume = silent ? 0 : Math.max(0, Math.min(1, master * volumes[stem]));
+      // On iPhone/iPad, HTMLMediaElement.volume is fixed at the hardware
+      // volume. GainNode is what makes mute, solo and per-track levels work
+      // inside the installed PWA.
+      if (gain) gain.gain.value = silent ? 0 : Math.max(0, Math.min(1, volumes[stem]));
+      if (audio) audio.volume = gain ? 1 : (silent ? 0 : Math.max(0, Math.min(1, master * volumes[stem])));
     }
+    if (masterGainRef.current)
+      masterGainRef.current.gain.value = Math.max(0, Math.min(1, master));
   }, [master, muted, solo, stems, volumes]);
 
   useEffect(() => {
