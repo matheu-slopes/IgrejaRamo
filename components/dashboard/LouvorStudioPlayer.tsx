@@ -181,6 +181,43 @@ function secondsText(value: number) {
   );
 }
 
+function waitForTrackSeek(audio: HTMLAudioElement, signal: AbortSignal) {
+  if (!audio.seeking && audio.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA)
+    return Promise.resolve();
+  return new Promise<void>((resolve, reject) => {
+    const cleanup = () => {
+      window.clearTimeout(timer);
+      audio.removeEventListener("seeked", check);
+      audio.removeEventListener("loadeddata", check);
+      audio.removeEventListener("canplay", check);
+      audio.removeEventListener("error", fail);
+      signal.removeEventListener("abort", abort);
+    };
+    const check = () => {
+      if (!audio.seeking && audio.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+        cleanup();
+        resolve();
+      }
+    };
+    const fail = () => {
+      cleanup();
+      reject(Error("Não foi possível carregar uma faixa neste ponto."));
+    };
+    const abort = () => {
+      cleanup();
+      reject(Error("Busca cancelada."));
+    };
+    const timer = window.setTimeout(fail, 10000);
+    audio.addEventListener("seeked", check);
+    audio.addEventListener("loadeddata", check);
+    audio.addEventListener("canplay", check);
+    audio.addEventListener("error", fail);
+    signal.addEventListener("abort", abort, { once: true });
+    if (signal.aborted) abort();
+    else check();
+  });
+}
+
 /**
  * Mobile browsers struggle when four long MP3s are decoded into Web Audio at
  * once: decoded PCM can consume more than a gigabyte. The lightweight player
@@ -208,16 +245,131 @@ function MobileStudioPlayer({ project, onEscolherTomDaEscala, salvandoTomDaEscal
   const gainsRef = useRef<Partial<Record<Stem, GainNode>>>({});
   const masterGainRef = useRef<GainNode | null>(null);
   const realtimeNodesRef = useRef<Partial<Record<Stem, import("signalsmith-stretch").StretchNode>>>({});
+  const playingRef = useRef(false);
+  const positionRef = useRef(0);
+  const transportRequestRef = useRef(0);
+  const seekingRef = useRef(false);
+  const seekAbortRef = useRef<AbortController | null>(null);
+  const startingRef = useRef(false);
+  const resumeAfterSeekRef = useRef(false);
+  const lastSyncSeekRef = useRef(0);
+  const bufferingSinceRef = useRef(0);
+  const pitchSemitonesRef = useRef(0);
+  const pitchedRouteRef = useRef(false);
+  const scrubPositionRef = useRef<number | null>(null);
+  const scrubChangedRef = useRef(false);
   const [target, setTarget] = useState(initial);
 
-  const stems = (Object.keys(urls) as Stem[]).filter((stem) => urls[stem]);
+  const stems = useMemo(
+    () => (JSON.parse(urlsKey) as [Stem, string | null][])
+      .filter(([, url]) => Boolean(url))
+      .map(([stem]) => stem),
+    [urlsKey],
+  );
   let semitones = 0;
   try {
     semitones = transposeSemitones(initial, target, "auto");
   } catch {}
 
+  const setPitchRoute = useCallback((enabled: boolean) => {
+    if (pitchedRouteRef.current === enabled) return;
+    for (const [stem, source] of Object.entries(sourcesRef.current) as [Stem, MediaElementAudioSourceNode][]) {
+      const gain = gainsRef.current[stem];
+      const node = realtimeNodesRef.current[stem];
+      if (!gain || !node) continue;
+      if (enabled) {
+        source.disconnect(gain);
+        node.connect(gain);
+      } else {
+        const context = contextRef.current;
+        if (context)
+          void node.schedule({ active: false, output: context.currentTime, outputTime: context.currentTime }).catch(() => {});
+        node.disconnect(gain);
+        source.connect(gain);
+      }
+    }
+    pitchedRouteRef.current = enabled;
+  }, []);
+
+  const pauseAll = useCallback((reason?: string) => {
+    transportRequestRef.current++;
+    seekAbortRef.current?.abort();
+    seekAbortRef.current = null;
+    seekingRef.current = false;
+    startingRef.current = false;
+    resumeAfterSeekRef.current = false;
+    playingRef.current = false;
+    scrubPositionRef.current = null;
+    setPitchRoute(false);
+    const tracks = Object.values(tracksRef.current).filter((audio): audio is HTMLAudioElement => Boolean(audio));
+    const lead = tracksRef.current.vocals ?? tracks[0];
+    if (lead && Number.isFinite(lead.currentTime)) positionRef.current = lead.currentTime;
+    tracks.forEach((audio) => {
+      audio.pause();
+      audio.playbackRate = 1;
+    });
+    setPosition(positionRef.current);
+    setPlaying(false);
+    if (reason) setMessage(reason);
+  }, [setPitchRoute]);
+
+  const playAll = useCallback(async (request: number) => {
+    if (request !== transportRequestRef.current || document.hidden) return;
+    const tracks = Object.values(tracksRef.current).filter((audio): audio is HTMLAudioElement => Boolean(audio));
+    if (!tracks.length) return;
+    try {
+      if (pitchSemitonesRef.current && contextRef.current) {
+        setPitchRoute(true);
+        setRealtimeLivePitch(contextRef.current, realtimeNodesRef.current, pitchSemitonesRef.current);
+      }
+      // Start both operations inside the user's gesture. On mobile, awaiting
+      // resume() before play() can lose permission to start media playback.
+      const context = contextRef.current;
+      const resume = context && context.state !== "running" && context.state !== "closed"
+        ? context.resume()
+        : Promise.resolve();
+      const starts = tracks.map((audio) => audio.play());
+      startingRef.current = true;
+      playingRef.current = true;
+      setPlaying(true);
+      setMessage("Carregando faixas...");
+      let timeout: ReturnType<typeof setTimeout> | undefined;
+      try {
+        await Promise.race([
+          Promise.all([resume, ...starts]),
+          new Promise<never>((_, reject) => {
+            timeout = setTimeout(() => reject(Error("Tempo esgotado ao iniciar as faixas.")), 10000);
+          }),
+        ]);
+      } finally {
+        clearTimeout(timeout);
+      }
+      if (request === transportRequestRef.current) {
+        startingRef.current = false;
+        if (document.hidden) pauseAll();
+        else setMessage("");
+      }
+    } catch {
+      if (request === transportRequestRef.current)
+        pauseAll("Não foi possível retomar todas as faixas. Aguarde o carregamento e toque em Reproduzir.");
+    }
+  }, [pauseAll, setPitchRoute]);
+
   useEffect(() => {
     let disposed = false;
+    const requests = transportRequestRef;
+    playingRef.current = false;
+    positionRef.current = 0;
+    requests.current++;
+    seekAbortRef.current?.abort();
+    seekingRef.current = false;
+    startingRef.current = false;
+    resumeAfterSeekRef.current = false;
+    bufferingSinceRef.current = 0;
+    lastSyncSeekRef.current = 0;
+    pitchSemitonesRef.current = 0;
+    pitchedRouteRef.current = false;
+    scrubPositionRef.current = null;
     setReady(false);
     setRealtimeReady(false);
     setPlaying(false);
@@ -229,26 +381,9 @@ function MobileStudioPlayer({ project, onEscolherTomDaEscala, salvandoTomDaEscal
     const gains: Partial<Record<Stem, GainNode>> = {};
     let masterGain: GainNode | null = null;
     let nodes: Partial<Record<Stem, import("signalsmith-stretch").StretchNode>> = {};
-    let pausing = false;
-    const pauseTogether = (becauseBackground = false) => {
-      if (disposed || pausing) return;
-      pausing = true;
-      const lead = tracks[stems[0]];
-      const nextPosition = lead && Number.isFinite(lead.currentTime)
-        ? lead.currentTime
-        : 0;
-      Object.values(tracks).forEach((audio) => audio?.pause());
-      if (!disposed) {
-        setPosition(nextPosition);
-        setPlaying(false);
-        if (becauseBackground)
-          setMessage("A reprodução foi pausada enquanto o app ficou em segundo plano. Toque em Reproduzir para continuar.");
-      }
-      pausing = false;
-    };
-    const onTrackPause = () => pauseTogether();
     const onVisibilityChange = () => {
-      if (document.hidden) pauseTogether(true);
+      if (document.hidden && playingRef.current)
+        pauseAll("A reprodução foi pausada enquanto o app ficou em segundo plano. Toque em Reproduzir para continuar.");
     };
     const waitForMetadata = (audio: HTMLAudioElement) =>
       new Promise<void>((resolve, reject) => {
@@ -286,7 +421,6 @@ function MobileStudioPlayer({ project, onEscolherTomDaEscala, salvandoTomDaEscal
           .filter((value) => Number.isFinite(value) && value > 0);
         if (!durations.length) throw Error("A duração das faixas não foi encontrada.");
         tracksRef.current = tracks;
-        Object.values(tracks).forEach((audio) => audio?.addEventListener("pause", onTrackPause));
         document.addEventListener("visibilitychange", onVisibilityChange);
         setDuration(Math.min(...durations));
         try {
@@ -303,12 +437,12 @@ function MobileStudioPlayer({ project, onEscolherTomDaEscala, salvandoTomDaEscal
               : volumes[stem];
             gains[stem] = gain;
             gain.connect(masterGain);
+            source.connect(gain);
           }
           try {
             for (const stem of stems) {
               const source = sources[stem]!;
               const node = await createRealtimeLiveStem(context, source);
-              node.connect(gains[stem]!);
               nodes[stem] = node;
             }
           } catch {
@@ -341,12 +475,18 @@ function MobileStudioPlayer({ project, onEscolherTomDaEscala, salvandoTomDaEscal
             node?.disconnect();
             node?.port.close();
           }
-          for (const source of Object.values(sources)) source?.disconnect();
-          masterGain?.disconnect();
+          for (const [stem, source] of Object.entries(sources) as [Stem, MediaElementAudioSourceNode][]) {
+            source.disconnect();
+            source.connect(gains[stem] ?? context!.destination);
+          }
           nodes = {};
+          contextRef.current = context;
+          sourcesRef.current = sources;
+          gainsRef.current = gains;
+          masterGainRef.current = masterGain;
           if (!disposed) setMessage("O navegador não permitiu carregar o mixer. A música continua disponível, mas os controles de faixa podem não funcionar.");
         }
-        setReady(true);
+        if (!disposed) setReady(true);
       } catch (error) {
         if (!disposed)
           setMessage(error instanceof Error ? error.message : "Não foi possível carregar as faixas.");
@@ -355,9 +495,17 @@ function MobileStudioPlayer({ project, onEscolherTomDaEscala, salvandoTomDaEscal
     void load();
     return () => {
       disposed = true;
+      playingRef.current = false;
+      requests.current++;
+      seekAbortRef.current?.abort();
+      seekingRef.current = false;
+      startingRef.current = false;
+      resumeAfterSeekRef.current = false;
+      bufferingSinceRef.current = 0;
+      pitchedRouteRef.current = false;
+      scrubPositionRef.current = null;
       document.removeEventListener("visibilitychange", onVisibilityChange);
       Object.values(tracks).forEach((audio) => {
-        audio?.removeEventListener("pause", onTrackPause);
         audio?.pause();
         audio?.removeAttribute("src");
         audio?.load();
@@ -380,7 +528,7 @@ function MobileStudioPlayer({ project, onEscolherTomDaEscala, salvandoTomDaEscal
     // URLs identify a distinct prepared project; loading is intentionally once
     // per project, not once per volume or playback adjustment.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [project.id, urlsKey]);
+  }, [project.id, urlsKey, pauseAll]);
 
   useEffect(() => {
     for (const stem of stems) {
@@ -397,63 +545,135 @@ function MobileStudioPlayer({ project, onEscolherTomDaEscala, salvandoTomDaEscal
       masterGainRef.current.gain.value = Math.max(0, Math.min(1, master));
   }, [master, muted, solo, stems, volumes]);
 
+  const seek = useCallback((value: number) => {
+    if (!ready) return;
+    const next = Math.max(0, Math.min(Math.max(0, duration - 0.05), value));
+    const tracks = Object.values(tracksRef.current).filter((audio): audio is HTMLAudioElement => Boolean(audio));
+    const resume = playingRef.current || resumeAfterSeekRef.current;
+    const request = ++transportRequestRef.current;
+    seekAbortRef.current?.abort();
+    const controller = new AbortController();
+    seekAbortRef.current = controller;
+    playingRef.current = false;
+    seekingRef.current = true;
+    startingRef.current = false;
+    resumeAfterSeekRef.current = resume;
+    setPlaying(false);
+    setPitchRoute(false);
+    tracks.forEach((audio) => {
+      audio.pause();
+      audio.playbackRate = 1;
+      if (Math.abs(audio.currentTime - next) > 0.015) audio.currentTime = next;
+    });
+    positionRef.current = next;
+    setPosition(next);
+    if (resume) {
+      setMessage("Carregando faixas no novo ponto...");
+      void Promise.all(tracks.map((audio) => waitForTrackSeek(audio, controller.signal)))
+        .then(() => {
+          if (request !== transportRequestRef.current || controller.signal.aborted) return;
+          seekingRef.current = false;
+          seekAbortRef.current = null;
+          resumeAfterSeekRef.current = false;
+          void playAll(request);
+        })
+        .catch(() => {
+          if (request !== transportRequestRef.current || controller.signal.aborted) return;
+          seekingRef.current = false;
+          seekAbortRef.current = null;
+          resumeAfterSeekRef.current = false;
+          setMessage("A faixa ainda está carregando neste ponto. Toque em Reproduzir para tentar novamente.");
+        });
+    } else {
+      seekingRef.current = false;
+      seekAbortRef.current = null;
+    }
+  }, [ready, duration, playAll, setPitchRoute]);
+
+  function commitScrub() {
+    const value = scrubPositionRef.current;
+    if (value == null) return;
+    scrubPositionRef.current = null;
+    if (scrubChangedRef.current) seek(value);
+    else setPosition(positionRef.current);
+    scrubChangedRef.current = false;
+  }
+
   useEffect(() => {
     if (!playing) return;
     const timer = window.setInterval(() => {
-      const lead = tracksRef.current[stems[0]];
+      if (!playingRef.current || startingRef.current || seekingRef.current) return;
+      const tracks = Object.values(tracksRef.current).filter((audio): audio is HTMLAudioElement => Boolean(audio));
+      const lead = tracksRef.current.vocals ?? tracks[0];
       if (!lead) return;
-      if (lead.ended || lead.currentTime >= lead.duration) {
-        Object.values(tracksRef.current).forEach((audio) => audio?.pause());
-        setPlaying(false);
+      if (lead.ended || lead.currentTime >= duration - 0.05) {
+        pauseAll();
+        tracks.forEach((audio) => { audio.currentTime = 0; });
+        positionRef.current = 0;
         setPosition(0);
-      } else {
-        // Cada stem é transmitido por um elemento de mídia próprio para não
-        // decodificar a música inteira no celular. Eles não compartilham o
-        // mesmo relógio e podem desviar alguns milissegundos ao longo do
-        // ensaio. Reposicionamos apenas desvios perceptíveis, sem interromper
-        // a reprodução normal nem alterar a afinação.
-        for (const audio of Object.values(tracksRef.current)) {
-          if (!audio || audio === lead || audio.paused) continue;
-          if (Math.abs(audio.currentTime - lead.currentTime) >= 0.08) {
-            audio.currentTime = lead.currentTime;
-          }
-        }
-        setPosition(lead.currentTime);
+        return;
       }
+      if (tracks.some((audio) => audio.paused || audio.seeking)) {
+        pauseAll("Uma faixa parou de carregar. Aguarde um instante e toque em Reproduzir para continuar.");
+        return;
+      }
+      const now = performance.now();
+      if (tracks.some((audio) => audio.readyState < HTMLMediaElement.HAVE_FUTURE_DATA)) {
+        if (!bufferingSinceRef.current) bufferingSinceRef.current = now;
+        else if (now - bufferingSinceRef.current > 500)
+          pauseAll("Uma faixa está carregando. Aguarde um instante e toque em Reproduzir para continuar.");
+        return;
+      }
+      bufferingSinceRef.current = 0;
+      for (const audio of tracks) {
+        if (audio === lead) continue;
+        const drift = audio.currentTime - lead.currentTime;
+        if (Math.abs(drift) > 0.75 && now - lastSyncSeekRef.current > 2500) {
+          // A large offset needs one coordinated seek. Seeking just one stem
+          // while the others play can trigger another buffer stall.
+          lastSyncSeekRef.current = now;
+          seek(lead.currentTime);
+          return;
+        } else if (Math.abs(drift) > 0.12 && !audio.seeking) {
+          audio.playbackRate = drift > 0 ? 0.975 : 1.025;
+        } else if (Math.abs(drift) < 0.06) {
+          audio.playbackRate = 1;
+        }
+      }
+      positionRef.current = lead.currentTime;
+      if (scrubPositionRef.current == null) setPosition(lead.currentTime);
     }, 250);
     return () => window.clearInterval(timer);
-  }, [playing, stems]);
-
-  function seek(value: number) {
-    const next = Math.max(0, Math.min(duration, value));
-    Object.values(tracksRef.current).forEach((audio) => {
-      if (audio) audio.currentTime = next;
-    });
-    setPosition(next);
-  }
+  }, [playing, duration, pauseAll, seek]);
 
   async function toggle() {
-    const tracks = Object.values(tracksRef.current).filter(
-      (audio): audio is HTMLAudioElement => Boolean(audio),
-    );
-    if (!tracks.length || !ready) return;
-    if (playing) {
-      tracks.forEach((audio) => audio.pause());
-      setPlaying(false);
+    if (!ready) return;
+    if (playingRef.current || resumeAfterSeekRef.current) {
+      pauseAll();
       return;
     }
-    try {
-      if (contextRef.current?.state === "suspended") await contextRef.current.resume();
-      tracks.forEach((audio) => {
-        audio.currentTime = position;
-        audio.playbackRate = 1;
-      });
-      await Promise.all(tracks.map((audio) => audio.play()));
-      setPlaying(true);
-    } catch {
-      tracks.forEach((audio) => audio.pause());
-      setMessage("O celular não permitiu iniciar todas as faixas. Toque em Reproduzir novamente.");
+    const request = ++transportRequestRef.current;
+    const tracks = Object.values(tracksRef.current).filter((audio): audio is HTMLAudioElement => Boolean(audio));
+    for (const audio of tracks) {
+      if (Math.abs(audio.currentTime - positionRef.current) > 0.25)
+        audio.currentTime = positionRef.current;
+      audio.playbackRate = 1;
     }
+    if (tracks.some((audio) => audio.seeking)) {
+      const controller = new AbortController();
+      seekAbortRef.current?.abort();
+      seekAbortRef.current = controller;
+      try {
+        await Promise.all(tracks.map((audio) => waitForTrackSeek(audio, controller.signal)));
+      } catch {
+        if (request === transportRequestRef.current)
+          setMessage("A faixa ainda está carregando. Toque em Reproduzir novamente.");
+        return;
+      } finally {
+        if (seekAbortRef.current === controller) seekAbortRef.current = null;
+      }
+    }
+    await playAll(request);
   }
 
   function stepTone(change: number) {
@@ -461,7 +681,9 @@ function MobileStudioPlayer({ project, onEscolherTomDaEscala, salvandoTomDaEscal
     const next = Math.max(-11, Math.min(11, semitones + change));
     const context = contextRef.current;
     if (!context) return;
-    setRealtimeLivePitch(context, realtimeNodesRef.current, next);
+    pitchSemitonesRef.current = next;
+    setPitchRoute(next !== 0);
+    if (next !== 0) setRealtimeLivePitch(context, realtimeNodesRef.current, next);
     setTarget(keyAt(initial, next));
   }
 
@@ -514,7 +736,7 @@ function MobileStudioPlayer({ project, onEscolherTomDaEscala, salvandoTomDaEscal
       {message && <p className="mt-3 text-xs text-amber-100" role="status">{message}</p>}
 
       <div className="mt-5">
-        <input aria-label="Posição da música" className={styles.slider} style={{ "--level": `${duration ? position / duration * 100 : 0}%`, "--fill": "#f1f5f4" } as CSSProperties} type="range" min="0" max={duration || 1} step=".1" value={position} disabled={!ready} onChange={(event) => seek(Number(event.target.value))} />
+        <input aria-label="Posição da música" className={styles.slider} style={{ "--level": `${duration ? position / duration * 100 : 0}%`, "--fill": "#f1f5f4" } as CSSProperties} type="range" min="0" max={duration || 1} step=".1" value={position} disabled={!ready} onPointerDown={() => { scrubPositionRef.current = positionRef.current; scrubChangedRef.current = false; }} onChange={(event) => { const next = Number(event.target.value); if (scrubPositionRef.current == null) seek(next); else { scrubPositionRef.current = next; scrubChangedRef.current = true; setPosition(next); } }} onPointerUp={commitScrub} onPointerCancel={commitScrub} onBlur={commitScrub} />
         <div className="-mt-1 flex justify-between text-xs tabular-nums text-white/45"><span>{secondsText(position)}</span><span>−{secondsText(Math.max(0, duration - position))}</span></div>
         <div className="mt-3 flex items-center justify-center gap-5">
           <button type="button" aria-label="Voltar 10 segundos" disabled={!ready} onClick={() => seek(position - 10)} className="flex h-12 w-12 flex-col items-center justify-center text-white/80 disabled:opacity-30"><RotateCcw size={22} /><span className="text-[9px]">10s</span></button>

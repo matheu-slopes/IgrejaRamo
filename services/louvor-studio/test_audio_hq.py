@@ -58,4 +58,19 @@ class AudioHQTests(unittest.TestCase):
         store_cache(cache,key,self.root,["mix.wav","mix.mp3"])
         self.assertIsNotNone(cached(cache,key,["mix.wav","mix.mp3"]))
         (cache/key/"mix.mp3").unlink();self.assertIsNone(cached(cache,key,["mix.wav","mix.mp3"]))
+    def test_exported_stems_keep_the_same_transient_position(self):
+        pulse_at=round(.4*RATE)
+        positions=[]
+        for stem,gain in (("vocals",.4),("drums",.8),("bass",.2),("other",.6)):
+            samples=np.zeros((2*RATE,2),dtype=np.float32)
+            samples[pulse_at,:]=gain
+            source=self.root/(stem+".wav")
+            mp3=self.root/(stem+".mp3")
+            decoded=self.root/(stem+"-decoded.wav")
+            sf.write(source,samples,RATE,subtype="FLOAT")
+            export_mp3(source,mp3)
+            convert_wav(mp3,decoded)
+            audio,_=sf.read(decoded,dtype="float32",always_2d=True)
+            positions.append(int(np.argmax(np.abs(audio[:,0]))))
+        self.assertLessEqual(max(positions)-min(positions),1)
 if __name__=="__main__":unittest.main()
