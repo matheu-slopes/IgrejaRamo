@@ -853,7 +853,7 @@ export function EscalasTab({
   const [avisoMusica, setAvisoMusica] = useState("");
   const [editandoKey, setEditandoKey] = useState<string | null>(null);
   const [adicionandoParticipante, setAdicionandoParticipante] = useState(false);
-  const [viewMode, setViewMode] = useState<"minhas" | "culto">(ministerio === "Louvor" && !isLider ? "minhas" : "culto");
+  const [viewMode, setViewMode] = useState<"minhas" | "culto">("culto");
   const [busca, setBusca] = useState("");
   const conflitosConfirmadosRef = useRef<Set<string>>(new Set());
   const [selectedId, setSelectedId] = useState<string | null>(escalaInicialId ?? null);
