@@ -229,6 +229,27 @@ function MobileStudioPlayer({ project, onEscolherTomDaEscala, salvandoTomDaEscal
     const gains: Partial<Record<Stem, GainNode>> = {};
     let masterGain: GainNode | null = null;
     let nodes: Partial<Record<Stem, import("signalsmith-stretch").StretchNode>> = {};
+    let pausing = false;
+    const pauseTogether = (becauseBackground = false) => {
+      if (disposed || pausing) return;
+      pausing = true;
+      const lead = tracks[stems[0]];
+      const nextPosition = lead && Number.isFinite(lead.currentTime)
+        ? lead.currentTime
+        : 0;
+      Object.values(tracks).forEach((audio) => audio?.pause());
+      if (!disposed) {
+        setPosition(nextPosition);
+        setPlaying(false);
+        if (becauseBackground)
+          setMessage("A reprodução foi pausada enquanto o app ficou em segundo plano. Toque em Reproduzir para continuar.");
+      }
+      pausing = false;
+    };
+    const onTrackPause = () => pauseTogether();
+    const onVisibilityChange = () => {
+      if (document.hidden) pauseTogether(true);
+    };
     const waitForMetadata = (audio: HTMLAudioElement) =>
       new Promise<void>((resolve, reject) => {
         const done = () => {
@@ -265,6 +286,8 @@ function MobileStudioPlayer({ project, onEscolherTomDaEscala, salvandoTomDaEscal
           .filter((value) => Number.isFinite(value) && value > 0);
         if (!durations.length) throw Error("A duração das faixas não foi encontrada.");
         tracksRef.current = tracks;
+        Object.values(tracks).forEach((audio) => audio?.addEventListener("pause", onTrackPause));
+        document.addEventListener("visibilitychange", onVisibilityChange);
         setDuration(Math.min(...durations));
         try {
           context = new AudioContext({ latencyHint: "playback" });
@@ -332,7 +355,9 @@ function MobileStudioPlayer({ project, onEscolherTomDaEscala, salvandoTomDaEscal
     void load();
     return () => {
       disposed = true;
+      document.removeEventListener("visibilitychange", onVisibilityChange);
       Object.values(tracks).forEach((audio) => {
+        audio?.removeEventListener("pause", onTrackPause);
         audio?.pause();
         audio?.removeAttribute("src");
         audio?.load();
