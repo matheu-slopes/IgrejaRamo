@@ -2193,14 +2193,14 @@ export function EscalasTab({
                       Músicas · {(selectedEscala.musicas ?? []).length}
                     </p>
                     <div className="table-scroll rounded-xl border border-gray-100">
-                      <table className="w-full min-w-[520px] text-sm">
+                      <table className="w-full table-fixed text-sm md:table-auto md:min-w-[520px]">
                         <thead>
                           <tr className="bg-gray-50 border-b border-gray-100">
-                            <th className="text-center text-xs font-semibold text-gray-400 px-2 py-2 w-7">#</th>
-                            <th className="text-left text-xs font-semibold text-gray-500 px-3 py-2">Música</th>
-                            <th className="text-left text-xs font-semibold text-gray-500 px-3 py-2">Tom</th>
-                            <th className="text-left text-xs font-semibold text-gray-500 px-3 py-2">BPM</th>
-                            <th className="text-left text-xs font-semibold text-gray-500 px-3 py-2">{ministerio === "Louvor" ? "Referência e ensaio" : "Letra"}</th>
+                            <th className="w-[7%] px-1 py-2 text-center text-xs font-semibold text-gray-400 md:w-7 md:px-2">#</th>
+                            <th className="w-[32%] break-words px-1.5 py-2 text-left text-xs font-semibold text-gray-500 md:w-auto md:px-3">Música</th>
+                            <th className="w-[13%] break-words px-1 py-2 text-left text-xs font-semibold text-gray-500 md:w-auto md:px-3">Tom</th>
+                            <th className="w-[13%] break-words px-1 py-2 text-left text-xs font-semibold text-gray-500 md:w-auto md:px-3">BPM</th>
+                            <th className="w-[35%] break-words px-1.5 py-2 text-left text-xs font-semibold text-gray-500 md:w-auto md:px-3">{ministerio === "Louvor" ? "Referência e ensaio" : "Letra"}</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-50">
@@ -2209,7 +2209,7 @@ export function EscalasTab({
                               <tr key={i} className={clsx(m.artistaSlug && m.musicaSlug ? "cursor-pointer hover:bg-gray-50" : "")} onClick={() => abrirCifraInline(selectedEscala.id, i, m)}>
                                 <td className="text-center px-2 py-2.5 text-xs font-bold text-gray-300">{i + 1}</td>
                                 <td className="px-3 py-2.5">
-                                  <p className={clsx("font-semibold text-sm leading-tight", m.artistaSlug ? "text-grape-700" : "text-gray-800")}>{m.titulo}{m.artistaSlug && " ?"}</p>
+                                  <p className={clsx("break-words font-semibold text-sm leading-tight", m.artistaSlug ? "text-grape-700" : "text-gray-800")}>{m.titulo}{m.artistaSlug && " ?"}</p>
                                   <p className="text-xs text-gray-400">{m.artista}</p>
                                 </td>
                                 <td className="px-3 py-2.5">
@@ -2226,11 +2226,11 @@ export function EscalasTab({
                                     </span>
                                   )}
                                 </td>
-                                <td className="px-3 py-2.5" onClick={(e) => e.stopPropagation()}>
+                                <td className="px-1.5 py-2.5 md:px-3" onClick={(e) => e.stopPropagation()}>
                                   <button
                                     onClick={() => copiarLetra(i, m)}
                                     className={clsx(
-                                      "flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border transition whitespace-nowrap",
+                                      "flex w-full items-center justify-center gap-1.5 rounded-lg border px-1.5 py-1.5 text-center text-xs font-medium transition md:w-auto md:px-3",
                                       copyLetraOk === i
                                         ? "border-green-300 bg-green-50 text-green-700"
                                         : "border-gray-200 bg-white text-gray-600 hover:border-grape-300 hover:text-grape-700 hover:bg-grape-50"
@@ -2244,16 +2244,16 @@ export function EscalasTab({
                                       <><ClipboardCopy className="w-3 h-3" /> Copiar letra</>
                                     )}
                                   </button>
-                                  {ministerio === "Louvor" && <div className="mt-2 flex flex-wrap items-center gap-2">
-                                    <a href={linkYoutubeDaMusica(m, selectedEscala.id)} target="_blank" rel="noopener noreferrer" className="rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50">
+                                  {ministerio === "Louvor" && <div className="mt-2 flex flex-col gap-2 md:flex-row md:flex-wrap md:items-center">
+                                    <a href={linkYoutubeDaMusica(m, selectedEscala.id)} target="_blank" rel="noopener noreferrer" className="flex w-full items-center justify-center rounded-lg border border-gray-200 px-1.5 py-1.5 text-center text-xs font-medium text-gray-700 hover:bg-gray-50 md:w-auto md:px-2.5">
                                       {videoStudioPorMusica[`${selectedEscala.id}:${m.musicaId}`] || m.linkYoutube || musicas.some((item) => item.id === m.musicaId && item.linkYoutube) ? "Vídeo de referência" : "Buscar gravação"}
                                     </a>
                                     {m.musicaId && statusStudioPorMusica[`${selectedEscala.id}:${m.musicaId}`] === "pronto" && onAbrirNoStudio ? (
-                                      <button type="button" onClick={() => onAbrirNoStudio({ escalaId: selectedEscala.id, escalaContexto: { culto: selectedEscala.culto, data: selectedEscala.data, horario: selectedEscala.horario, tom: m.tom, bpm: m.bpm }, ...dadosDaMusicaParaStudio(m) })} className="rounded-lg bg-rose-700 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-rose-600">Ensaiar no Studio</button>
+                                      <button type="button" onClick={() => onAbrirNoStudio({ escalaId: selectedEscala.id, escalaContexto: { culto: selectedEscala.culto, data: selectedEscala.data, horario: selectedEscala.horario, tom: m.tom, bpm: m.bpm }, ...dadosDaMusicaParaStudio(m) })} className="w-full rounded-lg bg-rose-700 px-1.5 py-1.5 text-center text-xs font-semibold text-white hover:bg-rose-600 md:w-auto md:px-2.5">Ensaiar no Studio</button>
                                     ) : m.musicaId && statusStudioPorMusica[`${selectedEscala.id}:${m.musicaId}`] === "preparando" ? (
                                       <span className="text-xs font-medium text-amber-700">Studio preparando</span>
                                     ) : m.musicaId && onAnalisarNoStudio ? (
-                                      <button type="button" onClick={() => onAnalisarNoStudio({ escalaId: selectedEscala.id, escalaContexto: { culto: selectedEscala.culto, data: selectedEscala.data, horario: selectedEscala.horario, tom: m.tom, bpm: m.bpm }, ...dadosDaMusicaParaStudio(m) })} className="rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-xs font-semibold text-rose-700">{statusStudioPorMusica[`${selectedEscala.id}:${m.musicaId}`] === "falhou" ? "Preparar novamente" : "Preparar no Studio"}</button>
+                                      <button type="button" onClick={() => onAnalisarNoStudio({ escalaId: selectedEscala.id, escalaContexto: { culto: selectedEscala.culto, data: selectedEscala.data, horario: selectedEscala.horario, tom: m.tom, bpm: m.bpm }, ...dadosDaMusicaParaStudio(m) })} className="w-full rounded-lg border border-rose-200 bg-rose-50 px-1.5 py-1.5 text-center text-xs font-semibold text-rose-700 md:w-auto md:px-2.5">{statusStudioPorMusica[`${selectedEscala.id}:${m.musicaId}`] === "falhou" ? "Preparar novamente" : "Preparar no Studio"}</button>
                                     ) : <span className="text-xs text-gray-500">{statusStudioPorMusica[`${selectedEscala.id}:${m.musicaId}`] === "pronto" ? "Studio pronto" : statusStudioPorMusica[`${selectedEscala.id}:${m.musicaId}`] === "falhou" ? "Falha na preparação" : "Ensaio ainda não preparado"}</span>}
                                   </div>}
                                 </td>
