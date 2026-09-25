@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     autorizado: acesso.podeVer,
     podeGerenciar: acesso.podeGerenciar,
-    podePrepararEnsaio: acesso.podeVer,
+    podePrepararEnsaio: acesso.podeGerenciar,
     workerConfigurado: workerConfigurado(),
     youtubeConfigurado: youtubeConfigurado(),
   });

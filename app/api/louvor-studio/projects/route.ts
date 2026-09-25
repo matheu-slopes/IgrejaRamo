@@ -62,6 +62,7 @@ export async function POST(req: NextRequest) {
   if (!user) return NextResponse.json({ error: "Nao autorizado" }, { status: 401 });
   const acesso = await getLouvorStudioAccess(user.id);
   if (!acesso.podeVer) return NextResponse.json({ error: "Acesso restrito ao ministerio de Louvor." }, { status: 403 });
+  if (!acesso.podeGerenciar) return NextResponse.json({ error: "Somente ministros e lideres podem preparar musicas no Studio." }, { status: 403 });
   if (!workerConfigurado()) return NextResponse.json({ error: "Configure LOUVOR_STUDIO_WORKER_SECRET na Vercel." }, { status: 503 });
   const body = (await req.json().catch(() => null) ?? {}) as { url?: string; titulo?: string; artista?: string; thumbnailUrl?: string; escalaId?: string; musicaId?: string; tomAlvo?: string | null };
   const url = typeof body.url === "string" ? body.url.trim() : "";

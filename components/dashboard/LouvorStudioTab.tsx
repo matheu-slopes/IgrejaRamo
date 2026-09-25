@@ -401,7 +401,9 @@ export function LouvorStudioTab({
             <h2 className="text-lg font-semibold text-gray-900">Louvor Studio</h2>
           </div>
           <p className="mt-1 max-w-2xl text-sm text-gray-500">
-            Prepare músicas quando precisar e use a biblioteca para abrir os ensaios da equipe.
+            {podeGerenciar
+              ? "Prepare músicas quando precisar e use a biblioteca para abrir os ensaios da equipe."
+              : "Abra as músicas da equipe para ouvir e estudar as faixas separadas."}
           </p>
         </div>
 
@@ -684,7 +686,7 @@ export function LouvorStudioTab({
               <div>
                 <h3 className="text-sm font-semibold text-gray-900">Sua biblioteca</h3>
                 <p className="mt-0.5 text-xs text-gray-500">Escolha uma música para abrir o ensaio</p>
-                {!podeGerenciar && <p className="mt-1 text-[11px] text-gray-500">Meus ensaios: {ensaiosPessoais.length} de 3 · expiram em até 7 dias</p>}
+                {!podeGerenciar && ensaiosPessoais.length > 0 && <p className="mt-1 text-[11px] text-gray-500">Meus ensaios anteriores: {ensaiosPessoais.length} · expiram em até 7 dias</p>}
               </div>
             </div>
             <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-600">{projects.length}</span>
@@ -785,7 +787,7 @@ export function LouvorStudioTab({
                 <p className="mt-2 max-w-md text-xs text-gray-500">A separação analisa a música inteira e pode levar vários minutos, dependendo da duração e do computador. O progresso avança conforme os trechos ficam prontos.</p>
               )}
               {selected.status !== "erro" && <p className="mt-3 text-xs font-medium text-rose-700" role="status" aria-live="polite">{selected.progresso}%</p>}
-              {selected.status === "erro" && (podeGerenciar || selected.visibilidade === "pessoal") && (
+              {selected.status === "erro" && podeGerenciar && (
                 <button
                   type="button"
                   disabled={!workerConfigurado || retryingId === selected.id}
@@ -803,6 +805,7 @@ export function LouvorStudioTab({
               <LouvorStudioPlayer
                 key={`${selected.id}-${selected.musicas?.tom || selected.tom_original || "sem-tom"}`}
                 project={selected}
+                podePrepararDownload={podeGerenciar}
                 tomBaseOverride={selected.musicas?.tom || undefined}
                 salvandoTomDaEscala={applyingId === selected.id}
                 onEscolherTomDaEscala={selected.escalas && selected.musica_id && podeGerenciar

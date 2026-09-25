@@ -37,7 +37,22 @@ test('all 12 keys preserve major/minor and obey all directions',()=>{
   assert.throws(()=>music.transposeSemitones('C','D','invalid'));
 });
 const projectId='a007fe56-8080-4924-b79d-b7fd429edddb';
-function route({user=true,member=true,status='concluido',existing=null,expired=false}={}){
+test('only users with Studio management permission can add a music processing job',async()=>{
+ for(const [manager,status] of [[false,403],[true,503]]){
+  const {POST}=loadTs('app/api/louvor-studio/projects/route.ts',{
+   'next/server':{NextResponse:{json:(body,init)=>Response.json(body,init)}},
+   '@/lib/louvorStudioServer':{
+    getLouvorStudioUser:async()=>({id:'member'}),
+    getLouvorStudioAccess:async()=>({podeVer:true,podeGerenciar:manager}),
+    workerConfigurado:()=>false,
+   },
+   '@/lib/youtubeSearch':{youtubeId:()=>null},
+   '@/lib/louvorStudioStorage':{},
+  });
+  assert.equal((await POST(new Request('http://localhost/projects',{method:'POST'}))).status,status);
+ }
+});
+function route({user=true,member=true,manager=true,status='concluido',existing=null,expired=false}={}){
  let inserted;
  const db={from(table){
    const query={select(){return this;},eq(){return this;},in:async()=>({count:0}),
@@ -49,13 +64,18 @@ function route({user=true,member=true,status='concluido',existing=null,expired=f
  const mod=loadTs('app/api/louvor-studio/projects/[id]/versions/route.ts',{
   'next/server':{NextResponse:{json:(body,init)=>Response.json(body,init)}},
   '@/lib/louvorStudioMusic':music,
-  '@/lib/louvorStudioServer':{getLouvorStudioUser:async()=>user?{id:'user'}:null,podeVerLouvorStudio:async()=>member,louvorStudioAdmin:db},
+  '@/lib/louvorStudioServer':{getLouvorStudioUser:async()=>user?{id:'user'}:null,podeVerLouvorStudio:async()=>member,getLouvorStudioAccess:async()=>({podeGerenciar:manager}),louvorStudioAdmin:db},
   '@/lib/louvorStudioHqServer':{uuidValid:id=>id===projectId,signedVersion:async v=>v}
  });
  return {call:body=>mod.POST(new Request('http://localhost/versions',{method:'POST',body:JSON.stringify(body)}),{params:Promise.resolve({id:projectId})}),inserted:()=>inserted};
 }
 test('version API preserves auth, membership, project completion and expiration',async()=>{
  for(const [options,status] of [[{user:false},401],[{member:false},403],[{status:'separando'},409],[{expired:true},404]])assert.equal((await route(options).call({original:'C',target:'D'})).status,status);
+});
+test('a member without preparation permission cannot queue an exported version',async()=>{
+ const subject=route({manager:false});
+ assert.equal((await subject.call({original:'C',target:'D'})).status,403);
+ assert.equal(subject.inserted(),undefined);
 });
 test('version API derives semitones on the server and caches identical pitch/speed',async()=>{
  const r=route();assert.equal((await r.call({original:'Em',target:'Dm',direction:'auto',speed:1,semitones:8})).status,202);

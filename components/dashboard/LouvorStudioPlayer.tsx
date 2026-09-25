@@ -64,6 +64,7 @@ type Project = {
 type EscolhaParaEscala = { tom: string; bpm?: number };
 type PlayerProps = {
   project: Project;
+  podePrepararDownload?: boolean;
   onEscolherTomDaEscala?: (escolha: EscolhaParaEscala) => void;
   salvandoTomDaEscala?: boolean;
   tomBaseOverride?: string | null;
@@ -748,7 +749,7 @@ function MobileStudioPlayer({ project, onEscolherTomDaEscala, salvandoTomDaEscal
   );
 }
 
-export function LouvorStudioPlayer({ project, onEscolherTomDaEscala, salvandoTomDaEscala, tomBaseOverride }: PlayerProps) {
+export function LouvorStudioPlayer({ project, podePrepararDownload = false, onEscolherTomDaEscala, salvandoTomDaEscala, tomBaseOverride }: PlayerProps) {
   const [mobile, setMobile] = useState<boolean | null>(null);
   useEffect(() => {
     const media = window.matchMedia("(max-width: 767px), (pointer: coarse)");
@@ -761,7 +762,7 @@ export function LouvorStudioPlayer({ project, onEscolherTomDaEscala, salvandoTom
     return <section aria-busy="true" className="flex min-h-48 items-center justify-center rounded-2xl bg-[#203138] p-4 text-sm text-white/65"><LoaderCircle className="mr-2 h-5 w-5 animate-spin" />Carregando player…</section>;
   return mobile
     ? <MobileStudioPlayer project={project} onEscolherTomDaEscala={onEscolherTomDaEscala} salvandoTomDaEscala={salvandoTomDaEscala} tomBaseOverride={tomBaseOverride} />
-    : <DesktopStudioPlayer project={project} onEscolherTomDaEscala={onEscolherTomDaEscala} salvandoTomDaEscala={salvandoTomDaEscala} tomBaseOverride={tomBaseOverride} />;
+    : <DesktopStudioPlayer project={project} podePrepararDownload={podePrepararDownload} onEscolherTomDaEscala={onEscolherTomDaEscala} salvandoTomDaEscala={salvandoTomDaEscala} tomBaseOverride={tomBaseOverride} />;
 }
 function tempoName(bpm: number) {
   if (bpm < 60) return "Largo";
@@ -771,7 +772,7 @@ function tempoName(bpm: number) {
   if (bpm < 168) return "Allegro";
   return "Presto";
 }
-function DesktopStudioPlayer({ project, onEscolherTomDaEscala, salvandoTomDaEscala = false, tomBaseOverride }: PlayerProps) {
+function DesktopStudioPlayer({ project, podePrepararDownload = false, onEscolherTomDaEscala, salvandoTomDaEscala = false, tomBaseOverride }: PlayerProps) {
   const tomBase = tomBaseOverride || project.tom_base_confirmado || project.tom_original;
   const initial = keyAt(tomBase || "C", 0);
   const analyzedBeatOffset =
@@ -1985,7 +1986,7 @@ function DesktopStudioPlayer({ project, onEscolherTomDaEscala, salvandoTomDaEsca
                   </button>
                 )}
               </details>
-              <div className="mt-4 border-t border-white/10 pt-4">
+              {podePrepararDownload && <div className="mt-4 border-t border-white/10 pt-4">
                 <p className="text-sm font-medium">
                   Download de alta qualidade
                 </p>
@@ -2004,7 +2005,7 @@ function DesktopStudioPlayer({ project, onEscolherTomDaEscala, salvandoTomDaEsca
                     ? "Preparando download…"
                     : "Preparar download neste tom"}
                 </button>
-              </div>
+              </div>}
               {versions.some((v) => v.status === "concluido") && (
                 <label className="mt-3 block text-xs text-white/60">
                   Downloads prontos

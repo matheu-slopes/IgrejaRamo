@@ -41,7 +41,7 @@ export async function DELETE(req: NextRequest, context: Context) {
 export async function PATCH(req: NextRequest, context: Context) {
   const contexto = await projetoDoPedido(req, context);
   if ("response" in contexto) return contexto.response;
-  const { projeto, acesso, eDono } = contexto;
+  const { projeto, acesso } = contexto;
   const body = await req.json().catch(() => ({})) as { action?: string; tom?: string; bpm?: number; escalaId?: string; musicaId?: string };
 
   if (body.action === "usar") {
@@ -63,7 +63,7 @@ export async function PATCH(req: NextRequest, context: Context) {
   }
 
   if (body.action === "retry") {
-    if (!acesso.podeGerenciar && !(projeto.visibilidade === "pessoal" && eDono)) return NextResponse.json({ error: "Sem permissao para tentar novamente." }, { status: 403 });
+    if (!acesso.podeGerenciar) return NextResponse.json({ error: "Somente ministros e lideres podem colocar musicas na fila." }, { status: 403 });
     if (projeto.status !== "erro") return NextResponse.json({ error: "Somente uma preparacao com falha pode ser tentada novamente." }, { status: 409 });
     const { error } = await db.from("louvor_studio_projetos").update({
       status: "aguardando", progresso: 0, erro: null, worker_id: null, claim_token: null, tentativas: 0, atualizado_em: new Date().toISOString(),

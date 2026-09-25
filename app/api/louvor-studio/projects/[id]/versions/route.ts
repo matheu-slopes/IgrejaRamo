@@ -1,5 +1,6 @@
 ﻿import { NextRequest, NextResponse } from "next/server";
 import {
+  getLouvorStudioAccess,
   getLouvorStudioUser,
   podeVerLouvorStudio,
   louvorStudioAdmin as db,
@@ -70,6 +71,11 @@ export async function POST(req: NextRequest, context: Context) {
   const { id } = await context.params,
     access = await authorized(req, id);
   if (access.response) return access.response;
+  if (!(await getLouvorStudioAccess(access.user!.id)).podeGerenciar)
+    return NextResponse.json(
+      { error: "Somente ministros e lideres podem preparar downloads em outro tom." },
+      { status: 403 },
+    );
   if (access.project?.status !== "concluido")
     return NextResponse.json(
       { error: "Aguarde a separação terminar." },
