@@ -381,7 +381,20 @@ function MobileStudioPlayer({ project, onEscolherTomDaEscala, salvandoTomDaEscal
         Object.values(tracksRef.current).forEach((audio) => audio?.pause());
         setPlaying(false);
         setPosition(0);
-      } else setPosition(lead.currentTime);
+      } else {
+        // Cada stem é transmitido por um elemento de mídia próprio para não
+        // decodificar a música inteira no celular. Eles não compartilham o
+        // mesmo relógio e podem desviar alguns milissegundos ao longo do
+        // ensaio. Reposicionamos apenas desvios perceptíveis, sem interromper
+        // a reprodução normal nem alterar a afinação.
+        for (const audio of Object.values(tracksRef.current)) {
+          if (!audio || audio === lead || audio.paused) continue;
+          if (Math.abs(audio.currentTime - lead.currentTime) >= 0.08) {
+            audio.currentTime = lead.currentTime;
+          }
+        }
+        setPosition(lead.currentTime);
+      }
     }, 250);
     return () => window.clearInterval(timer);
   }, [playing, stems]);
@@ -408,6 +421,7 @@ function MobileStudioPlayer({ project, onEscolherTomDaEscala, salvandoTomDaEscal
       if (contextRef.current?.state === "suspended") await contextRef.current.resume();
       tracks.forEach((audio) => {
         audio.currentTime = position;
+        audio.playbackRate = 1;
       });
       await Promise.all(tracks.map((audio) => audio.play()));
       setPlaying(true);
