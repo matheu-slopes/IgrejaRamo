@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { X, Music2, Check, ExternalLink, Loader2, AlertCircle, ChevronRight } from "lucide-react";
 import clsx from "clsx";
 
@@ -100,12 +100,12 @@ export default function BuscarCifraModal({ onClose, onSalva, buscaInicial = "" }
   const [query, setQuery] = useState(buscaInicial.trim());
   const [sugestoes, setSugestoes] = useState<Sugestao[]>([]);
   const [resultado, setResultado] = useState<CifraResult | null>(null);
-  const [tomOriginal, setTomOriginal] = useState("");
+  const [tomOriginal] = useState("");
   const [tomPrevia, setTomPrevia] = useState("");
   const [erro, setErro] = useState("");
   const [loadingCifra, setLoadingCifra] = useState(false);
   const [salvando, setSalvando] = useState(false);
-  const [sugestaoSelecionada, setSugestaoSelecionada] = useState<Sugestao | null>(null);
+  const [sugestaoSelecionada] = useState<Sugestao | null>(null);
   const [importacaoManual, setImportacaoManual] = useState<Sugestao | null>(null);
   const [versaoManual, setVersaoManual] = useState<"principal" | "simplificada">("principal");
   const [cifraManual, setCifraManual] = useState("");
@@ -155,7 +155,7 @@ export default function BuscarCifraModal({ onClose, onSalva, buscaInicial = "" }
     }, []);
   }, [cifraExibida]);
 
-  async function buscarSugestoes(termo = query) {
+  const buscarSugestoes = useCallback(async (termo: string) => {
     const pesquisa = termo.trim();
     if (!pesquisa) {
       setErro("Informe o título da música para buscar as versões.");
@@ -177,7 +177,15 @@ export default function BuscarCifraModal({ onClose, onSalva, buscaInicial = "" }
     } finally {
       setLoadingCifra(false);
     }
-  }
+  }, []);
+
+  useEffect(() => {
+    const pesquisaInicial = buscaInicial.trim();
+    const timer = window.setTimeout(() => {
+      if (pesquisaInicial) void buscarSugestoes(pesquisaInicial);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [buscaInicial, buscarSugestoes]);
 
   function selecionarSugestao(sugestao: Sugestao) {
     setImportacaoManual(sugestao);
@@ -203,21 +211,66 @@ export default function BuscarCifraModal({ onClose, onSalva, buscaInicial = "" }
       return;
     }
 
-    const selecionada = { ...importacaoManual, titulo, artista };
-    setSugestaoSelecionada(selecionada);
-    setResultado({
-      artist: artista,
-      name: titulo,
-      tom_original: tomManual || null,
-      cifraclub_url: urlCifraClubManual,
+    void salvarImportacaoManual({
+      titulo,
+      artista,
+      tom: tomManual,
+      sugestao: importacaoManual,
       cifra: linhas,
-      versao: versaoManual,
-      versoes: [{ id: "principal", label: "Principal" }, { id: "simplificada", label: "Simplificada" }],
-      tom_origem: null,
+      cifraUrl: urlCifraClubManual,
     });
-    setTomOriginal(tomManual);
-    setTomPrevia(tomManual);
+  }
+
+  async function salvarImportacaoManual({
+    titulo,
+    artista,
+    tom,
+    sugestao,
+    cifra,
+    cifraUrl,
+  }: {
+    titulo: string;
+    artista: string;
+    tom: string;
+    sugestao: Sugestao;
+    cifra: string[];
+    cifraUrl: string;
+  }) {
+    if (salvandoRef.current) return;
+    const requestId = salvamentoIdRef.current ?? crypto.randomUUID();
+    salvamentoIdRef.current = requestId;
+    salvandoRef.current = true;
     setErro("");
+    setSalvando(true);
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      await Promise.race([
+        onSalva({
+          requestId,
+          titulo,
+          artista,
+          tom,
+          artistaSlug: sugestao.artistaSlug,
+          musicaSlug: sugestao.musicaSlug,
+          cifraUrl,
+          cifra,
+        }),
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(
+            () => reject(new Error("A gravação demorou além do esperado. Verifique a conexão e tente novamente.")),
+            30_000,
+          );
+        }),
+      ]);
+      salvamentoIdRef.current = null;
+      onClose();
+    } catch (error) {
+      setErro(error instanceof Error ? error.message : "Não foi possível adicionar a música ao Repertório.");
+    } finally {
+      if (timer) clearTimeout(timer);
+      salvandoRef.current = false;
+      setSalvando(false);
+    }
   }
 
   async function salvar() {
@@ -294,15 +347,15 @@ export default function BuscarCifraModal({ onClose, onSalva, buscaInicial = "" }
             <p className="text-sm font-semibold text-gray-900">Qual música você quer adicionar?</p>
             <p className="mt-1 text-xs text-gray-500">Buscaremos somente os nomes e links das versões. A letra e os acordes continuam manuais.</p>
             <div className="mt-3 flex gap-2">
-              <input value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => event.key === "Enter" && void buscarSugestoes()} placeholder="Ex.: Pra Onde Eu Irei" className="min-w-0 flex-1 rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-grape-400" autoFocus />
-              <button type="button" onClick={() => void buscarSugestoes()} className="rounded-xl bg-grape-700 px-4 py-2 text-sm font-semibold text-white hover:bg-grape-800">Buscar versões</button>
+              <input value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => event.key === "Enter" && void buscarSugestoes(query)} placeholder="Ex.: Pra Onde Eu Irei" className="min-w-0 flex-1 rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-grape-400" autoFocus />
+              <button type="button" onClick={() => void buscarSugestoes(query)} className="rounded-xl bg-grape-700 px-4 py-2 text-sm font-semibold text-white hover:bg-grape-800">Buscar versões</button>
             </div>
           </div>
         )}
         {importacaoManual && !resultado && (
           <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4">
             <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
-              <p className="font-semibold">Escolha a versão e copie a cifra</p>
+              <p className="font-semibold">Escolha a versão e cole a cifra</p>
               <p className="mt-1 text-xs leading-5 text-amber-800">
                 Você escolheu <strong>{tituloManual}</strong> — {artistaManual}. Escolha Principal ou Simplificada e abra o link correto. A letra e os acordes serão colados manualmente.
               </p>
@@ -369,16 +422,17 @@ export default function BuscarCifraModal({ onClose, onSalva, buscaInicial = "" }
               <button
                 type="button"
                 onClick={confirmarImportacaoManual}
-                className="rounded-xl bg-grape-700 px-5 py-2 text-sm font-semibold text-white hover:bg-grape-800"
+                disabled={salvando}
+                className="rounded-xl bg-grape-700 px-5 py-2 text-sm font-semibold text-white hover:bg-grape-800 disabled:opacity-60"
               >
-                Conferir cifra copiada
+                {salvando ? "Salvando…" : "Salvar no Repertório"}
               </button>
             </div>
           </div>
         )}
 
         {/* Sugestões */}
-        {sugestoes.length > 0 && !resultado && (
+        {!importacaoManual && sugestoes.length > 0 && !resultado && (
           <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4 space-y-1">
             <p className="text-xs text-gray-400 font-semibold uppercase tracking-widest mb-2">Selecione a música</p>
             {sugestoes.map((s, i) => (
