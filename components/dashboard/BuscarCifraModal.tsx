@@ -107,18 +107,13 @@ export default function BuscarCifraModal({ onClose, onSalva, buscaInicial = "" }
   const [salvando, setSalvando] = useState(false);
   const [sugestaoSelecionada] = useState<Sugestao | null>(null);
   const [importacaoManual, setImportacaoManual] = useState<Sugestao | null>(null);
-  const [versaoManual, setVersaoManual] = useState<"principal" | "simplificada">("principal");
   const [cifraManual, setCifraManual] = useState("");
   const [tomManual, setTomManual] = useState("");
   const [tituloManual, setTituloManual] = useState(buscaInicial.trim());
   const [artistaManual, setArtistaManual] = useState("");
   const salvandoRef = useRef(false);
   const salvamentoIdRef = useRef<string | null>(null);
-  const urlCifraClubManual = useMemo(() => {
-    const base = importacaoManual?.url ?? "";
-    if (!base || versaoManual === "principal") return base;
-    return `${base.replace(/\/$/, "")}/simplificada.html`;
-  }, [importacaoManual, versaoManual]);
+  const urlCifraClubManual = importacaoManual?.url ?? "";
 
 
 
@@ -191,7 +186,6 @@ export default function BuscarCifraModal({ onClose, onSalva, buscaInicial = "" }
     setImportacaoManual(sugestao);
     setTituloManual(sugestao.titulo);
     setArtistaManual(sugestao.artista);
-    setVersaoManual("principal");
     setTomManual("");
     setCifraManual("");
     setErro("");
@@ -355,20 +349,13 @@ export default function BuscarCifraModal({ onClose, onSalva, buscaInicial = "" }
         {importacaoManual && !resultado && (
           <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4">
             <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
-              <p className="font-semibold">Escolha a versão e cole a cifra</p>
+              <p className="font-semibold">Abra a cifra e cole aqui</p>
               <p className="mt-1 text-xs leading-5 text-amber-800">
-                Você escolheu <strong>{tituloManual}</strong> — {artistaManual}. Escolha Principal ou Simplificada e abra o link correto. A letra e os acordes serão colados manualmente.
+                Você escolheu <strong>{tituloManual}</strong> — {artistaManual}. Abra a cifra, copie a letra com os acordes e cole no campo abaixo.
               </p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {(["principal", "simplificada"] as const).map((versao) => (
-                  <button key={versao} type="button" onClick={() => setVersaoManual(versao)} className={clsx("rounded-lg border px-3 py-1.5 text-xs font-semibold", versaoManual === versao ? "border-amber-900 bg-amber-900 text-white" : "border-amber-300 bg-white text-amber-950")}>
-                    {versao === "principal" ? "Principal" : "Simplificada"}
-                  </button>
-                ))}
-              </div>
               <a href={urlCifraClubManual} target="_blank" rel="noopener noreferrer" className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-amber-900 px-3 py-2 text-xs font-semibold text-white hover:bg-amber-800">
                 <ExternalLink className="h-3.5 w-3.5" />
-                Abrir {versaoManual === "principal" ? "cifra principal" : "cifra simplificada"} no Cifra Club
+                Abrir cifra no Cifra Club
               </a>
             </div>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
@@ -389,7 +376,7 @@ export default function BuscarCifraModal({ onClose, onSalva, buscaInicial = "" }
                 />
               </label>
               <label className="text-xs font-medium text-gray-600 sm:max-w-48">
-                Tom mostrado na página
+                Tom
                 <select
                   value={tomManual}
                   onChange={(e) => setTomManual(e.target.value)}
