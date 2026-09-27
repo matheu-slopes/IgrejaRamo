@@ -895,10 +895,11 @@ export function LouvorStudioTab({
                 </div>
               </div>}
               <LouvorStudioPlayer
-                key={`${selected.id}-${selected.musicas?.tom || selected.tom_original || "sem-tom"}`}
+                key={`${selected.id}-${selected.musicas?.tom || selected.tom_original || "sem-tom"}-${musicaNoContexto?.tom || "original"}`}
                 project={selected}
                 podePrepararDownload={podeGerenciar}
                 tomBaseOverride={selected.musicas?.tom || undefined}
+                tomDaEscala={musicaNoContexto?.tom}
                 salvandoTomDaEscala={applyingId === selected.id}
                 onEscolherTomDaEscala={podeGerenciar && ((contextoEfetivo?.escalaId && contextoEfetivo.musicaId) || (selected.escalas && selected.musica_id))
                   ? (escolha) => void confirmarTomNaEscala(selected, escolha)

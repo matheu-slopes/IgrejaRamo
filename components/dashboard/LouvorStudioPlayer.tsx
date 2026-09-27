@@ -68,6 +68,7 @@ type PlayerProps = {
   onEscolherTomDaEscala?: (escolha: EscolhaParaEscala) => void;
   salvandoTomDaEscala?: boolean;
   tomBaseOverride?: string | null;
+  tomDaEscala?: string | null;
 };
 type Version = {
   id: string;
@@ -101,6 +102,19 @@ const INITIAL: Record<Stem, number> = {
   bass: 1,
   other: 1,
 };
+
+// A tonalidade definida na escala é o destino da prévia, mas a gravação
+// preparada permanece no tom-base. Só aplicamos automaticamente quando os
+// dois tons preservam o mesmo modo (maior/menor).
+function tomInicialDoEnsaio(tomBase: string | null | undefined, tomDaEscala: string | null | undefined) {
+  const original = tomBase || "C";
+  if (!tomDaEscala) return keyAt(original, 0);
+  try {
+    return keyAt(original, transposeSemitones(original, tomDaEscala, "auto"));
+  } catch {
+    return keyAt(original, 0);
+  }
+}
 
 // The API renews signed Storage URLs frequently. Their query tokens change,
 // but the audio object path does not. Using the full URL as a React effect key
@@ -225,11 +239,12 @@ function waitForTrackSeek(audio: HTMLAudioElement, signal: AbortSignal) {
  * streams the MP3s through native media elements instead, keeping the PWA
  * responsive while retaining the per-track volume, mute, solo and seek tools.
  */
-function MobileStudioPlayer({ project, onEscolherTomDaEscala, salvandoTomDaEscala = false, tomBaseOverride }: PlayerProps) {
+function MobileStudioPlayer({ project, onEscolherTomDaEscala, salvandoTomDaEscala = false, tomBaseOverride, tomDaEscala }: PlayerProps) {
   const urls = project.stem_urls ?? {};
   const urlsKey = stemUrlsKey(urls);
   const tomBase = tomBaseOverride || project.tom_base_confirmado || project.tom_original;
   const initial = keyAt(tomBase || "C", 0);
+  const tomInicial = tomInicialDoEnsaio(tomBase, tomDaEscala);
   const [ready, setReady] = useState(false);
   const [realtimeReady, setRealtimeReady] = useState(false);
   const [playing, setPlaying] = useState(false);
@@ -259,7 +274,7 @@ function MobileStudioPlayer({ project, onEscolherTomDaEscala, salvandoTomDaEscal
   const pitchedRouteRef = useRef(false);
   const scrubPositionRef = useRef<number | null>(null);
   const scrubChangedRef = useRef(false);
-  const [target, setTarget] = useState(initial);
+  const [target, setTarget] = useState(tomInicial);
 
   const stems = useMemo(
     () => (JSON.parse(urlsKey) as [Stem, string | null][])
@@ -291,6 +306,20 @@ function MobileStudioPlayer({ project, onEscolherTomDaEscala, salvandoTomDaEscal
     }
     pitchedRouteRef.current = enabled;
   }, []);
+
+  useEffect(() => {
+    let next = 0;
+    try {
+      next = transposeSemitones(initial, target, "auto");
+    } catch {
+      return;
+    }
+    pitchSemitonesRef.current = next;
+    const context = contextRef.current;
+    if (!realtimeReady || !context) return;
+    setPitchRoute(next !== 0);
+    if (next !== 0) setRealtimeLivePitch(context, realtimeNodesRef.current, next);
+  }, [initial, realtimeReady, setPitchRoute, target]);
 
   const pauseAll = useCallback((reason?: string) => {
     transportRequestRef.current++;
@@ -749,7 +778,7 @@ function MobileStudioPlayer({ project, onEscolherTomDaEscala, salvandoTomDaEscal
   );
 }
 
-export function LouvorStudioPlayer({ project, podePrepararDownload = false, onEscolherTomDaEscala, salvandoTomDaEscala, tomBaseOverride }: PlayerProps) {
+export function LouvorStudioPlayer({ project, podePrepararDownload = false, onEscolherTomDaEscala, salvandoTomDaEscala, tomBaseOverride, tomDaEscala }: PlayerProps) {
   const [mobile, setMobile] = useState<boolean | null>(null);
   useEffect(() => {
     const media = window.matchMedia("(max-width: 767px), (pointer: coarse)");
@@ -761,8 +790,8 @@ export function LouvorStudioPlayer({ project, podePrepararDownload = false, onEs
   if (mobile == null)
     return <section aria-busy="true" className="flex min-h-48 items-center justify-center rounded-2xl bg-[#203138] p-4 text-sm text-white/65"><LoaderCircle className="mr-2 h-5 w-5 animate-spin" />Carregando player…</section>;
   return mobile
-    ? <MobileStudioPlayer project={project} onEscolherTomDaEscala={onEscolherTomDaEscala} salvandoTomDaEscala={salvandoTomDaEscala} tomBaseOverride={tomBaseOverride} />
-    : <DesktopStudioPlayer project={project} podePrepararDownload={podePrepararDownload} onEscolherTomDaEscala={onEscolherTomDaEscala} salvandoTomDaEscala={salvandoTomDaEscala} tomBaseOverride={tomBaseOverride} />;
+    ? <MobileStudioPlayer project={project} onEscolherTomDaEscala={onEscolherTomDaEscala} salvandoTomDaEscala={salvandoTomDaEscala} tomBaseOverride={tomBaseOverride} tomDaEscala={tomDaEscala} />
+    : <DesktopStudioPlayer project={project} podePrepararDownload={podePrepararDownload} onEscolherTomDaEscala={onEscolherTomDaEscala} salvandoTomDaEscala={salvandoTomDaEscala} tomBaseOverride={tomBaseOverride} tomDaEscala={tomDaEscala} />;
 }
 function tempoName(bpm: number) {
   if (bpm < 60) return "Largo";
@@ -772,9 +801,10 @@ function tempoName(bpm: number) {
   if (bpm < 168) return "Allegro";
   return "Presto";
 }
-function DesktopStudioPlayer({ project, podePrepararDownload = false, onEscolherTomDaEscala, salvandoTomDaEscala = false, tomBaseOverride }: PlayerProps) {
+function DesktopStudioPlayer({ project, podePrepararDownload = false, onEscolherTomDaEscala, salvandoTomDaEscala = false, tomBaseOverride, tomDaEscala }: PlayerProps) {
   const tomBase = tomBaseOverride || project.tom_base_confirmado || project.tom_original;
   const initial = keyAt(tomBase || "C", 0);
+  const tomInicial = tomInicialDoEnsaio(tomBase, tomDaEscala);
   const analyzedBeatOffset =
     typeof project.beat_offset_seg === "number" &&
     Number.isFinite(project.beat_offset_seg) &&
@@ -815,7 +845,7 @@ function DesktopStudioPlayer({ project, podePrepararDownload = false, onEscolher
     return () => window.cancelAnimationFrame(frame);
   }, [panel]);
   const [original, setOriginal] = useState(initial),
-    [target, setTarget] = useState(initial);
+    [target, setTarget] = useState(tomInicial);
   const [direction, setDirection] = useState<Direction>("auto"),
     [speed, setSpeed] = useState(1);
   const originalBpm =
@@ -851,6 +881,7 @@ function DesktopStudioPlayer({ project, podePrepararDownload = false, onEscolher
   try {
     semitones = transposeSemitones(original, target, direction);
   } catch {}
+
   const urls = project.stem_urls ?? {};
   const urlsKey = stemUrlsKey(urls);
   // O token da URL assinada muda a cada atualização da API. Preservamos a
@@ -1086,6 +1117,16 @@ function DesktopStudioPlayer({ project, podePrepararDownload = false, onEscolher
   useEffect(() => {
     loopRef.current = loop;
   }, [loop]);
+  useEffect(() => {
+    const engine = engineRef.current;
+    if (!engine || !realtimeReady || !keyConfirmed) return;
+    try {
+      setRealtimePitch(engine, transposeSemitones(original, target, direction));
+    } catch {
+      // An incompatible major/minor target remains visibly selected but is not
+      // sent to the audio engine.
+    }
+  }, [direction, keyConfirmed, original, realtimeReady, target]);
   useEffect(() => {
     if (!playing) return;
     const timer = window.setInterval(() => {

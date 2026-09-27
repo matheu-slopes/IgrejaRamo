@@ -192,8 +192,20 @@ def clean_cache(root:Path,days=7):
         # Only delete owned, direct cache entries. Never follow directory symlinks.
         if path.is_symlink() or not path.is_dir() or len(path.name)!=64 or any(c not in "0123456789abcdef" for c in path.name):
             continue
-        if time.time()-path.stat().st_mtime > days*86400:
-            shutil.rmtree(path)
+        try:
+            expired = time.time() - path.stat().st_mtime > days * 86400
+        except OSError as exc:
+            # The cache is optional. OneDrive or antivirus can temporarily hold a
+            # directory handle on Windows; that must never fail a music job.
+            logging.warning("Não foi possível verificar o cache %s: %s", path.name, exc)
+            continue
+        if expired:
+            try:
+                shutil.rmtree(path)
+            except OSError as exc:
+                # Leave the entry for a later cleanup attempt rather than
+                # interrupting the actual audio separation.
+                logging.warning("Não foi possível limpar o cache %s: %s", path.name, exc)
 
 def cached(root:Path,key:str,names):
     entry=root/key
