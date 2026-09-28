@@ -62,6 +62,7 @@ export function transposeSemitones(
 }
 export function keyAt(original: string, semitones: number) {
   const parsed = parseKey(original);
+  if (semitones === 0) return original;
   return (
     NOTES[(parsed.note + semitones + 24) % 12].value + (parsed.minor ? "m" : "")
   );
