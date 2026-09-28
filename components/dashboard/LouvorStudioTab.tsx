@@ -861,12 +861,15 @@ export function LouvorStudioTab({
           {selected && selected.status !== "concluido" && (
             <div className="flex min-h-72 flex-col items-center justify-center rounded-2xl border border-gray-100 bg-white px-5 text-center">
               {selected.status === "erro" ? <AlertCircle className="mb-3 h-9 w-9 text-red-400" /> : <LoaderCircle className="mb-3 h-9 w-9 animate-spin text-rose-600" />}
-              <p className="font-semibold text-gray-900">{selected.status === "separando" && selected.progresso >= 90 ? "Enviando faixas" : STATUS_LABEL[selected.status]}</p>
+              {selected.status === "erro" && <p className="font-semibold text-gray-900">{STATUS_LABEL[selected.status]}</p>}
+              {selected.status !== "erro" && <p className="max-w-md text-sm text-gray-500" role="status" aria-live="polite">{"Voc\u00ea pode sair desta tela. O processamento continuar\u00e1."}</p>}
+              {selected.status === "erro" && (
               <p className="mt-1 max-w-md text-sm text-gray-500">{selected.erro || "Você pode sair desta tela. O PC local continuará o processamento enquanto estiver ligado."}</p>
-              {selected.status === "separando" && selected.progresso < 90 && (
+              )}
+              {selected.status === "separando" && selected.progresso < 0 && (
                 <p className="mt-2 max-w-md text-xs text-gray-500">A separação analisa a música inteira e pode levar vários minutos, dependendo da duração e do computador. O progresso avança conforme os trechos ficam prontos.</p>
               )}
-              {selected.status !== "erro" && <p className="mt-3 text-xs font-medium text-rose-700" role="status" aria-live="polite">{selected.progresso}%</p>}
+              {selected.progresso < 0 && <p className="mt-3 text-xs font-medium text-rose-700" role="status" aria-live="polite">{selected.progresso}%</p>}
               {selected.status === "erro" && podeGerenciar && (
                 <button
                   type="button"
