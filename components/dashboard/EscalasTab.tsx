@@ -592,6 +592,11 @@ type ProjetoStudioResumo = {
   status?: "aguardando" | "baixando" | "analisando" | "separando" | "concluido" | "erro";
   escala_usos?: { escala_id: string; musica_id?: string | null }[];
 };
+type ConsultaStudio = {
+  projetos: ProjetoStudioResumo[];
+  disponivel: boolean;
+};
+
 
 export type PedidoAnaliseStudio = MusicaParaPreparacaoStudio & {
   escalaId: string;
@@ -647,23 +652,23 @@ export function EscalasTab({
 
     const reqSeq = ++fetchSeqRef.current;
     setErroCarregamento(null);
-    const projetosStudioPromise: Promise<ProjetoStudioResumo[]> = ministerio === "Louvor"
+    const projetosStudioPromise: Promise<ConsultaStudio> = ministerio === "Louvor"
       ? supabase.auth.getSession().then(async ({ data }) => {
-        if (!data.session?.access_token) return [];
-        const resposta = await fetch("/api/louvor-studio/projects", {
+        if (!data.session?.access_token) return { projetos: [], disponivel: false };
+        const resposta = await fetch("/api/louvor-studio/projects?resumo=1", {
           cache: "no-store",
-          // Studio status is optional and must not block the schedules list.
-          // It may be slow while storage URLs are being signed.
+          // Status is intentionally lightweight and must not block the schedules list.
+          // Audio URLs are not needed for this screen.
           signal: AbortSignal.timeout(5_000),
           headers: { Authorization: `Bearer ${data.session.access_token}` },
         });
-        if (!resposta.ok) return [];
+        if (!resposta.ok) return { projetos: [], disponivel: false };
         const payload = await resposta.json().catch(() => ({})) as { projetos?: ProjetoStudioResumo[] };
-        return payload.projetos ?? [];
-      }).catch(() => [])
-      : Promise.resolve([]);
+        return { projetos: payload.projetos ?? [], disponivel: true };
+      }).catch(() => ({ projetos: [], disponivel: false }))
+      : Promise.resolve({ projetos: [], disponivel: false });
 
-    const [perfisRes, escalasRes, musicasRes, projetosStudio] = await Promise.all([
+    const [perfisRes, escalasRes, musicasRes, consultaStudio] = await Promise.all([
       supabase
         .from("perfis")
         .select("id, nome, email, telefone, role, data_ingresso")
@@ -762,7 +767,7 @@ export function EscalasTab({
 
     const proximosStatus: Record<string, StatusStudioMusica> = {};
     const proximosVideos: Record<string, string> = {};
-    for (const projeto of projetosStudio) {
+    for (const projeto of consultaStudio.projetos) {
       const usos = projeto.escala_usos?.length
         ? projeto.escala_usos
         : projeto.escala_id && projeto.musica_id
@@ -781,8 +786,10 @@ export function EscalasTab({
             : "preparando";
       }
     }
-    setStatusStudioPorMusica(proximosStatus);
-    setVideoStudioPorMusica(proximosVideos);
+    if (consultaStudio.disponivel) {
+      setStatusStudioPorMusica(proximosStatus);
+      setVideoStudioPorMusica(proximosVideos);
+    }
   }, [isLoading, ministerio, user?.id]);
 
   useAppRefresh(() => { void carregarDados(); }, [carregarDados], { runOnMount: false, minIntervalMs: 2000 });

@@ -28,6 +28,7 @@ export async function GET(req: NextRequest) {
   const user = await getLouvorStudioUser(req);
   if (!user) return NextResponse.json({ error: "Nao autorizado" }, { status: 401 });
   const acesso = await getLouvorStudioAccess(user.id);
+  const resumo = new URL(req.url).searchParams.get("resumo") === "1";
   if (!acesso.podeVer) return NextResponse.json({ error: "Acesso restrito ao ministerio de Louvor." }, { status: 403 });
   // A biblioteca atualiza enquanto há uma tarefa pendente. Aproveite a leitura
   // para revelar uma queda do worker, sem esperar outro worker consultar a fila.
@@ -61,7 +62,17 @@ export async function GET(req: NextRequest) {
       id: escala.id, culto: escala.culto, data: escala.data, horario: escala.horario,
       escala_musicas: [...(escala.escala_musicas ?? [])].sort((a, b) => a.ordem - b.ordem),
     }));
-  return NextResponse.json({ projetos: await Promise.all((data ?? []).map(async (p) => ({ ...(await assinarProjeto(p as ProjetoRow)), escala_usos: usosPorProjeto.get(p.id) ?? [] }))), escalas });
+  const projetos = resumo
+    ? (data ?? []).map((p) => ({
+      id: p.id, status: p.status, youtube_url: p.youtube_url,
+      escala_id: p.escala_id, musica_id: p.musica_id,
+      escala_usos: usosPorProjeto.get(p.id) ?? [],
+    }))
+    : await Promise.all((data ?? []).map(async (p) => ({
+      ...(await assinarProjeto(p as ProjetoRow)),
+      escala_usos: usosPorProjeto.get(p.id) ?? [],
+    })));
+  return NextResponse.json({ projetos, escalas });
 }
 
 export async function POST(req: NextRequest) {
