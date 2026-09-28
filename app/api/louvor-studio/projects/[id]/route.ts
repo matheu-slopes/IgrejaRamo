@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getLouvorStudioAccess, getLouvorStudioUser, louvorStudioAdmin as db } from "@/lib/louvorStudioServer";
-import { listarAudios, removerAudios } from "@/lib/louvorStudioStorage";
+import { criarUrlDeLeitura, listarAudios, removerAudios } from "@/lib/louvorStudioStorage";
 
 type Context = { params: Promise<{ id: string }> };
 const validId = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id);
@@ -20,6 +20,21 @@ async function projetoDoPedido(req: NextRequest, context: Context) {
   const eDono = projeto.criado_por === user.id;
   if (projeto.visibilidade === "pessoal" && !eDono) return { response: NextResponse.json({ error: "Este ensaio e privado." }, { status: 403 }) };
   return { user, acesso, projeto, eDono };
+}
+export async function GET(req: NextRequest, context: Context) {
+  const contexto = await projetoDoPedido(req, context);
+  if ("response" in contexto) return contexto.response;
+  const { data, error } = await db.from("louvor_studio_projetos")
+    .select("stems").eq("id", contexto.projeto.id).maybeSingle();
+  if (error || !data) return NextResponse.json({ error: "Musica nao encontrada." }, { status: 404 });
+  const stems = (data.stems ?? {}) as Record<string, string>;
+  const stem_urls = Object.fromEntries(await Promise.all(
+    Object.entries(stems).map(async ([stem, path]) => {
+      try { return [stem, await criarUrlDeLeitura(path)] as const; }
+      catch { return [stem, null] as const; }
+    }),
+  ));
+  return NextResponse.json({ stem_urls });
 }
 
 export async function DELETE(req: NextRequest, context: Context) {

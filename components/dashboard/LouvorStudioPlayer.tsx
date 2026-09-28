@@ -980,6 +980,36 @@ function DesktopStudioPlayer({ project, podePrepararDownload = false, onEscolher
       duration: 0,
     };
     engineRef.current = engine;
+    let renewedUrls: Promise<Partial<Record<Stem, string | null>>> | null = null;
+    async function fetchStemUrl(stem: Stem, initialUrl: string) {
+      let url = initialUrl;
+      let lastError: unknown;
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        try {
+          const response = await fetch(url, { signal: controller.signal });
+          if (response.ok) return response;
+          throw Error(`Audio request failed (${response.status}).`);
+        } catch (error) {
+          lastError = error;
+          if (attempt === 0 && !controller.signal.aborted) {
+            setMessage("Reconectando faixas...");
+            renewedUrls ??= api(
+              `/api/louvor-studio/projects/${project.id}`,
+              undefined,
+              controller.signal,
+            ).then((result) => (result as { stem_urls?: Partial<Record<Stem, string | null>> }).stem_urls ?? {});
+            const renewed = await renewedUrls;
+            const renewedUrl = renewed[stem];
+            if (renewedUrl) {
+              url = renewedUrl;
+              continue;
+            }
+          }
+          break;
+        }
+      }
+      throw lastError instanceof Error ? lastError : Error("Nao foi possivel carregar uma faixa.");
+    }
     async function load() {
       await Promise.resolve();
       if (cancelled) return;
@@ -988,14 +1018,16 @@ function DesktopStudioPlayer({ project, podePrepararDownload = false, onEscolher
       setPlaying(false);
       setPosition(0);
       setLoop(null);
+      setMessage("Carregando faixas...");
       try {
         const entries = (
           Object.entries(urlsForLoad) as [Stem, string | null][]
         ).filter((entry): entry is [Stem, string] => Boolean(entry[1]));
         if (!entries.length) throw Error("Faixas indisponíveis.");
+        let loadedTracks = 0;
         await Promise.all(
           entries.map(async ([name, url]) => {
-            const response = await fetch(url!, { signal: controller.signal });
+            const response = await fetchStemUrl(name, url!);
             if (!response.ok)
               throw Error(
                 "Não foi possível carregar uma faixa. Atualize a página.",
@@ -1018,6 +1050,8 @@ function DesktopStudioPlayer({ project, podePrepararDownload = false, onEscolher
                 : settings.volumes[s];
             engine.gains[s] = gain;
             engine.buffers[s] = buffer;
+            loadedTracks += 1;
+            setMessage(`Carregando faixas (${loadedTracks}/${entries.length})...`);
           }),
         );
         if (cancelled) return;
@@ -1042,6 +1076,7 @@ function DesktopStudioPlayer({ project, podePrepararDownload = false, onEscolher
         // realtime processor may take longer on a full multi-track song.
         setDuration(engine.duration);
         setReady(true);
+        setMessage("");
         const realtimeNodes: Partial<
           Record<Stem, import("signalsmith-stretch").StretchNode>
         > = {};
