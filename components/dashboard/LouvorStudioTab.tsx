@@ -869,7 +869,7 @@ export function LouvorStudioTab({
               {selected.status === "separando" && selected.progresso < 0 && (
                 <p className="mt-2 max-w-md text-xs text-gray-500">A separação analisa a música inteira e pode levar vários minutos, dependendo da duração e do computador. O progresso avança conforme os trechos ficam prontos.</p>
               )}
-              {selected.progresso < 0 && <p className="mt-3 text-xs font-medium text-rose-700" role="status" aria-live="polite">{selected.progresso}%</p>}
+              {selected.status !== "erro" && <p className="mt-3 text-xs font-medium text-rose-700" role="status" aria-live="polite">{selected.progresso}%</p>}
               {selected.status === "erro" && podeGerenciar && (
                 <button
                   type="button"
