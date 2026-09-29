@@ -26,6 +26,9 @@ WORKER=os.environ.get("LOUVOR_STUDIO_WORKER_ID",socket.gethostname())+"-hq"
 HEADERS={"X-Worker-Secret":SECRET,"X-Worker-Id":WORKER}
 TIMEOUT=int(os.environ.get("HQ_TIMEOUT_SECONDS","7200"))
 
+class JobCancelled(Exception):
+    """The queue entry was removed or its lease was replaced."""
+
 def terminate_tree(child):
     """Stop the task and every process it started, including Demucs and FFmpeg."""
     if child.poll() is not None:
@@ -38,6 +41,8 @@ def terminate_tree(child):
 
 def api(method,payload=None):
     response=requests.request(method,SITE+"/api/louvor-studio/worker/hq",headers=HEADERS,json=payload,timeout=20)
+    if response.status_code == 404 or (response.status_code == 409 and "processador" in response.text):
+        raise JobCancelled("The task was cancelled or its lease was replaced.")
     if not response.ok:raise RuntimeError(f"API HQ HTTP {response.status_code}: {response.text[:180]}")
     return response.json()
 
@@ -54,6 +59,8 @@ def process(job):
         work=Path(folder);manifest=work/"job.json";log=work/"job.log"
         manifest.write_text(json.dumps(job),encoding="utf-8")
         stopped=threading.Event()
+        cancelled=threading.Event()
+        child=None
         progress={"progress":2,"stage":"baixando" if kind=="separate" else "separando"}
         def heartbeat():
             while not stopped.wait(5):
@@ -65,6 +72,13 @@ def process(job):
                         if lines:
                             latest=json.loads(lines[-1]);progress["progress"]=max(progress["progress"],latest["progress"]);progress["stage"]=latest["stage"]
                     api("POST",{**identity,"action":"heartbeat",**progress})
+                except JobCancelled:
+                    cancelled.set()
+                    if child is not None:
+                        try:terminate_tree(child)
+                        except Exception as exc:print(f"Failed to stop cancelled task: {exc}",flush=True)
+                    print(f"Cancelled: {row['id']}",flush=True)
+                    return
                 except Exception as exc:print(f"Atualização de progresso: {exc}",flush=True)
         monitor=threading.Thread(target=heartbeat,daemon=True);monitor.start()
         try:
@@ -92,6 +106,7 @@ def process(job):
                         child.wait(timeout=15)
                     raise
             result=json.loads((work/"result.json").read_text(encoding="utf-8"))
+            if cancelled.is_set():raise JobCancelled()
             uploads=api("POST",{**identity,"action":"uploads"})["uploads"]
             if set(uploads)!=set(result["files"]):raise ValueError("Arquivos de saída inesperados.")
             def upload_file(index,name,upload):
@@ -108,12 +123,19 @@ def process(job):
                 futures=[pool.submit(upload_file,index,name,upload) for index,(name,upload) in enumerate(uploads.items())]
                 for future in as_completed(futures):
                     index=future.result()
+                    if cancelled.is_set():raise JobCancelled()
                     progress["progress"]=max(progress["progress"],90+int(9*(index+1)/len(uploads)))
             stopped.set();monitor.join(25)
             api("POST",{**identity,"action":"complete",**result["metadata"]})
             print(f"Concluído: {row['id']}",flush=True)
+        except JobCancelled:
+            stopped.set();monitor.join(25)
+            print(f"Cancelled: {row['id']}",flush=True)
         except Exception as exc:
             stopped.set();monitor.join(25)
+            if cancelled.is_set():
+                print(f"Cancelled: {row['id']}",flush=True)
+                return
             detail=log.read_text(encoding="utf-8",errors="replace")[-5000:] if log.exists() else ""
             message=public_failure(exc)
             print(f"Falha {row['id']}: {message}\n{detail}",flush=True)

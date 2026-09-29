@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertCircle, CheckCircle2, Disc3, Download, LibraryBig, LoaderCircle, Music2, Search, Sparkles, Trash2 } from "lucide-react";
+import { AlertCircle, CheckCircle2, CircleStop, Disc3, Download, LibraryBig, LoaderCircle, Music2, Search, Sparkles, Trash2 } from "lucide-react";
 import { LouvorStudioPlayer } from "./LouvorStudioPlayer";
 import { supabase } from "@/lib/supabase";
 import { withDeadline } from "@/lib/withDeadline";
@@ -133,6 +133,7 @@ export function LouvorStudioTab({
   const [retryingId, setRetryingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [applyingId, setApplyingId] = useState<string | null>(null);
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [indiceDaFila, setIndiceDaFila] = useState(0);
   const podePreparar = podeGerenciar || podePrepararEnsaio;
 
@@ -323,6 +324,27 @@ export function LouvorStudioTab({
     }
   }
 
+  async function cancelarProcessamento(project: Projeto) {
+    if (cancellingId || ["concluido", "erro"].includes(project.status)) return;
+    if (!window.confirm(`Cancelar o processamento de "${project.titulo}"? A musica sera removida da fila e os arquivos parciais serao apagados.`)) return;
+    setCancellingId(project.id);
+    setMessage(null);
+    try {
+      const response = await studioFetch(`/api/louvor-studio/projects/${project.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ action: "cancelar" }),
+      });
+      const data = await response.json().catch(() => ({})) as { error?: string };
+      if (!response.ok) throw new Error(data.error ?? "Nao foi possivel cancelar o processamento.");
+      setProjects((current) => current.filter((item) => item.id !== project.id));
+      if (selectedId === project.id) setSelectedId(null);
+      await loadProjects();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Nao foi possivel cancelar o processamento.");
+    } finally {
+      setCancellingId(null);
+    }
+  }
   async function tentarNovamente(project: Projeto) {
     if (retryingId || project.status !== "erro") return;
     setRetryingId(project.id);
@@ -745,8 +767,14 @@ export function LouvorStudioTab({
                       {projeto?.status === "concluido" ? (
                         <button type="button" onClick={() => abrirProjeto(projeto, { escalaId: escala.id, musicaId: musica.musica_id ?? "" })} className="rounded-lg bg-rose-700 px-3 py-2 text-xs font-semibold text-white hover:bg-rose-600">Ensaiar no Studio</button>
                       ) : projeto && projeto.status !== "erro" ? (
+                        <div className="flex flex-wrap items-center gap-2">
                         <span className="text-xs font-medium text-amber-700">{STATUS_LABEL[projeto.status]} · {projeto.progresso}%</span>
+                        {(podeGerenciar || projeto.visibilidade === "pessoal") && <button type="button" disabled={cancellingId === projeto.id} onClick={() => void cancelarProcessamento(projeto)} className="rounded-lg border border-red-200 px-2.5 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:opacity-40">
+                          {cancellingId === projeto.id ? "Cancelando..." : "Cancelar"}
+                        </button>}
+                        </div>
                       ) : podeGerenciar && musica.musica_id && onPrepararDaEscala ? (
+
                         <button type="button" onClick={() => onPrepararDaEscala({ escalaId: escala.id, musicaId: musica.musica_id!, titulo: musica.titulo, artista: musica.artista })} className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700">{projeto?.status === "erro" ? "Preparar novamente" : "Preparar no Studio"}</button>
                       ) : <span className="text-xs text-gray-500">{projeto?.status === "erro" ? "Falha na preparação" : "Ensaio ainda não preparado"}</span>}
                     </div>;
@@ -835,6 +863,18 @@ export function LouvorStudioTab({
                   </div>
                 )}
                 </button>
+                {(podeGerenciar || project.visibilidade === "pessoal") && !["concluido", "erro"].includes(project.status) && (
+                  <button
+                    type="button"
+                    aria-label={`Cancelar processamento de ${project.titulo}`}
+                    title="Cancelar processamento"
+                    disabled={cancellingId === project.id}
+                    onClick={() => void cancelarProcessamento(project)}
+                    className="absolute right-1.5 top-1.5 flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition hover:bg-red-50 hover:text-red-600 disabled:opacity-40"
+                  >
+                    {cancellingId === project.id ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <CircleStop className="h-4 w-4" />}
+                  </button>
+                )}
                 {(podeGerenciar || project.visibilidade === "pessoal") && ["concluido", "erro"].includes(project.status) && (
                   <button
                     type="button"
@@ -870,6 +910,17 @@ export function LouvorStudioTab({
                 <p className="mt-2 max-w-md text-xs text-gray-500">A separação analisa a música inteira e pode levar vários minutos, dependendo da duração e do computador. O progresso avança conforme os trechos ficam prontos.</p>
               )}
               {selected.status !== "erro" && <p className="mt-3 text-xs font-medium text-rose-700" role="status" aria-live="polite">{selected.progresso}%</p>}
+              {selected.status !== "erro" && (podeGerenciar || selected.visibilidade === "pessoal") && (
+                <button
+                  type="button"
+                  disabled={cancellingId === selected.id}
+                  onClick={() => void cancelarProcessamento(selected)}
+                  className="mt-4 inline-flex items-center gap-2 rounded-xl border border-red-200 bg-white px-4 py-2.5 text-sm font-semibold text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {cancellingId === selected.id ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <CircleStop className="h-4 w-4" />}
+                  {cancellingId === selected.id ? "Cancelando..." : "Cancelar processamento"}
+                </button>
+              )}
               {selected.status === "erro" && podeGerenciar && (
                 <button
                   type="button"

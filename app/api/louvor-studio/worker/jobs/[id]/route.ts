@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { louvorStudioAdmin, validarWorker } from "@/lib/louvorStudioServer";
+import { criarUrlDeEnvio } from "@/lib/louvorStudioStorage";
 
 const STATUS = new Set(["baixando", "analisando", "separando", "concluido", "erro"]);
 const STEMS = ["vocals", "drums", "bass", "other"] as const;
@@ -10,12 +11,15 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
   const body = await req.json().catch(() => null) as { action?: string } | null;
   if (body?.action !== "upload_urls") return NextResponse.json({ error: "Ação inválida" }, { status: 400 });
 
-  const uploads: Record<string, { path: string; signedUrl: string; token: string }> = {};
+  const uploads: Record<string, { path: string; signedUrl: string }> = {};
   for (const stem of STEMS) {
     const path = id + "/" + stem + ".mp3";
-    const { data, error } = await louvorStudioAdmin.storage.from("louvor-studio").createSignedUploadUrl(path, { upsert: true });
-    if (error || !data) return NextResponse.json({ error: error?.message ?? "Falha ao assinar upload." }, { status: 500 });
-    uploads[stem] = { path, signedUrl: data.signedUrl, token: data.token };
+    try {
+      uploads[stem] = { path, signedUrl: await criarUrlDeEnvio(path) };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Falha ao assinar upload no Cloudflare R2.";
+      return NextResponse.json({ error: message }, { status: 503 });
+    }
   }
   return NextResponse.json({ uploads });
 }

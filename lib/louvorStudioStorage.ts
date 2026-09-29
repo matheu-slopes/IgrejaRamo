@@ -9,7 +9,6 @@ import {
   S3Client,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import { louvorStudioAdmin as db } from "@/lib/louvorStudioServer";
 
 const bucket = process.env.CLOUDFLARE_R2_BUCKET?.trim();
 const accountId = process.env.CLOUDFLARE_R2_ACCOUNT_ID?.trim();
@@ -27,9 +26,17 @@ const r2 = r2Enabled
   : null;
 
 function safePath(path: string) {
-  if (!path || path.includes("..") || path.startsWith("/"))
+  if (!path || path.includes("..") || path.startsWith("/")) {
     throw new Error("Caminho de áudio inválido.");
+  }
   return path;
+}
+
+function exigirR2() {
+  if (!r2) {
+    throw new Error("Cloudflare R2 não está configurado para o Louvor Studio.");
+  }
+  return r2;
 }
 
 export function louvorStudioR2Configurado() {
@@ -38,54 +45,36 @@ export function louvorStudioR2Configurado() {
 
 export async function criarUrlDeEnvio(path: string) {
   path = safePath(path);
-  if (r2) {
-    return getSignedUrl(r2, new PutObjectCommand({ Bucket: bucket!, Key: path }), {
-      expiresIn: 60 * 30,
-    });
-  }
-  const { data, error } = await db.storage
-    .from("louvor-studio")
-    .createSignedUploadUrl(path, { upsert: true });
-  if (error || !data) throw error ?? new Error("Não foi possível assinar o envio.");
-  return data.signedUrl;
+  return getSignedUrl(exigirR2(), new PutObjectCommand({ Bucket: bucket!, Key: path }), {
+    expiresIn: 60 * 30,
+  });
 }
 
 export async function existeAudio(path: string) {
   path = safePath(path);
-  if (r2) {
-    try {
-      await r2.send(new HeadObjectCommand({ Bucket: bucket!, Key: path }));
-      return true;
-    } catch {
-      return false;
-    }
+  const client = exigirR2();
+  try {
+    await client.send(new HeadObjectCommand({ Bucket: bucket!, Key: path }));
+    return true;
+  } catch {
+    return false;
   }
-  const slash = path.lastIndexOf("/");
-  const { data, error } = await db.storage
-    .from("louvor-studio")
-    .list(slash < 0 ? "" : path.slice(0, slash), { search: path.slice(slash + 1), limit: 1 });
-  return !error && Boolean(data?.some((object) => object.name === path.slice(slash + 1) && Number(object.metadata?.size) > 0));
 }
 
 export async function criarUrlDeLeitura(path: string, expiresIn = 6 * 60 * 60) {
   path = safePath(path);
-  if (r2 && (await existeAudio(path))) {
-    return getSignedUrl(r2, new GetObjectCommand({ Bucket: bucket!, Key: path }), { expiresIn });
+  if (!(await existeAudio(path))) {
+    throw new Error("A faixa não está disponível no Cloudflare R2.");
   }
-  // Existing Supabase objects remain playable after the migration.
-  const { data, error } = await db.storage
-    .from("louvor-studio")
-    .createSignedUrl(path, expiresIn);
-  if (error || !data) throw error ?? new Error("Não foi possível assinar o download.");
-  return data.signedUrl;
+  return getSignedUrl(exigirR2(), new GetObjectCommand({ Bucket: bucket!, Key: path }), { expiresIn });
 }
 
 async function r2Paths(prefix: string) {
-  if (!r2) return [];
+  const client = exigirR2();
   const paths: string[] = [];
   let token: string | undefined;
   do {
-    const page = await r2.send(
+    const page = await client.send(
       new ListObjectsV2Command({ Bucket: bucket!, Prefix: prefix, ContinuationToken: token }),
     );
     paths.push(...(page.Contents ?? []).flatMap((object) => (object.Key ? [object.Key] : [])));
@@ -96,22 +85,13 @@ async function r2Paths(prefix: string) {
 
 export async function listarAudios(prefix: string) {
   prefix = safePath(prefix.endsWith("/") ? prefix.slice(0, -1) : prefix) + "/";
-  const paths = new Set<string>();
-  if (r2) for (const path of await r2Paths(prefix)) paths.add(path);
-  // Include old files while the project migrates; this also makes deletion complete.
-  const { data } = await db.storage.from("louvor-studio").list(prefix.slice(0, -1), { limit: 1000 });
-  for (const object of data ?? []) if (object.name && !object.name.includes("..")) paths.add(prefix + object.name);
-  return [...paths];
+  return r2Paths(prefix);
 }
 
 export async function removerAudios(paths: string[]) {
   const valid = [...new Set(paths.map(safePath))];
   if (!valid.length) return;
-  if (r2) {
-    await r2.send(
-      new DeleteObjectsCommand({ Bucket: bucket!, Delete: { Objects: valid.map((Key) => ({ Key })) } }),
-    );
-  }
-  // No error if the object only existed in R2.
-  await db.storage.from("louvor-studio").remove(valid);
+  await exigirR2().send(
+    new DeleteObjectsCommand({ Bucket: bucket!, Delete: { Objects: valid.map((Key) => ({ Key })) } }),
+  );
 }

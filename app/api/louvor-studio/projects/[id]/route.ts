@@ -56,7 +56,7 @@ export async function DELETE(req: NextRequest, context: Context) {
 export async function PATCH(req: NextRequest, context: Context) {
   const contexto = await projetoDoPedido(req, context);
   if ("response" in contexto) return contexto.response;
-  const { projeto, acesso } = contexto;
+  const { projeto, acesso, eDono } = contexto;
   const body = await req.json().catch(() => ({})) as { action?: string; tom?: string; bpm?: number; escalaId?: string; musicaId?: string };
 
   if (body.action === "usar") {
@@ -67,6 +67,24 @@ export async function PATCH(req: NextRequest, context: Context) {
     return NextResponse.json({ ok: true });
   }
 
+  if (body.action === "cancelar") {
+    if (!acesso.podeGerenciar && !(projeto.visibilidade === "pessoal" && eDono))
+      return NextResponse.json({ error: "Sem permissao para cancelar esta musica." }, { status: 403 });
+    if (["concluido", "erro"].includes(projeto.status))
+      return NextResponse.json({ error: "Esta musica nao esta sendo processada." }, { status: 409 });
+    let paths: string[];
+    try { paths = await listarAudios(projeto.id); }
+    catch { return NextResponse.json({ error: "Nao foi possivel localizar os arquivos parciais da musica." }, { status: 500 }); }
+    if (paths.length) {
+      try { await removerAudios(paths); }
+      catch { return NextResponse.json({ error: "Nao foi possivel remover os arquivos parciais da musica." }, { status: 500 }); }
+    }
+    // Deleting the record invalidates the worker lease; its next heartbeat
+    // stops the audio process tree instead of finishing an unwanted song.
+    const { error } = await db.from("louvor_studio_projetos").delete().eq("id", projeto.id);
+    if (error) return NextResponse.json({ error: "Os arquivos foram removidos, mas a musica nao foi cancelada." }, { status: 500 });
+    return NextResponse.json({ ok: true });
+  }
   if (body.action === "confirmar_tom_base") {
     if (!acesso.podeGerenciar) return NextResponse.json({ error: "Somente ministros e lideres podem confirmar o tom-base." }, { status: 403 });
     if (projeto.status !== "concluido") return NextResponse.json({ error: "Aguarde a analise terminar." }, { status: 409 });
