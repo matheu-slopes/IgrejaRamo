@@ -15,7 +15,13 @@ const accountId = process.env.CLOUDFLARE_R2_ACCOUNT_ID?.trim();
 const accessKeyId = process.env.CLOUDFLARE_R2_ACCESS_KEY_ID?.trim();
 const secretAccessKey = process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY?.trim();
 
-const r2Enabled = Boolean(bucket && accountId && accessKeyId && secretAccessKey);
+const r2MissingConfig = [
+  ["CLOUDFLARE_R2_BUCKET", bucket],
+  ["CLOUDFLARE_R2_ACCOUNT_ID", accountId],
+  ["CLOUDFLARE_R2_ACCESS_KEY_ID", accessKeyId],
+  ["CLOUDFLARE_R2_SECRET_ACCESS_KEY", secretAccessKey],
+].flatMap(([name, value]) => value ? [] : [name]);
+const r2Enabled = r2MissingConfig.length === 0;
 
 const r2 = r2Enabled
   ? new S3Client({
@@ -34,7 +40,7 @@ function safePath(path: string) {
 
 function exigirR2() {
   if (!r2) {
-    throw new Error("Cloudflare R2 não está configurado para o Louvor Studio.");
+    throw new Error(`Cloudflare R2 não está configurado para o Louvor Studio: ${r2MissingConfig.join(", ")}.`);
   }
   return r2;
 }
