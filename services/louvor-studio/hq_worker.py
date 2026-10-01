@@ -59,8 +59,8 @@ def failure_code(exc, detail):
     response=getattr(exc,"response",None)
     if getattr(response,"status_code",None)==400:
         return "storage_limit"
-    lower=detail.lower()
-    if "cloudflare r2" in detail.lower():
+    lower=(str(exc)+"\n"+detail).lower()
+    if "cloudflare r2" in lower or "r2.cloudflarestorage.com" in lower:
         return "r2_access"
     if "rubberband" in lower or "rubberband_path" in lower:
         return "missing_rubberband"
