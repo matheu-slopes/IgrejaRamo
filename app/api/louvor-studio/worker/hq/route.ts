@@ -81,9 +81,15 @@ export async function POST(req: NextRequest) {
     for (const [name, path] of Object.entries(expected)) {
       try {
         uploads[name] = { path, signedUrl: await criarUrlDeEnvio(path) };
-      } catch {
+      } catch (error) {
+        console.error("Não foi possível gerar a URL de envio no Cloudflare R2:", error);
         return NextResponse.json(
-          { error: "Falha ao preparar envio." },
+          {
+            error:
+              error instanceof Error && error.message.includes("não está configurado")
+                ? error.message
+                : "Falha ao preparar envio no Cloudflare R2.",
+          },
           { status: 502 },
         );
       }
@@ -160,8 +166,13 @@ export async function POST(req: NextRequest) {
         : workerDetail ?? "O processamento falhou. Tente novamente; detalhes no registro do processador.";
     update.claim_token = null;
     update.progresso = 0;
-    // Remove only incomplete outputs belonging to this attempt.
-    await removerAudios(Object.values(expected));
+    // Cleanup must not hide the original processing error. If R2 is temporarily
+    // unavailable, the project still needs to leave the active worker lease.
+    try {
+      await removerAudios(Object.values(expected));
+    } catch (cleanupError) {
+      console.error("Não foi possível limpar arquivos parciais do Studio:", cleanupError);
+    }
   } else return NextResponse.json({ error: "Ação inválida." }, { status: 400 });
   const { data: changed, error } = await db
     .from(table)
