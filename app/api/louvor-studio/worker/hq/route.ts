@@ -83,12 +83,14 @@ export async function POST(req: NextRequest) {
         uploads[name] = { path, signedUrl: await criarUrlDeEnvio(path) };
       } catch (error) {
         console.error("Não foi possível gerar a URL de envio no Cloudflare R2:", error);
+        const detail = error instanceof Error ? error.message.slice(0, 300) : "Erro desconhecido.";
         return NextResponse.json(
           {
             error:
               error instanceof Error && error.message.includes("não está configurado")
                 ? error.message
                 : "Falha ao preparar envio no Cloudflare R2.",
+            detail,
           },
           { status: 502 },
         );
@@ -154,11 +156,10 @@ export async function POST(req: NextRequest) {
         update.model_version = body.model.slice(0, 160);
     }
   } else if (body.action === "fail") {
-    const workerDetail =
-      typeof body.detail === "string" &&
-      body.detail.startsWith("O Storage recusou uma faixa")
-        ? body.detail.slice(0, 300)
-        : null;
+    const workerDetail = typeof body.detail === "string" && (
+      body.detail.startsWith("O Storage recusou uma faixa") ||
+      body.detail.startsWith("Não foi possível acessar o Cloudflare R2")
+    ) ? body.detail.slice(0, 300) : null;
     update.status = "erro";
     update.erro =
       body.configuration === true

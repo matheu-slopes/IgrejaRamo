@@ -47,6 +47,8 @@ def api(method,payload=None):
     return response.json()
 
 def public_failure(exc):
+    if "Cloudflare R2" in str(exc):
+        return "Não foi possível acessar o Cloudflare R2. Verifique as chaves configuradas no armazenamento."
     response=getattr(exc,"response",None)
     if getattr(response,"status_code",None)==400:
         return "O Storage recusou uma faixa por tamanho. Tente uma música menor; no plano grátis cada arquivo pode ter até 50 MB."
@@ -138,7 +140,7 @@ def process(job):
                 return
             detail=log.read_text(encoding="utf-8",errors="replace")[-5000:] if log.exists() else ""
             message=public_failure(exc)
-            print(f"Falha {row['id']}: {message}\n{detail}",flush=True)
+            print(f"Falha {row['id']}: {message}\nCausa: {type(exc).__name__}: {str(exc)[:500]}\n{detail}",flush=True)
             api("POST",{**identity,"action":"fail","configuration":"RUBBERBAND_PATH" in detail,"detail":message})
         finally:
             stopped.set();monitor.join(25)
