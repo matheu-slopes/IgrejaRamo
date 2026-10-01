@@ -156,10 +156,19 @@ export async function POST(req: NextRequest) {
         update.model_version = body.model.slice(0, 160);
     }
   } else if (body.action === "fail") {
-    const workerDetail = typeof body.detail === "string" && (
-      body.detail.startsWith("O Storage recusou uma faixa") ||
-      body.detail.startsWith("Não foi possível acessar o Cloudflare R2")
-    ) ? body.detail.slice(0, 300) : null;
+    const safeWorkerDetails: Record<string, string> = {
+      storage_limit: "O Storage recusou uma faixa por tamanho. Tente uma música menor; no plano grátis cada arquivo pode ter até 50 MB.",
+      r2_access: "Não foi possível acessar o Cloudflare R2. Verifique as chaves configuradas no armazenamento.",
+      missing_rubberband: "O Rubber Band R3 não está instalado no processador. Execute o instalador do Louvor Studio e reinicie o worker.",
+      missing_dependency: "Falta uma dependência do processador de áudio. Execute o instalador do Louvor Studio e reinicie o worker.",
+      youtube_download: "Não foi possível obter o áudio desse vídeo no YouTube. Confirme se o link está disponível e tente novamente.",
+      missing_ffmpeg: "O FFmpeg não está disponível no processador. Execute o instalador do Louvor Studio e reinicie o worker.",
+    };
+    const workerDetail =
+      typeof body.detail === "string" &&
+      safeWorkerDetails[body.detail]
+        ? safeWorkerDetails[body.detail]
+        : null;
     update.status = "erro";
     update.erro =
       body.configuration === true

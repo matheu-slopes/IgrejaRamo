@@ -54,6 +54,28 @@ def public_failure(exc):
         return "O Storage recusou uma faixa por tamanho. Tente uma música menor; no plano grátis cada arquivo pode ter até 50 MB."
     return "O processamento falhou. Tente novamente; detalhes no registro do processador."
 
+def failure_code(exc, detail):
+    """Classify known local failures without exposing the full worker log."""
+    response=getattr(exc,"response",None)
+    if getattr(response,"status_code",None)==400:
+        return "storage_limit"
+    lower=detail.lower()
+    if "cloudflare r2" in detail.lower():
+        return "r2_access"
+    if "rubberband" in lower or "rubberband_path" in lower:
+        return "missing_rubberband"
+    if any(marker in lower for marker in (
+        "no module named", "modulenotfounderror", "audio_separator", "torch is not", "cannot import name",
+    )):
+        return "missing_dependency"
+    if any(marker in lower for marker in (
+        "yt-dlp", "youtube", "unable to download", "video unavailable", "http error 403",
+    )):
+        return "youtube_download"
+    if "ffmpeg" in lower or "imageio_ffmpeg" in lower:
+        return "missing_ffmpeg"
+    return "unknown"
+
 def process(job):
     kind=job["kind"];row=job["version"] if kind=="pitch" else job["project"]
     identity={"kind":kind,"id":row["id"],"claimToken":row["claim_token"]}
@@ -139,9 +161,10 @@ def process(job):
                 print(f"Cancelled: {row['id']}",flush=True)
                 return
             detail=log.read_text(encoding="utf-8",errors="replace")[-5000:] if log.exists() else ""
+            code=failure_code(exc,detail)
             message=public_failure(exc)
             print(f"Falha {row['id']}: {message}\nCausa: {type(exc).__name__}: {str(exc)[:500]}\n{detail}",flush=True)
-            api("POST",{**identity,"action":"fail","configuration":"RUBBERBAND_PATH" in detail,"detail":message})
+            api("POST",{**identity,"action":"fail","configuration":code=="missing_rubberband","detail":code})
         finally:
             stopped.set();monitor.join(25)
 
