@@ -49,11 +49,28 @@ export function louvorStudioR2Configurado() {
   return r2Enabled;
 }
 
-export async function criarUrlDeEnvio(path: string) {
+export async function criarUrlDeEnvio(path: string, bytes?: number) {
   path = safePath(path);
-  return getSignedUrl(exigirR2(), new PutObjectCommand({ Bucket: bucket!, Key: path }), {
+  return getSignedUrl(exigirR2(), new PutObjectCommand({ Bucket: bucket!, Key: path, ...(bytes ? { ContentLength: bytes } : {}) }), {
     expiresIn: 60 * 30,
   });
+}
+
+/** Count all objects in this bucket, including old/partial output. No downloads. */
+export async function medirEspacoR2(): Promise<number> {
+  const client = exigirR2();
+  let bytes = 0;
+  let token: string | undefined;
+  do {
+    const page = await client.send(new ListObjectsV2Command({ Bucket: bucket!, ContinuationToken: token }));
+    for (const object of page.Contents ?? []) {
+      if (!Number.isSafeInteger(object.Size) || object.Size! < 0) throw new Error("Nao foi possivel medir o armazenamento com seguranca.");
+      bytes += object.Size!;
+    }
+    token = page.IsTruncated ? page.NextContinuationToken : undefined;
+    if (page.IsTruncated && !token) throw new Error("Medicao incompleta do armazenamento.");
+  } while (token);
+  return bytes;
 }
 
 export async function existeAudio(path: string) {
@@ -97,7 +114,11 @@ export async function listarAudios(prefix: string) {
 export async function removerAudios(paths: string[]) {
   const valid = [...new Set(paths.map(safePath))];
   if (!valid.length) return;
-  await exigirR2().send(
-    new DeleteObjectsCommand({ Bucket: bucket!, Delete: { Objects: valid.map((Key) => ({ Key })) } }),
-  );
+  const client = exigirR2();
+  for (let offset = 0; offset < valid.length; offset += 1000) {
+    const result = await client.send(new DeleteObjectsCommand({
+      Bucket: bucket!, Delete: { Objects: valid.slice(offset, offset + 1000).map((Key) => ({ Key })) },
+    }));
+    if (result.Errors?.length) throw new Error("Nao foi possivel remover todos os arquivos de audio. A limpeza sera tentada novamente.");
+  }
 }

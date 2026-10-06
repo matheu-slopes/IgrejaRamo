@@ -37,9 +37,14 @@ function route({ manager = true, status = 'concluido' } = {}) {
     'next/server': { NextResponse: { json: (body, init) => Response.json(body, init) } },
     '@/lib/louvorStudioServer': {
       getLouvorStudioUser: async () => ({ id: 'leader' }),
-      getLouvorStudioAccess: async () => ({ podeGerenciar: manager }),
+      getLouvorStudioAccess: async () => ({ podeVer: true, podeGerenciar: manager }),
       louvorStudioAdmin: db,
     },
+    '@/lib/louvorStudioStorage': {
+      listarAudios: async () => [`${projectId}/vocals.mp3`, `${projectId}/mix.wav`],
+      removerAudios: async (paths) => { removed.push(...paths); },
+    },
+    '@/lib/louvorStudioQuota': { finalizarReservaStudio: async () => {} },
   });
   return {
     call: (id = projectId) => DELETE(new Request('http://localhost/project', { method: 'DELETE' }), { params: Promise.resolve({ id }) }),

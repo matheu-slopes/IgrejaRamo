@@ -14,6 +14,10 @@ class WorkerFailureTests(unittest.TestCase):
     def test_unknown_errors_remain_generic(self):
         self.assertEqual(hq_worker.failure_code(RuntimeError('Unknown'), ''), 'unknown')
 
+    def test_quota_errors_do_not_masquerade_as_r2_configuration_errors(self):
+        error = RuntimeError('API HQ HTTP 409: Limite seguro de 8 GB do Studio: 0.10 GB livres')
+        self.assertEqual(hq_worker.failure_code(error, ''), 'storage_quota')
+
 
 if __name__ == '__main__':
     unittest.main()

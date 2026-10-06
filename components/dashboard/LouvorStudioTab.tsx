@@ -686,9 +686,10 @@ export function LouvorStudioTab({
             {!podeGerenciar
               ? "Este ensaio é privado e será removido automaticamente após 7 dias."
               : vincularCulto
-              ? "A música ficará disponível para a equipe que participa desse culto."
+              ? "Os áudios ficam disponíveis até o fim do dia do último culto vinculado. Depois são removidos; letra, cifra e tom da escala permanecem salvos."
               : "A base ficará disponível na biblioteca da equipe por 90 dias desde o último uso."}
           </p>
+          <p className="px-1 text-xs text-gray-500">Proteção de espaço: limite de 8 GB no armazenamento do Studio, incluindo reservas para preparações em andamento. Se faltar espaço, somente novas preparações e downloads em outros tons são bloqueados; os ensaios prontos continuam disponíveis.</p>
           </section>
           {videoConfirmado && <div className="order-3 flex flex-wrap items-center justify-between gap-3 border-t border-rose-100 pt-3">
             <p className="text-xs text-gray-500">Voz, bateria, baixo e outros instrumentos serão separados.</p>

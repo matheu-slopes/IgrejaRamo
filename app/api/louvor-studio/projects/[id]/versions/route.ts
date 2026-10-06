@@ -11,6 +11,8 @@ import {
   QUALITY_VERSION,
   Direction,
 } from "@/lib/louvorStudioMusic";
+import { randomUUID } from "node:crypto";
+import { EspacoStudioError, reservarEspacoStudio, finalizarReservaStudio } from "@/lib/louvorStudioQuota";
 type Context = { params: Promise<{ id: string }> };
 async function authorized(req: NextRequest, id: string) {
   const user = await getLouvorStudioUser(req);
@@ -151,6 +153,9 @@ export async function POST(req: NextRequest, context: Context) {
       { error: "Aguarde suas versões em processamento antes de pedir outra." },
       { status: 429 },
     );
+  const versionId = existing?.id ?? randomUUID();
+  try { await reservarEspacoStudio(versionId); }
+  catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : "Nao foi possivel reservar espaco." }, { status: error instanceof EspacoStudioError ? error.status : 503 }); }
   if (existing) {
     const { data, error } = await db
       .from("louvor_studio_versions")
@@ -159,8 +164,10 @@ export async function POST(req: NextRequest, context: Context) {
       .eq("status", "erro")
       .select("*")
       .maybeSingle();
-    if (error || !data)
+    if (error || !data) {
+      await finalizarReservaStudio(versionId);
       return NextResponse.json({ error: "Tente novamente." }, { status: 409 });
+    }
     return NextResponse.json(
       { version: await signedVersion(data, id) },
       { status: 202 },
@@ -169,6 +176,7 @@ export async function POST(req: NextRequest, context: Context) {
   const { data, error } = await db
     .from("louvor_studio_versions")
     .insert({
+      id: versionId,
       projeto_id: id,
       semitones,
       speed,
@@ -178,6 +186,7 @@ export async function POST(req: NextRequest, context: Context) {
     .select("*")
     .single();
   if (error?.code === "23505") {
+    await finalizarReservaStudio(versionId);
     const { data: concurrent } = await match();
     if (concurrent)
       return NextResponse.json({
@@ -185,11 +194,13 @@ export async function POST(req: NextRequest, context: Context) {
         cached: true,
       });
   }
-  if (error || !data)
+  if (error || !data) {
+    await finalizarReservaStudio(versionId);
     return NextResponse.json(
       { error: "Não foi possível preparar esse tom." },
       { status: 500 },
     );
+  }
   return NextResponse.json(
     { version: await signedVersion(data, id) },
     { status: 202 },

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { sendPushToUsers } from "@/lib/sendPush";
+import { limparProjetosExpirados, recuperarProcessamentosLouvorTravados } from "@/lib/louvorStudioServer";
 
 const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 type Pessoa = { nome: string; funcoes: string[]; pendente: boolean; recusado: boolean };
@@ -30,6 +31,17 @@ export async function GET(req: NextRequest) {
   const type = req.nextUrl.searchParams.get("type");
   if (type !== "vespera" && type !== "hoje") return NextResponse.json({ error: "Use ?type=vespera ou ?type=hoje" }, { status: 400 });
   const referencia = dataBrasilia(type === "vespera" ? 1 : 0);
+
+  // Reuse the existing daily cron: audio must expire even if nobody opens
+  // the Studio. A storage outage must not suppress the service reminders.
+  if (type === "hoje") {
+    try {
+      await recuperarProcessamentosLouvorTravados();
+      await limparProjetosExpirados();
+    } catch (error) {
+      console.error("Nao foi possivel limpar os audios expirados do Studio:", error);
+    }
+  }
 
   const { data: escalas, error } = await admin.from("escalas").select("id, culto, horario, ministerio").eq("data", referencia).eq("visivel", true);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

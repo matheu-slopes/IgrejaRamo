@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getLouvorStudioAccess, getLouvorStudioUser, louvorStudioAdmin as db } from "@/lib/louvorStudioServer";
 import { criarUrlDeLeitura, listarAudios, removerAudios } from "@/lib/louvorStudioStorage";
 
+import { EspacoStudioError, reservarEspacoStudio, finalizarReservaStudio } from "@/lib/louvorStudioQuota";
 type Context = { params: Promise<{ id: string }> };
 const validId = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id);
 const expiraEmDias = (dias: number) => new Date(Date.now() + dias * 86_400_000).toISOString();
@@ -14,7 +15,7 @@ async function projetoDoPedido(req: NextRequest, context: Context) {
   const { id } = await context.params;
   if (!validId(id)) return { response: NextResponse.json({ error: "Musica invalida." }, { status: 400 }) };
   const { data: projeto, error } = await db.from("louvor_studio_projetos")
-    .select("id,status,visibilidade,criado_por,escala_id,musica_id,tom_original,tom_base_confirmado,bpm")
+    .select("id,status,visibilidade,criado_por,escala_id,musica_id,tom_original,tom_base_confirmado,bpm,escala_musicas(id)")
     .eq("id", id).maybeSingle();
   if (error || !projeto) return { response: NextResponse.json({ error: "Musica nao encontrada." }, { status: 404 }) };
   const eDono = projeto.criado_por === user.id;
@@ -50,6 +51,7 @@ export async function DELETE(req: NextRequest, context: Context) {
   }
   const { error } = await db.from("louvor_studio_projetos").delete().eq("id", projeto.id);
   if (error) return NextResponse.json({ error: "Os arquivos foram removidos, mas o registro nao foi excluido." }, { status: 500 });
+  await finalizarReservaStudio(projeto.id);
   return NextResponse.json({ ok: true });
 }
 
@@ -61,8 +63,9 @@ export async function PATCH(req: NextRequest, context: Context) {
 
   if (body.action === "usar") {
     const dias = projeto.visibilidade === "pessoal" ? 7 : 90;
+    const vinculadoACulto = Boolean(projeto.escala_id || projeto.escala_musicas?.length);
     const { error } = await db.from("louvor_studio_projetos")
-      .update({ ultimo_uso_em: new Date().toISOString(), expira_em: expiraEmDias(dias) }).eq("id", projeto.id);
+      .update({ ultimo_uso_em: new Date().toISOString(), ...(!vinculadoACulto ? { expira_em: expiraEmDias(dias) } : {}) }).eq("id", projeto.id);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json({ ok: true });
   }
@@ -98,10 +101,12 @@ export async function PATCH(req: NextRequest, context: Context) {
   if (body.action === "retry") {
     if (!acesso.podeGerenciar) return NextResponse.json({ error: "Somente ministros e lideres podem colocar musicas na fila." }, { status: 403 });
     if (projeto.status !== "erro") return NextResponse.json({ error: "Somente uma preparacao com falha pode ser tentada novamente." }, { status: 409 });
+    try { await reservarEspacoStudio(projeto.id); }
+    catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : "Nao foi possivel reservar espaco." }, { status: error instanceof EspacoStudioError ? error.status : 503 }); }
     const { error } = await db.from("louvor_studio_projetos").update({
       status: "aguardando", progresso: 0, erro: null, worker_id: null, claim_token: null, tentativas: 0, atualizado_em: new Date().toISOString(),
     }).eq("id", projeto.id).eq("status", "erro");
-    if (error) return NextResponse.json({ error: "Nao foi possivel colocar a preparacao na fila novamente." }, { status: 500 });
+    if (error) { await finalizarReservaStudio(projeto.id); return NextResponse.json({ error: "Nao foi possivel colocar a preparacao na fila novamente." }, { status: 500 }); }
     return NextResponse.json({ ok: true, status: "aguardando" });
   }
 

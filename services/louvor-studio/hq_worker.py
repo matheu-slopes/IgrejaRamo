@@ -60,6 +60,8 @@ def failure_code(exc, detail):
     if getattr(response,"status_code",None)==400:
         return "storage_limit"
     lower=(str(exc)+"\n"+detail).lower()
+    if "limite seguro de 8 gb" in lower:
+        return "storage_quota"
     if "cloudflare r2" in lower or "r2.cloudflarestorage.com" in lower:
         return "r2_access"
     if "rubberband" in lower or "rubberband_path" in lower:
@@ -131,11 +133,17 @@ def process(job):
                     raise
             result=json.loads((work/"result.json").read_text(encoding="utf-8"))
             if cancelled.is_set():raise JobCancelled()
-            uploads=api("POST",{**identity,"action":"uploads"})["uploads"]
+            sizes={}
+            for name,filename in result["files"].items():
+                path=work/"output"/filename
+                if path.resolve().parent!=(work/"output").resolve():raise ValueError("Caminho invalido.")
+                sizes[name]=path.stat().st_size
+            uploads=api("POST",{**identity,"action":"uploads","sizes":sizes})["uploads"]
             if set(uploads)!=set(result["files"]):raise ValueError("Arquivos de saída inesperados.")
             def upload_file(index,name,upload):
                 path=work/"output"/result["files"][name]
                 if path.resolve().parent!=(work/"output").resolve():raise ValueError("Caminho inválido.")
+                if upload.get("bytes")!=path.stat().st_size:raise ValueError("Tamanho de envio inesperado.")
                 with path.open("rb") as audio:
                     response=requests.put(upload["signedUrl"],data=audio,
                         headers={"Content-Type":"audio/flac" if path.suffix==".flac" else "audio/mpeg","x-upsert":"true"},timeout=(20,1800))

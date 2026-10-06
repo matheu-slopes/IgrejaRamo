@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { youtubeId } from "@/lib/youtubeSearch";
 import { getLouvorStudioAccess, getLouvorStudioUser, limparProjetosExpirados, louvorStudioAdmin, recuperarProcessamentosLouvorTravados, workerConfigurado } from "@/lib/louvorStudioServer";
 import { criarUrlDeLeitura } from "@/lib/louvorStudioStorage";
+import { expiracaoAposCulto, expiracaoAoVincularCulto } from "@/lib/louvorStudioRetention";
+import { randomUUID } from "node:crypto";
+import { EspacoStudioError, reservarEspacoStudio, finalizarReservaStudio } from "@/lib/louvorStudioQuota";
 
 type ProjetoRow = { id: string; audio_path?: string | null; stems?: Record<string, string> | null; [key: string]: unknown };
 type UsoDaEscala = { escala_id: string; musica_id: string | null; studio_projeto_id: string };
@@ -94,25 +97,26 @@ export async function POST(req: NextRequest) {
     const { data: musica } = await louvorStudioAdmin.from("musicas").select("tom").eq("id", musicaId).maybeSingle();
     if (typeof musica?.tom === "string" && /^[A-G](?:#|b)?m?$/.test(musica.tom)) tomDaCifra = musica.tom;
   }
-  let escala: { id: string; ministerio: string } | null = null;
+  let escala: { id: string; ministerio: string; data: string } | null = null;
   if (escalaId) {
-    const { data: escalaEncontrada } = await louvorStudioAdmin.from("escalas").select("id, ministerio").eq("id", escalaId).maybeSingle();
+    const { data: escalaEncontrada } = await louvorStudioAdmin.from("escalas").select("id, ministerio, data").eq("id", escalaId).maybeSingle();
     escala = escalaEncontrada;
     if (musicaId && escala?.id) {
       const { data: musicaDaEscala } = await louvorStudioAdmin.from("escala_musicas").select("id").eq("escala_id", escala.id).eq("musica_id", musicaId).maybeSingle();
       if (!musicaDaEscala) return NextResponse.json({ error: "Essa musica nao faz parte do set deste culto." }, { status: 400 });
     }
     if (!escala || escala.ministerio !== "Louvor") return NextResponse.json({ error: "Escala de Louvor invalida." }, { status: 400 });
+    if (Date.parse(expiracaoAposCulto(escala.data)) <= Date.now()) return NextResponse.json({ error: "Este culto ja passou. Escolha uma escala futura." }, { status: 400 });
   }
   const ensaioPessoal = !acesso.podeGerenciar;
   const visibilidade = ensaioPessoal ? "pessoal" : "equipe";
-  const expiraEm = expiraEmDias(ensaioPessoal ? DIAS_ENSAIO_PESSOAL : DIAS_BIBLIOTECA);
+  const expiraEm = escala ? expiracaoAposCulto(escala.data) : expiraEmDias(ensaioPessoal ? DIAS_ENSAIO_PESSOAL : DIAS_BIBLIOTECA);
   if (escala && musicaId) {
     const { data: existente } = await louvorStudioAdmin.from("louvor_studio_projetos").select("*").eq("musica_id", musicaId).eq("status", "concluido").eq("visibilidade", "equipe").gt("expira_em", new Date().toISOString()).order("criado_em", { ascending: false }).limit(1).maybeSingle();
     if (existente) {
       const { error: vinculoError } = await louvorStudioAdmin.from("escala_musicas").update({ studio_projeto_id: existente.id }).eq("escala_id", escala.id).eq("musica_id", musicaId);
       if (!vinculoError) {
-        await louvorStudioAdmin.from("louvor_studio_projetos").update({ expira_em: expiraEmDias(DIAS_BIBLIOTECA), ultimo_uso_em: new Date().toISOString() }).eq("id", existente.id);
+        await louvorStudioAdmin.from("louvor_studio_projetos").update({ expira_em: expiracaoAoVincularCulto(escala.data, existente.expira_em), ultimo_uso_em: new Date().toISOString() }).eq("id", existente.id);
         return NextResponse.json({ projeto: existente, reutilizado: true });
       }
     }
@@ -140,7 +144,11 @@ export async function POST(req: NextRequest) {
       .eq("criado_por", user.id).eq("visibilidade", "equipe").in("status", ["aguardando", "baixando", "analisando", "separando"]);
     if ((count ?? 0) >= 3) return NextResponse.json({ error: "Aguarde as musicas em processamento." }, { status: 429 });
   }
+  const projetoId = randomUUID();
+  try { await reservarEspacoStudio(projetoId); }
+  catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : "Nao foi possivel reservar espaco." }, { status: error instanceof EspacoStudioError ? error.status : 503 }); }
   const { data: projeto, error } = await louvorStudioAdmin.from("louvor_studio_projetos").insert({
+    id: projetoId,
     criado_por: user.id, separation_mode: MODELO_COMPLETO, visibilidade, ultimo_uso_em: new Date().toISOString(), pipeline_version: 2,
     escala_id: escala?.id ?? null, musica_id: musicaId || null, youtube_url: url,
     titulo: (typeof body.titulo === "string" ? body.titulo.trim() : "") || "Processando musica",
@@ -150,6 +158,7 @@ export async function POST(req: NextRequest) {
     tom_original: tomDaCifra,
     tom_alvo: typeof body.tomAlvo === "string" ? body.tomAlvo.trim() || null : null, expira_em: expiraEm, status: "aguardando", progresso: 0, erro: null,
   }).select("*").single();
+  if (error || !projeto) await finalizarReservaStudio(projetoId);
   if (error && ["PGRST204", "42703"].includes(error.code)) return NextResponse.json({ error: "Aplique a migration 20260920_louvor_studio_ensaios_pessoais.sql no Supabase." }, { status: 503 });
   if (error || !projeto) return NextResponse.json({ error: error?.message ?? "Nao foi possivel criar a tarefa." }, { status: 500 });
   if (escala && musicaId) await louvorStudioAdmin.from("escala_musicas").update({ studio_projeto_id: projeto.id }).eq("escala_id", escala.id).eq("musica_id", musicaId);

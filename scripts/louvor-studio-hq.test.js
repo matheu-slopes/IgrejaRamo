@@ -12,7 +12,10 @@ function loadTs(relative, mocks = {}) {
   loaded.filename = filename;
   loaded.paths = Module._nodeModulePaths(path.dirname(filename));
   const originalRequire = loaded.require.bind(loaded);
-  loaded.require = (id) => Object.hasOwn(mocks, id) ? mocks[id] : originalRequire(id);
+  loaded.require = (id) => Object.hasOwn(mocks, id) ? mocks[id]
+    : id === '@/lib/louvorStudioQuota' ? { reservarEspacoStudio: async () => {}, finalizarReservaStudio: async () => {}, RESERVA_PREPARACAO_BYTES: 1_100_000_000 }
+    : id === '@/lib/louvorStudioRetention' ? loadTs('lib/louvorStudioRetention.ts')
+    : originalRequire(id);
   loaded._compile(ts.transpileModule(fs.readFileSync(filename, 'utf8'), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true },
   }).outputText, filename);
@@ -163,7 +166,8 @@ function workerRoute({authorized=true,missing=false}={}){
    removerAudios:async()=>{},
   },
  });
- return {call:(action,extra={},kind='pitch')=>POST(new Request('http://localhost/worker/hq',{method:'POST',headers:{'x-worker-id':'worker'},body:JSON.stringify({kind,id:versionId,claimToken,action,...extra})})),uploads,update:()=>update};
+ return {call:(action,extra={},kind='pitch')=>POST(new Request('http://localhost/worker/hq',{method:'POST',headers:{'x-worker-id':'worker'},body:JSON.stringify({kind,id:versionId,claimToken,action,
+   ...(action==='uploads'?{sizes:kind==='pitch'?{vocals:123,instrumental:123,mix_mp3:123,mix_wav:123}:{vocals:123,instrumental:123,vocals_wav:123,instrumental_wav:123}}:{}),...extra})})),uploads,update:()=>update};
 }
 test('worker rejects unauthorized/stale claims and isolates upload paths by attempt',async()=>{
  assert.equal((await workerRoute({authorized:false}).call('uploads')).status,401);
@@ -175,4 +179,12 @@ test('worker cannot complete missing files and preserves monotonic progress',asy
  assert.equal((await workerRoute({missing:true}).call('complete')).status,409);
  const r=workerRoute();assert.equal((await r.call('heartbeat',{progress:10})).status,200);assert.equal(r.update().progresso,20);
  const done=workerRoute();assert.equal((await done.call('uploads',{},'separate')).status,200);assert.equal((await done.call('complete',{bpm:120,beat_offset_seg:.18},'separate')).status,200);assert.equal(done.update().status,'concluido');assert.equal(done.update().beat_offset_seg,.18);assert.equal(done.update().claim_token,null);
+});
+test('worker refuses missing, invalid or oversized upload manifests before signing any URL',async()=>{
+ for(const sizes of [null,{}, {vocals:-1,instrumental:123,mix_mp3:123,mix_wav:123},
+   {vocals:1_100_000_000,instrumental:123,mix_mp3:123,mix_wav:123}]){
+  const subject=workerRoute();
+  assert.ok([400,413].includes((await subject.call('uploads',{sizes})).status));
+  assert.equal(subject.uploads.length,0);
+ }
 });

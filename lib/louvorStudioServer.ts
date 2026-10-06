@@ -120,18 +120,33 @@ export async function recuperarProcessamentosLouvorTravados(): Promise<void> {
 
 export async function limparProjetosExpirados(): Promise<number> {
   const { listarAudios, removerAudios } = await import("@/lib/louvorStudioStorage");
-  const { data } = await louvorStudioAdmin
+  const { data, error } = await louvorStudioAdmin
     .from("louvor_studio_projetos")
-    .select("id")
+    .select("id,expira_em")
     .lt("expira_em", new Date().toISOString())
+    .in("status", ["concluido", "erro", "aguardando"])
     .limit(20);
+  if (error) throw new Error(error.message);
 
   let removidos = 0;
   for (const projeto of data ?? []) {
-    const paths = await listarAudios(projeto.id);
-    try { await removerAudios(paths); } catch { continue; }
-    const { error } = await louvorStudioAdmin.from("louvor_studio_projetos").delete().eq("id", projeto.id);
-    if (!error) removidos += 1;
+    try {
+      // The database claim serializes cleanup with service changes. The trigger
+      // rejects future reuse once deletion starts, including partial R2 failures.
+      const { data: inicio, error: claimError } = await louvorStudioAdmin.rpc("claim_louvor_studio_cleanup", {
+        p_id: projeto.id, p_expira: projeto.expira_em,
+      });
+      if (claimError || !inicio) continue;
+      const paths = await listarAudios(projeto.id);
+      await removerAudios(paths);
+      // Includes base MP3/FLAC and prepared downloads in the project prefix.
+      // FK ON DELETE SET NULL keeps the service's song, key, BPM and lyrics.
+      const { data: excluidos, error: excluirError } = await louvorStudioAdmin.from("louvor_studio_projetos")
+        .delete().eq("id", projeto.id).eq("expira_em", projeto.expira_em).eq("limpeza_em", inicio).select("id");
+      if (!excluirError) removidos += excluidos?.length ?? 0;
+    } catch (error) {
+      console.error("Falha ao limpar preparacao expirada do Studio:", projeto.id, error);
+    }
   }
   return removidos;
 }

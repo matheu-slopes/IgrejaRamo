@@ -6,6 +6,7 @@ import {
 import { signedPaths, uuidValid } from "@/lib/louvorStudioHqServer";
 import { stemNames } from "@/lib/louvorStudioMusic";
 import { criarUrlDeEnvio, existeAudio, removerAudios } from "@/lib/louvorStudioStorage";
+import { EspacoStudioError, reservarEspacoStudio, finalizarReservaStudio, RESERVA_PREPARACAO_BYTES } from "@/lib/louvorStudioQuota";
 export async function GET(req: NextRequest) {
   if (!validarWorker(req))
     return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
@@ -77,10 +78,19 @@ export async function POST(req: NextRequest) {
       expected[n + "_wav"] = projectId + "/" + prefix + "_" + n + ".flac";
     });
   if (body.action === "uploads") {
+    const sizes = body.sizes as Record<string, number> | undefined;
+    if (!sizes || Object.keys(sizes).length !== Object.keys(expected).length
+      || Object.keys(expected).some(name => !Number.isSafeInteger(sizes[name]) || sizes[name] <= 0))
+      return NextResponse.json({ error: "Atualize o worker: informe os tamanhos de todos os arquivos antes do envio." }, { status: 400 });
+    const total = Object.keys(expected).reduce((sum, name) => sum + sizes[name], 0);
+    if (!Number.isSafeInteger(total) || total > RESERVA_PREPARACAO_BYTES)
+      return NextResponse.json({ error: "A preparacao excedeu o tamanho seguro permitido." }, { status: 413 });
+    try { await reservarEspacoStudio(body.id, total); }
+    catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : "Nao foi possivel reservar espaco." }, { status: error instanceof EspacoStudioError ? error.status : 503 }); }
     const uploads: Record<string, unknown> = {};
     for (const [name, path] of Object.entries(expected)) {
       try {
-        uploads[name] = { path, signedUrl: await criarUrlDeEnvio(path) };
+        uploads[name] = { path, bytes: sizes[name], signedUrl: await criarUrlDeEnvio(path, sizes[name]) };
       } catch (error) {
         console.error("Não foi possível gerar a URL de envio no Cloudflare R2:", error);
         const detail = error instanceof Error ? error.message.slice(0, 300) : "Erro desconhecido.";
@@ -157,6 +167,7 @@ export async function POST(req: NextRequest) {
     }
   } else if (body.action === "fail") {
     const safeWorkerDetails: Record<string, string> = {
+      storage_quota: "O limite seguro de 8 GB do Studio foi atingido. Aguarde a limpeza apos os cultos ou a conclusao das preparacoes. Os ensaios prontos continuam disponiveis.",
       storage_limit: "O Storage recusou uma faixa por tamanho. Tente uma música menor; no plano grátis cada arquivo pode ter até 50 MB.",
       r2_access: "Não foi possível acessar o Cloudflare R2. Verifique as chaves configuradas no armazenamento.",
       missing_rubberband: "O Rubber Band R3 não está instalado no processador. Execute o instalador do Louvor Studio e reinicie o worker.",
@@ -195,5 +206,6 @@ export async function POST(req: NextRequest) {
       { error: "Não foi possível atualizar a tarefa." },
       { status: 409 },
     );
+  if (body.action === "complete" || body.action === "fail") await finalizarReservaStudio(body.id);
   return NextResponse.json({ ok: true });
 }
