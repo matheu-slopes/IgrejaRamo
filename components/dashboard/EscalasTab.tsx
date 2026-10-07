@@ -902,13 +902,26 @@ export function EscalasTab({
   }
 
   // cifra inline
-  const [cifraAberta, setCifraAberta] = useState<{ idx: number; escalaId: string } | null>(null);
+  const [cifraAberta, setCifraAberta] = useState<{ musicaId: string; escalaId: string } | null>(null);
   const [cifraInline, setCifraInline] = useState<string[] | null>(null);
   const [loadingCifraInline, setLoadingCifraInline] = useState(false);
-  // cache de cifras no formulário: índice ? linhas no tom original
-  const [cifraFormCache, setCifraFormCache] = useState<Record<number, { lines: string[]; tomOrig: string; tomAtFetch: string }>>({});
-  const [cifraFormAberta, setCifraFormAberta] = useState<number | null>(null);
-  const [loadingCifraForm, setLoadingCifraForm] = useState<number | null>(null);
+  // A posição muda ao remover/reordenar músicas; somente o ID identifica a letra.
+  const [cifraFormCache, setCifraFormCache] = useState<Record<string, { lines: string[]; tomOrig: string; tomAtFetch: string }>>({});
+  const [cifraFormAberta, setCifraFormAberta] = useState<string | null>(null);
+  const [loadingCifraForm, setLoadingCifraForm] = useState<string | null>(null);
+  const cifraFormRequest = useRef(0);
+  const cifraInlineRequest = useRef(0);
+
+  function resetarCifras() {
+    cifraFormRequest.current += 1;
+    cifraInlineRequest.current += 1;
+    setCifraFormCache({});
+    setCifraFormAberta(null);
+    setLoadingCifraForm(null);
+    setCifraAberta(null);
+    setCifraInline(null);
+    setLoadingCifraInline(false);
+  }
 
   const funcoesMinisterio = FUNCOES_POR_MIN[ministerio] ?? FUNCOES_GENERICAS;
   const funcaoFixaOculta = ministerio === "Limpeza" || ministerio === "Oração";
@@ -949,11 +962,12 @@ export function EscalasTab({
   }
 
   async function abrirCifraInline(escalaId: string, idx: number, m: EscalaMusica) {
-    if (cifraAberta?.escalaId === escalaId && cifraAberta?.idx === idx) {
-      setCifraAberta(null); setCifraInline(null); return;
+    const request = ++cifraInlineRequest.current;
+    if (cifraAberta?.escalaId === escalaId && cifraAberta?.musicaId === m.musicaId) {
+      setCifraAberta(null); setCifraInline(null); setLoadingCifraInline(false); return;
     }
-    if (!m.artistaSlug || !m.musicaSlug) return;
-    setCifraAberta({ escalaId, idx });
+    if (!m.musicaId) return;
+    setCifraAberta({ escalaId, musicaId: m.musicaId });
     setCifraInline(null);
     setLoadingCifraInline(true);
     try {
@@ -970,6 +984,7 @@ export function EscalasTab({
           data = salva;
         } else return;
       }
+      if (request !== cifraInlineRequest.current) return;
       if (data.cifra) {
         const cifra: string[] = data.cifra;
         const tomOrig: string = data.tom_original ?? "";
@@ -1007,12 +1022,15 @@ export function EscalasTab({
         }
         setCifraInline(cifra);
       }
+    } catch {
+      if (request === cifraInlineRequest.current) setCifraInline(null);
     } finally {
-      setLoadingCifraInline(false);
+      if (request === cifraInlineRequest.current) setLoadingCifraInline(false);
     }
   }
 
   function abrirNova() {
+    resetarCifras();
     setForm(EMPTY_FORM);
     setEditId(null);
     setSubTab("detalhes");
@@ -1023,6 +1041,7 @@ export function EscalasTab({
   }
 
   function abrirEdicao(esc: Escala) {
+    resetarCifras();
     const { equipe, notas } = parseEquipeObs(esc.observacoes);
     const { ageGroup, tema } = esc.ministerio === "Infantil"
       ? parseInfantilObs(esc.observacoes)
@@ -1511,6 +1530,11 @@ export function EscalasTab({
   }
 
   function removeMusica(musicaId: string) {
+    if (cifraFormAberta === musicaId) {
+      cifraFormRequest.current += 1;
+      setCifraFormAberta(null);
+      setLoadingCifraForm(null);
+    }
     setForm((f) => ({ ...f, musicas: f.musicas.filter((m) => m.musicaId !== musicaId) }));
   }
 
@@ -1604,13 +1628,18 @@ export function EscalasTab({
   }
 
   async function toggleCifraForm(idx: number) {
-    if (cifraFormAberta === idx) { setCifraFormAberta(null); return; }
-    setCifraFormAberta(idx);
     const m = form.musicas[idx];
-    if (!m.artistaSlug || !m.musicaSlug) return;
+    if (!m?.musicaId) return;
+    const musicaId = m.musicaId;
+    const request = ++cifraFormRequest.current;
+    if (cifraFormAberta === musicaId) {
+      setCifraFormAberta(null); setLoadingCifraForm(null); return;
+    }
+    setCifraFormAberta(musicaId);
+    setLoadingCifraForm(null);
     // usa cache se já buscou
-    if (cifraFormCache[idx]) return;
-    setLoadingCifraForm(idx);
+    if (cifraFormCache[musicaId]) return;
+    setLoadingCifraForm(musicaId);
     try {
       const musicaDoRepertorio = musicas.find((musica) => musica.id === m.musicaId);
       let data: { cifra?: string[]; tom_original?: string | null };
@@ -1625,19 +1654,22 @@ export function EscalasTab({
           data = salva;
         } else return;
       }
+      if (request !== cifraFormRequest.current) return;
       if (data.cifra) {
         const cifra = data.cifra;
         setCifraFormCache(prev => ({
           ...prev,
-          [idx]: {
+          [musicaId]: {
             lines: cifra,
             tomOrig: data.tom_original ?? "",
-            tomAtFetch: form.musicas[idx]?.tom ?? "",
+            tomAtFetch: m.tom ?? "",
           },
         }));
       }
+    } catch {
+      if (request === cifraFormRequest.current) setAvisoMusica("Não foi possível carregar a letra desta música. Tente novamente.");
     } finally {
-      setLoadingCifraForm(null);
+      if (request === cifraFormRequest.current) setLoadingCifraForm(null);
     }
   }
 
@@ -2212,8 +2244,8 @@ export function EscalasTab({
                         </thead>
                         <tbody className="divide-y divide-gray-50">
                           {(selectedEscala.musicas ?? []).map((m, i) => (
-                            <React.Fragment key={i}>
-                              <tr key={i} className={clsx(m.artistaSlug && m.musicaSlug ? "cursor-pointer hover:bg-gray-50" : "")} onClick={() => abrirCifraInline(selectedEscala.id, i, m)}>
+                            <React.Fragment key={m.musicaId}>
+                              <tr className={clsx(m.musicaId ? "cursor-pointer hover:bg-gray-50" : "")} onClick={() => abrirCifraInline(selectedEscala.id, i, m)}>
                                 <td className="text-center px-2 py-2.5 text-xs font-bold text-gray-300">{i + 1}</td>
                                 <td className="px-3 py-2.5">
                                   <p className={clsx("break-words font-semibold text-sm leading-tight", m.artistaSlug ? "text-grape-700" : "text-gray-800")}>{m.titulo}{m.artistaSlug && " ?"}</p>
@@ -2265,7 +2297,7 @@ export function EscalasTab({
                                   </div>}
                                 </td>
                               </tr>
-                              {cifraAberta?.escalaId === selectedEscala.id && cifraAberta?.idx === i && (
+                              {cifraAberta?.escalaId === selectedEscala.id && cifraAberta?.musicaId === m.musicaId && (
                                 <tr key={`cifra-${i}`}>
                                   <td colSpan={5} className="px-3 py-3 bg-gray-50 border-t border-gray-100">
                                     {loadingCifraInline ? (
@@ -2890,7 +2922,7 @@ export function EscalasTab({
                 </p>
               </div>
               {form.musicas.map((em, i) => (
-                <div key={i} className="bg-white border border-gray-100 rounded-xl shadow-sm overflow-hidden">
+                <div key={em.musicaId} className="bg-white border border-gray-100 rounded-xl shadow-sm overflow-hidden">
                   <div className="flex items-center gap-3 px-4 py-3">
                     <span className="text-xs text-gray-400 w-4 text-right">{i + 1}</span>
                     <div className="flex-1 min-w-0">
@@ -2930,11 +2962,11 @@ export function EscalasTab({
                       )} />
                       {textoStatusStudio(statusDoStudio(em))}
                     </span>
-                    {em.artistaSlug && em.musicaSlug && (
+                    {em.musicaId && (
                       <button
                         onClick={() => toggleCifraForm(i)}
                         className="p-1.5 text-grape-600 hover:bg-grape-50 rounded-lg transition shrink-0"
-                        title="Ver cifra"
+                        title="Ver letra e cifra"
                       >
                         <Music2 className="w-3.5 h-3.5" />
                       </button>
@@ -2991,16 +3023,16 @@ export function EscalasTab({
                       </label>
                     </div>
                   )}
-                  {cifraFormAberta === i && (
+                  {cifraFormAberta === em.musicaId && (
                     <div className="border-t border-gray-100 px-4 py-3 bg-gray-50">
-                      {loadingCifraForm === i ? (
+                      {loadingCifraForm === em.musicaId ? (
                         <p className="text-xs text-gray-400 animate-pulse">Carregando cifra...</p>
-                      ) : cifraFormCache[i] ? (
+                      ) : cifraFormCache[em.musicaId] ? (
                         <pre className="text-xs font-mono text-gray-700 whitespace-pre-wrap leading-relaxed max-h-80 overflow-y-auto">
                           {transposeCifraLocal(
-                            cifraFormCache[i].lines,
-                            cifraFormCache[i].tomOrig || cifraFormCache[i].tomAtFetch,
-                            em.tom ?? cifraFormCache[i].tomOrig ?? cifraFormCache[i].tomAtFetch
+                            cifraFormCache[em.musicaId].lines,
+                            cifraFormCache[em.musicaId].tomOrig || cifraFormCache[em.musicaId].tomAtFetch,
+                            em.tom ?? cifraFormCache[em.musicaId].tomOrig ?? cifraFormCache[em.musicaId].tomAtFetch
                           ).join("\n")}
                         </pre>
                       ) : (
