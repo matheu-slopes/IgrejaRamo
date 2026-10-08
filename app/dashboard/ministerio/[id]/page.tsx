@@ -9,7 +9,7 @@ import {
   Pin, ChevronDown, ShieldCheck, ChevronUp,
   Star, Mic, Square, Image as ImageIcon, Grid3x3, Link2,
   MoreVertical,
-  AudioLines, LibraryBig, ChevronUp as ArrowUp, ChevronDown as ArrowDown, Save, Eye, EyeOff, UserCheck,
+  LibraryBig, ChevronUp as ArrowUp, ChevronDown as ArrowDown, Save, Eye, EyeOff, UserCheck,
   Reply,
 } from "lucide-react";
 import clsx from "clsx";
@@ -18,7 +18,7 @@ import { supabase } from "@/lib/supabase";
 import { downloadICS, linkGoogleCalendar, formatarData, diaSemana } from "@/lib/calendarUtils";
 import { EscalasTab, PedidoAnaliseStudio } from "@/components/dashboard/EscalasTab";
 import { EventosTab } from "@/components/dashboard/EventosTab";
-import { LouvorStudioTab } from "@/components/dashboard/LouvorStudioTab";
+import { LouvorStudioTab, type AnaliseStudioInicial } from "@/components/dashboard/LouvorStudioTab";
 import { RepertorioTab } from "@/components/dashboard/RepertorioTab";
 import { useAppRefresh } from "@/hooks/useAppRefresh";
 
@@ -55,11 +55,13 @@ export default function CanalMinisterioPage() {
     workerConfigurado: false,
     youtubeConfigurado: false,
   });
-  const [analiseStudioInicial, setAnaliseStudioInicial] = useState<(PedidoAnaliseStudio & { id: string }) | null>(null);
+  const [analiseStudioInicial, setAnaliseStudioInicial] = useState<AnaliseStudioInicial | null>(null);
   const [escalaParaAbrir, setEscalaParaAbrir] = useState<string | null>(null);
   const [projetoStudioInicial, setProjetoStudioInicial] = useState<string | null>(null);
+  const [origemStudio, setOrigemStudio] = useState<"escalas" | "repertorio">("escalas");
 
   function abrirAnaliseNoStudio(pedido: PedidoAnaliseStudio) {
+    setOrigemStudio("escalas");
     setProjetoStudioInicial(null);
     setAnaliseStudioInicial({ id: crypto.randomUUID(), ...pedido });
     setTab("studio");
@@ -202,19 +204,16 @@ export default function CanalMinisterioPage() {
               { id: "chat",    label: "Chat",    icon: MessageSquare },
               { id: "eventos", label: "Eventos", icon: Calendar      },
               ...(slug === "Louvor" && studioAccess.autorizado
-                ? [{ id: "studio" as const, label: "Studio", icon: AudioLines }]
-                : []),
-              ...(slug === "Louvor" && studioAccess.autorizado
                 ? [{ id: "repertorio" as const, label: "Repertório", icon: LibraryBig }]
                 : []),
               { id: "membros", label: "Membros", icon: Users         },
             ] as { id: Tab; label: string; icon: React.ElementType }[]).map(({ id, label, icon: Icon }) => (
               <button
                 key={id}
-                onClick={() => { if (id === "studio") { setAnaliseStudioInicial(null); setProjetoStudioInicial(null); } if (id === "escalas") setEscalaParaAbrir(null); setTab(id); }}
+                onClick={() => { if (id === "escalas") setEscalaParaAbrir(null); setTab(id); }}
                 className={clsx(
                   "flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-medium transition shrink-0",
-                  tab === id
+                  (tab === "studio" ? origemStudio : tab) === id
                     ? "bg-white text-gray-900"
                     : "text-white/70 hover:text-white hover:bg-white/10"
                 )}
@@ -233,16 +232,21 @@ export default function CanalMinisterioPage() {
       {tab === "eventos" && <EventosTab ministerio={slug} isLider={podeCriarEvento} podeEditar={podeEditarEvento} />}
       {temEscalas && tab === "escalas" && <EscalasTab ministerio={slug} isLider={isAdmin || temPermissaoNoMinisterio("criar_escala", slug)} podeGerenciarRepertorio={slug === "Louvor" && podeGerenciarRepertorio} escalaInicialId={escalaParaAbrir} onAbrirNoStudio={slug === "Louvor" && studioAccess.autorizado ? abrirAnaliseNoStudio : undefined} onAnalisarNoStudio={slug === "Louvor" && studioAccess.podeGerenciar ? abrirAnaliseNoStudio : undefined} />}
       {tab === "studio" && studioAccess.autorizado && (
-        <LouvorStudioTab key={analiseStudioInicial?.id ?? projetoStudioInicial ?? "biblioteca"}
+        <LouvorStudioTab key={analiseStudioInicial?.id ?? projetoStudioInicial ?? "ensaio"}
           podeGerenciar={studioAccess.podeGerenciar}
           podePrepararEnsaio={studioAccess.podePrepararEnsaio}
           workerConfigurado={studioAccess.workerConfigurado}
           analiseInicial={analiseStudioInicial}
           projetoInicialId={projetoStudioInicial}
-          onVoltarParaEscalas={(escalaId) => { setEscalaParaAbrir(escalaId); setAnaliseStudioInicial(null); setTab("escalas"); }}
+          origem={origemStudio}
+          onVoltar={() => { setTab(origemStudio); setAnaliseStudioInicial(null); setProjetoStudioInicial(null); }}
+          onVoltarParaEscalas={(escalaId) => { setEscalaParaAbrir(escalaId); setAnaliseStudioInicial(null); setProjetoStudioInicial(null); setTab("escalas"); }}
         />
       )}
-      {tab === "repertorio" && studioAccess.autorizado && <RepertorioTab podeGerenciar={podeGerenciarRepertorio} onAbrirStudio={(projetoId) => { setAnaliseStudioInicial(null); setProjetoStudioInicial(projetoId ?? null); setTab("studio"); }} />}
+      {tab === "repertorio" && studioAccess.autorizado && <RepertorioTab podeGerenciar={podeGerenciarRepertorio}
+        onAbrirEnsaio={(projetoId) => { setOrigemStudio("repertorio"); setAnaliseStudioInicial(null); setProjetoStudioInicial(projetoId); setTab("studio"); }}
+        onPrepararEnsaio={studioAccess.podeGerenciar ? (musica) => { setOrigemStudio("repertorio"); setProjetoStudioInicial(null); setAnaliseStudioInicial({ id: crypto.randomUUID(), musicaId: musica.id, titulo: musica.titulo, artista: musica.artista, youtubeUrl: musica.linkYoutube }); setTab("studio"); } : undefined}
+      />}
     </div>
   );
 }

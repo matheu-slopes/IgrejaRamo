@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlertCircle, Archive, Check, ChevronDown, ExternalLink, LoaderCircle,
-  Headphones, Music2, Pencil, Plus, RotateCcw, Search, Trash2, X,
+  Music2, Pencil, Play, Plus, RotateCcw, Search, Trash2, X,
 } from "lucide-react";
 import clsx from "clsx";
 import { supabase } from "@/lib/supabase";
@@ -38,7 +38,11 @@ function cifraSemTabs(cifra: string) {
     .join("\n");
 }
 
-export function RepertorioTab({ podeGerenciar, onAbrirStudio }: { podeGerenciar: boolean; onAbrirStudio?: (projetoId?: string) => void }) {
+export function RepertorioTab({ podeGerenciar, onAbrirEnsaio, onPrepararEnsaio }: {
+  podeGerenciar: boolean;
+  onAbrirEnsaio?: (projetoId: string) => void;
+  onPrepararEnsaio?: (musica: Musica) => void;
+}) {
   const [musicas, setMusicas] = useState<MusicaRepertorio[]>([]);
   const [usoPorMusica, setUsoPorMusica] = useState<Map<string, number>>(new Map());
   const [busca, setBusca] = useState("");
@@ -99,6 +103,14 @@ export function RepertorioTab({ podeGerenciar, onAbrirStudio }: { podeGerenciar:
 
   useEffect(() => { void carregar(); }, [carregar]);
   useAppRefresh(() => { void carregar(); }, [carregar], { minIntervalMs: 2500 });
+
+  useEffect(() => {
+    if (!projetos.some((projeto) => !["concluido", "erro"].includes(projeto.status))) return;
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === "visible") void carregar();
+    }, 5000);
+    return () => window.clearInterval(timer);
+  }, [carregar, projetos]);
 
   const ensaioPorMusica = useMemo(() => {
     const mapa = new Map<string, ProjetoResumo>();
@@ -240,7 +252,14 @@ export function RepertorioTab({ podeGerenciar, onAbrirStudio }: { podeGerenciar:
               <span className="hidden text-xs text-gray-600 md:block">{musica.artista}</span>
               <span className="hidden text-xs font-semibold text-gray-600 md:block">{musica.tom || "A definir"}</span>
               <span className="hidden text-xs text-gray-500 md:block">{ensaio?.bpm ? Math.round(ensaio.bpm) : "—"}</span>
-              <div className="col-start-1 row-start-2 text-xs md:col-auto md:row-auto"><p className={ensaio?.status === "concluido" ? "text-emerald-600" : "text-gray-400"}>{!studioDisponivel ? studioCarregando ? "Consultando ensaio…" : "Ensaio indisponível" : ensaio?.status === "concluido" ? "● Disponível" : ensaio?.status === "erro" ? "Falha na preparação" : ensaio ? "Preparando" : "Não preparado"}</p>{ensaio?.status === "concluido" && onAbrirStudio && <button type="button" onClick={() => onAbrirStudio(ensaio.id)} className="mt-1 inline-flex items-center gap-1 font-semibold text-rose-700 hover:underline"><ExternalLink className="h-3 w-3" />Abrir no Studio</button>}</div>
+              <div className="col-start-1 row-start-2 text-xs md:col-auto md:row-auto">
+                <p role="status" className={ensaio?.status === "concluido" ? "text-emerald-600" : ensaio?.status === "erro" ? "text-red-600" : "text-gray-400"}>{!studioDisponivel ? studioCarregando ? "Consultando ensaio…" : "Ensaio indisponível" : ensaio?.status === "concluido" ? "● Disponível" : ensaio?.status === "erro" ? "Falha na preparação" : ensaio ? "Preparando ensaio" : "Não preparado"}</p>
+                {ensaio?.status === "concluido" && onAbrirEnsaio
+                  ? <button type="button" onClick={() => onAbrirEnsaio(ensaio.id)} className="mt-1 inline-flex items-center gap-1 font-semibold text-rose-700 hover:underline"><Play className="h-3 w-3" />Ensaiar</button>
+                  : ensaio && onAbrirEnsaio
+                    ? <button type="button" onClick={() => onAbrirEnsaio(ensaio.id)} className="mt-1 font-semibold text-rose-700 hover:underline">{ensaio.status === "erro" ? "Ver falha" : "Ver andamento"}</button>
+                    : studioDisponivel && onPrepararEnsaio && <button type="button" onClick={() => onPrepararEnsaio(musica)} className="mt-1 font-semibold text-rose-700 hover:underline">Preparar ensaio</button>}
+              </div>
               <button type="button" aria-label={`${aberta ? "Recolher" : "Ver"} detalhes de ${musica.titulo}`} onClick={() => { setSelecionadaId(aberta ? null : musica.id); setTomDeLeitura(null); }} className="col-start-2 row-start-1 rounded-lg p-1 text-gray-400 hover:bg-gray-100 md:col-auto md:row-auto"><ChevronDown className={clsx("h-4 w-4 transition", aberta && "rotate-180")} /></button>
             </div>
             {aberta && <div id={`musica-${musica.id}`} className="border-t border-gray-100 bg-gray-50/50 px-4 py-4"><p className="mb-3 text-xs text-gray-500">{usos ? `Usada em ${usos} escala${usos === 1 ? "" : "s"}.` : "Ainda não usada em uma escala."}</p><div className="flex flex-wrap gap-2">
@@ -253,7 +272,6 @@ export function RepertorioTab({ podeGerenciar, onAbrirStudio }: { podeGerenciar:
           </article>;
         })}</div>}
       </section>
-      {onAbrirStudio && <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-gray-100 bg-white px-4 py-4 text-xs text-gray-500"><Headphones className="h-5 w-5 text-rose-700" /><p className="flex-1">Os áudios preparados para ensaio ficam na biblioteca do Studio.</p><button type="button" onClick={() => onAbrirStudio()} className="font-semibold text-rose-700 hover:underline">Ir para o Studio →</button></div>}
     </div>
   );
 }

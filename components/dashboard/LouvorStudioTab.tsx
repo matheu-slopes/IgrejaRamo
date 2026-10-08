@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AlertCircle, AudioLines, CheckCircle2, CircleStop, Disc3, Download, Headphones, LibraryBig, LoaderCircle, Music2, Play, Search, Sparkles, Trash2 } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { AlertCircle, CheckCircle2, ChevronLeft, CircleStop, Disc3, Download, LoaderCircle, Music2, Search, Sparkles, Trash2 } from "lucide-react";
 import { LouvorStudioPlayer } from "./LouvorStudioPlayer";
 import { supabase } from "@/lib/supabase";
 import { withDeadline } from "@/lib/withDeadline";
@@ -57,7 +57,7 @@ type MusicaDaFilaStudio = {
 
 export type AnaliseStudioInicial = MusicaDaFilaStudio & {
   id: string;
-  escalaId: string;
+  escalaId?: string;
   escalaContexto?: { culto: string; data: string; horario: string; tom?: string; bpm?: number };
   fila?: MusicaDaFilaStudio[];
 };
@@ -70,6 +70,12 @@ const STATUS_LABEL: Record<Projeto["status"], string> = {
   concluido: "Pronto",
   erro: "Falha no processamento",
 };
+
+function projetoDaMusica(project: Projeto, analise: AnaliseStudioInicial, musicaId: string) {
+  if (!analise.escalaId) return project.musica_id === musicaId || Boolean(project.escala_usos?.some((uso) => uso.musica_id === musicaId));
+  return (project.musica_id === musicaId && project.escalas?.id === analise.escalaId)
+    || Boolean(project.escala_usos?.some((uso) => uso.escala_id === analise.escalaId && uso.musica_id === musicaId));
+}
 
 async function token(): Promise<string> {
   const { data } = await supabase.auth.getSession();
@@ -104,6 +110,8 @@ export function LouvorStudioTab({
   analiseInicial,
   projetoInicialId,
   onVoltarParaEscalas,
+  onVoltar,
+  origem = "escalas",
 }: {
   podeGerenciar: boolean;
   podePrepararEnsaio: boolean;
@@ -111,24 +119,20 @@ export function LouvorStudioTab({
   analiseInicial?: AnaliseStudioInicial | null;
   projetoInicialId?: string | null;
   onVoltarParaEscalas?: (escalaId: string) => void;
+  onVoltar: () => void;
+  origem?: "escalas" | "repertorio";
 }) {
   const [query, setQuery] = useState("");
   const [searching, setSearching] = useState(false);
   const [results, setResults] = useState<SearchResult[]>([]);
   const [projects, setProjects] = useState<Projeto[]>([]);
   const [escalas, setEscalas] = useState<EscalaOption[]>([]);
-  const [escalaId, setEscalaId] = useState("");
-  const [musicaId, setMusicaId] = useState("");
-  const [contextoPlayer, setContextoPlayer] = useState<{ escalaId: string; musicaId: string } | null>(null);
-  const [vincularCulto, setVincularCulto] = useState(false);
   const [videoConfirmado, setVideoConfirmado] = useState<SearchResult | null>(null);
   const [buscandoOutraVersao, setBuscandoOutraVersao] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(projetoInicialId ?? null);
-  const projetoInicialAberto = useRef(false);
-  const [mostrarPreparacao, setMostrarPreparacao] = useState(false);
-  const [buscaNaBiblioteca, setBuscaNaBiblioteca] = useState("");
-  const [filtroDaBiblioteca, setFiltroDaBiblioteca] = useState<"todas" | "prontas" | "processando">("todas");
-  const [ordemDaBiblioteca, setOrdemDaBiblioteca] = useState("recentes");
+  const projetoInicialAberto = useRef<string | null>(null);
+  const [carregando, setCarregando] = useState(true);
+  const [erroCarregamento, setErroCarregamento] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [preparando, setPreparando] = useState(false);
   const [retryingId, setRetryingId] = useState<string | null>(null);
@@ -137,14 +141,6 @@ export function LouvorStudioTab({
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [indiceDaFila, setIndiceDaFila] = useState(0);
   const podePreparar = podeGerenciar || podePrepararEnsaio;
-
-  useEffect(() => {
-    if (!analiseInicial) return;
-    setIndiceDaFila(0);
-    setEscalaId(analiseInicial.escalaId);
-    setContextoPlayer({ escalaId: analiseInicial.escalaId, musicaId: analiseInicial.musicaId });
-    setVincularCulto(true);
-  }, [analiseInicial]);
 
   const filaDaEscala = analiseInicial
     ? (analiseInicial.fila?.length ? analiseInicial.fila : [analiseInicial])
@@ -168,37 +164,33 @@ export function LouvorStudioTab({
       url: analiseAtual.youtubeUrl,
     }
     : null;
-  const fluxoDaEscala = Boolean(analiseInicial);
+  const fluxoDaEscala = Boolean(analiseInicial?.escalaId);
   const escalaDoFluxo = escalas.find((escala) => escala.id === analiseInicial?.escalaId)
-    ?? (analiseInicial?.escalaContexto ? { id: analiseInicial.escalaId, ...analiseInicial.escalaContexto, escala_musicas: [] } : undefined);
+    ?? (analiseInicial?.escalaId && analiseInicial.escalaContexto ? { id: analiseInicial.escalaId, ...analiseInicial.escalaContexto, escala_musicas: [] } : undefined);
   const videoDiretoDoRepertorio = Boolean(
     videoSugeridoDoRepertorio && !/youtube\.com\/results/i.test(videoSugeridoDoRepertorio.url),
   );
 
   const loadProjects = useCallback(async () => {
-    const response = await studioFetch("/api/louvor-studio/projects");
-    const data = await response.json().catch(() => ({})) as { projetos?: Projeto[]; escalas?: EscalaOption[]; error?: string };
-    if (response.ok) {
+    try {
+      const response = await studioFetch("/api/louvor-studio/projects");
+      const data = await response.json().catch(() => ({})) as { projetos?: Projeto[]; escalas?: EscalaOption[]; error?: string };
+      if (!response.ok) throw new Error(data.error ?? "Não foi possível carregar o ensaio.");
+      setErroCarregamento(null);
       setProjects(data.projetos ?? []);
       setEscalas(data.escalas ?? []);
-      // A biblioteca comum só abre sob ação da pessoa. Já o fluxo vindo da
-      // escala volta direto para a preparação daquela música, se ela existir.
       setSelectedId((current) => {
-        if (data.projetos?.some((project) => project.id === current && (!analiseAtual ||
-          (project.musica_id === analiseAtual.musicaId && project.escalas?.id === analiseInicial?.escalaId) ||
-          project.escala_usos?.some((uso) => uso.escala_id === analiseInicial?.escalaId && uso.musica_id === analiseAtual.musicaId)))) return current;
-        if (!analiseAtual) return null;
-        return data.projetos?.find((project) =>
-          (project.musica_id === analiseAtual.musicaId && project.escalas?.id === analiseInicial?.escalaId) ||
-          project.escala_usos?.some((uso) =>
-            uso.escala_id === analiseInicial?.escalaId && uso.musica_id === analiseAtual.musicaId,
-          ),
-        )?.id ?? null;
+        const pertenceAoContexto = (project: Projeto) => !analiseAtual || !analiseInicial || projetoDaMusica(project, analiseInicial, analiseAtual.musicaId);
+        if (data.projetos?.some((project) => project.id === current && pertenceAoContexto(project))) return current;
+        if (!analiseAtual || !analiseInicial) return null;
+        return data.projetos?.find((project) => pertenceAoContexto(project))?.id ?? null;
       });
-    } else {
-      setMessage(data.error ?? "Não foi possível carregar o Studio.");
+    } catch (error) {
+      setErroCarregamento(error instanceof Error ? error.message : "Não foi possível carregar o ensaio.");
+    } finally {
+      setCarregando(false);
     }
-  }, [analiseAtual, analiseInicial?.escalaId]);
+  }, [analiseAtual, analiseInicial]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => void loadProjects(), 0);
@@ -208,15 +200,6 @@ export function LouvorStudioTab({
   useAppRefresh(() => { void loadProjects(); }, [loadProjects], { minIntervalMs: 2500 });
 
   const pending = projects.some((project) => !["concluido", "erro"].includes(project.status));
-  useEffect(() => {
-    if (!projetoInicialAberto.current && projetoInicialId && selectedId === projetoInicialId && projects.some((project) => project.id === projetoInicialId)) {
-      projetoInicialAberto.current = true;
-      document.getElementById("studio-player")?.scrollIntoView({ behavior: "smooth", block: "start" });
-      if (projects.find((project) => project.id === projetoInicialId)?.status === "concluido") {
-        void studioFetch(`/api/louvor-studio/projects/${projetoInicialId}`, { method: "PATCH", body: JSON.stringify({ action: "usar" }) });
-      }
-    }
-  }, [projetoInicialId, selectedId, projects]);
   useEffect(() => {
     if (!pending) return;
     const timer = window.setInterval(() => void loadProjects(), 5000);
@@ -265,8 +248,8 @@ export function LouvorStudioTab({
             thumbnailUrl: result.thumbnailUrl,
             // No fluxo vindo da Escala, ela continua sendo a fonte de verdade mesmo
             // enquanto a lista de cultos ainda estiver carregando.
-            escalaId: analiseInicial?.escalaId ?? (vincularCulto ? escalaId : undefined),
-            musicaId: analiseAtual?.musicaId ?? (vincularCulto ? musicaId : undefined),
+            escalaId: analiseInicial?.escalaId,
+            musicaId: analiseAtual?.musicaId,
           }),
           signal,
         });
@@ -278,7 +261,6 @@ export function LouvorStudioTab({
       setQuery("");
       setVideoConfirmado(null);
       setBuscandoOutraVersao(false);
-      setMostrarPreparacao(false);
       setSelectedId(data.projeto?.id ?? null);
       await loadProjects();
       if (fluxoDaEscala && indiceDaFila < filaDaEscala.length - 1) {
@@ -292,18 +274,6 @@ export function LouvorStudioTab({
       );
     } finally {
       setPreparando(false);
-    }
-  }
-
-  function abrirProjeto(project: Projeto, contexto?: { escalaId: string; musicaId: string }) {
-    setSelectedId(project.id);
-    setContextoPlayer(contexto ?? null);
-    window.requestAnimationFrame(() => document.getElementById("studio-player")?.scrollIntoView({ behavior: "smooth", block: "start" }));
-    if (project.status === "concluido") {
-      void studioFetch(`/api/louvor-studio/projects/${project.id}`, {
-        method: "PATCH",
-        body: JSON.stringify({ action: "usar" }),
-      });
     }
   }
 
@@ -326,7 +296,7 @@ export function LouvorStudioTab({
       };
       if (!response.ok) throw Error(data.error ?? "Não foi possível excluir.");
       setProjects((current) => current.filter((item) => item.id !== project.id));
-      if (selectedId === project.id) setSelectedId(null);
+      if (selectedId === project.id) onVoltar();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Não foi possível excluir.");
     } finally {
@@ -347,7 +317,7 @@ export function LouvorStudioTab({
       const data = await response.json().catch(() => ({})) as { error?: string };
       if (!response.ok) throw new Error(data.error ?? "Nao foi possivel cancelar o processamento.");
       setProjects((current) => current.filter((item) => item.id !== project.id));
-      if (selectedId === project.id) setSelectedId(null);
+      if (selectedId === project.id) onVoltar();
       await loadProjects();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Nao foi possivel cancelar o processamento.");
@@ -375,8 +345,8 @@ export function LouvorStudioTab({
   }
 
   async function confirmarTomNaEscala(project: Projeto, escolha: { tom: string; bpm?: number }) {
-    const escalaIdDaEscolha = analiseInicial?.escalaId ?? contextoPlayer?.escalaId ?? project.escalas?.id;
-    const musicaIdDaEscolha = analiseAtual?.musicaId ?? contextoPlayer?.musicaId ?? project.musica_id;
+    const escalaIdDaEscolha = analiseInicial?.escalaId;
+    const musicaIdDaEscolha = analiseAtual?.musicaId;
     if (applyingId || !escalaIdDaEscolha || !musicaIdDaEscolha) return;
     setApplyingId(project.id);
     setMessage(null);
@@ -396,55 +366,21 @@ export function LouvorStudioTab({
     }
   }
 
-  const selected = fluxoDaEscala
-    ? projects.find((project) =>
-      project.id === selectedId &&
-      ((project.musica_id === analiseAtual?.musicaId && project.escalas?.id === analiseInicial?.escalaId) ||
-        project.escala_usos?.some((uso) =>
-          uso.escala_id === analiseInicial?.escalaId && uso.musica_id === analiseAtual?.musicaId,
-        )),
-    ) ?? null
-    : projects.find((project) => project.id === selectedId) ?? null;
-
-  const contextoEfetivo = analiseInicial && analiseAtual
+  const selected = projects.find((project) => project.id === selectedId && (!analiseInicial || !analiseAtual || projetoDaMusica(project, analiseInicial, analiseAtual.musicaId))) ?? null;
+  useEffect(() => {
+    if (selected?.status !== "concluido" || projetoInicialAberto.current === selected.id) return;
+    projetoInicialAberto.current = selected.id;
+    void studioFetch(`/api/louvor-studio/projects/${selected.id}`, { method: "PATCH", body: JSON.stringify({ action: "usar" }) }).catch(() => {});
+  }, [selected?.id, selected?.status]);
+  const contextoEfetivo = analiseInicial?.escalaId && analiseAtual
     ? { escalaId: analiseInicial.escalaId, musicaId: analiseAtual.musicaId }
-    : contextoPlayer;
+    : null;
   const escalaNoContexto = escalas.find((escala) => escala.id === contextoEfetivo?.escalaId)
     ?? (contextoEfetivo?.escalaId === analiseInicial?.escalaId ? escalaDoFluxo : undefined);
   const musicaNoContexto = escalaNoContexto?.escala_musicas.find((musica) => musica.musica_id === contextoEfetivo?.musicaId)
     ?? (analiseInicial && contextoEfetivo?.musicaId === analiseAtual?.musicaId && analiseInicial.escalaContexto
       ? { titulo: analiseAtual.titulo, tom: analiseInicial.escalaContexto.tom, bpm: analiseInicial.escalaContexto.bpm }
       : undefined);
-  const escalaEscolhida = escalas.find((escala) => escala.id === escalaId);
-  const cultosDoProjeto = (project: Projeto) => {
-    const ids = new Set((project.escala_usos ?? []).map((uso) => uso.escala_id));
-    if (project.escalas?.id && (podeGerenciar || escalas.some((escala) => escala.id === project.escalas?.id))) ids.add(project.escalas.id);
-    return [...ids].map((id) => escalas.find((escala) => escala.id === id) ?? (podeGerenciar && project.escalas?.id === id ? project.escalas : null)).filter((escala): escala is Pick<EscalaOption, "id" | "culto" | "data" | "horario"> => Boolean(escala));
-  };
-  const projetosProntos = projects.filter((project) => project.status === "concluido").length;
-  const projetosEmProcessamento = projects.filter((project) => !["concluido", "erro"].includes(project.status)).length;
-  const ensaiosPessoais = projects.filter((project) => project.visibilidade === "pessoal");
-  const limiteDeEnsaiosAtingido = !podeGerenciar && ensaiosPessoais.length >= 3;
-  const projetosDaBiblioteca = useMemo(() => {
-    const termo = buscaNaBiblioteca
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .trim()
-      .toLocaleLowerCase("pt-BR");
-
-    return projects.filter((project) => {
-      const correspondeAoFiltro = filtroDaBiblioteca === "todas"
-        || (filtroDaBiblioteca === "prontas" && project.status === "concluido")
-        || (filtroDaBiblioteca === "processando" && !["concluido", "erro"].includes(project.status));
-      const texto = `${project.titulo} ${project.artista ?? ""}`
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .toLocaleLowerCase("pt-BR");
-      return correspondeAoFiltro && (!termo || texto.includes(termo));
-    }).sort((a, b) => ordemDaBiblioteca === "titulo"
-      ? a.titulo.localeCompare(b.titulo, "pt-BR") : b.criado_em.localeCompare(a.criado_em));
-  }, [buscaNaBiblioteca, filtroDaBiblioteca, ordemDaBiblioteca, projects]);
-
   const selecionarVideo = (result: SearchResult) => {
     setVideoConfirmado(result);
     setBuscandoOutraVersao(false);
@@ -454,55 +390,20 @@ export function LouvorStudioTab({
 
   return (
     <div className="space-y-6">
-      <div className={fluxoDaEscala || mostrarPreparacao ? "rounded-2xl border border-rose-100 bg-gradient-to-br from-rose-50 via-white to-white p-5 shadow-sm md:p-6" : "flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm"}>
-        <div>
-          <div className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-rose-700" />
-            <h2 className="text-lg font-semibold text-gray-900">Louvor Studio</h2>
-          </div>
-          <p className="mt-1 max-w-2xl text-sm text-gray-500">
-            {podeGerenciar
-              ? "Prepare os áudios e ensaie as músicas da equipe."
-              : "Abra as músicas da equipe para ouvir e estudar as faixas separadas."}
-          </p>
-        </div>
-
-        {podePreparar && !fluxoDaEscala && (
-          <button
-            type="button"
-            disabled={limiteDeEnsaiosAtingido && !mostrarPreparacao}
-            onClick={() => {
-              if (limiteDeEnsaiosAtingido && !mostrarPreparacao) {
-                setMessage("Você atingiu o limite de 3 ensaios pessoais. Exclua um ou aguarde a expiração para preparar outra música.");
-                return;
-              }
-              setMostrarPreparacao((aberto) => !aberto);
-            }}
-            className="inline-flex items-center gap-2 rounded-xl bg-rose-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-rose-600 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <Download className="h-4 w-4" /> {mostrarPreparacao ? "Fechar preparação" : podeGerenciar ? "Preparar música" : "Novo ensaio"}
-          </button>
-        )}
-
-        {podePreparar && !workerConfigurado && (
-          <div className="mt-4 flex gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-            <span>Configure o segredo do processador na Vercel. Depois, o PC local buscará as tarefas sem ficar exposto na internet.</span>
-          </div>
-        )}
-
-        {podePreparar ? (
-          fluxoDaEscala ? (
-            selected?.status === "concluido" ? (
-              <section className="mt-4 rounded-xl border border-emerald-100 bg-emerald-50/60 p-4" aria-label="Música pronta para definir tom">
-                <p className="text-xs font-bold uppercase tracking-widest text-emerald-700">Base pronta para esta escala</p>
-                <h3 className="mt-1 text-base font-semibold text-gray-900">{selected.titulo}</h3>
-                <p className="mt-1 text-sm text-gray-600">Ouça no player abaixo, teste os tons e confirme o que a equipe usará neste culto.</p>
-              </section>
-            ) : (
-            <section className="mt-4 space-y-4" aria-label="Preparar música da escala">
+      <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm md:p-6">
+        <button type="button" onClick={onVoltar} className="mb-4 inline-flex items-center gap-1.5 rounded-lg py-2 text-sm font-semibold text-rose-700 hover:underline">
+          <ChevronLeft className="h-4 w-4" />{origem === "repertorio" ? "Voltar ao repertório" : "Voltar às escalas"}
+        </button>
+        <h2 className="flex items-center gap-2 text-lg font-semibold text-gray-900"><Sparkles className="h-5 w-5 text-rose-700" />Louvor Studio</h2>
+        <p className="mt-1 text-sm text-gray-500">{selected ? "Ouça e ajuste as faixas para ensaiar." : "Confirme a gravação para preparar o ensaio desta música."}</p>
+        {carregando && <p role="status" className="mt-4 flex items-center gap-2 text-sm text-gray-500"><LoaderCircle className="h-4 w-4 animate-spin" />Carregando ensaio…</p>}
+        {erroCarregamento && <div className="mt-4 rounded-xl border border-red-100 bg-red-50 p-3"><p role="alert" className="text-sm text-red-700">{erroCarregamento}</p><button type="button" onClick={() => void loadProjects()} className="mt-2 rounded-lg border border-rose-200 px-3 py-2 text-xs font-semibold text-rose-700">Recarregar ensaio</button></div>}
+        {!carregando && !erroCarregamento && !selected && !analiseAtual && <p className="mt-4 text-sm text-gray-500">Este ensaio não está disponível. Volte à música para conferir a preparação.</p>}
+        {podePreparar && analiseAtual && !selected && !carregando && !erroCarregamento && !workerConfigurado && <p role="status" className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">A preparação de ensaios está indisponível no momento.</p>}
+        {podePreparar && analiseAtual && !selected && !carregando && !erroCarregamento && (
+            <section className="mt-4 space-y-4" aria-label="Preparar ensaio">
               <div className="rounded-xl border border-rose-100 bg-white p-4">
-                <p className="text-xs font-bold uppercase tracking-widest text-rose-700">Preparação para a escala</p>
+                <p className="text-xs font-bold uppercase tracking-widest text-rose-700">{fluxoDaEscala ? "Preparação para a escala" : "Preparação para o Repertório"}</p>
                 {filaDaEscala.length > 1 && (
                   <p className="mt-1 text-xs font-semibold text-rose-700">Música {indiceDaFila + 1} de {filaDaEscala.length}</p>
                 )}
@@ -511,7 +412,7 @@ export function LouvorStudioTab({
                 <p className="mt-2 text-xs text-gray-600">
                   {escalaDoFluxo
                     ? `${new Date(escalaDoFluxo.data + "T12:00:00").toLocaleDateString("pt-BR")} · ${escalaDoFluxo.culto} · ${escalaDoFluxo.horario.slice(0, 5)}`
-                    : "Este preparo será vinculado à música desta escala."}
+                    : "Este ensaio ficará disponível nesta música do Repertório."}
                 </p>
               </div>
 
@@ -585,134 +486,8 @@ export function LouvorStudioTab({
                 </div>
               )}
             </section>
-            )
-          ) : mostrarPreparacao ? <form onSubmit={pesquisar} className="mt-5 flex flex-col gap-4">
-          {videoSugeridoDoRepertorio && (
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">
-              <div>
-                <strong className="block">Vídeo sugerido pelo Repertório</strong>
-                <span className="text-xs text-emerald-800">Confira a versão antes de preparar. Você pode pesquisar outra gravação abaixo.</span>
-              </div>
-              <button
-                type="button"
-                disabled={!workerConfigurado}
-                onClick={() => void processar(videoSugeridoDoRepertorio)}
-                className="rounded-lg bg-emerald-700 px-3 py-2 text-xs font-semibold text-white transition hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                Usar este vídeo
-              </button>
-            </div>
-          )}
-          <div>
-            <div className="mb-2 flex items-center justify-between px-1">
-              <label className="text-xs font-bold uppercase tracking-widest text-gray-500">Buscar e confirmar a gravação</label>
-              <span className="text-xs text-gray-400">Etapa 1 de 2</span>
-            </div>
-          <div className="flex flex-col gap-2 sm:flex-row">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-            <input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Nome da música, artista ou link do YouTube"
-              aria-label="Nome da música, artista ou link do YouTube"
-              maxLength={500}
-              className="w-full rounded-xl border border-gray-200 bg-white py-2.5 pl-9 pr-3 text-sm outline-none transition focus:border-rose-400 focus:ring-2 focus:ring-rose-100"
-            />
-          </div>
-          <button
-            disabled={searching || query.trim().length < 2}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-gray-950 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            {searching ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-            {searching ? "Pesquisando…" : "Pesquisar no YouTube"}
-          </button>
-          </div>
-          </div>
-          <p className="text-xs text-gray-500" role="status" aria-live="polite">
-            {searching ? "Buscando os vídeos no YouTube. Aguarde alguns segundos…" : "Escolha a gravação certa abaixo. Depois indique onde ela será usada."}
-          </p>
-          {videoConfirmado && <div className="order-1 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-950">
-            <div className="min-w-0"><strong className="block truncate">{videoConfirmado.titulo}</strong><span className="text-xs">Gravação escolhida</span></div>
-            <div className="flex gap-2">
-              <a href={videoConfirmado.url} target="_blank" rel="noopener noreferrer" className="rounded-lg border border-emerald-300 bg-white px-3 py-2 text-xs font-semibold">Conferir vídeo</a>
-              <button type="button" onClick={() => setVideoConfirmado(null)} className="rounded-lg border border-emerald-300 bg-white px-3 py-2 text-xs font-semibold">Trocar</button>
-            </div>
-          </div>}
-          <section aria-label="Destino da preparação" className={videoConfirmado ? "order-2 space-y-3" : "hidden"}>
-            <div className="mb-2 flex items-center justify-between px-1">
-              <p className="text-xs font-bold uppercase tracking-widest text-gray-500">Onde usar</p>
-              <p className="text-xs text-gray-400">Etapa 2 de 2</p>
-            </div>
-          <div className={`grid gap-2 ${podeGerenciar ? "grid-cols-2" : "grid-cols-1"}`}>
-            <button
-              type="button"
-              aria-pressed={!vincularCulto}
-              onClick={() => setVincularCulto(false)}
-              className={`rounded-xl border p-3 text-left text-sm transition ${!vincularCulto ? "border-rose-300 bg-rose-50 text-rose-900" : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"}`}
-            >
-              <strong className="block">{podeGerenciar ? "Biblioteca da equipe" : "Meu ensaio"}</strong>
-              <span className="mt-0.5 block text-xs opacity-75">{podeGerenciar ? "Disponível para a equipe de Louvor" : "Privado e disponível por 7 dias"}</span>
-            </button>
-            {podeGerenciar && (
-            <button
-              type="button"
-              aria-pressed={vincularCulto}
-              onClick={() => setVincularCulto(true)}
-              className={`rounded-xl border p-3 text-left text-sm transition ${vincularCulto ? "border-rose-300 bg-rose-50 text-rose-900" : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"}`}
-            >
-              <strong className="block">Usar em um culto</strong>
-              <span className="mt-0.5 block text-xs opacity-75">Vincula a música à escala</span>
-            </button>
-            )}
-          </div>
-          {podeGerenciar && vincularCulto && (
-            <label className="block text-xs font-medium text-gray-600">
-              Selecione o culto
-              <select
-                value={escalaId}
-                onChange={(event) => { setEscalaId(event.target.value); setMusicaId(""); }}
-                className="mt-1 w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm font-normal outline-none focus:border-rose-400"
-              >
-                <option value="">Selecione um culto</option>
-                {escalas.map((escala) => (
-                  <option key={escala.id} value={escala.id}>
-                    {new Date(escala.data + "T12:00:00").toLocaleDateString("pt-BR")} · {escala.culto} · {escala.horario.slice(0, 5)}
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
-          {podeGerenciar && vincularCulto && (
-            <label className="block text-xs font-medium text-gray-600">
-              Música do set
-              <select value={musicaId} onChange={(event) => setMusicaId(event.target.value)} disabled={!escalaId} className="mt-1 w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm disabled:opacity-50">
-                <option value="">Selecione a música</option>
-                {(escalaEscolhida?.escala_musicas ?? []).filter((musica) => musica.musica_id).map((musica) => <option key={musica.musica_id} value={musica.musica_id ?? ""}>{musica.titulo}</option>)}
-              </select>
-            </label>
-          )}
-          {vincularCulto && escalaId && !escalaEscolhida?.escala_musicas.length && <p className="text-xs text-amber-700">Adicione a música ao set na aba Escalas antes de preparar o ensaio.</p>}
-          <p className="px-1 text-xs text-gray-500" aria-live="polite">
-            {!podeGerenciar
-              ? "Este ensaio é privado e será removido automaticamente após 7 dias."
-              : vincularCulto
-              ? "Os áudios ficam disponíveis até o fim do dia do último culto vinculado. Depois são removidos; letra, cifra e tom da escala permanecem salvos."
-              : "A base ficará disponível na biblioteca da equipe por 90 dias desde o último uso."}
-          </p>
-          <p className="px-1 text-xs text-gray-500">Proteção de espaço: limite de 8 GB no armazenamento do Studio, incluindo reservas para preparações em andamento. Se faltar espaço, somente novas preparações e downloads em outros tons são bloqueados; os ensaios prontos continuam disponíveis.</p>
-          </section>
-          {videoConfirmado && <div className="order-3 flex flex-wrap items-center justify-between gap-3 border-t border-rose-100 pt-3">
-            <p className="text-xs text-gray-500">Voz, bateria, baixo e outros instrumentos serão separados.</p>
-            <button type="button" disabled={!workerConfigurado || preparando || (vincularCulto && (!escalaId || !musicaId))} onClick={() => void processar(videoConfirmado)} className="rounded-xl bg-rose-700 px-4 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40">
-              {preparando ? "Preparando…" : "Preparar música"}
-            </button>
-          </div>}
-        </form> : null) : (
-          <p className="mt-4 rounded-xl bg-white p-3 text-sm text-gray-600 ring-1 ring-gray-100">
-            Escolha um ensaio na biblioteca. Os cultos e seus repertórios estão na aba Escalas.
-          </p>
         )}
+        {!podePreparar && analiseAtual && !selected && !carregando && !erroCarregamento && <p className="mt-4 text-sm text-gray-500">O ensaio desta música ainda não está disponível.</p>}
       </div>
 
       {message && (
@@ -724,7 +499,6 @@ export function LouvorStudioTab({
       {results.length > 0 && (
         <section className="rounded-2xl border border-gray-100 bg-white p-3 md:p-4">
           <h3 className="mb-3 text-sm font-semibold text-gray-800">{fluxoDaEscala ? "Escolha outra versão" : "Escolha a música"} ({results.length})</h3>
-          {vincularCulto && !escalaId && !fluxoDaEscala && <p className="mb-3 text-xs text-gray-500">Confira a gravação e clique em Selecionar.</p>}
           <div className="grid gap-2 lg:grid-cols-2">
             {results.map((result) => (
               <article key={result.id} className="flex items-center gap-3 rounded-xl border border-gray-100 p-2.5">
@@ -750,140 +524,19 @@ export function LouvorStudioTab({
         </section>
       )}
 
-      <div className={fluxoDaEscala ? "" : "space-y-5"}>
-        {!fluxoDaEscala && <section id="studio-biblioteca" className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm md:p-5">
-          <div className="mb-4 flex items-start justify-between gap-3">
-            <div className="flex min-w-0 items-center gap-3">
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-rose-50 text-rose-700"><LibraryBig className="h-5 w-5" /></span>
-              <div>
-                <h3 className="text-sm font-semibold text-gray-900">Biblioteca de ensaios</h3>
-                {!podeGerenciar && ensaiosPessoais.length > 0 && <p className="mt-1 text-[11px] text-gray-500">Meus ensaios anteriores: {ensaiosPessoais.length} · expiram em até 7 dias</p>}
-              </div>
-            </div>
-            <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-600">{projects.length}</span>
-          </div>
-
-          <div className="flex flex-col gap-2 sm:flex-row">
-          <label className="relative block flex-1">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-            <input
-              value={buscaNaBiblioteca}
-              onChange={(event) => setBuscaNaBiblioteca(event.target.value)}
-              placeholder="Buscar por música ou artista"
-              aria-label="Buscar na sua biblioteca"
-              className="w-full rounded-xl border border-gray-200 bg-white py-2.5 pl-9 pr-3 text-sm outline-none transition focus:border-rose-400 focus:ring-2 focus:ring-rose-100"
-            />
-          </label>
-          <select aria-label="Ordenar biblioteca" value={ordemDaBiblioteca} onChange={(event) => setOrdemDaBiblioteca(event.target.value)} className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-600">
-            <option value="recentes">Mais recentes</option><option value="titulo">Título A–Z</option>
-          </select>
-          </div>
-
-          <div className="mt-3 flex gap-2 overflow-x-auto pb-1" aria-label="Filtrar biblioteca">
-            {([
-              ["todas", `Todas (${projects.length})`],
-              ["prontas", `Prontas (${projetosProntos})`],
-              ["processando", `Processando (${projetosEmProcessamento})`],
-            ] as const).map(([filtro, texto]) => (
-              <button
-                key={filtro}
-                type="button"
-                onClick={() => setFiltroDaBiblioteca(filtro)}
-                className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold transition ${filtroDaBiblioteca === filtro ? "bg-rose-700 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
-              >
-                {texto}
-              </button>
-            ))}
-          </div>
-
-          <p className="mt-4 flex items-center gap-2 rounded-xl bg-gray-50 px-4 py-3 text-xs text-gray-500"><Headphones className="h-4 w-4 shrink-0" />Escolha uma música para abrir o player de ensaio.</p>
-
-          <div className="mt-3 space-y-3">
-            {!projects.length && <p className="w-full rounded-xl bg-gray-50 p-5 text-center text-xs text-gray-400">Nenhuma música preparada ainda.</p>}
-            {projects.length > 0 && !projetosDaBiblioteca.length && <p className="w-full rounded-xl bg-gray-50 p-5 text-center text-xs text-gray-500">Nenhuma música encontrada nesta busca.</p>}
-            {projetosDaBiblioteca.map((project) => (
-              <div
-                key={project.id}
-                className={`flex w-full flex-wrap items-center gap-3 rounded-xl border p-3 transition sm:gap-4 sm:p-4 ${selectedId === project.id ? "border-rose-200 bg-rose-50" : "border-gray-100 bg-white hover:bg-gray-50/50"}`}
-              >
-                <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-rose-50 text-rose-700 sm:h-16 sm:w-16"><AudioLines className="h-7 w-7" /></span>
-                <button
-                  type="button"
-                  onClick={() => abrirProjeto(project)}
-                  aria-label={`Abrir ensaio de ${project.titulo}`}
-                  className="min-w-0 flex-1 text-left"
-                >
-                <p className="truncate text-sm font-semibold text-gray-900">{project.titulo}</p>
-                <p className="mt-0.5 truncate text-xs text-gray-400">{project.artista || "YouTube"}</p>
-                <div className="mt-2 flex flex-wrap gap-1.5 text-[11px] text-gray-600"><span className="rounded-full bg-gray-100 px-2 py-1">Tom {project.musicas?.tom || project.tom_original || "a definir"}</span><span className="rounded-full bg-gray-100 px-2 py-1">{project.bpm ? `${Math.round(project.bpm)} BPM` : "BPM —"}</span></div>
-                {project.visibilidade === "pessoal" && (
-                  <p className="mt-1 text-[11px] font-semibold text-amber-700">Meu ensaio · expira em 7 dias</p>
-                )}
-                {cultosDoProjeto(project).length > 0 && (
-                  <p className="mt-1 truncate text-[11px] text-gray-500">
-                    Em {cultosDoProjeto(project).slice(0, 2).map((escala) => escala.culto + " · " + new Date(escala.data + "T12:00:00").toLocaleDateString("pt-BR")).join(" | ")}
-                    {cultosDoProjeto(project).length > 2 ? " +" + (cultosDoProjeto(project).length - 2) : ""}
-                  </p>
-                )}
-                {cultosDoProjeto(project).length === 0 && project.visibilidade !== "pessoal" && <p className="mt-1 text-[11px] text-gray-500">{podeGerenciar ? "Ensaio livre da equipe · sem culto vinculado" : "Ensaio da biblioteca da equipe"}</p>}
-                </button>
-                <div className="flex w-full flex-wrap items-center justify-end gap-3 sm:w-auto">
-                <span className="flex items-center gap-1.5 text-xs text-gray-500" role="status">
-                  {project.status === "concluido" ? <CheckCircle2 className="h-3.5 w-3.5 text-green-600" /> :
-                    project.status === "erro" ? <AlertCircle className="h-3.5 w-3.5 text-red-500" /> :
-                    <LoaderCircle className="h-3.5 w-3.5 animate-spin text-amber-500" />}
-                  {project.status === "separando" && project.progresso >= 90 ? "Enviando faixas" : STATUS_LABEL[project.status]}
-                </span>
-                <button type="button" onClick={() => abrirProjeto(project)} className={project.status === "concluido" ? "inline-flex items-center gap-1.5 rounded-xl bg-rose-700 px-4 py-2.5 text-xs font-semibold text-white hover:bg-rose-600" : "rounded-xl border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-50"}>
-                  {project.status === "concluido" && <Play className="h-3.5 w-3.5" />}{project.status === "concluido" ? "Ensaiar" : "Ver detalhes"}
-                </button>
-                {!['concluido', 'erro'].includes(project.status) && (
-                  <div className="h-1 w-20 overflow-hidden rounded-full bg-gray-100" aria-label={`Progresso: ${project.progresso}%`}>
-                    <div className="h-full rounded-full bg-rose-600 transition-all" style={{ width: `${project.progresso}%` }} />
-                  </div>
-                )}
-                {(podeGerenciar || project.visibilidade === "pessoal") && !["concluido", "erro"].includes(project.status) && (
-                  <button
-                    type="button"
-                    aria-label={`Cancelar processamento de ${project.titulo}`}
-                    title="Cancelar processamento"
-                    disabled={cancellingId === project.id}
-                    onClick={() => void cancelarProcessamento(project)}
-                    className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-400 transition hover:bg-red-50 hover:text-red-600 disabled:opacity-40"
-                  >
-                    {cancellingId === project.id ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <CircleStop className="h-4 w-4" />}
-                  </button>
-                )}
-                {(podeGerenciar || project.visibilidade === "pessoal") && ["concluido", "erro"].includes(project.status) && (
-                  <button
-                    type="button"
-                    aria-label={`Excluir ${project.titulo}`}
-                    title="Excluir ensaio"
-                    disabled={deletingId === project.id}
-                    onClick={() => void excluir(project)}
-                    className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-400 transition hover:bg-red-50 hover:text-red-600 disabled:opacity-40"
-                  >
-                    {deletingId === project.id ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-                  </button>
-                )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>}
-
-        <main id="studio-player" className={selected || fluxoDaEscala ? "min-w-0" : "hidden"}>
-          {selected && !fluxoDaEscala && (
+        <main id="studio-player" className="min-w-0">
+          {selected && (
             <div className="flex flex-wrap items-center gap-2 border-b border-gray-100 pb-3">
               <Disc3 className="h-4 w-4 text-rose-700" />
               <p className="text-sm font-semibold text-gray-900">Ensaio: <span className="font-medium text-gray-600">{selected.titulo}</span></p>
-              <button type="button" onClick={() => { setSelectedId(null); document.getElementById("studio-biblioteca")?.scrollIntoView({ behavior: "smooth" }); }} className="ml-auto rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-600">Voltar à biblioteca</button>
+              {(podeGerenciar || selected.visibilidade === "pessoal") && ["concluido", "erro"].includes(selected.status) && <button type="button" onClick={() => void excluir(selected)} disabled={deletingId === selected.id} aria-label={`Excluir ensaio de ${selected.titulo}`} className="ml-auto rounded-lg p-2 text-gray-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-40"><Trash2 className="h-4 w-4" /></button>}
             </div>
           )}
           {selected && selected.status !== "concluido" && (
             <div className="flex min-h-72 flex-col items-center justify-center rounded-2xl border border-gray-100 bg-white px-5 text-center">
               {selected.status === "erro" ? <AlertCircle className="mb-3 h-9 w-9 text-red-400" /> : <LoaderCircle className="mb-3 h-9 w-9 animate-spin text-rose-600" />}
               {selected.status === "erro" && <p className="font-semibold text-gray-900">{STATUS_LABEL[selected.status]}</p>}
+              {selected.status !== "erro" && <p className="mb-2 font-semibold text-gray-900">{STATUS_LABEL[selected.status]}</p>}
               {selected.status !== "erro" && <p className="max-w-md text-sm text-gray-500" role="status" aria-live="polite">{"Voc\u00ea pode sair desta tela. O processamento continuar\u00e1."}</p>}
               {selected.status === "erro" && (
               <p className="mt-1 max-w-md text-sm text-gray-500">{selected.erro || "Você pode sair desta tela. O PC local continuará o processamento enquanto estiver ligado."}</p>
@@ -891,7 +544,7 @@ export function LouvorStudioTab({
               {selected.status === "separando" && selected.progresso < 0 && (
                 <p className="mt-2 max-w-md text-xs text-gray-500">A separação analisa a música inteira e pode levar vários minutos, dependendo da duração e do computador. O progresso avança conforme os trechos ficam prontos.</p>
               )}
-              {selected.status !== "erro" && <p className="mt-3 text-xs font-medium text-rose-700" role="status" aria-live="polite">{selected.progresso}%</p>}
+              {selected.status !== "erro" && selected.progresso >= 0 && <p className="mt-3 text-xs font-medium text-rose-700" role="status" aria-live="polite">{selected.progresso}%</p>}
               {selected.status !== "erro" && (podeGerenciar || selected.visibilidade === "pessoal") && (
                 <button
                   type="button"
@@ -937,14 +590,13 @@ export function LouvorStudioTab({
                 tomBaseOverride={selected.musicas?.tom || undefined}
                 tomDaEscala={musicaNoContexto?.tom}
                 salvandoTomDaEscala={applyingId === selected.id}
-                onEscolherTomDaEscala={podeGerenciar && ((contextoEfetivo?.escalaId && contextoEfetivo.musicaId) || (selected.escalas && selected.musica_id))
+                onEscolherTomDaEscala={podeGerenciar && contextoEfetivo?.escalaId && contextoEfetivo.musicaId
                   ? (escolha) => void confirmarTomNaEscala(selected, escolha)
                   : undefined}
               />
             </>
           )}
         </main>
-      </div>
     </div>
   );
 }

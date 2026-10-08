@@ -798,6 +798,14 @@ export function EscalasTab({
   useAppRefresh(() => { void carregarDados(); }, [carregarDados], { runOnMount: false, minIntervalMs: 2000 });
 
   useEffect(() => {
+    if (!Object.values(statusStudioPorMusica).includes("preparando")) return;
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === "visible") void carregarDados();
+    }, 5000);
+    return () => window.clearInterval(timer);
+  }, [carregarDados, statusStudioPorMusica]);
+
+  useEffect(() => {
     if (isLoading || !user?.id) return;
     void carregarDados();
   }, [carregarDados, isLoading, user?.id]);
@@ -1588,10 +1596,10 @@ export function EscalasTab({
   const musicasProntasStudio = form.musicas.filter((musica) => statusDoStudio(musica) === "pronto");
 
   function textoStatusStudio(status: StatusStudioMusica): string {
-    if (status === "pronto") return "Studio pronto";
-    if (status === "preparando") return "Studio preparando";
-    if (status === "falhou") return "Studio falhou";
-    return "Studio pendente";
+    if (status === "pronto") return "Ensaio pronto";
+    if (status === "preparando") return "Preparando ensaio";
+    if (status === "falhou") return "Falha na preparação";
+    return "Ensaio pendente";
   }
 
   async function prepararSetNoStudio() {
@@ -2316,10 +2324,10 @@ export function EscalasTab({
                                     {m.musicaId && statusStudioPorMusica[`${selectedEscala.id}:${m.musicaId}`] === "pronto" && onAbrirNoStudio ? (
                                       <button type="button" onClick={() => onAbrirNoStudio({ escalaId: selectedEscala.id, escalaContexto: { culto: selectedEscala.culto, data: selectedEscala.data, horario: selectedEscala.horario, tom: m.tom, bpm: m.bpm }, ...dadosDaMusicaParaStudio(m) })} className="w-full rounded-lg bg-rose-700 px-1.5 py-1.5 text-center text-xs font-semibold text-white hover:bg-rose-600 md:w-auto md:px-2.5">Ensaiar</button>
                                     ) : m.musicaId && statusStudioPorMusica[`${selectedEscala.id}:${m.musicaId}`] === "preparando" ? (
-                                      <span className="text-xs font-medium text-amber-700">Studio preparando</span>
+                                      <span role="status" className="text-xs font-medium text-amber-700">Preparando ensaio</span>
                                     ) : m.musicaId && onAnalisarNoStudio ? (
-                                      <button type="button" onClick={() => onAnalisarNoStudio({ escalaId: selectedEscala.id, escalaContexto: { culto: selectedEscala.culto, data: selectedEscala.data, horario: selectedEscala.horario, tom: m.tom, bpm: m.bpm }, ...dadosDaMusicaParaStudio(m) })} className="w-full rounded-lg border border-rose-200 bg-rose-50 px-1.5 py-1.5 text-center text-xs font-semibold text-rose-700 md:w-auto md:px-2.5">{statusStudioPorMusica[`${selectedEscala.id}:${m.musicaId}`] === "falhou" ? "Preparar novamente" : "Preparar no Studio"}</button>
-                                    ) : <span className="text-xs text-gray-500">{statusStudioPorMusica[`${selectedEscala.id}:${m.musicaId}`] === "pronto" ? "Studio pronto" : statusStudioPorMusica[`${selectedEscala.id}:${m.musicaId}`] === "falhou" ? "Falha na preparação" : "Ensaio ainda não preparado"}</span>}
+                                      <button type="button" onClick={() => onAnalisarNoStudio({ escalaId: selectedEscala.id, escalaContexto: { culto: selectedEscala.culto, data: selectedEscala.data, horario: selectedEscala.horario, tom: m.tom, bpm: m.bpm }, ...dadosDaMusicaParaStudio(m) })} className="w-full rounded-lg border border-rose-200 bg-rose-50 px-1.5 py-1.5 text-center text-xs font-semibold text-rose-700 md:w-auto md:px-2.5">{statusStudioPorMusica[`${selectedEscala.id}:${m.musicaId}`] === "falhou" ? "Tentar novamente" : "Preparar ensaio"}</button>
+                                    ) : <span className="text-xs text-gray-500">{statusStudioPorMusica[`${selectedEscala.id}:${m.musicaId}`] === "pronto" ? "Ensaio pronto" : statusStudioPorMusica[`${selectedEscala.id}:${m.musicaId}`] === "falhou" ? "Falha na preparação" : "Ensaio ainda não preparado"}</span>}
                                   </div>}
                                 </td>
                               </tr>
@@ -2942,7 +2950,7 @@ export function EscalasTab({
               <div>
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest">Set deste culto</p>
                 <p className="mt-1 text-xs text-gray-400">
-                  Studio: {musicasProntasStudio.length} prontas
+                  Ensaios: {musicasProntasStudio.length} prontos
                   {musicasPreparandoStudio.length ? ` · ${musicasPreparandoStudio.length} preparando` : ""}
                   {musicasParaPrepararStudio.length ? ` · ${musicasParaPrepararStudio.length} pendentes` : ""}.
                 </p>
@@ -3147,8 +3155,8 @@ export function EscalasTab({
               : musicasParaPrepararStudio.length
                 ? `Preparar ${musicasParaPrepararStudio.length} ${musicasParaPrepararStudio.length === 1 ? "música" : "músicas"} no Studio`
                 : musicasPreparandoStudio.length
-                  ? "Studio preparando"
-                  : "Studio pronto"}
+                  ? "Preparando ensaios"
+                  : "Ensaios prontos"}
           </button>
         )}
         <button
