@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertCircle, CheckCircle2, CircleStop, Disc3, Download, LibraryBig, LoaderCircle, Music2, Search, Sparkles, Trash2 } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { AlertCircle, AudioLines, CheckCircle2, CircleStop, Disc3, Download, Headphones, LibraryBig, LoaderCircle, Music2, Play, Search, Sparkles, Trash2 } from "lucide-react";
 import { LouvorStudioPlayer } from "./LouvorStudioPlayer";
 import { supabase } from "@/lib/supabase";
 import { withDeadline } from "@/lib/withDeadline";
@@ -102,14 +102,14 @@ export function LouvorStudioTab({
   podePrepararEnsaio,
   workerConfigurado,
   analiseInicial,
-  onPrepararDaEscala,
+  projetoInicialId,
   onVoltarParaEscalas,
 }: {
   podeGerenciar: boolean;
   podePrepararEnsaio: boolean;
   workerConfigurado: boolean;
   analiseInicial?: AnaliseStudioInicial | null;
-  onPrepararDaEscala?: (pedido: Omit<AnaliseStudioInicial, "id">) => void;
+  projetoInicialId?: string | null;
   onVoltarParaEscalas?: (escalaId: string) => void;
 }) {
   const [query, setQuery] = useState("");
@@ -117,17 +117,18 @@ export function LouvorStudioTab({
   const [results, setResults] = useState<SearchResult[]>([]);
   const [projects, setProjects] = useState<Projeto[]>([]);
   const [escalas, setEscalas] = useState<EscalaOption[]>([]);
-  const [mostrarTodosCultos, setMostrarTodosCultos] = useState(false);
   const [escalaId, setEscalaId] = useState("");
   const [musicaId, setMusicaId] = useState("");
   const [contextoPlayer, setContextoPlayer] = useState<{ escalaId: string; musicaId: string } | null>(null);
   const [vincularCulto, setVincularCulto] = useState(false);
   const [videoConfirmado, setVideoConfirmado] = useState<SearchResult | null>(null);
   const [buscandoOutraVersao, setBuscandoOutraVersao] = useState(false);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(projetoInicialId ?? null);
+  const projetoInicialAberto = useRef(false);
   const [mostrarPreparacao, setMostrarPreparacao] = useState(false);
   const [buscaNaBiblioteca, setBuscaNaBiblioteca] = useState("");
   const [filtroDaBiblioteca, setFiltroDaBiblioteca] = useState<"todas" | "prontas" | "processando">("todas");
+  const [ordemDaBiblioteca, setOrdemDaBiblioteca] = useState("recentes");
   const [message, setMessage] = useState<string | null>(null);
   const [preparando, setPreparando] = useState(false);
   const [retryingId, setRetryingId] = useState<string | null>(null);
@@ -207,6 +208,15 @@ export function LouvorStudioTab({
   useAppRefresh(() => { void loadProjects(); }, [loadProjects], { minIntervalMs: 2500 });
 
   const pending = projects.some((project) => !["concluido", "erro"].includes(project.status));
+  useEffect(() => {
+    if (!projetoInicialAberto.current && projetoInicialId && selectedId === projetoInicialId && projects.some((project) => project.id === projetoInicialId)) {
+      projetoInicialAberto.current = true;
+      document.getElementById("studio-player")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      if (projects.find((project) => project.id === projetoInicialId)?.status === "concluido") {
+        void studioFetch(`/api/louvor-studio/projects/${projetoInicialId}`, { method: "PATCH", body: JSON.stringify({ action: "usar" }) });
+      }
+    }
+  }, [projetoInicialId, selectedId, projects]);
   useEffect(() => {
     if (!pending) return;
     const timer = window.setInterval(() => void loadProjects(), 5000);
@@ -431,8 +441,9 @@ export function LouvorStudioTab({
         .replace(/[\u0300-\u036f]/g, "")
         .toLocaleLowerCase("pt-BR");
       return correspondeAoFiltro && (!termo || texto.includes(termo));
-    });
-  }, [buscaNaBiblioteca, filtroDaBiblioteca, projects]);
+    }).sort((a, b) => ordemDaBiblioteca === "titulo"
+      ? a.titulo.localeCompare(b.titulo, "pt-BR") : b.criado_em.localeCompare(a.criado_em));
+  }, [buscaNaBiblioteca, filtroDaBiblioteca, ordemDaBiblioteca, projects]);
 
   const selecionarVideo = (result: SearchResult) => {
     setVideoConfirmado(result);
@@ -451,7 +462,7 @@ export function LouvorStudioTab({
           </div>
           <p className="mt-1 max-w-2xl text-sm text-gray-500">
             {podeGerenciar
-              ? "Prepare músicas quando precisar e use a biblioteca para abrir os ensaios da equipe."
+              ? "Prepare os áudios e ensaie as músicas da equipe."
               : "Abra as músicas da equipe para ouvir e estudar as faixas separadas."}
           </p>
         </div>
@@ -699,7 +710,7 @@ export function LouvorStudioTab({
           </div>}
         </form> : null) : (
           <p className="mt-4 rounded-xl bg-white p-3 text-sm text-gray-600 ring-1 ring-gray-100">
-            Comece pelos próximos cultos abaixo ou consulte os ensaios da biblioteca.
+            Escolha um ensaio na biblioteca. Os cultos e seus repertórios estão na aba Escalas.
           </p>
         )}
       </div>
@@ -740,66 +751,20 @@ export function LouvorStudioTab({
       )}
 
       <div className={fluxoDaEscala ? "" : "space-y-5"}>
-        {!fluxoDaEscala && <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm md:p-5">
-          <div className="mb-4">
-            <h3 className="text-sm font-semibold text-gray-900">{podeGerenciar ? "Próximos cultos" : "Meus próximos cultos"}</h3>
-            <p className="mt-1 text-xs text-gray-500">As músicas do set e o ensaio correspondente ficam juntos aqui.</p>
-          </div>
-          {escalas.length === 0 ? <p className="rounded-xl bg-gray-50 p-4 text-xs text-gray-500">{podeGerenciar ? "Nenhum culto próximo cadastrado." : "Você não está escalado em um culto próximo."}</p> : (
-            <div className="space-y-3">
-              {(mostrarTodosCultos ? escalas : escalas.slice(0, 3)).map((escala) => <article key={escala.id} className="overflow-hidden rounded-xl border border-gray-100">
-                <div className="flex flex-wrap items-center justify-between gap-2 bg-gray-50 px-4 py-3">
-                  <div>
-                    <p className="text-sm font-semibold text-gray-900">{escala.culto}</p>
-                    <p className="text-xs text-gray-500">{new Date(escala.data + "T12:00:00").toLocaleDateString("pt-BR")} · {escala.horario.slice(0, 5)}</p>
-                  </div>
-                  {onVoltarParaEscalas && <button type="button" onClick={() => onVoltarParaEscalas(escala.id)} className="text-xs font-semibold text-rose-700 hover:underline">Ver escala</button>}
-                </div>
-                {escala.escala_musicas.length ? <div className="divide-y divide-gray-100">
-                  {escala.escala_musicas.map((musica, index) => {
-                    const projeto = projects.find((item) => item.id === musica.studio_projeto_id)
-                      ?? projects.find((item) => item.musica_id === musica.musica_id && item.escala_usos?.some((uso) => uso.escala_id === escala.id && uso.musica_id === musica.musica_id));
-                    return <div key={musica.musica_id ?? index} className="flex flex-wrap items-center gap-3 px-4 py-3">
-                      <span className="w-5 text-xs font-semibold text-gray-400">{index + 1}</span>
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-semibold text-gray-900">{musica.titulo}</p>
-                        <p className="text-xs text-gray-500">{musica.artista} · Tom {musica.tom || "a definir"} · BPM {musica.bpm || "—"}</p>
-                      </div>
-                      {projeto?.status === "concluido" ? (
-                        <button type="button" onClick={() => abrirProjeto(projeto, { escalaId: escala.id, musicaId: musica.musica_id ?? "" })} className="rounded-lg bg-rose-700 px-3 py-2 text-xs font-semibold text-white hover:bg-rose-600">Ensaiar no Studio</button>
-                      ) : projeto && projeto.status !== "erro" ? (
-                        <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-xs font-medium text-amber-700">{STATUS_LABEL[projeto.status]} · {projeto.progresso}%</span>
-                        {(podeGerenciar || projeto.visibilidade === "pessoal") && <button type="button" disabled={cancellingId === projeto.id} onClick={() => void cancelarProcessamento(projeto)} className="rounded-lg border border-red-200 px-2.5 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:opacity-40">
-                          {cancellingId === projeto.id ? "Cancelando..." : "Cancelar"}
-                        </button>}
-                        </div>
-                      ) : podeGerenciar && musica.musica_id && onPrepararDaEscala ? (
-
-                        <button type="button" onClick={() => onPrepararDaEscala({ escalaId: escala.id, musicaId: musica.musica_id!, titulo: musica.titulo, artista: musica.artista })} className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700">{projeto?.status === "erro" ? "Preparar novamente" : "Preparar no Studio"}</button>
-                      ) : <span className="text-xs text-gray-500">{projeto?.status === "erro" ? "Falha na preparação" : "Ensaio ainda não preparado"}</span>}
-                    </div>;
-                  })}
-                </div> : <p className="px-4 py-3 text-xs text-gray-500">O set deste culto ainda não tem músicas.</p>}
-              </article>)}
-              {escalas.length > 3 && <button type="button" onClick={() => setMostrarTodosCultos((mostrar) => !mostrar)} className="text-xs font-semibold text-rose-700 hover:underline">{mostrarTodosCultos ? "Mostrar menos cultos" : `Ver todos os ${escalas.length} cultos`}</button>}
-            </div>
-          )}
-        </section>}
-        {!fluxoDaEscala && <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm md:p-5">
+        {!fluxoDaEscala && <section id="studio-biblioteca" className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm md:p-5">
           <div className="mb-4 flex items-start justify-between gap-3">
             <div className="flex min-w-0 items-center gap-3">
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-rose-50 text-rose-700"><LibraryBig className="h-5 w-5" /></span>
               <div>
                 <h3 className="text-sm font-semibold text-gray-900">Biblioteca de ensaios</h3>
-                <p className="mt-0.5 text-xs text-gray-500">Escolha uma música para abrir o ensaio</p>
                 {!podeGerenciar && ensaiosPessoais.length > 0 && <p className="mt-1 text-[11px] text-gray-500">Meus ensaios anteriores: {ensaiosPessoais.length} · expiram em até 7 dias</p>}
               </div>
             </div>
             <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-600">{projects.length}</span>
           </div>
 
-          <label className="relative block">
+          <div className="flex flex-col gap-2 sm:flex-row">
+          <label className="relative block flex-1">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
             <input
               value={buscaNaBiblioteca}
@@ -809,6 +774,10 @@ export function LouvorStudioTab({
               className="w-full rounded-xl border border-gray-200 bg-white py-2.5 pl-9 pr-3 text-sm outline-none transition focus:border-rose-400 focus:ring-2 focus:ring-rose-100"
             />
           </label>
+          <select aria-label="Ordenar biblioteca" value={ordemDaBiblioteca} onChange={(event) => setOrdemDaBiblioteca(event.target.value)} className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-600">
+            <option value="recentes">Mais recentes</option><option value="titulo">Título A–Z</option>
+          </select>
+          </div>
 
           <div className="mt-3 flex gap-2 overflow-x-auto pb-1" aria-label="Filtrar biblioteca">
             {([
@@ -827,21 +796,26 @@ export function LouvorStudioTab({
             ))}
           </div>
 
-          <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+          <p className="mt-4 flex items-center gap-2 rounded-xl bg-gray-50 px-4 py-3 text-xs text-gray-500"><Headphones className="h-4 w-4 shrink-0" />Escolha uma música para abrir o player de ensaio.</p>
+
+          <div className="mt-3 space-y-3">
             {!projects.length && <p className="w-full rounded-xl bg-gray-50 p-5 text-center text-xs text-gray-400">Nenhuma música preparada ainda.</p>}
             {projects.length > 0 && !projetosDaBiblioteca.length && <p className="w-full rounded-xl bg-gray-50 p-5 text-center text-xs text-gray-500">Nenhuma música encontrada nesta busca.</p>}
             {projetosDaBiblioteca.map((project) => (
               <div
                 key={project.id}
-                className={`relative w-full rounded-xl border transition ${selectedId === project.id ? "border-rose-200 bg-rose-50" : "border-gray-100 bg-white hover:bg-gray-50"}`}
+                className={`flex w-full flex-wrap items-center gap-3 rounded-xl border p-3 transition sm:gap-4 sm:p-4 ${selectedId === project.id ? "border-rose-200 bg-rose-50" : "border-gray-100 bg-white hover:bg-gray-50/50"}`}
               >
+                <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-rose-50 text-rose-700 sm:h-16 sm:w-16"><AudioLines className="h-7 w-7" /></span>
                 <button
                   type="button"
                   onClick={() => abrirProjeto(project)}
-                  className="w-full p-2.5 pr-10 text-left"
+                  aria-label={`Abrir ensaio de ${project.titulo}`}
+                  className="min-w-0 flex-1 text-left"
                 >
                 <p className="truncate text-sm font-semibold text-gray-900">{project.titulo}</p>
                 <p className="mt-0.5 truncate text-xs text-gray-400">{project.artista || "YouTube"}</p>
+                <div className="mt-2 flex flex-wrap gap-1.5 text-[11px] text-gray-600"><span className="rounded-full bg-gray-100 px-2 py-1">Tom {project.musicas?.tom || project.tom_original || "a definir"}</span><span className="rounded-full bg-gray-100 px-2 py-1">{project.bpm ? `${Math.round(project.bpm)} BPM` : "BPM —"}</span></div>
                 {project.visibilidade === "pessoal" && (
                   <p className="mt-1 text-[11px] font-semibold text-amber-700">Meu ensaio · expira em 7 dias</p>
                 )}
@@ -852,18 +826,22 @@ export function LouvorStudioTab({
                   </p>
                 )}
                 {cultosDoProjeto(project).length === 0 && project.visibilidade !== "pessoal" && <p className="mt-1 text-[11px] text-gray-500">{podeGerenciar ? "Ensaio livre da equipe · sem culto vinculado" : "Ensaio da biblioteca da equipe"}</p>}
-                <div className="mt-2 flex items-center gap-1.5 text-[11px] text-gray-500">
+                </button>
+                <div className="flex w-full flex-wrap items-center justify-end gap-3 sm:w-auto">
+                <span className="flex items-center gap-1.5 text-xs text-gray-500" role="status">
                   {project.status === "concluido" ? <CheckCircle2 className="h-3.5 w-3.5 text-green-600" /> :
                     project.status === "erro" ? <AlertCircle className="h-3.5 w-3.5 text-red-500" /> :
                     <LoaderCircle className="h-3.5 w-3.5 animate-spin text-amber-500" />}
                   {project.status === "separando" && project.progresso >= 90 ? "Enviando faixas" : STATUS_LABEL[project.status]}
-                </div>
+                </span>
+                <button type="button" onClick={() => abrirProjeto(project)} className={project.status === "concluido" ? "inline-flex items-center gap-1.5 rounded-xl bg-rose-700 px-4 py-2.5 text-xs font-semibold text-white hover:bg-rose-600" : "rounded-xl border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-50"}>
+                  {project.status === "concluido" && <Play className="h-3.5 w-3.5" />}{project.status === "concluido" ? "Ensaiar" : "Ver detalhes"}
+                </button>
                 {!['concluido', 'erro'].includes(project.status) && (
-                  <div className="mt-2 h-1 overflow-hidden rounded-full bg-gray-100">
+                  <div className="h-1 w-20 overflow-hidden rounded-full bg-gray-100" aria-label={`Progresso: ${project.progresso}%`}>
                     <div className="h-full rounded-full bg-rose-600 transition-all" style={{ width: `${project.progresso}%` }} />
                   </div>
                 )}
-                </button>
                 {(podeGerenciar || project.visibilidade === "pessoal") && !["concluido", "erro"].includes(project.status) && (
                   <button
                     type="button"
@@ -871,7 +849,7 @@ export function LouvorStudioTab({
                     title="Cancelar processamento"
                     disabled={cancellingId === project.id}
                     onClick={() => void cancelarProcessamento(project)}
-                    className="absolute right-1.5 top-1.5 flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition hover:bg-red-50 hover:text-red-600 disabled:opacity-40"
+                    className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-400 transition hover:bg-red-50 hover:text-red-600 disabled:opacity-40"
                   >
                     {cancellingId === project.id ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <CircleStop className="h-4 w-4" />}
                   </button>
@@ -880,13 +858,15 @@ export function LouvorStudioTab({
                   <button
                     type="button"
                     aria-label={`Excluir ${project.titulo}`}
+                    title="Excluir ensaio"
                     disabled={deletingId === project.id}
                     onClick={() => void excluir(project)}
-                    className="absolute right-1.5 top-1.5 flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition hover:bg-red-50 hover:text-red-600 disabled:opacity-40"
+                    className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-400 transition hover:bg-red-50 hover:text-red-600 disabled:opacity-40"
                   >
                     {deletingId === project.id ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
                   </button>
                 )}
+                </div>
               </div>
             ))}
           </div>
@@ -894,9 +874,10 @@ export function LouvorStudioTab({
 
         <main id="studio-player" className={selected || fluxoDaEscala ? "min-w-0" : "hidden"}>
           {selected && !fluxoDaEscala && (
-            <div className="flex items-center gap-2 border-b border-gray-100 pb-3">
+            <div className="flex flex-wrap items-center gap-2 border-b border-gray-100 pb-3">
               <Disc3 className="h-4 w-4 text-rose-700" />
               <p className="text-sm font-semibold text-gray-900">Ensaio: <span className="font-medium text-gray-600">{selected.titulo}</span></p>
+              <button type="button" onClick={() => { setSelectedId(null); document.getElementById("studio-biblioteca")?.scrollIntoView({ behavior: "smooth" }); }} className="ml-auto rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-600">Voltar à biblioteca</button>
             </div>
           )}
           {selected && selected.status !== "concluido" && (

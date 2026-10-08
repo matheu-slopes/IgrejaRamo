@@ -5,7 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import {
   Plus, Trash2, Pencil, X, Save, Music2, Users, Eye, EyeOff, UserCheck,
   ChevronUp as ArrowUp, ChevronDown as ArrowDown, Star, Filter, Search, Youtube, ClipboardCopy, Check, ChevronLeft,
-  CheckCircle2, XCircle, Clock3, LoaderCircle, RotateCcw,
+  CheckCircle2, XCircle, Clock3, LoaderCircle, RotateCcw, ChevronRight, CalendarDays,
 } from "lucide-react";
 import clsx from "clsx";
 import {
@@ -18,6 +18,8 @@ import BuscarCifraModal from "@/components/dashboard/BuscarCifraModal";
 import { notificarEscala } from "@/lib/notificarEscala";
 import { analisarAlteracoesEscala, prepararConfirmacoes } from "@/lib/escalaChanges";
 import { fetchWithTimeout } from "@/lib/network";
+import { LouvorCultosList } from "./LouvorCultosList";
+import { hojeEmSaoPaulo, moverPeriodoDeCultos, periodoDeCultos } from "@/lib/louvorSchedule";
 
 // --- Constantes ---------------------------------------------------------------
 
@@ -864,6 +866,8 @@ export function EscalasTab({
   const [busca, setBusca] = useState("");
   const conflitosConfirmadosRef = useRef<Set<string>>(new Set());
   const [selectedId, setSelectedId] = useState<string | null>(escalaInicialId ?? null);
+  const [periodoLouvor, setPeriodoLouvor] = useState<"semana" | "mes">("mes");
+  const [dataLouvor, setDataLouvor] = useState(hojeEmSaoPaulo);
   const [editandoDadosMusica, setEditandoDadosMusica] = useState<number | null>(null);
 
   useEffect(() => {
@@ -1829,13 +1833,15 @@ export function EscalasTab({
 
   // -- LISTA --------------------------------------------------------------------
   if (modo === "lista") {
-    const hojeStr = new Date().toISOString().split("T")[0];
+    const hojeStr = hojeEmSaoPaulo();
+    const intervaloLouvor = periodoDeCultos(dataLouvor, periodoLouvor);
 
     const escalasMinhas = escalas.filter((e) =>
       e.itens.some((it) => it.voluntarioId === user?.id)
     );
     const base = viewMode === "minhas" ? escalasMinhas : escalas;
     const escalasVisiveis = base
+      .filter((e) => ministerio !== "Louvor" || e.data >= intervaloLouvor.inicio && e.data <= intervaloLouvor.fim)
       .filter((e) => {
         if (!busca) return true;
         const q = busca.toLowerCase();
@@ -1971,44 +1977,51 @@ export function EscalasTab({
 
     return (
       <div className="flex flex-col w-full gap-4">
+        {ministerio === "Louvor" && <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm"><h2 className="flex items-center gap-2 text-lg font-semibold text-gray-900"><CalendarDays className="h-5 w-5 text-rose-700" />Escalas do Louvor</h2><p className="mt-1 text-sm text-gray-500">Equipe, repertório e ensaio de cada culto.</p></div>}
         {/* Header: tabs + botão */}
         <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex min-w-0 gap-1 bg-gray-100 p-1 rounded-xl sm:w-auto shrink-0">
             <button
-              onClick={() => setViewMode("minhas")}
+              onClick={() => { setViewMode("minhas"); if (ministerio === "Louvor") setSelectedId(null); }}
               className={clsx(
                 "flex flex-1 items-center justify-center gap-1.5 px-2 sm:px-3 py-1.5 text-xs sm:text-sm font-semibold rounded-lg transition",
                 viewMode === "minhas" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
               )}
             >
-              <Star className="w-3.5 h-3.5" /> Minhas Escalas
+              <Star className="w-3.5 h-3.5" /> Minhas escalas
             </button>
             <button
-              onClick={() => setViewMode("culto")}
+              onClick={() => { setViewMode("culto"); if (ministerio === "Louvor") setSelectedId(null); }}
               className={clsx(
                 "flex flex-1 items-center justify-center gap-1.5 px-2 sm:px-3 py-1.5 text-xs sm:text-sm font-semibold rounded-lg transition",
                 viewMode === "culto" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
               )}
             >
-              <Filter className="w-3.5 h-3.5" /> Escala do Culto
+              <Filter className="w-3.5 h-3.5" /> Escalas do culto
             </button>
           </div>
           {isLider && viewMode === "culto" && (
             <button
               onClick={abrirNova}
-              className="flex items-center justify-center gap-1.5 bg-black text-white text-sm font-semibold px-4 py-2 rounded-xl hover:bg-gray-900 transition shrink-0 sm:self-auto"
+              className={clsx("flex items-center justify-center gap-1.5 text-white text-sm font-semibold px-4 py-2 rounded-xl transition shrink-0 sm:self-auto", ministerio === "Louvor" ? "bg-rose-700 hover:bg-rose-600" : "bg-black hover:bg-gray-900")}
             >
               <Plus className="w-4 h-4" /> Nova escala
             </button>
           )}
         </div>
 
+        {ministerio === "Louvor" && <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-100 bg-white px-3 py-2.5">
+          <div className="flex gap-1 rounded-lg bg-gray-100 p-1">{([ ["semana", "Semana"], ["mes", "Mês"] ] as const).map(([valor, label]) => <button key={valor} type="button" aria-pressed={periodoLouvor === valor} onClick={() => { setPeriodoLouvor(valor); setSelectedId(null); }} className={clsx("rounded-md px-3 py-1.5 text-xs font-semibold", periodoLouvor === valor ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-800")}>{label}</button>)}</div>
+          <div className="flex items-center gap-2"><button type="button" aria-label="Período anterior" onClick={() => { setDataLouvor((data) => moverPeriodoDeCultos(data, periodoLouvor, -1)); setSelectedId(null); }} className="rounded-lg p-2 text-gray-500 hover:bg-gray-100"><ChevronLeft className="h-4 w-4" /></button><span className="text-center text-sm font-semibold capitalize text-gray-800">{intervaloLouvor.titulo}</span><button type="button" aria-label="Próximo período" onClick={() => { setDataLouvor((data) => moverPeriodoDeCultos(data, periodoLouvor, 1)); setSelectedId(null); }} className="rounded-lg p-2 text-gray-500 hover:bg-gray-100"><ChevronRight className="h-4 w-4" /></button></div>
+          <button type="button" onClick={() => { setDataLouvor(hojeEmSaoPaulo()); setSelectedId(null); }} className="rounded-lg px-3 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-50">Hoje</button>
+        </div>}
+
         {/* Search */}
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
           <input
             value={busca}
-            onChange={(e) => setBusca(e.target.value)}
+            onChange={(e) => { setBusca(e.target.value); if (ministerio === "Louvor") setSelectedId(null); }}
             placeholder="Buscar por culto ou membro..."
             className="w-full border border-gray-200 rounded-xl pl-9 pr-4 py-2.5 text-sm outline-none focus:border-gray-400 bg-white"
           />
@@ -2018,7 +2031,7 @@ export function EscalasTab({
         <div className="flex gap-4 items-start">
 
           {/* Lista */}
-          <div className={clsx("flex flex-col gap-3 min-w-0", selectedEscala ? "hidden lg:flex lg:w-72 shrink-0" : "w-full")}>
+          <div className={clsx("flex flex-col gap-3 min-w-0", selectedEscala ? ministerio === "Louvor" ? "hidden" : "hidden lg:flex lg:w-72 shrink-0" : "w-full")}>
             {isLoading || (!dadosCarregados && !erroCarregamento) ? (
               <div className="flex flex-col items-center justify-center py-16 gap-3 bg-gray-50 rounded-2xl border border-dashed border-gray-200 text-center">
                 <LoaderCircle className="w-6 h-6 animate-spin text-gray-400" />
@@ -2036,7 +2049,7 @@ export function EscalasTab({
               <div className="flex flex-col items-center justify-center py-16 gap-2 bg-gray-50 rounded-2xl border border-dashed border-gray-200 text-center">
                 <Users className="w-7 h-7 text-gray-300" />
                 <p className="text-sm text-gray-400">
-                  {viewMode === "minhas" ? "Você não está escalado em nenhum culto." : "Nenhuma escala criada."}
+                  {ministerio === "Louvor" ? viewMode === "minhas" ? "Você não está escalado neste período." : "Nenhum culto neste período." : viewMode === "minhas" ? "Você não está escalado em nenhum culto." : "Nenhuma escala criada."}
                 </p>
                 {isLider && viewMode === "culto" && (
                   <button onClick={abrirNova} className="text-sm text-gray-900 font-semibold hover:underline">
@@ -2044,6 +2057,15 @@ export function EscalasTab({
                   </button>
                 )}
               </div>
+            ) : ministerio === "Louvor" ? (
+              <><p className="px-1 text-xs font-semibold text-gray-500">Cultos do período · {escalasVisiveis.length}</p><LouvorCultosList
+                key={`${viewMode}:${periodoLouvor}:${dataLouvor}:${busca}`}
+                escalas={escalasVisiveis} hoje={hojeStr} usuarioId={user?.id}
+                podeVerConfirmacoes={isLider} statusStudio={statusStudioPorMusica}
+                onDetalhes={(escala) => setSelectedId(escala.id)}
+                onEnsaiar={onAbrirNoStudio ? (escala, musica) => onAbrirNoStudio({ escalaId: escala.id, escalaContexto: { culto: escala.culto, data: escala.data, horario: escala.horario, tom: musica.tom, bpm: musica.bpm }, ...dadosDaMusicaParaStudio(musica) }) : undefined}
+                onPreparar={onAnalisarNoStudio ? (escala, musica) => onAnalisarNoStudio({ escalaId: escala.id, escalaContexto: { culto: escala.culto, data: escala.data, horario: escala.horario, tom: musica.tom, bpm: musica.bpm }, ...dadosDaMusicaParaStudio(musica) }) : undefined}
+              /></>
             ) : (
               <>
                 {proximas.length > 0 && (
@@ -2068,7 +2090,7 @@ export function EscalasTab({
 
           {/* Painel de detalhe */}
           {selectedEscala && (
-            <div className="flex flex-col flex-1 min-w-0 bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm lg:sticky lg:top-4">
+            <div className={clsx("flex flex-col flex-1 min-w-0 bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm", ministerio !== "Louvor" && "lg:sticky lg:top-4")}>
               {/* Header do painel */}
               <div className={clsx(
                 "px-5 py-4 border-b border-gray-100",
@@ -2114,10 +2136,11 @@ export function EscalasTab({
                   <div className="flex items-center gap-0.5 shrink-0">
                     <button
                       onClick={() => setSelectedId(null)}
-                      className="lg:hidden p-2 text-gray-500 hover:text-gray-800 rounded-xl transition mr-1"
+                      className={clsx("inline-flex items-center gap-1 p-2 text-gray-500 hover:text-gray-800 rounded-xl transition mr-1", ministerio !== "Louvor" && "lg:hidden")}
                       title="Voltar"
                     >
                       <ChevronLeft className="w-5 h-5" />
+                      {ministerio === "Louvor" && <span className="hidden text-xs font-semibold sm:inline">Voltar aos cultos</span>}
                     </button>
                     {isLider && (
                       <>
@@ -2288,7 +2311,7 @@ export function EscalasTab({
                                       {videoStudioPorMusica[`${selectedEscala.id}:${m.musicaId}`] || m.linkYoutube || musicas.some((item) => item.id === m.musicaId && item.linkYoutube) ? "Vídeo de referência" : "Buscar gravação"}
                                     </a>
                                     {m.musicaId && statusStudioPorMusica[`${selectedEscala.id}:${m.musicaId}`] === "pronto" && onAbrirNoStudio ? (
-                                      <button type="button" onClick={() => onAbrirNoStudio({ escalaId: selectedEscala.id, escalaContexto: { culto: selectedEscala.culto, data: selectedEscala.data, horario: selectedEscala.horario, tom: m.tom, bpm: m.bpm }, ...dadosDaMusicaParaStudio(m) })} className="w-full rounded-lg bg-rose-700 px-1.5 py-1.5 text-center text-xs font-semibold text-white hover:bg-rose-600 md:w-auto md:px-2.5">Ensaiar no Studio</button>
+                                      <button type="button" onClick={() => onAbrirNoStudio({ escalaId: selectedEscala.id, escalaContexto: { culto: selectedEscala.culto, data: selectedEscala.data, horario: selectedEscala.horario, tom: m.tom, bpm: m.bpm }, ...dadosDaMusicaParaStudio(m) })} className="w-full rounded-lg bg-rose-700 px-1.5 py-1.5 text-center text-xs font-semibold text-white hover:bg-rose-600 md:w-auto md:px-2.5">Ensaiar</button>
                                     ) : m.musicaId && statusStudioPorMusica[`${selectedEscala.id}:${m.musicaId}`] === "preparando" ? (
                                       <span className="text-xs font-medium text-amber-700">Studio preparando</span>
                                     ) : m.musicaId && onAnalisarNoStudio ? (

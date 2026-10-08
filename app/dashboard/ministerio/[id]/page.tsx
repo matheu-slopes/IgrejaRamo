@@ -57,8 +57,10 @@ export default function CanalMinisterioPage() {
   });
   const [analiseStudioInicial, setAnaliseStudioInicial] = useState<(PedidoAnaliseStudio & { id: string }) | null>(null);
   const [escalaParaAbrir, setEscalaParaAbrir] = useState<string | null>(null);
+  const [projetoStudioInicial, setProjetoStudioInicial] = useState<string | null>(null);
 
   function abrirAnaliseNoStudio(pedido: PedidoAnaliseStudio) {
+    setProjetoStudioInicial(null);
     setAnaliseStudioInicial({ id: crypto.randomUUID(), ...pedido });
     setTab("studio");
   }
@@ -209,7 +211,7 @@ export default function CanalMinisterioPage() {
             ] as { id: Tab; label: string; icon: React.ElementType }[]).map(({ id, label, icon: Icon }) => (
               <button
                 key={id}
-                onClick={() => { if (id === "studio") setAnaliseStudioInicial(null); setTab(id); }}
+                onClick={() => { if (id === "studio") { setAnaliseStudioInicial(null); setProjetoStudioInicial(null); } if (id === "escalas") setEscalaParaAbrir(null); setTab(id); }}
                 className={clsx(
                   "flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-medium transition shrink-0",
                   tab === id
@@ -231,16 +233,16 @@ export default function CanalMinisterioPage() {
       {tab === "eventos" && <EventosTab ministerio={slug} isLider={podeCriarEvento} podeEditar={podeEditarEvento} />}
       {temEscalas && tab === "escalas" && <EscalasTab ministerio={slug} isLider={isAdmin || temPermissaoNoMinisterio("criar_escala", slug)} podeGerenciarRepertorio={slug === "Louvor" && podeGerenciarRepertorio} escalaInicialId={escalaParaAbrir} onAbrirNoStudio={slug === "Louvor" && studioAccess.autorizado ? abrirAnaliseNoStudio : undefined} onAnalisarNoStudio={slug === "Louvor" && studioAccess.podeGerenciar ? abrirAnaliseNoStudio : undefined} />}
       {tab === "studio" && studioAccess.autorizado && (
-        <LouvorStudioTab key={analiseStudioInicial?.id ?? "biblioteca"}
+        <LouvorStudioTab key={analiseStudioInicial?.id ?? projetoStudioInicial ?? "biblioteca"}
           podeGerenciar={studioAccess.podeGerenciar}
           podePrepararEnsaio={studioAccess.podePrepararEnsaio}
           workerConfigurado={studioAccess.workerConfigurado}
           analiseInicial={analiseStudioInicial}
-          onPrepararDaEscala={studioAccess.podeGerenciar ? abrirAnaliseNoStudio : undefined}
+          projetoInicialId={projetoStudioInicial}
           onVoltarParaEscalas={(escalaId) => { setEscalaParaAbrir(escalaId); setAnaliseStudioInicial(null); setTab("escalas"); }}
         />
       )}
-      {tab === "repertorio" && studioAccess.autorizado && <RepertorioTab podeGerenciar={podeGerenciarRepertorio} />}
+      {tab === "repertorio" && studioAccess.autorizado && <RepertorioTab podeGerenciar={podeGerenciarRepertorio} onAbrirStudio={(projetoId) => { setAnaliseStudioInicial(null); setProjetoStudioInicial(projetoId ?? null); setTab("studio"); }} />}
     </div>
   );
 }

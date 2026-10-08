@@ -67,7 +67,7 @@ export async function GET(req: NextRequest) {
     }));
   const projetos = resumo
     ? (data ?? []).map((p) => ({
-      id: p.id, status: p.status, youtube_url: p.youtube_url,
+      id: p.id, status: p.status, youtube_url: p.youtube_url, bpm: p.bpm,
       escala_id: p.escala_id, musica_id: p.musica_id,
       escala_usos: usosPorProjeto.get(p.id) ?? [],
     }))
