@@ -866,7 +866,7 @@ export function EscalasTab({
   const [busca, setBusca] = useState("");
   const conflitosConfirmadosRef = useRef<Set<string>>(new Set());
   const [selectedId, setSelectedId] = useState<string | null>(escalaInicialId ?? null);
-  const [periodoLouvor, setPeriodoLouvor] = useState<"semana" | "mes">("mes");
+  const [periodoLouvor, setPeriodoLouvor] = useState<"semana" | "mes">("semana");
   const [dataLouvor, setDataLouvor] = useState(hojeEmSaoPaulo);
   const [editandoDadosMusica, setEditandoDadosMusica] = useState<number | null>(null);
 
@@ -1982,15 +1982,6 @@ export function EscalasTab({
         <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex min-w-0 gap-1 bg-gray-100 p-1 rounded-xl sm:w-auto shrink-0">
             <button
-              onClick={() => { setViewMode("minhas"); if (ministerio === "Louvor") setSelectedId(null); }}
-              className={clsx(
-                "flex flex-1 items-center justify-center gap-1.5 px-2 sm:px-3 py-1.5 text-xs sm:text-sm font-semibold rounded-lg transition",
-                viewMode === "minhas" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
-              )}
-            >
-              <Star className="w-3.5 h-3.5" /> Minhas escalas
-            </button>
-            <button
               onClick={() => { setViewMode("culto"); if (ministerio === "Louvor") setSelectedId(null); }}
               className={clsx(
                 "flex flex-1 items-center justify-center gap-1.5 px-2 sm:px-3 py-1.5 text-xs sm:text-sm font-semibold rounded-lg transition",
@@ -1998,6 +1989,15 @@ export function EscalasTab({
               )}
             >
               <Filter className="w-3.5 h-3.5" /> Escalas do culto
+            </button>
+            <button
+              onClick={() => { setViewMode("minhas"); if (ministerio === "Louvor") setSelectedId(null); }}
+              className={clsx(
+                "flex flex-1 items-center justify-center gap-1.5 px-2 sm:px-3 py-1.5 text-xs sm:text-sm font-semibold rounded-lg transition",
+                viewMode === "minhas" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
+              )}
+            >
+              <Star className="w-3.5 h-3.5" /> Minhas escalas
             </button>
           </div>
           {isLider && viewMode === "culto" && (
