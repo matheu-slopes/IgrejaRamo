@@ -19,6 +19,7 @@ import { notificarEscala } from "@/lib/notificarEscala";
 import { analisarAlteracoesEscala, prepararConfirmacoes } from "@/lib/escalaChanges";
 import { fetchWithTimeout } from "@/lib/network";
 import { LouvorCultosList } from "./LouvorCultosList";
+import { MusicasOrdenaveis } from "./MusicasOrdenaveis";
 import { hojeEmSaoPaulo, moverPeriodoDeCultos, periodoDeCultos, prioridadeParticipanteLouvor } from "@/lib/louvorSchedule";
 
 // --- Constantes ---------------------------------------------------------------
@@ -868,7 +869,7 @@ export function EscalasTab({
   const [selectedId, setSelectedId] = useState<string | null>(escalaInicialId ?? null);
   const [periodoLouvor, setPeriodoLouvor] = useState<"semana" | "mes">("semana");
   const [dataLouvor, setDataLouvor] = useState(hojeEmSaoPaulo);
-  const [editandoDadosMusica, setEditandoDadosMusica] = useState<number | null>(null);
+  const [editandoDadosMusica, setEditandoDadosMusica] = useState<string | null>(null);
 
   useEffect(() => {
     if (dadosCarregados && selectedId && !escalas.some((e) => e.id === selectedId)) {
@@ -1534,6 +1535,7 @@ export function EscalasTab({
   }
 
   function removeMusica(musicaId: string) {
+    if (editandoDadosMusica === musicaId) setEditandoDadosMusica(null);
     if (cifraFormAberta === musicaId) {
       cifraFormRequest.current += 1;
       setCifraFormAberta(null);
@@ -2063,6 +2065,7 @@ export function EscalasTab({
                 escalas={escalasVisiveis} hoje={hojeStr} usuarioId={user?.id}
                 podeVerConfirmacoes={isLider} statusStudio={statusStudioPorMusica}
                 onDetalhes={(escala) => setSelectedId(escala.id)}
+                onAdicionarMusica={isLider ? (escala) => { abrirEdicao(escala); setSubTab("musicas"); } : undefined}
                 onEnsaiar={onAbrirNoStudio ? (escala, musica) => onAbrirNoStudio({ escalaId: escala.id, escalaContexto: { culto: escala.culto, data: escala.data, horario: escala.horario, tom: musica.tom, bpm: musica.bpm }, ...dadosDaMusicaParaStudio(musica) }) : undefined}
                 onPreparar={onAnalisarNoStudio ? (escala, musica) => onAnalisarNoStudio({ escalaId: escala.id, escalaContexto: { culto: escala.culto, data: escala.data, horario: escala.horario, tom: musica.tom, bpm: musica.bpm }, ...dadosDaMusicaParaStudio(musica) }) : undefined}
               /></>
@@ -2944,11 +2947,14 @@ export function EscalasTab({
                   {musicasParaPrepararStudio.length ? ` · ${musicasParaPrepararStudio.length} pendentes` : ""}.
                 </p>
               </div>
-              {form.musicas.map((em, i) => (
+              <p className="text-xs text-gray-500">Arraste pelo ícone ou use as setas para mudar a ordem das músicas.</p>
+              <MusicasOrdenaveis musicas={form.musicas} onReorder={(musicas) => setForm((f) => ({ ...f, musicas }))}>
+              {(em, i, { alca, setas }) => (
                 <div key={em.musicaId} className="bg-white border border-gray-100 rounded-xl shadow-sm overflow-hidden">
-                  <div className="flex items-center gap-3 px-4 py-3">
+                  <div className="flex flex-wrap items-center gap-2 px-3 py-3 sm:flex-nowrap sm:gap-3 sm:px-4">
+                    {alca}
                     <span className="text-xs text-gray-400 w-4 text-right">{i + 1}</span>
-                    <div className="flex-1 min-w-0">
+                    <div className="flex-1 min-w-[120px]">
                       <p className="text-sm font-semibold text-gray-800">{em.titulo}</p>
                       <p className="text-xs text-gray-400">
                         {em.artista} · {em.tom ? `Tom ${em.tom}` : statusDoStudio(em) === "pronto" ? "Tom: escolher no Studio" : "Tom: a definir"} · BPM {em.bpm ?? "—"}
@@ -2994,6 +3000,7 @@ export function EscalasTab({
                         <Music2 className="w-3.5 h-3.5" />
                       </button>
                     )}
+                    {setas}
                     <button
                       onClick={() => removeMusica(em.musicaId)}
                       className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition"
@@ -3013,13 +3020,13 @@ export function EscalasTab({
                     )}
                     <button
                       type="button"
-                      onClick={() => setEditandoDadosMusica((aberta) => aberta === i ? null : i)}
+                      onClick={() => setEditandoDadosMusica((aberta) => aberta === em.musicaId ? null : em.musicaId)}
                       className="rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-gray-600 transition hover:border-gray-300 hover:bg-gray-50"
                     >
-                      {editandoDadosMusica === i ? "Fechar ajuste" : "Definir manualmente"}
+                      {editandoDadosMusica === em.musicaId ? "Fechar ajuste" : "Definir manualmente"}
                     </button>
                   </div>
-                  {editandoDadosMusica === i && (
+                  {editandoDadosMusica === em.musicaId && (
                     <div className="grid gap-2 border-t border-gray-100 bg-white px-4 py-3 sm:grid-cols-2">
                       <label className="text-xs font-medium text-gray-600">
                         Tom do culto
@@ -3064,7 +3071,8 @@ export function EscalasTab({
                     </div>
                   )}
                 </div>
-              ))}
+              )}
+              </MusicasOrdenaveis>
             </div>
           )}
         </div>

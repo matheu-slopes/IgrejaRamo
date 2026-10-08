@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import {
   X, Pencil, Trash2, Save, Plus, Music2,
-  ChevronUp as ArrowUp, ChevronDown as ArrowDown, Search, Youtube,
+  Search, Youtube,
 } from "lucide-react";
 import clsx from "clsx";
 import {
@@ -16,6 +16,7 @@ import { notificarEscala } from "@/lib/notificarEscala";
 import { analisarAlteracoesEscala, prepararConfirmacoes } from "@/lib/escalaChanges";
 import { fetchWithTimeout } from "@/lib/network";
 import { prioridadeParticipanteLouvor } from "@/lib/louvorSchedule";
+import { MusicasOrdenaveis } from "./MusicasOrdenaveis";
 import {
   FUNCOES_POR_MIN, TEMPLATES_CULTO, TONS,
   proximasDatas, formatDateSimples, displayFuncao,
@@ -433,14 +434,6 @@ export function EscalaModal({ escala, podeEditar, onClose, onUpdate, onDelete }:
         tom: tomOverride[m.id] ?? m.tom ?? "",
       }],
     }));
-  }
-
-  function moverMusica(idx: number, dir: -1 | 1) {
-    const arr = [...form.musicas];
-    const target = idx + dir;
-    if (target < 0 || target >= arr.length) return;
-    [arr[idx], arr[target]] = [arr[target], arr[idx]];
-    setForm((f) => ({ ...f, musicas: arr }));
   }
 
   // ── header info (view mode) ───────────────────────────────────────────────────
@@ -915,9 +908,10 @@ export function EscalaModal({ escala, podeEditar, onClose, onUpdate, onDelete }:
                 <div className="space-y-4">
                   {/* Lista atual */}
                   {form.musicas.length > 0 && (
-                    <div className="space-y-1">
-                      {form.musicas.map((m, i) => (
-                        <div key={i} className="flex items-center gap-2 bg-gray-50 rounded-xl px-3 py-2">
+                    <MusicasOrdenaveis musicas={form.musicas} onReorder={(musicas) => setForm((f) => ({ ...f, musicas }))}>
+                      {(m, i, { alca, setas }) => (
+                        <div className="flex items-center gap-2 bg-gray-50 rounded-xl px-3 py-2">
+                          {alca}
                           <span className="w-5 text-center text-xs font-bold text-gray-300">{i + 1}</span>
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-semibold text-gray-800 truncate">{m.titulo}</p>
@@ -934,10 +928,7 @@ export function EscalaModal({ escala, podeEditar, onClose, onUpdate, onDelete }:
                             <option value="">Tom</option>
                             {TONS.map((t) => <option key={t}>{t}</option>)}
                           </select>
-                          <div className="flex flex-col">
-                            <button onClick={() => moverMusica(i, -1)} disabled={i === 0} className="p-0.5 text-gray-300 hover:text-gray-600 disabled:opacity-20"><ArrowUp className="w-3 h-3" /></button>
-                            <button onClick={() => moverMusica(i, 1)} disabled={i === form.musicas.length - 1} className="p-0.5 text-gray-300 hover:text-gray-600 disabled:opacity-20"><ArrowDown className="w-3 h-3" /></button>
-                          </div>
+                          {setas}
                           <button
                             onClick={() => setForm((f) => ({ ...f, musicas: f.musicas.filter((_, j) => j !== i) }))}
                             className="p-1.5 text-gray-300 hover:text-red-500 transition"
@@ -945,8 +936,8 @@ export function EscalaModal({ escala, podeEditar, onClose, onUpdate, onDelete }:
                             <X className="w-3.5 h-3.5" />
                           </button>
                         </div>
-                      ))}
-                    </div>
+                      )}
+                    </MusicasOrdenaveis>
                   )}
 
                   {/* Busca para adicionar */}

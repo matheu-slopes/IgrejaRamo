@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CalendarDays, CheckCircle2, ChevronDown, Music2, Play, Users } from "lucide-react";
+import { CheckCircle2, ChevronDown, Music2, Play, Plus, Users } from "lucide-react";
 import clsx from "clsx";
 import type { Escala, EscalaMusica } from "@/types";
 import { prioridadeParticipanteLouvor } from "@/lib/louvorSchedule";
@@ -13,11 +13,12 @@ type Props = {
   podeVerConfirmacoes: boolean;
   statusStudio: Record<string, string>;
   onDetalhes: (escala: Escala) => void;
+  onAdicionarMusica?: (escala: Escala) => void;
   onEnsaiar?: (escala: Escala, musica: EscalaMusica) => void;
   onPreparar?: (escala: Escala, musica: EscalaMusica) => void;
 };
 
-export function LouvorCultosList({ escalas, hoje, usuarioId, podeVerConfirmacoes, statusStudio, onDetalhes, onEnsaiar, onPreparar }: Props) {
+export function LouvorCultosList({ escalas, hoje, usuarioId, podeVerConfirmacoes, statusStudio, onDetalhes, onAdicionarMusica, onEnsaiar, onPreparar }: Props) {
   const [expandido, setExpandido] = useState<string | null | undefined>(undefined);
   const aberto = expandido === undefined ? (escalas.find((escala) => escala.data >= hoje) ?? escalas[0])?.id : expandido;
 
@@ -74,7 +75,7 @@ export function LouvorCultosList({ escalas, hoje, usuarioId, podeVerConfirmacoes
               </li>;
             })}</ol> : <p className="px-4 py-5 text-xs text-gray-500">O repertório deste culto ainda não tem músicas.</p>}
           </section>
-          <div className="flex justify-end"><button type="button" onClick={() => onDetalhes(escala)} className="inline-flex items-center gap-1.5 text-xs font-semibold text-rose-700 hover:underline"><CalendarDays className="h-3.5 w-3.5" />Abrir escala completa</button></div>
+          {onAdicionarMusica && <div className="flex justify-end"><button type="button" onClick={() => onAdicionarMusica(escala)} className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-50"><Plus className="h-3.5 w-3.5" />Adicionar música</button></div>}
         </div>}
       </article>;
     })}
