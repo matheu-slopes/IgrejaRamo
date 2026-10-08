@@ -4,6 +4,7 @@ import { useState } from "react";
 import { CalendarDays, CheckCircle2, ChevronDown, Music2, Play, Users } from "lucide-react";
 import clsx from "clsx";
 import type { Escala, EscalaMusica } from "@/types";
+import { prioridadeParticipanteLouvor } from "@/lib/louvorSchedule";
 
 type Props = {
   escalas: Escala[];
@@ -29,8 +30,8 @@ export function LouvorCultosList({ escalas, hoje, usuarioId, podeVerConfirmacoes
         const itens = escala.itens.filter((item) => (item.voluntarioId || item.voluntarioNome) === id);
         const status = itens.some((item) => item.confirmacaoStatus === "recusado") ? "recusado"
           : itens.every((item) => (item.confirmacaoStatus ?? (item.confirmado ? "confirmado" : "pendente")) === "confirmado") ? "confirmado" : "pendente";
-        return { id, nome: itens[0].voluntarioNome, funcoes: [...new Set(itens.map((item) => item.funcao))].join(" · "), status };
-      });
+        return { id, nome: itens[0].voluntarioNome, funcoes: [...new Set(itens.map((item) => item.funcao))], status };
+      }).sort((a, b) => prioridadeParticipanteLouvor(a.funcoes) - prioridadeParticipanteLouvor(b.funcoes));
       const musicas = escala.musicas ?? [];
       return <article key={escala.id} className={clsx("overflow-hidden rounded-2xl border border-l-4 border-gray-200 bg-white shadow-sm", escala.culto.includes("Domingo") ? "border-l-amber-400" : "border-l-rose-500")}>
         <div className="flex items-center gap-2 pr-3 sm:pr-5">
@@ -55,7 +56,7 @@ export function LouvorCultosList({ escalas, hoje, usuarioId, podeVerConfirmacoes
             <div className="mb-3 flex flex-wrap items-center gap-3"><h3 className="flex items-center gap-2 text-xs font-semibold text-gray-800"><Users className="h-4 w-4" />Equipe escalada</h3>{podeVerConfirmacoes && escala.confirmacaoParticipantes && <span className="flex items-center gap-1 text-xs text-emerald-700"><CheckCircle2 className="h-3.5 w-3.5" />{pessoas.filter((pessoa) => pessoa.status === "confirmado").length} de {pessoas.length} confirmados</span>}</div>
             {pessoas.length ? <div className="flex flex-wrap gap-2">{pessoas.map((pessoa) => <div key={pessoa.id} className={clsx("flex items-center gap-2 rounded-xl border px-3 py-2", pessoa.id === usuarioId ? "border-rose-200 bg-rose-50" : "border-gray-100 bg-gray-50/50")}>
               <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-rose-100 text-xs font-bold text-rose-800">{pessoa.nome.split(" ").filter(Boolean).map((parte) => parte[0]).slice(0, 2).join("")}</span>
-              <span><span className="block text-xs font-semibold text-gray-800">{pessoa.nome}{pessoa.id === usuarioId ? " · você" : ""}</span><span className="block text-[11px] text-gray-500">{pessoa.funcoes}</span></span>
+              <span><span className="block text-xs font-semibold text-gray-800">{pessoa.nome}{pessoa.id === usuarioId ? " · você" : ""}</span><span className="block text-[11px] text-gray-500">{pessoa.funcoes.join(" · ")}</span></span>
               {podeVerConfirmacoes && escala.confirmacaoParticipantes && <span title={pessoa.status} aria-label={pessoa.status} className={clsx("h-2 w-2 rounded-full", pessoa.status === "confirmado" ? "bg-emerald-500" : pessoa.status === "recusado" ? "bg-red-500" : "bg-amber-400")} />}
             </div>)}</div> : <p className="text-xs text-gray-500">Nenhum participante definido.</p>}
           </section>

@@ -15,6 +15,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { notificarEscala } from "@/lib/notificarEscala";
 import { analisarAlteracoesEscala, prepararConfirmacoes } from "@/lib/escalaChanges";
 import { fetchWithTimeout } from "@/lib/network";
+import { prioridadeParticipanteLouvor } from "@/lib/louvorSchedule";
 import {
   FUNCOES_POR_MIN, TEMPLATES_CULTO, TONS,
   proximasDatas, formatDateSimples, displayFuncao,
@@ -611,7 +612,9 @@ export function EscalaModal({ escala, podeEditar, onClose, onUpdate, onDelete }:
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-50">
-                        {escala.itens.map((it, i) => (
+                        {(escala.ministerio === "Louvor"
+                          ? [...escala.itens].sort((a, b) => prioridadeParticipanteLouvor([a.funcao]) - prioridadeParticipanteLouvor([b.funcao]))
+                          : escala.itens).map((it, i) => (
                           <tr key={i} className={it.voluntarioId === user?.id ? "bg-gray-50" : ""}>
                             <td className="px-3 py-2.5">
                               <span className="text-xs font-bold text-grape-800 bg-grape-50 px-2 py-0.5 rounded-full">

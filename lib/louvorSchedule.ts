@@ -1,3 +1,9 @@
+export function prioridadeParticipanteLouvor(funcoes: readonly string[]) {
+  if (funcoes.includes("Ministro")) return 0;
+  if (funcoes.includes("Backing Vocal")) return 1;
+  return 2;
+}
+
 export function hojeEmSaoPaulo() {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date());
 }

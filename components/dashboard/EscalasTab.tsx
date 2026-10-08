@@ -19,7 +19,7 @@ import { notificarEscala } from "@/lib/notificarEscala";
 import { analisarAlteracoesEscala, prepararConfirmacoes } from "@/lib/escalaChanges";
 import { fetchWithTimeout } from "@/lib/network";
 import { LouvorCultosList } from "./LouvorCultosList";
-import { hojeEmSaoPaulo, moverPeriodoDeCultos, periodoDeCultos } from "@/lib/louvorSchedule";
+import { hojeEmSaoPaulo, moverPeriodoDeCultos, periodoDeCultos, prioridadeParticipanteLouvor } from "@/lib/louvorSchedule";
 
 // --- Constantes ---------------------------------------------------------------
 
@@ -2214,7 +2214,7 @@ export function EscalasTab({
                                 });
                               }
                             }
-                            grupos.sort((a, b) => (a.funcoes.includes("Ministro") ? 0 : 1) - (b.funcoes.includes("Ministro") ? 0 : 1));
+                            grupos.sort((a, b) => prioridadeParticipanteLouvor(a.funcoes) - prioridadeParticipanteLouvor(b.funcoes));
                             return grupos.map((grp) => {
                               const isMinistro = grp.funcoes.includes("Ministro");
                               return (

@@ -11,6 +11,7 @@ import { store, STORE_KEYS } from "@/lib/dataStore";
 import { useAppRefresh } from "@/hooks/useAppRefresh";
 import { userMinisterios } from "@/lib/userMinistries";
 import { fetchWithTimeout } from "@/lib/network";
+import { prioridadeParticipanteLouvor } from "@/lib/louvorSchedule";
 import {
   ChevronLeft, ChevronRight, ChevronDown, ChevronUp,
   Music2, Users, Calendar, Star, Settings2, ClipboardCopy, Check, UserCheck, AlertCircle, BellRing,
@@ -83,12 +84,8 @@ function agruparItens(itens: Escala["itens"]) {
       });
     }
   }
-  // Ministro sempre primeiro
-  return grupos.sort((a, b) => {
-    const aMin = a.funcoes.includes("Ministro") ? 0 : 1;
-    const bMin = b.funcoes.includes("Ministro") ? 0 : 1;
-    return aMin - bMin;
-  });
+  // Ministro, backing vocals e demais músicos, mantendo a ordem dentro de cada grupo.
+  return grupos.sort((a, b) => prioridadeParticipanteLouvor(a.funcoes) - prioridadeParticipanteLouvor(b.funcoes));
 }
 
 function escalaPendenteParaUsuario(escala: Escala, userId?: string | null) {
