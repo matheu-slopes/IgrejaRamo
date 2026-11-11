@@ -9,6 +9,7 @@ import {
 } from "react";
 import { User, Permissao } from "@/types";
 import { supabase } from "@/lib/supabase";
+import { authJsonHeaders } from "@/lib/authHeaders";
 import { temPermissao as checkPermissao, temPermissaoNoMinisterio as checkPermissaoMin } from "@/lib/permissions";
 import { useAppRefresh } from "@/hooks/useAppRefresh";
 
@@ -318,7 +319,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   async function atualizarUsuario(id: string, dados: Partial<User>) {
     const res = await fetch("/api/atualizar-perfil", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: await authJsonHeaders(),
       body: JSON.stringify({ id, ...dados }),
     });
     if (!res.ok) {
@@ -336,7 +337,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   async function criarUsuario(dados: Omit<User, "id">, senha: string): Promise<{ user: User } | { error: string }> {
     const res = await fetch("/api/criar-usuario", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: await authJsonHeaders(),
       body: JSON.stringify({
         email:             dados.email,
         senha,
@@ -361,7 +362,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   async function removerUsuario(id: string) {
     const res = await fetch("/api/remover-usuario", {
       method: "DELETE",
-      headers: { "Content-Type": "application/json" },
+      headers: await authJsonHeaders(),
       body: JSON.stringify({ userId: id }),
     });
     if (!res.ok) {

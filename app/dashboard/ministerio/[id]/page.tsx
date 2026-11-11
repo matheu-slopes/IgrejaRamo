@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
+import { authJsonHeaders } from "@/lib/authHeaders";
 import {
   MessageSquare, Users, CalendarDays, Send, Lock, Unlock,
   Plus, Trash2, Pencil, X, Check, Calendar, ExternalLink,
@@ -1330,15 +1331,24 @@ function MembrosTab({
     });
   }
 
-  function remover(id: string) {
+  async function remover(id: string) {
     const membro = membros.find((m) => m.id === id);
     if (!membro) return;
-    setMembros((prev) => prev.filter((m) => m.id !== id));
-    fetch("/api/ministerio/membro", {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ usuarioId: id, ministerio }),
-    });
+    try {
+      const res = await fetch("/api/ministerio/membro", {
+        method: "DELETE",
+        headers: await authJsonHeaders(),
+        body: JSON.stringify({ usuarioId: id, ministerio }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error ?? "Não foi possível remover o membro.");
+      }
+      setMembros((prev) => prev.filter((m) => m.id !== id));
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : "Não foi possível remover o membro.");
+      carregarMembros();
+    }
   }
 
   async function adicionar() {
@@ -1347,7 +1357,7 @@ function MembrosTab({
     if (!usuario) return;
     const res = await fetch("/api/ministerio/membro", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: await authJsonHeaders(),
       body: JSON.stringify({ usuarioId: usuario.id, ministerio, funcao: novaFuncaoForm }),
     });
     if (res.ok) {

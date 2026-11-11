@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
+import { forbidden, securityAuth } from "@/lib/securityAuth";
 
 function adminClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -9,7 +10,10 @@ function adminClient() {
 
 // POST /api/ministerio/membro — adicionar membro ao ministério
 export async function POST(req: NextRequest) {
+  const auth = await securityAuth(req);
+  if (auth.error) return auth.error;
   const { usuarioId, ministerio, funcao } = await req.json();
+  if (!auth.permissions.includes("gerenciar_membros_ministerio") && !auth.perfil.lider_ministerios?.includes(ministerio)) return forbidden();
   if (!usuarioId || !ministerio || !funcao) {
     return NextResponse.json({ error: "Campos obrigatórios ausentes." }, { status: 400 });
   }
@@ -56,31 +60,42 @@ export async function POST(req: NextRequest) {
 
 // DELETE /api/ministerio/membro — remover membro do ministério
 export async function DELETE(req: NextRequest) {
+  const auth = await securityAuth(req);
+  if (auth.error) return auth.error;
   const { usuarioId, ministerio } = await req.json();
+  if (!auth.permissions.includes("gerenciar_membros_ministerio") && !auth.perfil.lider_ministerios?.includes(ministerio)) return forbidden();
   if (!usuarioId || !ministerio) {
     return NextResponse.json({ error: "Campos obrigatórios ausentes." }, { status: 400 });
   }
 
   const admin = adminClient();
 
-  const { data: perfil } = await admin
+  const { data: perfil, error: perfilError } = await admin
     .from("perfis")
     .select("ministerios")
     .eq("id", usuarioId)
     .single();
 
+  if (perfilError || !perfil) {
+    return NextResponse.json({ error: "Usuário não encontrado." }, { status: 404 });
+  }
+
   const ministeriosAtuais: string[] = perfil?.ministerios ?? [];
 
-  await admin
+  const { error: updateError } = await admin
     .from("perfis")
     .update({ ministerios: ministeriosAtuais.filter((m) => m !== ministerio) })
     .eq("id", usuarioId);
 
-  await admin
+  if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 });
+
+  const { error: deleteError } = await admin
     .from("membros_ministerio")
     .delete()
     .eq("usuario_id", usuarioId)
     .eq("ministerio", ministerio);
+
+  if (deleteError) return NextResponse.json({ error: deleteError.message }, { status: 500 });
 
   return NextResponse.json({ ok: true });
 }

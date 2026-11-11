@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { authJsonHeaders } from "@/lib/authHeaders";
 import { useSearchParams } from "next/navigation";
 import {
   TODAS_PERMISSOES, PERMISSAO_LABEL, GRUPOS_PERMISSAO,
@@ -491,7 +492,7 @@ function EditarUsuarioPanel({
     setErroSenha(""); setSalvandoSenha(true); setOkSenha(false);
     const res = await fetch("/api/alterar-senha", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: await authJsonHeaders(),
       body: JSON.stringify({ userId: usuario.id, novaSenha }),
     });
     const json = await res.json().catch(() => ({}));
@@ -887,6 +888,7 @@ function EditarUsuarioPanel({
                 title="Excluir permanentemente"
               >
                 <Trash2 className="w-3.5 h-3.5" />
+                Excluir
               </button>
             )}
           </div>
@@ -898,7 +900,7 @@ function EditarUsuarioPanel({
                 <p><span className="font-semibold">Nome:</span> {usuario.nome}</p>
                 <p><span className="font-semibold">E-mail:</span> {usuario.email}</p>
               </div>
-              <p className="text-xs text-red-500">Isso remove o acesso ao app e apaga todos os dados do usuário. Não pode ser desfeito.</p>
+              <p className="text-xs text-red-500">Isso exclui a conta e o perfil permanentemente. Alguns registros compartilhados, como escalas e mensagens, podem ser preservados. Não pode ser desfeito.</p>
               {erroExcluir && <p className="text-xs text-red-600 font-medium">{erroExcluir}</p>}
               <div className="flex gap-2">
                 <button

@@ -1091,12 +1091,13 @@ export function EscalasTab({
   function carregarEquipe(label: string) {
     const equipe = EQUIPES_LOUVOR.find((e) => e.label === label);
     if (!equipe) { setForm((f) => ({ ...f, equipe: "" })); return; }
-    const itens: import("@/types").ItemEscala[] = equipe.membros.map((m) => {
+    const membrosAtuais = new Map(membros.map((m) => [m.id, m]));
+    const itens: import("@/types").ItemEscala[] = equipe.membros.filter((m) => m.id && membrosAtuais.has(m.id)).map((m) => {
       const alias = FUNCAO_DB_MAP[m.funcao];
       return {
         funcao: (alias ?? m.funcao) as import("@/types").FuncaoEscala,
         voluntarioId: m.id ?? "",
-        voluntarioNome: m.nome,
+        voluntarioNome: membrosAtuais.get(m.id!)!.nome,
         observacao: alias ? m.funcao : (m.obs || undefined),
       };
     });

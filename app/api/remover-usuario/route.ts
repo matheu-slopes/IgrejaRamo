@@ -1,7 +1,11 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
+import { forbidden, securityAuth } from "@/lib/securityAuth";
 
 export async function DELETE(req: NextRequest) {
+  const auth = await securityAuth(req);
+  if (auth.error) return auth.error;
+  if (!auth.permissions.includes("gerenciar_usuarios")) return forbidden();
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 
@@ -25,10 +29,12 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: "userId ausente." }, { status: 400 });
   }
 
-  // Remove o perfil primeiro (a chave estrangeira aponta para auth.users).
-  await admin.from("perfis").delete().eq("id", userId);
+  if (userId === auth.user.id) {
+    return NextResponse.json({ error: "Você não pode excluir sua própria conta." }, { status: 400 });
+  }
 
-  // Remove da autenticação do Supabase — exclui permanentemente.
+  // A exclusão do usuário de autenticação remove o perfil por cascata, na mesma
+  // transação do banco. Nunca apague o perfil antes de saber se ela foi concluída.
   const { error } = await admin.auth.admin.deleteUser(userId);
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });
