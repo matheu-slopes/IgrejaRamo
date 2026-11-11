@@ -22,8 +22,9 @@ import { EventosTab } from "@/components/dashboard/EventosTab";
 import { LouvorStudioTab, type AnaliseStudioInicial } from "@/components/dashboard/LouvorStudioTab";
 import { RepertorioTab } from "@/components/dashboard/RepertorioTab";
 import { useAppRefresh } from "@/hooks/useAppRefresh";
+import { EquipesTab } from "@/components/dashboard/EquipesTab";
 
-type Tab = "chat" | "membros" | "eventos" | "escalas" | "studio" | "repertorio";
+type Tab = "chat" | "membros" | "equipes" | "eventos" | "escalas" | "studio" | "repertorio";
 
 const corMap: Record<string, string> = {
   Louvor:        "bg-rose-700",
@@ -208,6 +209,7 @@ export default function CanalMinisterioPage() {
                 ? [{ id: "repertorio" as const, label: "Repertório", icon: LibraryBig }]
                 : []),
               { id: "membros", label: "Membros", icon: Users         },
+              { id: "equipes", label: "Equipes", icon: Users },
             ] as { id: Tab; label: string; icon: React.ElementType }[]).map(({ id, label, icon: Icon }) => (
               <button
                 key={id}
@@ -230,6 +232,7 @@ export default function CanalMinisterioPage() {
       {/* Conteúdo da tab */}
       {tab === "chat"    && <ChatTab ministerio={slug} chatBloqueado={chatBloqueado} podeEnviar={temPermissaoNoMinisterio("enviar_chat", slug)} podeFixar={temPermissaoNoMinisterio("fixar_mensagem", slug)} user={user} />}
       {tab === "membros" && <MembrosTab ministerio={slug} isLider={podeGerenciarMembros} podeAtribuirPermissoes={podeAtribuirPermissoes} />}
+      {tab === "equipes" && <EquipesTab ministerio={slug} podeGerenciar={podeGerenciarMembros} />}
       {tab === "eventos" && <EventosTab ministerio={slug} isLider={podeCriarEvento} podeEditar={podeEditarEvento} />}
       {temEscalas && tab === "escalas" && <EscalasTab ministerio={slug} isLider={isAdmin || temPermissaoNoMinisterio("criar_escala", slug)} podeGerenciarRepertorio={slug === "Louvor" && podeGerenciarRepertorio} escalaInicialId={escalaParaAbrir} onAbrirNoStudio={slug === "Louvor" && studioAccess.autorizado ? abrirAnaliseNoStudio : undefined} onAnalisarNoStudio={slug === "Louvor" && studioAccess.podeGerenciar ? abrirAnaliseNoStudio : undefined} />}
       {tab === "studio" && studioAccess.autorizado && (

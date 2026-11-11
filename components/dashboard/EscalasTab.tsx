@@ -21,6 +21,8 @@ import { fetchWithTimeout } from "@/lib/network";
 import { LouvorCultosList } from "./LouvorCultosList";
 import { MusicasOrdenaveis } from "./MusicasOrdenaveis";
 import { hojeEmSaoPaulo, moverPeriodoDeCultos, periodoDeCultos, prioridadeParticipanteLouvor } from "@/lib/louvorSchedule";
+import { authJsonHeaders } from "@/lib/authHeaders";
+import type { EquipeMinisterio } from "@/lib/equipesMinisterio";
 
 // --- Constantes ---------------------------------------------------------------
 
@@ -41,38 +43,6 @@ export const FUNCOES_POR_MIN: Record<string, string[]> = {
   "Oração":       ["Responsável"],
 };
 const FUNCOES_GENERICAS = ["Responsável"];
-
-// --- Equipes fixas do Louvor ------------------------------------------------
-export const EQUIPES_LOUVOR = [
-  {
-    numero: 1, label: "Equipe 1", responsavel: "Pr Flávio",
-    membros: [
-      { id: "093a4e47-e3b6-4ffe-9ac0-efcdf0800bf9", nome: "Pastor Flavio",       funcao: "Ministro",      obs: "" },
-      { id: "2a5a89e6-0452-4643-af64-c17f7881e7e5", nome: "Isadora Fernandes",  funcao: "Backing Vocal", obs: "" },
-      { id: "8ecd6e4e-67c0-437d-9e36-8edb80d5276c", nome: "Eduarda Tudes",     funcao: "Backing Vocal", obs: "" },
-      { id: "af737764-2a81-4f89-8153-672571c5df16", nome: "Ricardo Bortot",     funcao: "Cajón",         obs: "" },
-    ],
-  },
-  {
-    numero: 2, label: "Equipe 2", responsavel: "Matheus Alves",
-    membros: [
-      { id: "4c646c5d-cf1a-401f-a8bf-5bc9af996cdf", nome: "Matheus Alves",      funcao: "Ministro",      obs: "" },
-      { id: "4d729cce-d0a0-42b1-9d09-62d3cd4b7b87", nome: "Lívia Martins",      funcao: "Backing Vocal", obs: "" },
-      { id: null,                                   nome: "Edeni",              funcao: "Backing Vocal", obs: "" },
-      { id: "d935d257-c430-44fe-9577-2e15a2ab94fa", nome: "Victor Sabino",       funcao: "Cajón",         obs: "" },
-      { id: "ad69a900-1be0-41fa-943b-20c30a5bfb3c", nome: "Thaíná Victoria",   funcao: "Backing Vocal", obs: "" },
-    ],
-  },
-  {
-    numero: 3, label: "Equipe 3", responsavel: "Matheus Lopes",
-    membros: [
-      { id: "253ebd74-151a-405b-ba2a-87e64107ab59", nome: "Matheus Lopes",      funcao: "Ministro",      obs: "" },
-      { id: "01c938ee-69b0-430b-9fe3-cd6632d70982", nome: "Luisa Lopes",        funcao: "Backing Vocal", obs: "" },
-      { id: "d153862e-bdc6-4769-8bbd-4814b10b3846", nome: "Melissa Vaz",        funcao: "Backing Vocal", obs: "" },
-      { id: "c9db7bdf-0d50-4698-8728-d45b91e09c63", nome: "Larissa Pedro",      funcao: "Cajón",         obs: "" },
-    ],
-  },
-];
 
 type TemplateEncontro = {
   id: string;
@@ -194,14 +164,16 @@ interface EscalaForm {
 /** Extrai equipe e notas livres do campo observacoes do banco */
 function parseEquipeObs(raw: string | undefined): { equipe: string; notas: string } {
   if (!raw) return { equipe: "", notas: "" };
-  const m = raw.match(/^(Equipe \d)\n?([\s\S]*)/);
+  const nova = raw.match(/^\[Equipe: ([^\]\n]+)\]\n?([\s\S]*)/);
+  if (nova) return { equipe: nova[1], notas: nova[2].trim() };
+  const m = raw.match(/^(Equipe \d+)(?:\n|$)([\s\S]*)/);
   if (m) return { equipe: m[1], notas: m[2].trim() };
   return { equipe: "", notas: raw };
 }
 
 /** Reconstrói o campo observacoes para salvar no banco */
 function buildObs(equipe: string, notas: string): string | null {
-  const parts = [equipe, notas].filter(Boolean).join("\n");
+  const parts = [equipe ? `[Equipe: ${equipe}]` : "", notas].filter(Boolean).join("\n");
   return parts || null;
 }
 
@@ -226,6 +198,7 @@ const FUNCAO_DB_MAP: Partial<Record<string, string>> = {
   "Abertura":     "Abertura/Oferta",
   "Oferta":       "Abertura/Oferta",
   "Responsável":  "Abertura/Oferta",
+  "Líder":        "Abertura/Oferta",
   "Palavra":      "Ministro",
   "Pregador(a)":  "Ministro",
   "Recepção":     "Abertura/Oferta",
@@ -237,7 +210,7 @@ const FUNCAO_DB_MAP: Partial<Record<string, string>> = {
   "Foto/Vídeo":   "Fotografia",
   "Câmera":       "Fotografia",
 };
-const FUNCAO_ALIAS_SET = new Set(["Cajón", "Pandeiro", "Violão", "Professor(a)", "Monitor(a)", "Auxiliar", "Voluntário(a)", "Preletor(a)", "Abertura", "Oferta", "Responsável", "Discipulador(a)", "Palavra", "Pregador(a)", "Recepção", "Apoio", "Projeção", "Foto", "Videomaker", "Foto/Vídeo", "Câmera"]);
+const FUNCAO_ALIAS_SET = new Set(["Cajón", "Pandeiro", "Violão", "Professor(a)", "Monitor(a)", "Auxiliar", "Voluntário(a)", "Preletor(a)", "Abertura", "Oferta", "Responsável", "Líder", "Discipulador(a)", "Palavra", "Pregador(a)", "Recepção", "Apoio", "Projeção", "Foto", "Videomaker", "Foto/Vídeo", "Câmera"]);
 
 function splitAliasObs(obs?: string): { alias?: string; obs?: string } {
   if (!obs) return {};
@@ -624,6 +597,21 @@ export function EscalasTab({
 }) {
   const { user, isLoading } = useAuth();
   const [membros, setMembros] = useState<MembroMinisterio[]>([]);
+  const [equipes, setEquipes] = useState<EquipeMinisterio[]>([]);
+  const [erroEquipes, setErroEquipes] = useState(false);
+  useEffect(() => {
+    let ativo = true;
+    async function carregarEquipes() {
+      try {
+        const res = await fetch(`/api/ministerio/equipes?ministerio=${encodeURIComponent(ministerio)}`, { headers: await authJsonHeaders(), cache: "no-store" });
+        if (!res.ok) throw new Error("Erro ao carregar equipes");
+        const data = await res.json();
+        if (ativo) { setEquipes(data.equipes ?? []); setErroEquipes(false); }
+      } catch { if (ativo) setErroEquipes(true); }
+    }
+    void carregarEquipes();
+    return () => { ativo = false; };
+  }, [ministerio]);
   const [escalas, setEscalas] = useState<Escala[]>([]);
   const [musicas, setMusicas] = useState<Musica[]>([]);
   const [statusStudioPorMusica, setStatusStudioPorMusica] = useState<Record<string, StatusStudioMusica>>({});
@@ -1089,16 +1077,16 @@ export function EscalasTab({
   }
 
   function carregarEquipe(label: string) {
-    const equipe = EQUIPES_LOUVOR.find((e) => e.label === label);
+    const equipe = equipes.find((e) => e.nome === label);
     if (!equipe) { setForm((f) => ({ ...f, equipe: "" })); return; }
     const membrosAtuais = new Map(membros.map((m) => [m.id, m]));
-    const itens: import("@/types").ItemEscala[] = equipe.membros.filter((m) => m.id && membrosAtuais.has(m.id)).map((m) => {
+    const itens: import("@/types").ItemEscala[] = equipe.membros.filter((m) => membrosAtuais.has(m.usuarioId)).map((m) => {
       const alias = FUNCAO_DB_MAP[m.funcao];
       return {
         funcao: (alias ?? m.funcao) as import("@/types").FuncaoEscala,
-        voluntarioId: m.id ?? "",
-        voluntarioNome: membrosAtuais.get(m.id!)!.nome,
-        observacao: alias ? m.funcao : (m.obs || undefined),
+        voluntarioId: m.usuarioId,
+        voluntarioNome: membrosAtuais.get(m.usuarioId)!.nome,
+        observacao: alias ? m.funcao : undefined,
       };
     });
     setForm((f) => ({ ...f, equipe: label, itens }));
@@ -1885,7 +1873,7 @@ export function EscalasTab({
       const isSel = selectedId === esc.id;
       const d = esc.data ? new Date(esc.data + "T00:00:00") : null;
       const isPast = esc.data < hojeStr;
-      const equipeLabel = esc.observacoes?.match(/^(Equipe \d)/)?.[1];
+      const equipeLabel = parseEquipeObs(esc.observacoes).equipe;
       return (
         <button
           key={esc.id}
@@ -2114,9 +2102,9 @@ export function EscalasTab({
                   <div className="space-y-0.5">
                     <div className="flex items-center gap-2 flex-wrap">
                       <h3 className="font-bold text-gray-900 text-base">{selectedEscala.culto}</h3>
-                      {selectedEscala.observacoes?.match(/^(Equipe \d)/)?.[1] && (
+                      {parseEquipeObs(selectedEscala.observacoes).equipe && (
                         <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-900 border border-gray-200">
-                          {selectedEscala.observacoes.match(/^(Equipe \d)/)?.[1]}
+                          {parseEquipeObs(selectedEscala.observacoes).equipe}
                         </span>
                       )}
                       {selectedEscala.ministerio === "Infantil" && selectedEscala.observacoes && (() => {
@@ -2354,11 +2342,11 @@ export function EscalasTab({
                 )}
 
                 {/* Observações (oculto para Infantil pois é dado estruturado) */}
-                {selectedEscala.observacoes && selectedEscala.ministerio !== "Infantil" && (
+                {parseEquipeObs(selectedEscala.observacoes).notas && selectedEscala.ministerio !== "Infantil" && (
                   <div className="space-y-1.5">
                     <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Observações</p>
                     <p className="text-sm text-gray-600 bg-gray-50 rounded-xl px-3 py-2.5 leading-relaxed">
-                      {selectedEscala.observacoes}
+                      {parseEquipeObs(selectedEscala.observacoes).notas}
                     </p>
                   </div>
                 )}
@@ -2430,31 +2418,32 @@ export function EscalasTab({
       {/* -- Detalhes -- */}
       {subTab === "detalhes" && (
         <div className="space-y-4">
-          {/* Equipe (somente Louvor) */}
-          {ministerio === "Louvor" && (
+          {/* Equipes configuradas neste ministério */}
+          {(equipes.length > 0 || erroEquipes) && (
             <div>
               <p className="text-xs text-gray-400 mb-2 font-semibold uppercase tracking-widest">Equipe</p>
               <div className="flex gap-2 flex-wrap">
-                {[{ label: "", responsavel: "" }, ...EQUIPES_LOUVOR].map((eq) => (
+                {[{ nome: "" }, ...equipes].map((eq) => (
                   <button
-                    key={eq.label}
-                    onClick={() => carregarEquipe(eq.label)}
+                    key={eq.nome}
+                    onClick={() => carregarEquipe(eq.nome)}
                     className={clsx(
                       "text-xs font-semibold px-3 py-1.5 rounded-full border transition",
-                      form.equipe === eq.label
+                      form.equipe === eq.nome
                         ? "bg-black text-white border-gray-900"
                         : "bg-white text-gray-600 border-gray-200 hover:border-gray-400"
                     )}
                   >
-                    {eq.label || "Sem equipe"}
+                    {eq.nome || "Sem equipe"}
                   </button>
                 ))}
               </div>
               {form.equipe && (
                 <p className="text-xs text-gray-400 mt-1.5">
-                  Resp.: {EQUIPES_LOUVOR.find((e) => e.label === form.equipe)?.responsavel} · {new Set(form.itens.map((it) => it.voluntarioId ?? it.voluntarioNome)).size} participantes carregados
+                  {new Set(form.itens.map((it) => it.voluntarioId ?? it.voluntarioNome)).size} participantes carregados
                 </p>
               )}
+              {erroEquipes && <p className="mt-2 text-sm text-red-600">Não foi possível carregar as equipes deste ministério.</p>}
             </div>
           )}
 
