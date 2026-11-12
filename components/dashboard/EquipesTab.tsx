@@ -5,7 +5,8 @@ import { Pencil, Plus, Trash2, Users, X } from "lucide-react";
 import { authJsonHeaders } from "@/lib/authHeaders";
 import { supabase } from "@/lib/supabase";
 import type { EquipeMinisterio, EquipeMembro } from "@/lib/equipesMinisterio";
-import { FUNCOES_POR_MIN } from "@/components/dashboard/EscalasTab";
+import { useFuncoesMinisterio } from "@/hooks/useFuncoesMinisterio";
+import { FuncoesMinisterio } from "@/components/dashboard/FuncoesMinisterio";
 
 type Pessoa = { id: string; nome: string };
 
@@ -16,6 +17,7 @@ export function EquipesTab({ ministerio, podeGerenciar }: { ministerio: string; 
   const [erro, setErro] = useState("");
   const [editando, setEditando] = useState<EquipeMinisterio | null>(null);
   const [salvando, setSalvando] = useState(false);
+  const { funcoes: configuradas, erroFuncoes, carregandoFuncoes, carregarFuncoes } = useFuncoesMinisterio(ministerio);
 
   const carregar = useCallback(async () => {
     setErro("");
@@ -35,7 +37,7 @@ export function EquipesTab({ ministerio, podeGerenciar }: { ministerio: string; 
 
   useEffect(() => { void carregar(); }, [carregar]);
   const nomePessoa = (id: string) => pessoas.find((p) => p.id === id)?.nome;
-  const funcoes = FUNCOES_POR_MIN[ministerio] ?? ["Responsável"];
+  const funcoes = configuradas.map((f) => f.nome);
 
   async function salvar() {
     if (!editando) return;
@@ -67,7 +69,8 @@ export function EquipesTab({ ministerio, podeGerenciar }: { ministerio: string; 
       <div><h2 className="text-lg font-semibold text-gray-900">Equipes</h2><p className="text-sm text-gray-500">Organize os membros em equipes para usar nas escalas.</p></div>
       {podeGerenciar && <button onClick={() => { setErro(""); setEditando({ id: "", ministerio, nome: "", membros: [] }); }} className="inline-flex items-center gap-2 rounded-xl bg-gray-900 px-4 py-2.5 text-sm font-semibold text-white"><Plus className="h-4 w-4" /> Nova equipe</button>}
     </div>
-    {erro && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{erro}</p>}
+    {podeGerenciar && !editando && <FuncoesMinisterio ministerio={ministerio} funcoes={configuradas} atualizar={async () => { await carregarFuncoes(); await carregar(); }} />}
+    {(erro || erroFuncoes) && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{erro || erroFuncoes}</p>}
     {editando && <div className="space-y-4 rounded-2xl border border-gray-200 bg-white p-4">
       <h3 className="font-semibold">{editando.id ? "Editar equipe" : "Nova equipe"}</h3>
       <label className="block text-sm font-medium">Nome da equipe<input value={editando.nome} maxLength={80} onChange={(e) => setEditando({ ...editando, nome: e.target.value })} className="mt-1 block w-full rounded-xl border border-gray-300 px-3 py-2" placeholder="Ex.: Equipe 1" /></label>
@@ -79,7 +82,7 @@ export function EquipesTab({ ministerio, podeGerenciar }: { ministerio: string; 
           </select>
           <button aria-label={`Remover ${nomePessoa(m.usuarioId) ?? "membro"} da equipe`} onClick={() => alterarMembros(editando.membros.filter((item) => item.usuarioId !== m.usuarioId))} className="rounded-lg p-2 text-red-600 hover:bg-red-50"><X className="h-4 w-4" /></button>
         </div>)}</div>
-        <label className="mt-3 block text-sm text-gray-600">Adicionar membro<select value="" onChange={(e) => { if (e.target.value) alterarMembros([...editando.membros, { usuarioId: e.target.value, funcao: funcoes[0] }]); }} className="mt-1 block w-full rounded-xl border border-gray-300 bg-white px-3 py-2"><option value="">Selecione um membro</option>{pessoas.filter((p) => !editando.membros.some((m) => m.usuarioId === p.id)).map((p) => <option key={p.id} value={p.id}>{p.nome}</option>)}</select></label>
+        <label className="mt-3 block text-sm text-gray-600">Adicionar membro<select disabled={carregandoFuncoes || !!erroFuncoes || funcoes.length === 0} value="" onChange={(e) => { if (e.target.value && funcoes[0]) alterarMembros([...editando.membros, { usuarioId: e.target.value, funcao: funcoes[0] }]); }} className="mt-1 block w-full rounded-xl border border-gray-300 bg-white px-3 py-2 disabled:opacity-50"><option value="">{funcoes.length ? "Selecione um membro" : "Cadastre uma função primeiro"}</option>{pessoas.filter((p) => !editando.membros.some((m) => m.usuarioId === p.id)).map((p) => <option key={p.id} value={p.id}>{p.nome}</option>)}</select></label>
       </div>
       <div className="flex gap-2"><button disabled={salvando} onClick={() => setEditando(null)} className="rounded-xl border px-4 py-2 text-sm">Cancelar</button><button disabled={salvando || !editando.nome.trim()} onClick={() => void salvar()} className="rounded-xl bg-gray-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{salvando ? "Salvando..." : "Salvar equipe"}</button></div>
     </div>}

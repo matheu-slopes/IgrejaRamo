@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { Ministerio, Escala, FuncaoEscala, EscalaMusica } from "@/types";
-import { EscalasTab } from "@/components/dashboard/EscalasTab";
+import { EscalasTab, displayFuncao, displayObs } from "@/components/dashboard/EscalasTab";
 import { EscalaModal } from "@/components/dashboard/EscalaModal";
 import { supabase } from "@/lib/supabase";
 import { store, STORE_KEYS } from "@/lib/dataStore";
@@ -25,26 +25,11 @@ const MIN_LABEL: Record<string, string> = {
 };
 const minLabel = (m: string) => MIN_LABEL[m] ?? m;
 
-const ALIASES_FUNCAO = new Set([
-  "Cajón", "Pandeiro", "Violão", "Abertura", "Oferta", "Recepção", "Apoio", "Responsável",
-]);
-
 function partesObservacao(it: { funcao: string; observacao?: string }) {
-  const partes = (it.observacao ?? "").split(" · ");
-  const primeira = partes[0]?.trim();
-  const alias = primeira && ALIASES_FUNCAO.has(primeira) ? primeira : undefined;
-  return { alias, detalhe: alias ? partes.slice(1).join(" · ") || undefined : it.observacao };
+  return { detalhe: displayObs(it) };
 }
 
-const showFuncao = (it: { funcao: string; observacao?: string }) => {
-  const { alias } = partesObservacao(it);
-  if (alias) return alias;
-  if (it.funcao === "Bateria") return "Cajón";
-  if (it.funcao === "Professora" || it.funcao === "Professor") return "Professor(a)";
-  if (it.funcao === "Monitor") return "Monitor(a)";
-  if (it.funcao === "Voluntário") return "Voluntário(a)";
-  return it.funcao;
-};
+const showFuncao = displayFuncao;
 
 function corFuncao(funcao: string) {
   if (funcao === "Recepção") return "bg-blue-50 text-blue-700 border-blue-200";

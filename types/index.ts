@@ -79,27 +79,7 @@ export interface Aviso {
 // ─────────────────────────────────────────────
 // Escalas
 // ─────────────────────────────────────────────
-export type FuncaoEscala =
-  // Louvor
-  | "Ministro"
-  | "Guitarra"
-  | "Baixo"
-  | "Bateria"
-  | "Cajón"
-  | "Pandeiro"
-  | "Violão"
-  | "Teclado"
-  | "Backing Vocal"
-  // Mídia
-  | "Transmissão"
-  | "Projeção/Letras"
-  | "Fotografia"
-  // Geral
-  | "Abertura/Oferta"
-  | "Escala de Limpeza"
-  // Infantil
-  | "Professora"
-  | "Monitor";
+export type FuncaoEscala = string;
 
 export interface ItemEscala {
   funcao: FuncaoEscala;

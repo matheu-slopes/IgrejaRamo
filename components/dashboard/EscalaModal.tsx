@@ -17,8 +17,9 @@ import { analisarAlteracoesEscala, prepararConfirmacoes } from "@/lib/escalaChan
 import { fetchWithTimeout } from "@/lib/network";
 import { prioridadeParticipanteLouvor } from "@/lib/louvorSchedule";
 import { MusicasOrdenaveis } from "./MusicasOrdenaveis";
+import { useFuncoesMinisterio } from "@/hooks/useFuncoesMinisterio";
 import {
-  FUNCOES_POR_MIN, TEMPLATES_CULTO, TONS,
+  TEMPLATES_CULTO, TONS,
   proximasDatas, formatDateSimples, displayFuncao,
 } from "@/components/dashboard/EscalasTab";
 
@@ -117,9 +118,9 @@ export function EscalaModal({ escala, podeEditar, onClose, onUpdate, onDelete }:
   const [membros, setMembros] = useState<MembroMinisterio[]>([]);
   const [musicas, setMusicas] = useState<Musica[]>([]);
   const [novoMembroId, setNovoMembroId] = useState("");
-  const [novaFuncao, setNovaFuncao] = useState<string>(
-    (FUNCOES_POR_MIN[escala.ministerio] ?? FUNCOES_POR_MIN.Louvor)[0]
-  );
+  const { funcoes, erroFuncoes } = useFuncoesMinisterio(escala.ministerio);
+  const [novaFuncao, setNovaFuncao] = useState("");
+  useEffect(() => { if (!funcoes.some((f) => f.nome === novaFuncao)) setNovaFuncao(funcoes[0]?.nome ?? ""); }, [funcoes, novaFuncao]);
   const [novaObs, setNovaObs] = useState("");
   const [buscaMusica, setBuscaMusica] = useState("");
   const [tomOverride, setTomOverride] = useState<Record<string, string>>({});
@@ -741,6 +742,7 @@ export function EscalaModal({ escala, podeEditar, onClose, onUpdate, onDelete }:
               {/* ─── Detalhes ─── */}
               {subTab === "detalhes" && (
                 <div className="space-y-4">
+                  {erroFuncoes && <p role="alert" className="text-sm text-red-600">{erroFuncoes}</p>}
                   {/* Tipo de culto */}
                   <div>
                     <p className="text-xs text-gray-400 mb-2 font-semibold uppercase tracking-widest">Tipo de culto</p>
@@ -841,8 +843,8 @@ export function EscalaModal({ escala, podeEditar, onClose, onUpdate, onDelete }:
                         onChange={(e) => setNovaFuncao(e.target.value)}
                         className="flex-1 sm:flex-initial border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-gray-400 bg-white"
                       >
-                        {(FUNCOES_POR_MIN[escala.ministerio] ?? FUNCOES_POR_MIN.Louvor).map((f) => (
-                          <option key={f}>{f}</option>
+                        {funcoes.map((f) => (
+                          <option key={f.id}>{f.nome}</option>
                         ))}
                       </select>
                       <select
@@ -858,7 +860,7 @@ export function EscalaModal({ escala, podeEditar, onClose, onUpdate, onDelete }:
                     </div>
                     <button
                       onClick={addParticipante}
-                      disabled={!novoMembroId}
+                      disabled={!novoMembroId || !novaFuncao || !!erroFuncoes}
                       className="flex items-center justify-center gap-1 px-4 py-2 bg-black text-white text-sm font-semibold rounded-xl hover:bg-gray-900 transition disabled:opacity-40 w-full sm:w-auto shrink-0"
                     >
                       <Plus className="w-4 h-4 shrink-0" />

@@ -19,6 +19,7 @@ import { User, Role, Ministerio, Permissao, CanalMinisterio, Local } from "@/typ
 import { supabase } from "@/lib/supabase";
 import { notificarBroadcast } from "@/lib/notificarBroadcast";
 import { notificarInApp } from "@/lib/notificarInApp";
+import { FuncoesUsuarioAdmin } from "@/components/dashboard/FuncoesUsuarioAdmin";
 
 const ROLES: Role[] = ["admin", "pastor", "lider", "voluntario", "membro"];
 const MINISTERIOS_PADRAO: Ministerio[] = ["Louvor","Mídias","Ensino","Infantil","Ação Social","Jovens","Limpeza","Recepcionamento"];
@@ -285,6 +286,7 @@ function MinisteriosTab({
   const [novoNome, setNovoNome] = useState("");
   const [criando, setCriando] = useState(false);
   const [erroCriacao, setErroCriacao] = useState("");
+  const [erroMembro, setErroMembro] = useState("");
 
   const ministeriosLista = canais.map((c) => c.ministerio);
   const usuariosRender = usuarios.map((u) => (
@@ -303,10 +305,18 @@ function MinisteriosTab({
     setMinisteriosOverrides((prev) => ({ ...prev, [usuario.id]: novos }));
     setSalvandoIds((prev) => new Set(prev).add(saveKey));
 
-    const { error } = await supabase.from("perfis").update({ ministerios: novos }).eq("id", usuario.id);
-
-    if (error) {
+    setErroMembro("");
+    try {
+      const res = await fetch("/api/ministerio/membro", {
+        method: jaEsta ? "DELETE" : "POST",
+        headers: await authJsonHeaders(),
+        body: JSON.stringify({ usuarioId: usuario.id, ministerio: ministerioDb, ...(!jaEsta ? { funcao: "Voluntário(a)" } : {}) }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error ?? "Não foi possível atualizar o membro.");
+    } catch (error) {
       setMinisteriosOverrides((prev) => ({ ...prev, [usuario.id]: anteriores }));
+      setErroMembro(error instanceof Error ? error.message : "Não foi possível atualizar o membro.");
     }
 
     setSalvandoIds((prev) => {
@@ -357,6 +367,7 @@ function MinisteriosTab({
         <div>
           <h1 className="text-2xl font-sans font-semibold text-black">Ministérios</h1>
           <p className="text-sm text-gray-500">{ministeriosLista.length} ministérios cadastrados</p>
+          <p className="mt-1 text-sm text-gray-500">Gerencie os membros aqui. Para organizar equipes e funções de serviço, use “Equipes e funções” no ministério desejado.</p>
         </div>
 
         <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
@@ -385,6 +396,7 @@ function MinisteriosTab({
           {erroCriacao && <p className="mt-3 rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-xs text-red-600">{erroCriacao}</p>}
         </div>
       </div>
+      {erroMembro && <p role="alert" className="rounded-lg border border-red-100 bg-red-50 p-3 text-sm text-red-700">{erroMembro}</p>}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {ministeriosLista.map((min) => {
           const membros = usuariosRender.filter((u) => u.ministerios?.some((m) => displayMinisterio(m) === displayMinisterio(min)));
@@ -406,6 +418,7 @@ function MinisteriosTab({
                   >
                     <Users className="w-3 h-3" /> {isEditing ? "Fechar" : "Membros"}
                   </button>
+                  <a href={`/dashboard/ministerio/${encodeURIComponent(min)}?tab=equipes`} className="text-white/80 hover:text-white text-xs bg-white/10 hover:bg-white/20 px-2.5 py-1.5 rounded-lg transition flex items-center gap-1"><Layers className="w-3 h-3" /> Equipes e funções</a>
                 </div>
               </div>
               <div className="px-5 py-4">
@@ -675,7 +688,7 @@ function EditarUsuarioPanel({
         {/* Role */}
         {podeatribuir && (
           <div>
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Role</p>
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Perfil de acesso</p>
             <div className="flex flex-wrap gap-1.5">
               {ROLES.map((r) => (
                 <button
@@ -693,7 +706,7 @@ function EditarUsuarioPanel({
               ))}
             </div>
             <p className="text-[10px] text-gray-400 mt-1.5">
-              Mudar o role redefine as permissões para o padrão do novo role.
+              Define o acesso geral ao sistema. Ao mudar o perfil, as permissões voltam ao padrão dele.
             </p>
           </div>
         )}
@@ -701,6 +714,7 @@ function EditarUsuarioPanel({
         {/* Ministérios */}
         <div>
           <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Ministérios</p>
+          <p className="text-xs text-gray-500 mb-2">Ministérios dos quais esta pessoa participa.</p>
           <div className="flex flex-wrap gap-1.5">
             {ministerios.map((m) => {
               const ativo = usuario.ministerios.includes(m);
@@ -711,6 +725,7 @@ function EditarUsuarioPanel({
                     ministerios: ativo
                       ? usuario.ministerios.filter((x) => x !== m)
                       : [...usuario.ministerios, m],
+                    ...(ativo && usuario.liderMinisterios?.includes(m) ? { liderMinisterios: usuario.liderMinisterios.filter((x) => x !== m) } : {}),
                   })}
                   disabled={!podeatribuir}
                   className={clsx(
@@ -727,12 +742,14 @@ function EditarUsuarioPanel({
           </div>
         </div>
 
+        <FuncoesUsuarioAdmin key={usuario.id} usuarioId={usuario.id} ministerios={usuario.ministerios} />
+
         {/* Líder de Ministérios */}
         {podeatribuir && (
           <div>
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Líder de Ministério</p>
             <p className="text-[10px] text-gray-400 mb-2 leading-relaxed">
-              Dá privilégios de organização (escala, membros, eventos, avisos) dentro do ministério, independente do role global.
+              Dá privilégios de organização dentro do ministério. Marcar como líder também adiciona a pessoa ao ministério.
             </p>
             <div className="flex flex-wrap gap-1.5">
               {ministerios.map((m) => {
@@ -744,6 +761,7 @@ function EditarUsuarioPanel({
                       liderMinisterios: eLider
                         ? (usuario.liderMinisterios ?? []).filter((x) => x !== m)
                         : [...(usuario.liderMinisterios ?? []), m],
+                      ...(!eLider && !usuario.ministerios.includes(m) ? { ministerios: [...usuario.ministerios, m] } : {}),
                     })}
                     className={clsx(
                       "text-xs px-2.5 py-1 rounded-full border transition flex items-center gap-1",

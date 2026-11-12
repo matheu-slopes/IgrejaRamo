@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
   // Busca os ministérios atuais do usuário
   const { data: perfil, error: fetchError } = await admin
     .from("perfis")
-    .select("ministerios")
+    .select("ministerios, lider_ministerios")
     .eq("id", usuarioId)
     .single();
 
@@ -72,7 +72,7 @@ export async function DELETE(req: NextRequest) {
 
   const { data: perfil, error: perfilError } = await admin
     .from("perfis")
-    .select("ministerios")
+    .select("ministerios, lider_ministerios")
     .eq("id", usuarioId)
     .single();
 
@@ -84,7 +84,7 @@ export async function DELETE(req: NextRequest) {
 
   const { error: updateError } = await admin
     .from("perfis")
-    .update({ ministerios: ministeriosAtuais.filter((m) => m !== ministerio) })
+    .update({ ministerios: ministeriosAtuais.filter((m) => m !== ministerio), lider_ministerios: (perfil.lider_ministerios ?? []).filter((m: string) => m !== ministerio) })
     .eq("id", usuarioId);
 
   if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 });

@@ -23,6 +23,7 @@ import { MusicasOrdenaveis } from "./MusicasOrdenaveis";
 import { hojeEmSaoPaulo, moverPeriodoDeCultos, periodoDeCultos, prioridadeParticipanteLouvor } from "@/lib/louvorSchedule";
 import { authJsonHeaders } from "@/lib/authHeaders";
 import type { EquipeMinisterio } from "@/lib/equipesMinisterio";
+import { useFuncoesMinisterio } from "@/hooks/useFuncoesMinisterio";
 
 // --- Constantes ---------------------------------------------------------------
 
@@ -30,19 +31,6 @@ export const TONS = [
   "C","C#","Db","D","D#","Eb","E","F","F#","Gb","G","G#","Ab","A","A#","Bb","B",
   "Cm","C#m","Dm","D#m","Ebm","Em","Fm","F#m","Gm","G#m","Am","A#m","Bbm","Bm",
 ];
-
-export const FUNCOES_POR_MIN: Record<string, string[]> = {
-  Louvor:        ["Ministro","Backing Vocal","Guitarra","Violão","Baixo","Teclado","Cajón"],
-  "Mídias":      ["Projeção","Transmissão","Videomaker"],
-  Recepcionamento: ["Abertura","Oferta","Recepção"],
-  Limpeza:       ["Escala de Limpeza"],
-  Infantil:      ["Professor(a)","Auxiliar"],
-  "Ação Social": ["Líder","Voluntário(a)"],
-  Jovens:        ["Discipulador(a)","Recepção","Abertura","Oferta","Pregador(a)"],
-  Ensino:        ["Preletor(a)"],
-  "Oração":       ["Responsável"],
-};
-const FUNCOES_GENERICAS = ["Responsável"];
 
 type TemplateEncontro = {
   id: string;
@@ -184,32 +172,7 @@ function parseInfantilObs(raw: string | undefined): { ageGroup: string; tema: st
   return { ageGroup: parts[0].trim(), tema: (parts[1] ?? "").trim() };
 }
 
-// O DB usa ENUM funcao_escala que ainda não tem Cajón/Pandeiro/Violão nem variantes gender-neutral.
-// Mapeamos para o valor válido mais próximo e preservamos o nome real em observacao.
-const FUNCAO_DB_MAP: Partial<Record<string, string>> = {
-  "Cajón":        "Bateria",
-  "Pandeiro":     "Bateria",
-  "Violão":       "Guitarra",
-  "Professor(a)": "Professora",
-  "Monitor(a)":   "Monitor",
-  "Auxiliar":      "Monitor",
-  "Voluntário(a)": "Voluntário",
-  "Preletor(a)":  "Ministro",
-  "Abertura":     "Abertura/Oferta",
-  "Oferta":       "Abertura/Oferta",
-  "Responsável":  "Abertura/Oferta",
-  "Líder":        "Abertura/Oferta",
-  "Palavra":      "Ministro",
-  "Pregador(a)":  "Ministro",
-  "Recepção":     "Abertura/Oferta",
-  "Apoio":        "Abertura/Oferta",
-  "Discipulador(a)": "Ministro",
-  "Projeção":     "Projeção/Letras",
-  "Foto":         "Fotografia",
-  "Videomaker":   "Fotografia",
-  "Foto/Vídeo":   "Fotografia",
-  "Câmera":       "Fotografia",
-};
+// Observações antigas podem conter o nome que substituía um valor do antigo enum.
 const FUNCAO_ALIAS_SET = new Set(["Cajón", "Pandeiro", "Violão", "Professor(a)", "Monitor(a)", "Auxiliar", "Voluntário(a)", "Preletor(a)", "Abertura", "Oferta", "Responsável", "Líder", "Discipulador(a)", "Palavra", "Pregador(a)", "Recepção", "Apoio", "Projeção", "Foto", "Videomaker", "Foto/Vídeo", "Câmera"]);
 
 function splitAliasObs(obs?: string): { alias?: string; obs?: string } {
@@ -227,12 +190,6 @@ export function displayFuncao(it: { funcao: string; observacao?: string }): stri
   if (alias === "Palavra") return "Pregador(a)";
   if (alias === "Foto" || alias === "Foto/Vídeo" || alias === "Câmera") return "Videomaker";
   if (alias) return alias;
-  if (it.funcao === "Bateria") return "Cajón";
-  if (it.funcao === "Professora") return "Professor(a)";
-  if (it.funcao === "Monitor") return "Monitor(a)";
-  if (it.funcao === "Voluntário") return "Voluntário(a)";
-  if (it.funcao === "Projeção/Letras") return "Projeção";
-  if (it.funcao === "Fotografia") return "Videomaker";
   return it.funcao;
 }
 /** Retorna a observação real (ocultando alias de instrumento que já aparece em displayFuncao) */
@@ -241,10 +198,6 @@ export function displayObs(it: { observacao?: string }): string | undefined {
 }
 /** Normaliza funcao para salvar no DB (resolve aliases ? enum válido + preserva em obs) */
 function normalizeFuncaoParaDB(funcao: string, obs?: string): { funcao: string; observacao: string | null } {
-  const mapped = FUNCAO_DB_MAP[funcao];
-  if (mapped) {
-    return { funcao: mapped, observacao: obs ? `${funcao} · ${obs}` : funcao };
-  }
   return { funcao, observacao: obs || null };
 }
 
@@ -597,6 +550,7 @@ export function EscalasTab({
 }) {
   const { user, isLoading } = useAuth();
   const [membros, setMembros] = useState<MembroMinisterio[]>([]);
+  const { funcoes: funcoesConfiguradas, erroFuncoes } = useFuncoesMinisterio(ministerio);
   const [equipes, setEquipes] = useState<EquipeMinisterio[]>([]);
   const [erroEquipes, setErroEquipes] = useState(false);
   useEffect(() => {
@@ -847,7 +801,6 @@ export function EscalasTab({
   const [subTab, setSubTab] = useState<EscalaSubTab>("detalhes");
   const [form, setForm] = useState<EscalaForm>(EMPTY_FORM);
   const [novoMembroId, setNovoMembroId] = useState("");
-  const [novaFuncao, setNovaFuncao] = useState<string>((FUNCOES_POR_MIN[ministerio] ?? FUNCOES_GENERICAS)[0]);
   const [novasFuncoes, setNovasFuncoes] = useState<string[]>([]);
   const [novaObs, setNovaObs] = useState("");
   const [buscaMusica, setBuscaMusica] = useState("");
@@ -924,12 +877,12 @@ export function EscalasTab({
     setLoadingCifraInline(false);
   }
 
-  const funcoesMinisterio = FUNCOES_POR_MIN[ministerio] ?? FUNCOES_GENERICAS;
-  const funcaoFixaOculta = ministerio === "Limpeza" || ministerio === "Oração";
+  const funcoesMinisterio = funcoesConfiguradas.map((f) => f.nome);
+  const funcaoFixaOculta = (ministerio === "Limpeza" || ministerio === "Oração") && funcoesMinisterio.length === 1;
   const participanteUnico = ministerio === "Oração";
   const funcoesUnicas = new Set<string>(
     ministerio === "Louvor"
-      ? funcoesMinisterio.filter((f) => f !== "Backing Vocal")
+      ? funcoesMinisterio.filter((f) => ["Ministro", "Guitarra", "Violão", "Baixo", "Teclado", "Cajón"].includes(f))
       : ministerio === "Jovens"
         ? ["Abertura", "Oferta", "Pregador(a)", "Palavra"]
         : ministerio === "Mídias"
@@ -1081,12 +1034,11 @@ export function EscalasTab({
     if (!equipe) { setForm((f) => ({ ...f, equipe: "" })); return; }
     const membrosAtuais = new Map(membros.map((m) => [m.id, m]));
     const itens: import("@/types").ItemEscala[] = equipe.membros.filter((m) => membrosAtuais.has(m.usuarioId)).map((m) => {
-      const alias = FUNCAO_DB_MAP[m.funcao];
       return {
-        funcao: (alias ?? m.funcao) as import("@/types").FuncaoEscala,
+        funcao: m.funcao as import("@/types").FuncaoEscala,
         voluntarioId: m.usuarioId,
         voluntarioNome: membrosAtuais.get(m.usuarioId)!.nome,
-        observacao: alias ? m.funcao : undefined,
+        observacao: undefined,
       };
     });
     setForm((f) => ({ ...f, equipe: label, itens }));
@@ -1461,7 +1413,6 @@ export function EscalasTab({
     setAdicionandoParticipante(false);
     setNovoMembroId("");
     setNovaObs("");
-    setNovaFuncao(funcoesMinisterio[0]);
     setNovasFuncoes([]);
   }
 
@@ -2775,6 +2726,7 @@ export function EscalasTab({
             return (
               <div className="border border-gray-200 rounded-xl p-3 space-y-3 bg-gray-50">
                 <p className="text-xs font-semibold text-gray-600">Adicionar participante</p>
+                {erroFuncoes && <p role="alert" className="text-sm text-red-600">{erroFuncoes}</p>}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <MembroSearchSelect
                     value={novoMembroId}

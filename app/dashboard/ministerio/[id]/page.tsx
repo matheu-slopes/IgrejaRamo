@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { authJsonHeaders } from "@/lib/authHeaders";
 import {
@@ -43,11 +43,12 @@ const corMap: Record<string, string> = {
 
 export default function CanalMinisterioPage() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const slug = decodeURIComponent(params.id as string) as Ministerio;
   const { user, isLoading, temPermissao, temPermissaoNoMinisterio } = useAuth();
 
   // ── estado global ─────────────────────────────────────────────────────
-  const [tab, setTab] = useState<Tab>(() => slug === "Ensino" ? "chat" : "escalas");
+  const [tab, setTab] = useState<Tab>(() => searchParams.get("tab") === "equipes" ? "equipes" : slug === "Ensino" ? "chat" : "escalas");
   const [canalBase, setCanalBase] = useState<{ ministerio: string; descricao: string; chatBloqueado: boolean; cor: string } | null>(null);
   const [chatBloqueado, setChatBloqueado] = useState(false);
   const [studioAccess, setStudioAccess] = useState({
@@ -139,8 +140,8 @@ export default function CanalMinisterioPage() {
 
   useEffect(() => {
     // Ao trocar de ministério, abre sua área principal. Ensino não possui escalas.
-    setTab(temEscalas ? "escalas" : "chat");
-  }, [slug, temEscalas]);
+    setTab(searchParams.get("tab") === "equipes" ? "equipes" : temEscalas ? "escalas" : "chat");
+  }, [slug, temEscalas, searchParams]);
 
   if (isLoading || !canalBase) {
     return (
