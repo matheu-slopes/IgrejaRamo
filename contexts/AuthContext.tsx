@@ -12,6 +12,7 @@ import { supabase } from "@/lib/supabase";
 import { authJsonHeaders } from "@/lib/authHeaders";
 import { temPermissao as checkPermissao, temPermissaoNoMinisterio as checkPermissaoMin } from "@/lib/permissions";
 import { useAppRefresh } from "@/hooks/useAppRefresh";
+import { limparCacheDeFotos } from "@/lib/cacheFotosPerfis";
 
 // Converte linha da tabela `perfis` para o tipo User do app
 function rowToUser(row: Record<string, unknown>): User {
@@ -186,6 +187,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Limpa somente do cliente para evitar loop de erro no console.
         await supabase.auth.signOut({ scope: "local" });
         clearUserCache();
+        limparCacheDeFotos();
         setUser(null);
         setUsuarios([]);
         initialLoadDone = true;
@@ -233,6 +235,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }, 0);
       } else if (event === "SIGNED_OUT") {
         clearUserCache();
+        limparCacheDeFotos();
         setUser(null);
         setUsuarios([]);
       }
@@ -326,6 +329,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   function logout() {
     clearUserCache();
+    limparCacheDeFotos();
     supabase.auth.signOut();
   }
 

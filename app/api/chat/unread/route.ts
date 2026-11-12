@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { inicioSeguroDeMensagens } from "@/lib/chatUnreadWindow";
 
 const admin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -137,7 +138,8 @@ export async function GET(req: NextRequest) {
     (cursors ?? []).map((cursor: { conversa_id: string; last_read_message_id: string | null }) => [cursor.conversa_id, cursor])
   );
 
-  let { data: messages, error: msgErr } = await admin
+  const inicioSeguro = inicioSeguroDeMensagens(participacoes ?? [], cursors ?? [], readMessageById);
+  let mensagensQuery = admin
     .from("chat_mensagens")
     .select("id, conversa_id, autor_id, criado_em, sequence_id")
     .in("conversa_id", conversaIds)
@@ -145,15 +147,20 @@ export async function GET(req: NextRequest) {
     .order("sequence_id", { ascending: true })
     .order("criado_em", { ascending: true })
     .limit(5000);
+  // Mantém timestamps nulos para preservar o comportamento das mensagens antigas.
+  if (inicioSeguro) mensagensQuery = mensagensQuery.or(`criado_em.is.null,criado_em.gte.${inicioSeguro}`);
+  let { data: messages, error: msgErr } = await mensagensQuery;
 
   if (msgErr && isMissingSequenceColumn(msgErr)) {
-    const fallbackMessages = await admin
+    let fallbackQuery = admin
       .from("chat_mensagens")
       .select("id, conversa_id, autor_id, criado_em")
       .in("conversa_id", conversaIds)
       .neq("autor_id", user.id)
       .order("criado_em", { ascending: true })
       .limit(5000);
+    if (inicioSeguro) fallbackQuery = fallbackQuery.or(`criado_em.is.null,criado_em.gte.${inicioSeguro}`);
+    const fallbackMessages = await fallbackQuery;
     messages = (fallbackMessages.data ?? []).map((m: { id: string; conversa_id: string; autor_id: string; criado_em: string | null }) => ({ ...m, sequence_id: null }));
     msgErr = fallbackMessages.error;
   }

@@ -85,3 +85,9 @@ test("as rotas de áudio e imagem usam o destino autorizado", async () => {
   assert.equal(negado.resposta.status, 403);
   assert.equal(negado.uploads.length, 0);
 });
+
+test("a API rejeita vídeos mesmo quando enviados diretamente", async () => {
+  const video = await executarRota("app/api/chat/upload-arquivo/route.ts", new File(["video"], "video.mp4", { type: "video/mp4" }), "video", true);
+  assert.equal(video.resposta.status, 400);
+  assert.equal(video.uploads.length, 0);
+});

@@ -26,16 +26,8 @@ const DOC_TYPES: Record<string, string> = {
   "text/plain": "txt",
 };
 
-const VIDEO_TYPES: Record<string, string> = {
-  "video/mp4": "mp4",
-  "video/webm": "webm",
-  "video/quicktime": "mov",
-  "video/x-msvideo": "avi",
-};
-
 const MAX_AUDIO_BYTES = 10 * 1024 * 1024; // 10 MB
 const MAX_DOC_BYTES   = 20 * 1024 * 1024; // 20 MB
-const MAX_VIDEO_BYTES = 50 * 1024 * 1024; // 50 MB
 
 export async function POST(req: NextRequest) {
   const token = req.headers.get("authorization")?.replace("Bearer ", "").trim();
@@ -47,7 +39,7 @@ export async function POST(req: NextRequest) {
   const formData = await req.formData();
   const file       = formData.get("file")        as File   | null;
   const conversaId = formData.get("conversa_id") as string | null;
-  const fileType   = formData.get("file_type")   as string | null; // "audio" | "documento" | "video"
+  const fileType   = formData.get("file_type")   as string | null; // "audio" | "documento"
 
   if (!(file instanceof File) || typeof conversaId !== "string" || !conversaId || typeof fileType !== "string" || !fileType) {
     return NextResponse.json({ error: "Campos obrigatórios ausentes" }, { status: 400 });
@@ -72,10 +64,7 @@ export async function POST(req: NextRequest) {
     if (file.size > MAX_DOC_BYTES) return NextResponse.json({ error: "Documento muito grande (máx 20 MB)" }, { status: 413 });
     prefix = "doc";
   } else if (fileType === "video") {
-    ext = VIDEO_TYPES[mimeBase];
-    if (!ext) return NextResponse.json({ error: `Tipo de vídeo não suportado: ${mimeBase}` }, { status: 400 });
-    if (file.size > MAX_VIDEO_BYTES) return NextResponse.json({ error: "Vídeo muito grande (máx 50 MB)" }, { status: 413 });
-    prefix = "video";
+    return NextResponse.json({ error: "Envio de vídeos ainda não está disponível." }, { status: 400 });
   } else {
     return NextResponse.json({ error: "file_type inválido" }, { status: 400 });
   }

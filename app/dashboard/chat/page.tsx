@@ -5,6 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useChatUnread } from "@/contexts/ChatUnreadContext";
 import { supabase } from "@/lib/supabase";
 import { useAppRefresh } from "@/hooks/useAppRefresh";
+import { guardarFotosEmCache, obterFotosEmCache } from "@/lib/cacheFotosPerfis";
 import { ConversaDireta, Grupo, MensagemConversa, User } from "@/types";
 import {
   MessageSquare, Users, Send, ArrowLeft, Search, Lock, Plus,
@@ -1577,18 +1578,22 @@ function UserAvatar({ nome, foto, size = "md" }: { nome: string; foto?: string; 
 
 export default function ChatPage() {
   const { user, usuarios: usuariosBase } = useAuth();
-  const [fotosUsuarios, setFotosUsuarios] = useState<Record<string, string>>({});
+  const [fotosUsuarios, setFotosUsuarios] = useState<{ usuarioId: string; fotos: Record<string, string> } | null>(null);
   const usuarios = useMemo(() => usuariosBase.map((usuario) => ({
     ...usuario,
-    foto: usuario.foto ?? fotosUsuarios[usuario.id],
-  })), [usuariosBase, fotosUsuarios]);
+    foto: usuario.foto ?? (fotosUsuarios && fotosUsuarios.usuarioId === user?.id ? fotosUsuarios.fotos[usuario.id] : undefined),
+  })), [usuariosBase, fotosUsuarios, user?.id]);
 
   useEffect(() => {
-    if (!user?.id) { setFotosUsuarios({}); return; }
+    if (!user?.id) { setFotosUsuarios(null); return; }
+    const fotosCache = obterFotosEmCache(user.id);
+    if (fotosCache) { setFotosUsuarios({ usuarioId: user.id, fotos: fotosCache }); return; }
     let ativo = true;
     void supabase.from("perfis").select("id,foto").not("foto", "is", null).then(({ data, error }) => {
       if (!ativo || error || !data) return;
-      setFotosUsuarios(Object.fromEntries(data.filter((perfil) => perfil.foto).map((perfil) => [perfil.id, perfil.foto])));
+      const fotos = Object.fromEntries(data.filter((perfil) => perfil.foto).map((perfil) => [perfil.id, perfil.foto]));
+      guardarFotosEmCache(user.id, fotos);
+      setFotosUsuarios({ usuarioId: user.id, fotos });
     });
     return () => { ativo = false; };
   }, [user?.id]);
