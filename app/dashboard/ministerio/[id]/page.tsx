@@ -567,6 +567,15 @@ function ChatTab({
     setTexto(""); setImagemPreview(null); setAudioUrl(null); setRespostaA(null); setImagemFile(null); setAudioBlob(null);
 
     const blobParaUpload = audioBlob;
+    function restaurarMidia() {
+      if (tipo === "audio" && blobParaUpload && localUrl) {
+        setAudioBlob((atual) => atual ?? blobParaUpload);
+        setAudioUrl((atual) => atual ?? localUrl);
+      } else if (tipo === "imagem" && imagemFile && localUrl) {
+        setImagemFile((atual) => atual ?? imagemFile);
+        setImagemPreview((atual) => atual ?? localUrl);
+      }
+    }
 
     // 2. Upload de mídia via API
     let uploadedUrl: string | null = null;
@@ -581,12 +590,15 @@ function ChatTab({
         const res = await muralFetchWithRetry("/api/chat/upload-imagem", {
           method: "POST", headers: { authorization: `Bearer ${token}` }, body: fd,
         });
-        const json = await res.json();
+        const json = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(json.error ?? "Upload falhou");
+        if (typeof json.url !== "string" || !json.url) throw new Error("O arquivo enviado não ficou disponível.");
         uploadedUrl = json.url;
         setMsgs((prev) => prev.map((m) => m.id === msgId ? { ...m, mediaUrl: uploadedUrl ?? undefined } : m));
       } else if (tipo === "audio" && blobParaUpload) {
-        const audioFile = new File([blobParaUpload], "audio.webm", { type: "audio/webm" });
+        const mimeAudio = blobParaUpload.type.split(";")[0] || "audio/webm";
+        const extensao = mimeAudio === "audio/mp4" ? "m4a" : mimeAudio === "audio/ogg" ? "ogg" : "webm";
+        const audioFile = new File([blobParaUpload], `audio.${extensao}`, { type: mimeAudio });
         const fd = new FormData();
         fd.append("file", audioFile);
         fd.append("conversa_id", `ministerio_${ministerio}`);
@@ -594,15 +606,17 @@ function ChatTab({
         const res = await muralFetchWithRetry("/api/chat/upload-arquivo", {
           method: "POST", headers: { authorization: `Bearer ${token}` }, body: fd,
         });
-        const json = await res.json();
+        const json = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(json.error ?? "Upload falhou");
+        if (typeof json.url !== "string" || !json.url) throw new Error("O arquivo enviado não ficou disponível.");
         uploadedUrl = json.url;
         setMsgs((prev) => prev.map((m) => m.id === msgId ? { ...m, mediaUrl: uploadedUrl ?? undefined } : m));
-      }
+      } else if (tipo === "audio" || tipo === "imagem") throw new Error("A mídia não está disponível. Grave ou selecione novamente.");
     } catch (err) {
       mensagensPendentesRef.current.delete(msgId);
       setMsgs((prev) => prev.filter((m) => m.id !== msgId));
-      alert("Erro ao enviar mídia. Tente novamente.");
+      restaurarMidia();
+      window.alert(err instanceof Error ? `Não foi possível enviar a mídia: ${err.message}` : "Não foi possível enviar a mídia. Tente novamente.");
       console.error(err);
       return;
     }
@@ -642,6 +656,7 @@ function ChatTab({
     } catch (err) {
       console.error("ministerio enviar error:", err);
       setMsgs((prev) => prev.filter((m) => m.id !== msgId));
+      restaurarMidia();
       window.alert(err instanceof Error ? err.message : "Não foi possível enviar a mensagem.");
     } finally { mensagensPendentesRef.current.delete(msgId); }
   }
@@ -679,7 +694,8 @@ function ChatTab({
       chunksRef.current = [];
       mr.ondataavailable = (e) => chunksRef.current.push(e.data);
       mr.onstop = () => {
-        const blob = new Blob(chunksRef.current, { type: "audio/webm" });
+        const primeiroTrecho = chunksRef.current[0];
+        const blob = new Blob(chunksRef.current, { type: mr.mimeType || (primeiroTrecho instanceof Blob ? primeiroTrecho.type : "") || "audio/webm" });
         setAudioBlob(blob);
         setAudioUrl(URL.createObjectURL(blob)); // preview local
         stream.getTracks().forEach((t) => t.stop());

@@ -1,6 +1,6 @@
 ﻿import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { isChatMember } from "@/lib/chatServerAuth";
+import { autorizarUploadChat } from "@/lib/chatUploadAuth";
 
 const admin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -22,12 +22,11 @@ export async function POST(req: NextRequest) {
   const file = formData.get("file") as File | null;
   const conversaId = formData.get("conversa_id") as string | null;
 
-  if (!file || !conversaId) {
+  if (!(file instanceof File) || typeof conversaId !== "string" || !conversaId) {
     return NextResponse.json({ error: "Arquivo e conversa_id obrigatórios" }, { status: 400 });
   }
-  if (!(await isChatMember(admin, conversaId, user.id))) {
-    return NextResponse.json({ error: "Você não participa desta conversa" }, { status: 403 });
-  }
+  const acesso = await autorizarUploadChat(admin, conversaId, user.id);
+  if (!acesso.ok) return NextResponse.json({ error: acesso.erro }, { status: acesso.status });
 
   // Valida tipo MIME
   if (!["image/jpeg", "image/png", "image/webp", "image/gif"].includes(file.type)) {
@@ -40,7 +39,7 @@ export async function POST(req: NextRequest) {
   }
 
   const ext = file.type.split("/")[1].replace("jpeg", "jpg");
-  const path = `${user.id}/${conversaId}/${Date.now()}.${ext}`;
+  const path = `${user.id}/${acesso.caminho}/${Date.now()}.${ext}`;
 
   const { error: uploadError } = await admin.storage
     .from("chat-imagens")

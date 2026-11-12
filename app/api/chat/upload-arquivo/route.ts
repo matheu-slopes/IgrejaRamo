@@ -1,6 +1,6 @@
 ﻿import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { isChatMember } from "@/lib/chatServerAuth";
+import { autorizarUploadChat } from "@/lib/chatUploadAuth";
 
 const admin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -49,12 +49,11 @@ export async function POST(req: NextRequest) {
   const conversaId = formData.get("conversa_id") as string | null;
   const fileType   = formData.get("file_type")   as string | null; // "audio" | "documento" | "video"
 
-  if (!file || !conversaId || !fileType) {
+  if (!(file instanceof File) || typeof conversaId !== "string" || !conversaId || typeof fileType !== "string" || !fileType) {
     return NextResponse.json({ error: "Campos obrigatórios ausentes" }, { status: 400 });
   }
-  if (!(await isChatMember(admin, conversaId, user.id))) {
-    return NextResponse.json({ error: "Você não participa desta conversa" }, { status: 403 });
-  }
+  const acesso = await autorizarUploadChat(admin, conversaId, user.id);
+  if (!acesso.ok) return NextResponse.json({ error: acesso.erro }, { status: acesso.status });
 
   const mime = file.type;
   // Normaliza MIME: remove parâmetros extras (ex: "audio/webm;codecs=opus" → "audio/webm")
@@ -83,7 +82,7 @@ export async function POST(req: NextRequest) {
 
   // Sanitiza o nome original do arquivo (remove caracteres perigosos)
   const safeName = file.name.replace(/[^a-zA-Z0-9._\-\u00C0-\u024F]/g, "_").slice(0, 100);
-  const path = `${user.id}/${conversaId}/${prefix}_${Date.now()}_${safeName}`;
+  const path = `${user.id}/${acesso.caminho}/${prefix}_${Date.now()}_${safeName}`;
 
   const { error: uploadError } = await admin.storage
     .from("chat-midias")
