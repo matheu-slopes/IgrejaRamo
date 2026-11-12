@@ -199,14 +199,14 @@ export default function CanalMinisterioPage() {
   }
 
   return (
-    <div className="space-y-0">
+    <div className={tab === "chat" ? "flex h-full min-h-0 flex-col" : "space-y-0"}>
       {/* Header do canal */}
-      <div className={clsx("rounded-2xl px-4 py-4 md:px-6 md:py-5 mb-6 text-white overflow-hidden", corBg)}>
+      <div className={clsx("shrink-0 rounded-2xl px-4 md:px-6 text-white overflow-hidden", tab === "chat" ? "mb-3 py-3" : "mb-6 py-4 md:py-5", corBg)}>
         {/* Título e descrição */}
         <p className="text-xs uppercase tracking-widest opacity-60 mb-0.5">Canal</p>
         <h1 className="text-2xl font-sans font-semibold">{nomeCanal}</h1>
         {canalBase.descricao && (
-          <p className="text-sm opacity-70 mt-1">{canalBase.descricao}</p>
+          <p className={clsx("text-sm opacity-70 mt-1", tab === "chat" && "hidden sm:block")}>{canalBase.descricao}</p>
         )}
 
         {/* Botão de bloqueio de chat — abaixo do título, só na tab chat */}
@@ -215,7 +215,7 @@ export default function CanalMinisterioPage() {
               onClick={() => void alterarChat()}
               disabled={!podeBloquearChat || alterandoChat}
             className={clsx(
-              "mt-3 flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full border transition",
+              "mt-2 flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full border transition",
               !podeBloquearChat && "opacity-40 cursor-not-allowed",
               chatBloqueado
                 ? "border-white/40 text-white bg-white/20 hover:bg-white/30"
@@ -227,7 +227,7 @@ export default function CanalMinisterioPage() {
         )}
 
         {/* Tabs com scrollbar visível */}
-        <div className="mt-4 border-t border-white/20 pt-3">
+        <div className={clsx("border-t border-white/20", tab === "chat" ? "mt-2 pt-2" : "mt-4 pt-3")}>
           <div
             className="tabs-scroll flex items-center gap-1 overflow-x-auto pb-2"
             style={{
@@ -755,12 +755,12 @@ function ChatTab({
   const temMidia = !!imagemPreview || !!audioUrl;
 
   return (
-    <div className="flex min-w-0 flex-col gap-4 lg:flex-row lg:items-stretch">
+    <div className="relative flex min-h-[12rem] min-w-0 flex-1 gap-3">
       {/* ── Área principal do chat ── */}
-      <div className="flex h-[max(24rem,calc(100dvh-20rem))] min-h-0 min-w-0 flex-col lg:h-[max(24rem,calc(100dvh-21rem))] lg:flex-1">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
         {/* Mensagem fixada */}
         {fixadas.length > 0 && (
-          <div className="mb-3 bg-gold-50 border border-gold-200 rounded-xl px-4 py-2 flex items-center gap-2">
+          <div className="shrink-0 border-b border-gold-200 bg-gold-50 px-4 py-2 flex items-center gap-2">
             <Pin className="w-3.5 h-3.5 text-gold-600 shrink-0" />
             <div className="flex-1 min-w-0">
               <p className="text-[11px] font-semibold text-gold-700 mb-0.5">Fixada</p>
@@ -780,14 +780,14 @@ function ChatTab({
         )}
 
         {chatBloqueado && (
-          <div className="mb-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5 flex items-center gap-2 text-amber-700 text-xs">
+          <div className="shrink-0 border-b border-amber-200 bg-amber-50 px-4 py-2.5 flex items-center gap-2 text-amber-700 text-xs">
             <Lock className="w-3.5 h-3.5" />
             <span>Chat fechado. Somente líderes, colíderes e administradores podem enviar mensagens.</span>
           </div>
         )}
 
         {/* Atalhos Mídia / Links / Favoritos */}
-        <div className="flex gap-1.5 mb-2">
+        <div className="flex shrink-0 flex-wrap items-center gap-1.5 border-b border-gray-100 bg-white px-3 py-2 sm:px-4">
           {([
             { id: "midia" as InfoPanel,     label: `Mídia (${midiaMsgs.length})`,    icon: Grid3x3 },
             { id: "links" as InfoPanel,     label: `Links (${linksMsgs.length})`,    icon: Link2   },
@@ -797,7 +797,7 @@ function ChatTab({
               key={id}
               onClick={() => setInfoPanel(infoPanel === id ? null : id)}
               className={clsx(
-                "flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-xl border transition",
+                "flex min-h-9 items-center gap-1.5 rounded-full border px-3 text-xs font-medium transition",
                 infoPanel === id
                   ? "bg-vine-700 text-white border-vine-700"
                   : "bg-white text-gray-500 border-gray-200 hover:border-vine-300 hover:text-vine-700"
@@ -811,15 +811,13 @@ function ChatTab({
         {/* Lista de mensagens */}
         <div
           ref={mensagensRef}
-          className="min-h-0 flex-1 overflow-y-auto bg-gray-50 rounded-xl p-4 space-y-3 border border-gray-100"
+          className="min-h-0 flex-1 space-y-3 overflow-y-auto bg-[#f2f5f1] px-4 py-4 sm:px-6"
           onClick={() => { setMenuId(null); setEmojiMenuId(null); }}
         >
-          {msgs.length === 0 && (
-            <div className="flex h-full min-h-32 items-center justify-center text-center" role="status">
-              <p className="max-w-xs text-sm text-gray-500">
-                {!mensagensCarregadas ? "Carregando mensagens..." : erroMensagens ? "Não foi possível carregar as mensagens agora." : "Nenhuma mensagem ainda. As conversas do ministério aparecerão aqui."}
-              </p>
-            </div>
+          {msgs.length === 0 && (!mensagensCarregadas || erroMensagens) && (
+            <p className="rounded-lg bg-white/90 px-3 py-2 text-sm text-gray-600" role="status">
+              {!mensagensCarregadas ? "Carregando mensagens..." : "Não foi possível carregar as mensagens agora."}
+            </p>
           )}
           {msgs.map((m) => {
             const isMe = !!user && (m.autorId === user.id || m.autorId === "me" || m.autorNome === user.nome);
@@ -1032,6 +1030,7 @@ function ChatTab({
           })}
         </div>
 
+        <div className="shrink-0 border-t border-gray-200 bg-white px-3 pb-3 pt-2 sm:px-4">
         {/* Preview de imagem */}
         {imagemPreview && !audioUrl && (
           <div className="mt-2 bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 flex items-center gap-3">
@@ -1091,17 +1090,18 @@ function ChatTab({
 
         {/* Compose bar */}
         {!temMidia && !gravando && (
-          <div className="mt-3 flex gap-2">
+          <div className="flex items-center gap-2">
             <input
               value={texto}
               onChange={(e) => setTexto(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && (e.preventDefault(), podeEnviar && enviar())}
               disabled={!podeEnviar}
-              placeholder={podeEnviar ? "Mensagem…" : "Chat bloqueado para membros"}
+              aria-label="Digite uma mensagem"
+              placeholder={podeEnviar ? "Mensagem..." : "Somente a liderança pode enviar mensagens"}
               className={clsx(
-                "flex-1 rounded-xl border px-4 py-2.5 text-sm outline-none transition",
+                "h-11 min-w-0 flex-1 rounded-xl border px-4 text-base outline-none transition sm:text-sm",
                 podeEnviar
-                  ? "border-gray-200 focus:border-vine-400 focus:ring-1 focus:ring-vine-200"
+                  ? "border-gray-300 bg-gray-50 text-gray-900 placeholder:text-gray-500 focus:border-vine-500 focus:bg-white focus:ring-2 focus:ring-vine-100"
                   : "bg-gray-100 text-gray-400 cursor-not-allowed"
               )}
             />
@@ -1110,39 +1110,43 @@ function ChatTab({
                 <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleImageSelect} />
                 <button
                   onClick={() => fileRef.current?.click()}
-                  className="p-2.5 rounded-xl border border-gray-200 bg-white text-gray-500 hover:text-vine-700 hover:border-vine-300 transition"
+                  aria-label="Enviar imagem"
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-600 hover:text-vine-700 hover:border-vine-300 transition"
                   title="Enviar imagem"
                 ><ImageIcon className="w-5 h-5" /></button>
                 <button
                   onClick={iniciarGravacao}
-                  className="p-2.5 rounded-xl border border-gray-200 bg-white text-gray-500 hover:text-vine-700 hover:border-vine-300 transition"
+                  aria-label="Gravar áudio"
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-600 hover:text-vine-700 hover:border-vine-300 transition"
                   title="Gravar áudio"
                 ><Mic className="w-5 h-5" /></button>
               </>
             )}
             <button
               onClick={() => enviar()}
+              aria-label="Enviar mensagem"
               disabled={!podeEnviar || !texto.trim()}
-              className={clsx("p-2.5 rounded-xl transition",
+              className={clsx("flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition",
                 podeEnviar && texto.trim()
                   ? "bg-vine-700 text-white hover:bg-vine-600"
-                  : "bg-gray-100 text-gray-300 cursor-not-allowed"
+                  : "bg-vine-50 text-vine-400 cursor-not-allowed"
               )}
             ><Send className="w-4 h-4" /></button>
           </div>
         )}
+        </div>
       </div>
 
       {/* ── Painel lateral: Mídia / Links / Favoritos ── */}
       {infoPanel && (
-        <div className="flex h-64 w-full min-h-0 flex-col overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm lg:h-auto lg:w-72 lg:shrink-0">
+        <div className="absolute inset-0 z-10 flex min-h-0 flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-lg lg:static lg:w-72 lg:shrink-0 lg:shadow-sm">
           <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
             <p className="text-sm font-semibold text-gray-800">
               {infoPanel === "midia" && "Galeria de Mídia"}
               {infoPanel === "links" && "Links compartilhados"}
               {infoPanel === "favoritos" && "Mensagens favoritas"}
             </p>
-            <button onClick={() => setInfoPanel(null)} className="text-gray-400 hover:text-gray-600"><X className="w-4 h-4" /></button>
+            <button onClick={() => setInfoPanel(null)} aria-label="Fechar painel" className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-700"><X className="w-4 h-4" /></button>
           </div>
 
           <div className="flex-1 overflow-y-auto p-3">
