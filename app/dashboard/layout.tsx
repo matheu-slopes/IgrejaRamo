@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
+import { authJsonHeaders } from "@/lib/authHeaders";
 import { ChatUnreadProvider } from "@/contexts/ChatUnreadContext";
 import { NotificationsProvider } from "@/contexts/NotificationsContext";
 import Sidebar from "@/components/Sidebar";
@@ -203,7 +204,7 @@ function ProfileDropdown({
                       setSalvandoSenha(true); setErroSenha("");
                       const res = await fetch("/api/alterar-senha", {
                         method: "POST",
-                        headers: { "Content-Type": "application/json" },
+                        headers: await authJsonHeaders(),
                         body: JSON.stringify({ userId: user.id, novaSenha }),
                       });
                       const json = await res.json().catch(() => ({}));
@@ -396,7 +397,7 @@ export default function DashboardLayout({
     setSalvandoPrimeiro(true); setErroPrimeiro("");
     const res = await fetch("/api/alterar-senha", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: await authJsonHeaders(),
       body: JSON.stringify({ userId: user.id, novaSenha: novaSenhaPrimeiro }),
     });
     const json = await res.json().catch(() => ({}));

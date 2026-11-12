@@ -1,7 +1,10 @@
 ﻿import { createClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
+import { forbidden, securityAuth } from "@/lib/securityAuth";
 
 export async function POST(req: NextRequest) {
+  const auth = await securityAuth(req);
+  if (auth.error) return auth.error;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 
@@ -11,6 +14,7 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json();
   const { userId, novaSenha } = body;
+  if (userId !== auth.user.id && (!auth.permissions.includes("gerenciar_usuarios") || !auth.permissions.includes("atribuir_permissoes"))) return forbidden();
 
   if (!userId || !novaSenha || novaSenha.length < 6) {
     return NextResponse.json({ error: "Dados inválidos. Senha mínima de 6 caracteres." }, { status: 400 });

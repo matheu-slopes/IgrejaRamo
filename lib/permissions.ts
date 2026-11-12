@@ -44,17 +44,8 @@ export const DEFAULTS_POR_ROLE: Record<Role, Permissao[]> = {
     "criar_aviso",
     "ver_relatorios",
   ],
-  lider: [
-    "criar_evento",
-    "editar_evento",
-    "criar_escala",
-    "gerenciar_repertorio",
-    "gerenciar_membros_ministerio",
-    "bloquear_chat",
-    "enviar_chat",
-    "fixar_mensagem",
-    "criar_aviso",
-  ],
+  // A liderança de ministério é concedida no contexto do ministério, não globalmente.
+  lider: ["enviar_chat"],
   voluntario: [
     "enviar_chat",
   ],
@@ -123,7 +114,7 @@ export function temPermissaoNoMinisterio(
 ): boolean {
   if (!user) return false;
   // Admin e pastor — permissão global
-  if (temPermissao(user, permissao)) return true;
+  if (user.role !== "lider" && temPermissao(user, permissao)) return true;
   // Usuário é líder nomeado deste ministério?
   const eLider = user.liderMinisterios?.includes(ministerio as import("@/types").Ministerio);
   if (eLider && PERMISSOES_LIDER_MINISTERIO.includes(permissao)) return true;

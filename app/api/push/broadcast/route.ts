@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { sendPushToAll, sendPushToUsers } from "@/lib/sendPush";
+import { securityAuth } from "@/lib/securityAuth";
+import { temPermissaoMinisterio } from "@/lib/ministerioAcesso";
 
 const admin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -40,6 +42,17 @@ export async function POST(req: NextRequest) {
   const { tipo, titulo, conteudo, ministerio, todos, roles, ministerios } = await req.json();
   if (!tipo || !titulo) {
     return NextResponse.json({ error: "tipo e titulo sao obrigatorios" }, { status: 400 });
+  }
+
+  const auth = await securityAuth(req);
+  if (auth.error) return auth.error;
+  if (tipo === "evento" && ministerio) {
+    try { if (!await temPermissaoMinisterio(admin, user.id, ministerio, "criar_evento")) return NextResponse.json({ error: "Sem permissão neste ministério." }, { status: 403 }); }
+    catch { return NextResponse.json({ error: "Não foi possível verificar a permissão." }, { status: 500 }); }
+  } else if (tipo === "evento" && !["admin", "pastor"].includes(auth.perfil.role)) {
+    return NextResponse.json({ error: "Sem permissão para eventos gerais." }, { status: 403 });
+  } else if (tipo === "aviso" && !auth.permissions.includes("criar_aviso")) {
+    return NextResponse.json({ error: "Sem permissão para avisos." }, { status: 403 });
   }
 
   const nowTag = Date.now().toString();

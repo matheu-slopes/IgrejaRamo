@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { securityAuth } from "@/lib/securityAuth";
+import { temPermissaoMinisterio } from "@/lib/ministerioAcesso";
 
 const admin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -57,6 +59,19 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({})) as CreateBody;
   if (!body.titulo || !body.corpo || !body.tipo) {
     return NextResponse.json({ error: "titulo, corpo e tipo sao obrigatorios" }, { status: 400 });
+  }
+
+  const auth = await securityAuth(req);
+  if (auth.error) return auth.error;
+  if (body.tipo === "evento" && body.ministerio) {
+    try { if (!await temPermissaoMinisterio(admin, user.id, body.ministerio, "criar_evento")) return NextResponse.json({ error: "Sem permissão neste ministério." }, { status: 403 }); }
+    catch { return NextResponse.json({ error: "Não foi possível verificar a permissão." }, { status: 500 }); }
+    // Um evento do ministério só pode notificar membros desse ministério.
+    body.usuarioIds = undefined; body.roles = undefined; body.todos = false; body.ministerios = [body.ministerio];
+  } else if (body.tipo === "aviso" && !auth.permissions.includes("criar_aviso")) {
+    return NextResponse.json({ error: "Sem permissão para avisos." }, { status: 403 });
+  } else if (body.tipo !== "aviso" && !(body.tipo === "evento" && body.ministerio) && !["admin", "pastor"].includes(auth.perfil.role)) {
+    return NextResponse.json({ error: "Sem permissão para esta notificação." }, { status: 403 });
   }
 
   try {

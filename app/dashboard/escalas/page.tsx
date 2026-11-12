@@ -608,12 +608,12 @@ function InfantilSection({
 // ─── Card de um culto (agrupa todos os ministérios) ───────────────────────────
 
 function CultoCard({
-  data, escalas, userId, isLider, podeAvisarMinisterio, onGerenciarMinisterio, onAbrirEscala, onConfirmar, confirmandoIds,
+  data, escalas, userId, podeGerenciarMinisterio, podeAvisarMinisterio, onGerenciarMinisterio, onAbrirEscala, onConfirmar, confirmandoIds,
 }: {
   data: string;
   escalas: Escala[];
   userId: string;
-  isLider: boolean;
+  podeGerenciarMinisterio: (ministerio: Ministerio) => boolean;
   podeAvisarMinisterio: (ministerio: Ministerio) => boolean;
   onGerenciarMinisterio: (m: Ministerio) => void;
   onAbrirEscala: (escala: Escala) => void;
@@ -698,7 +698,7 @@ function CultoCard({
                   key="infantil"
                   escalas={escalasInfantil}
                   userId={userId}
-                  isLider={isLider}
+                  isLider={podeGerenciarMinisterio("Infantil")}
                   podeAvisar={podeAvisarMinisterio("Infantil")}
                   onGerenciar={() => onGerenciarMinisterio("Infantil")}
                   onAbrirEscala={onAbrirEscala}
@@ -715,7 +715,7 @@ function CultoCard({
                   ministerio={min}
                   escala={escala}
                   userId={userId}
-                  isLider={isLider}
+                  isLider={podeGerenciarMinisterio(min)}
                   podeAvisar={podeAvisarMinisterio(min)}
                   onGerenciar={() => onGerenciarMinisterio(min)}
                   onAbrir={() => onAbrirEscala(escala)}
@@ -822,7 +822,7 @@ function MinhasEscalasList({
 
 export default function EscalasDashboardPage() {
   const searchParams = useSearchParams();
-  const { user, isLoading, temPermissao, temPermissaoNoMinisterio } = useAuth();
+  const { user, isLoading, temPermissaoNoMinisterio } = useAuth();
   const isAdmin = user?.role === "admin" || user?.role === "pastor";
   const meus = userMinisterios(user);
   const lista = isAdmin ? TODOS : meus;
@@ -959,7 +959,7 @@ export default function EscalasDashboardPage() {
     [minhasEscalas, user?.id]
   );
 
-  const isLider = isAdmin || temPermissao("criar_escala");
+  const isLider = isAdmin || lista.some((ministerio) => temPermissaoNoMinisterio("criar_escala", ministerio));
   const userId = user?.id;
 
   const confirmarEscala = useCallback(async (escalaId: string, acao: "confirmar" | "recusar") => {
@@ -1177,7 +1177,7 @@ export default function EscalasDashboardPage() {
               </p>
               {isLider && (
                 <button
-                  onClick={() => setEditing(lista[0] ?? "Louvor")}
+                  onClick={() => setEditing(lista.find((ministerio) => isAdmin || temPermissaoNoMinisterio("criar_escala", ministerio)) ?? "Louvor")}
                   className="text-sm text-gray-800 font-semibold hover:underline"
                 >
                   + Criar escala
@@ -1203,7 +1203,7 @@ export default function EscalasDashboardPage() {
                       data={data}
                       escalas={escalasPorData[data] ?? []}
                       userId={user?.id ?? ""}
-                      isLider={isLider}
+                      podeGerenciarMinisterio={(ministerio) => isAdmin || temPermissaoNoMinisterio("criar_escala", ministerio)}
                       podeAvisarMinisterio={(ministerio) =>
                         user?.role === "admin" ||
                         user?.role === "pastor" ||
@@ -1228,7 +1228,7 @@ export default function EscalasDashboardPage() {
           escala={modalEscala}
           podeEditar={
             isAdmin ||
-            (temPermissao("criar_escala") && lista.includes(modalEscala.ministerio))
+            temPermissaoNoMinisterio("criar_escala", modalEscala.ministerio)
           }
           onClose={() => setModalEscala(null)}
           onUpdate={(updated) => {

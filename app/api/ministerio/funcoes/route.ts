@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { forbidden, securityAuth } from "@/lib/securityAuth";
+import { temPermissaoMinisterio } from "@/lib/ministerioAcesso";
 
 export async function GET(req: NextRequest) {
   const auth = await securityAuth(req);
@@ -17,7 +18,8 @@ export async function POST(req: NextRequest) {
   let body: { id?: string; ministerio?: string; nome?: string };
   try { body = await req.json(); } catch { return NextResponse.json({ error: "Dados inválidos." }, { status: 400 }); }
   if (!body.ministerio || typeof body.ministerio !== "string") return NextResponse.json({ error: "Informe o ministério." }, { status: 400 });
-  if (!auth.permissions.includes("gerenciar_membros_ministerio") && !auth.perfil.lider_ministerios?.includes(body.ministerio)) return forbidden();
+  try { if (!await temPermissaoMinisterio(auth.admin, auth.user.id, body.ministerio, "gerenciar_membros_ministerio")) return forbidden(); }
+  catch { return NextResponse.json({ error: "Não foi possível verificar a permissão." }, { status: 500 }); }
   const nome = typeof body.nome === "string" ? body.nome.trim() : "";
   if (!nome || nome.length > 80 || /[\r\n]/.test(nome)) return NextResponse.json({ error: "Informe um nome válido para a função." }, { status: 400 });
   const query = body.id
@@ -34,7 +36,8 @@ export async function DELETE(req: NextRequest) {
   let body: { id?: string; ministerio?: string };
   try { body = await req.json(); } catch { return NextResponse.json({ error: "Dados inválidos." }, { status: 400 }); }
   if (!body.id || !body.ministerio) return NextResponse.json({ error: "Informe a função e o ministério." }, { status: 400 });
-  if (!auth.permissions.includes("gerenciar_membros_ministerio") && !auth.perfil.lider_ministerios?.includes(body.ministerio)) return forbidden();
+  try { if (!await temPermissaoMinisterio(auth.admin, auth.user.id, body.ministerio, "gerenciar_membros_ministerio")) return forbidden(); }
+  catch { return NextResponse.json({ error: "Não foi possível verificar a permissão." }, { status: 500 }); }
   const { error } = await auth.admin.from("funcoes_ministerio").update({ ativo: false }).eq("id", body.id).eq("ministerio", body.ministerio);
   if (error) return NextResponse.json({ error: "Não foi possível remover a função." }, { status: 500 });
   return NextResponse.json({ ok: true });

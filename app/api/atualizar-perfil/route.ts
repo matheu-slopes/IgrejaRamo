@@ -1,7 +1,10 @@
 ﻿import { createClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
+import { forbidden, securityAuth } from "@/lib/securityAuth";
 
 export async function POST(req: NextRequest) {
+  const auth = await securityAuth(req);
+  if (auth.error) return auth.error;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 
@@ -15,6 +18,15 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json();
   const { id, ...dados } = body;
+
+  if (id === auth.user.id && typeof dados.email === "string" && dados.email.trim().toLowerCase() === auth.user.email?.toLowerCase()) {
+    delete dados.email;
+  }
+  const ownFields = ["nome", "email", "telefone", "foto", "dataNascimento", "primeiroAcesso"];
+  const ownSafeUpdate = id === auth.user.id && Object.keys(dados).every((key) => ownFields.includes(key));
+  if (!ownSafeUpdate && (!auth.permissions.includes("gerenciar_usuarios") || !auth.permissions.includes("atribuir_permissoes"))) return forbidden();
+  if ((dados.role !== undefined || dados.permissoes !== undefined || dados.liderMinisterios !== undefined)
+      && !auth.permissions.includes("atribuir_permissoes")) return forbidden();
 
   if (!id) {
     return NextResponse.json({ error: "ID do usuário ausente." }, { status: 400 });

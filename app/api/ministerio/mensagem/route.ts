@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { PushDispatchResult, sendPushToUsers } from "@/lib/sendPush";
+import { acessoMinisterio } from "@/lib/ministerioAcesso";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -19,12 +20,27 @@ export async function POST(req: NextRequest) {
   if (authError || !user) return NextResponse.json({ error: "Token inválido" }, { status: 401 });
 
   const body = await req.json();
-  const { id: clientId, ministerio, autor_id, autor_nome, autor_role, conteudo, tipo, media_url, resposta_a } = body;
+  const { id: clientId, ministerio, autor_id, conteudo, tipo, media_url, resposta_a } = body;
 
   if (autor_id !== user.id) return NextResponse.json({ error: "Não autorizado" }, { status: 403 });
   if (!ministerio || !autor_id || (!conteudo && !media_url)) {
     return NextResponse.json({ error: "Campos obrigatórios faltando" }, { status: 400 });
   }
+
+  try {
+    const acesso = await acessoMinisterio(admin, user.id, ministerio);
+    if (!acesso.membro) return NextResponse.json({ error: "Você não participa deste ministério." }, { status: 403 });
+    const { data: canal, error } = await admin.from("canais_ministerio").select("chat_bloqueado").eq("ministerio", ministerio).maybeSingle();
+    if (error || !canal) return NextResponse.json({ error: "Não foi possível verificar o chat." }, { status: 500 });
+    if (canal.chat_bloqueado && !acesso.lider) return NextResponse.json({ error: "Somente líderes e colíderes podem enviar mensagens enquanto o chat está fechado." }, { status: 403 });
+  } catch {
+    return NextResponse.json({ error: "Não foi possível verificar o acesso ao chat." }, { status: 500 });
+  }
+
+  const { data: perfil, error: perfilError } = await admin.from("perfis").select("nome,role").eq("id", user.id).maybeSingle();
+  if (perfilError || !perfil) return NextResponse.json({ error: "Não foi possível identificar o autor." }, { status: 500 });
+  const autor_nome = perfil.nome;
+  const autor_role = perfil.role;
 
   const insertData: Record<string, unknown> = {
     ministerio, autor_id, autor_nome, autor_role, conteudo, tipo: tipo ?? "texto",

@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { sendPushToUsers } from "@/lib/sendPush";
-import { DEFAULTS_POR_ROLE } from "@/lib/permissions";
-import type { Permissao, Role } from "@/types";
+import { acessoMinisterio, temPermissaoMinisterio } from "@/lib/ministerioAcesso";
 
 const admin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -10,25 +9,6 @@ const admin = createClient(
 );
 
 type Acao = "alterada" | "cobrar_pendentes" | "aviso_geral";
-type Perfil = {
-  id: string;
-  role: Role;
-  permissoes?: Permissao[] | null;
-  lider_ministerios?: string[] | null;
-  ativo?: boolean;
-};
-
-function podeEditarEscala(perfil: Perfil, ministerio: string) {
-  const permissoes = perfil.permissoes ?? DEFAULTS_POR_ROLE[perfil.role] ?? [];
-  return permissoes.includes("criar_escala") || Boolean(perfil.lider_ministerios?.includes(ministerio));
-}
-
-function podeEnviarAvisoManual(perfil: Perfil, ministerio: string) {
-  return perfil.role === "admin" ||
-    perfil.role === "pastor" ||
-    Boolean(perfil.lider_ministerios?.includes(ministerio));
-}
-
 function dataPtBr(data: string) {
   return new Intl.DateTimeFormat("pt-BR", { timeZone: "UTC", day: "2-digit", month: "2-digit", year: "numeric" })
     .format(new Date(`${data}T00:00:00Z`));
@@ -62,12 +42,12 @@ export async function POST(req: NextRequest) {
   if (!escala) return NextResponse.json({ ok: false, error: "Escala nao encontrada" }, { status: 404 });
 
   const avisoManual = body.acao === "cobrar_pendentes" || body.acao === "aviso_geral";
-  if (avisoManual && !podeEnviarAvisoManual(perfil as Perfil, escala.ministerio)) {
-    return NextResponse.json({ ok: false, error: "Acao permitida apenas para Admin, Pastor ou lider deste ministerio" }, { status: 403 });
-  }
-  if (!avisoManual && !podeEditarEscala(perfil as Perfil, escala.ministerio)) {
-    return NextResponse.json({ ok: false, error: "Sem permissao para notificar esta escala" }, { status: 403 });
-  }
+  try {
+    const permitido = avisoManual
+      ? (await acessoMinisterio(admin, user.id, escala.ministerio)).lider
+      : await temPermissaoMinisterio(admin, user.id, escala.ministerio, "criar_escala");
+    if (!permitido) return NextResponse.json({ ok: false, error: "Sem permissão para notificar esta escala." }, { status: 403 });
+  } catch { return NextResponse.json({ ok: false, error: "Não foi possível verificar a permissão." }, { status: 500 }); }
 
   if (body.acao === "aviso_geral") {
     const mensagem = body.mensagem?.trim();

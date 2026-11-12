@@ -41,7 +41,8 @@ export async function getLouvorStudioAccess(userId: string): Promise<StudioAcces
 
   const funcao = String(membro?.funcao ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
   const membroLouvor = Boolean(membro) || ministerios.includes("Louvor") || liderMinisterios.includes("Louvor");
-  const gestorLouvor = liderMinisterios.includes("Louvor") || ["ministro", "lider", "colider"].includes(funcao);
+  const { data: delegado } = await louvorStudioAdmin.rpc("tem_permissao_ministerio", { p_user: userId, p_ministerio: "Louvor", p_permissao: "gerenciar_repertorio" });
+  const gestorLouvor = delegado === true || liderMinisterios.includes("Louvor") || ["ministro", "lider", "colider"].includes(funcao);
 
   return {
     podeVer: administrador || membroLouvor,

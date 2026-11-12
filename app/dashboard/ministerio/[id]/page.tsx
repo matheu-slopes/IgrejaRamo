@@ -14,7 +14,7 @@ import {
   Reply,
 } from "lucide-react";
 import clsx from "clsx";
-import { Local, Ministerio, MuralMensagem, MembroMinisterio, Evento, FuncaoMinisterio, Escala, EscalaMusica, Musica, FuncaoEscala, ItemEscala } from "@/types";
+import { Local, Ministerio, MuralMensagem, MembroMinisterio, Evento, FuncaoMinisterio, Escala, EscalaMusica, Musica, FuncaoEscala, ItemEscala, Permissao } from "@/types";
 import { supabase } from "@/lib/supabase";
 import { downloadICS, linkGoogleCalendar, formatarData, diaSemana } from "@/lib/calendarUtils";
 import { EscalasTab, PedidoAnaliseStudio } from "@/components/dashboard/EscalasTab";
@@ -45,12 +45,14 @@ export default function CanalMinisterioPage() {
   const params = useParams();
   const searchParams = useSearchParams();
   const slug = decodeURIComponent(params.id as string) as Ministerio;
-  const { user, isLoading, temPermissao, temPermissaoNoMinisterio } = useAuth();
+  const { user, isLoading, temPermissaoNoMinisterio } = useAuth();
 
   // ── estado global ─────────────────────────────────────────────────────
   const [tab, setTab] = useState<Tab>(() => searchParams.get("tab") === "equipes" ? "equipes" : slug === "Ensino" ? "chat" : "escalas");
   const [canalBase, setCanalBase] = useState<{ ministerio: string; descricao: string; chatBloqueado: boolean; cor: string } | null>(null);
   const [chatBloqueado, setChatBloqueado] = useState(false);
+  const [acessoCanal, setAcessoCanal] = useState<{ lider: boolean; permissoes: string[] }>({ lider: false, permissoes: [] });
+  const [alterandoChat, setAlterandoChat] = useState(false);
   const [studioAccess, setStudioAccess] = useState({
     autorizado: false,
     podeGerenciar: false,
@@ -97,16 +99,37 @@ export default function CanalMinisterioPage() {
 
   useAppRefresh(() => { carregarCanalBase(); }, [slug], { runOnMount: false, minIntervalMs: 3000 });
 
+  useEffect(() => {
+    if (!user?.id) return;
+    let ativo = true;
+    const carregar = async () => {
+      const [lider, membro] = await Promise.all([
+        supabase.rpc("eh_lider_ministerio", { p_user: user.id, p_ministerio: slug }),
+        supabase.from("membros_ministerio").select("permissoes_canal").eq("usuario_id", user.id).eq("ministerio", slug).maybeSingle(),
+      ]);
+      if (ativo) setAcessoCanal({ lider: !lider.error && lider.data === true, permissoes: membro.error ? [] : (membro.data?.permissoes_canal ?? []) });
+    };
+    void carregar();
+    const canal = supabase.channel(`acesso-canal:${slug}:${user.id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "membros_ministerio", filter: `usuario_id=eq.${user.id}` }, () => void carregar())
+      .on("postgres_changes", { event: "*", schema: "public", table: "canais_ministerio", filter: `ministerio=eq.${slug}` }, () => carregarCanalBase())
+      .subscribe();
+    return () => { ativo = false; void supabase.removeChannel(canal); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slug, user?.id]);
+
   // ── permissão ─────────────────────────────────────────────────────
   const isAdmin               = user?.role === "admin" || user?.role === "pastor";
   const canaisRestritos = new Set<string>(["Ensino", "Jovens", "Ação Social"]);
   const pertenceAoMinisterio = user?.ministerios?.includes(slug) || user?.liderMinisterios?.includes(slug);
-  const podeBloquearChat     = temPermissaoNoMinisterio("bloquear_chat", slug);
-  const podeGerenciarMembros = temPermissaoNoMinisterio("gerenciar_membros_ministerio", slug);
-  const podeCriarEvento      = temPermissaoNoMinisterio("criar_evento", slug);
-  const podeEditarEvento     = temPermissaoNoMinisterio("editar_evento", slug);
-  const podeGerenciarRepertorio = temPermissaoNoMinisterio("gerenciar_repertorio", slug);
-  const podeAtribuirPermissoes = temPermissao("atribuir_permissoes");
+  const liderCanal = Boolean(isAdmin || acessoCanal.lider);
+  const podeNoCanal = (permissao: Permissao) => liderCanal || acessoCanal.permissoes.includes(permissao) || temPermissaoNoMinisterio(permissao, slug);
+  const podeBloquearChat     = liderCanal;
+  const podeGerenciarMembros = podeNoCanal("gerenciar_membros_ministerio");
+  const podeCriarEvento      = podeNoCanal("criar_evento");
+  const podeEditarEvento     = podeNoCanal("editar_evento");
+  const podeGerenciarRepertorio = podeNoCanal("gerenciar_repertorio");
+  const podeAtribuirPermissoes = liderCanal;
   const temEscalas = slug !== "Ensino";
 
   useEffect(() => {
@@ -164,6 +187,17 @@ export default function CanalMinisterioPage() {
   const corBg = corMap[slug] ?? corMap[canalBase.cor] ?? "bg-gray-900";
   const nomeCanal = slug;
 
+  async function alterarChat() {
+    setAlterandoChat(true);
+    try {
+      const res = await fetch("/api/ministerio/chat", { method: "PATCH", headers: await authJsonHeaders(), body: JSON.stringify({ ministerio: slug, bloqueado: !chatBloqueado }) });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error);
+      setChatBloqueado(json.bloqueado);
+    } catch (error) { window.alert(error instanceof Error ? error.message : "Não foi possível alterar o chat."); }
+    finally { setAlterandoChat(false); }
+  }
+
   return (
     <div className="space-y-0">
       {/* Header do canal */}
@@ -178,8 +212,8 @@ export default function CanalMinisterioPage() {
         {/* Botão de bloqueio de chat — abaixo do título, só na tab chat */}
         {tab === "chat" && (
           <button
-            onClick={() => podeBloquearChat && setChatBloqueado(!chatBloqueado)}
-            disabled={!podeBloquearChat}
+              onClick={() => void alterarChat()}
+              disabled={!podeBloquearChat || alterandoChat}
             className={clsx(
               "mt-3 flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full border transition",
               !podeBloquearChat && "opacity-40 cursor-not-allowed",
@@ -231,11 +265,11 @@ export default function CanalMinisterioPage() {
       </div>
 
       {/* Conteúdo da tab */}
-      {tab === "chat"    && <ChatTab ministerio={slug} chatBloqueado={chatBloqueado} podeEnviar={temPermissaoNoMinisterio("enviar_chat", slug)} podeFixar={temPermissaoNoMinisterio("fixar_mensagem", slug)} user={user} />}
+      {tab === "chat"    && <ChatTab ministerio={slug} chatBloqueado={chatBloqueado} podeEnviar={Boolean(user && (pertenceAoMinisterio || liderCanal))} podeFixar={liderCanal} user={user} />}
       {tab === "membros" && <MembrosTab ministerio={slug} isLider={podeGerenciarMembros} podeAtribuirPermissoes={podeAtribuirPermissoes} />}
       {tab === "equipes" && <EquipesTab ministerio={slug} podeGerenciar={podeGerenciarMembros} />}
       {tab === "eventos" && <EventosTab ministerio={slug} isLider={podeCriarEvento} podeEditar={podeEditarEvento} />}
-      {temEscalas && tab === "escalas" && <EscalasTab ministerio={slug} isLider={isAdmin || temPermissaoNoMinisterio("criar_escala", slug)} podeGerenciarRepertorio={slug === "Louvor" && podeGerenciarRepertorio} escalaInicialId={escalaParaAbrir} onAbrirNoStudio={slug === "Louvor" && studioAccess.autorizado ? abrirAnaliseNoStudio : undefined} onAnalisarNoStudio={slug === "Louvor" && studioAccess.podeGerenciar ? abrirAnaliseNoStudio : undefined} />}
+      {temEscalas && tab === "escalas" && <EscalasTab ministerio={slug} isLider={podeNoCanal("criar_escala")} podeGerenciarRepertorio={slug === "Louvor" && podeGerenciarRepertorio} escalaInicialId={escalaParaAbrir} onAbrirNoStudio={slug === "Louvor" && studioAccess.autorizado ? abrirAnaliseNoStudio : undefined} onAnalisarNoStudio={slug === "Louvor" && studioAccess.podeGerenciar ? abrirAnaliseNoStudio : undefined} />}
       {tab === "studio" && studioAccess.autorizado && (
         <LouvorStudioTab key={analiseStudioInicial?.id ?? projetoStudioInicial ?? "ensaio"}
           podeGerenciar={studioAccess.podeGerenciar}
@@ -339,6 +373,7 @@ function ChatTab({
   });
 
   const broadcastChRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const mensagensPendentesRef = useRef<Set<string>>(new Set());
 
   function rowToMsg(m: Record<string, unknown>): MuralMensagem {
     return {
@@ -366,14 +401,14 @@ function ChatTab({
       .from("mural_mensagens")
       .select()
       .eq("ministerio", ministerio)
-      .order("criado_em", { ascending: true })
+      .order("criado_em", { ascending: false })
       .limit(200);
     if (!data) return;
-    const fresh = data.map(rowToMsg);
+    const fresh = data.map(rowToMsg).reverse();
     setMsgs((prev) => {
-      // Merge: mantém mensagens locais (temp) e merge com as do servidor
+      // Preserva apenas envios em andamento; exclusões do servidor não reaparecem.
       const serverIds = new Set(fresh.map(m => m.id));
-      const onlyLocal = prev.filter(m => m.id.startsWith("temp-") || !serverIds.has(m.id));
+      const onlyLocal = prev.filter(m => mensagensPendentesRef.current.has(m.id) && !serverIds.has(m.id));
       const merged = [...fresh, ...onlyLocal].sort((a, b) =>
         new Date(a.criadoEm).getTime() - new Date(b.criadoEm).getTime()
       );
@@ -507,6 +542,7 @@ function ChatTab({
 
     // UUID gerado pelo cliente — permite idempotência e deduplicação exata
     const msgId = crypto.randomUUID();
+    mensagensPendentesRef.current.add(msgId);
     const agora = new Date().toISOString();
     const conteudo = tipo === "texto" ? texto.trim() : tipo === "imagem" ? "📷 Imagem" : "🎙️ Áudio";
     const respostaCapturada = respostaA;
@@ -559,6 +595,7 @@ function ChatTab({
         setMsgs((prev) => prev.map((m) => m.id === msgId ? { ...m, mediaUrl: uploadedUrl ?? undefined } : m));
       }
     } catch (err) {
+      mensagensPendentesRef.current.delete(msgId);
       setMsgs((prev) => prev.filter((m) => m.id !== msgId));
       alert("Erro ao enviar mídia. Tente novamente.");
       console.error(err);
@@ -600,7 +637,8 @@ function ChatTab({
     } catch (err) {
       console.error("ministerio enviar error:", err);
       setMsgs((prev) => prev.filter((m) => m.id !== msgId));
-    }
+      window.alert(err instanceof Error ? err.message : "Não foi possível enviar a mensagem.");
+    } finally { mensagensPendentesRef.current.delete(msgId); }
   }
 
   function handleImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
@@ -660,13 +698,17 @@ function ChatTab({
     setMenuId(null);
   }
 
-  function toggleFixar(id: string) {
+  async function toggleFixar(id: string) {
     const msg = msgs.find((m) => m.id === id);
     if (!msg) return;
     const novaFixada = !msg.fixada;
-    setMsgs((prev) => prev.map((m) => m.id === id ? { ...m, fixada: novaFixada } : m));
-    supabase.from("mural_mensagens").update({ fixada: novaFixada }).eq("id", id);
-    setMenuId(null);
+    try {
+      const res = await fetch("/api/ministerio/mensagem/moderar", { method: "PATCH", headers: await authJsonHeaders(), body: JSON.stringify({ id, fixada: novaFixada }) });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error);
+      setMsgs((prev) => prev.map((m) => m.id === id ? { ...m, fixada: novaFixada } : m));
+      setMenuId(null);
+    } catch (error) { window.alert(error instanceof Error ? error.message : "Não foi possível fixar a mensagem."); }
   }
 
   function toggleReacao(msgId: string, emoji: string) {
@@ -684,28 +726,25 @@ function ChatTab({
     setMenuId(null);
   }
 
-  function salvarEdicao(msgId: string) {
+  async function salvarEdicao(msgId: string) {
     if (!editTexto.trim()) return;
     const novoConteudo = editTexto.trim();
     const agora = new Date().toISOString();
+    const { error } = await supabase.from("mural_mensagens").update({ conteudo: novoConteudo, editado_em: agora }).eq("id", msgId);
+    if (error) { window.alert("Não foi possível editar a mensagem."); return; }
     setMsgs((prev) => prev.map((m) => m.id === msgId ? { ...m, conteudo: novoConteudo, editadoEm: agora } : m));
-    supabase.from("mural_mensagens").update({ conteudo: novoConteudo, editado_em: agora }).eq("id", msgId);
     setEditandoId(null);
     setEditTexto("");
   }
 
-  function excluirMensagem(msgId: string) {
-    setMsgs((prev) => prev.filter((m) => m.id !== msgId));
-    setMenuId(null);
-    supabase.from("mural_mensagens").delete().eq("id", msgId).then(({ error }) => {
-      if (error) {
-        // Reverte o otimismo se o banco rejeitar
-        console.error("Erro ao excluir mensagem:", error.message);
-        supabase.from("mural_mensagens").select().eq("id", msgId).single().then(({ data }) => {
-          if (data) setMsgs((prev) => [...prev, rowToMsg(data as Record<string, unknown>)]);
-        });
-      }
-    });
+  async function excluirMensagem(msgId: string) {
+    try {
+      const res = await fetch("/api/ministerio/mensagem/moderar", { method: "DELETE", headers: await authJsonHeaders(), body: JSON.stringify({ id: msgId }) });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error);
+      setMsgs((prev) => { const next = prev.filter((m) => m.id !== msgId); saveCache(next); return next; });
+      setMenuId(null);
+    } catch (error) { window.alert(error instanceof Error ? error.message : "Não foi possível excluir a mensagem."); }
   }
 
   const temMidia = !!imagemPreview || !!audioUrl;
@@ -735,10 +774,10 @@ function ChatTab({
           </div>
         )}
 
-        {chatBloqueado && !podeEnviar && (
+        {chatBloqueado && (
           <div className="mb-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5 flex items-center gap-2 text-amber-700 text-xs">
             <Lock className="w-3.5 h-3.5" />
-            <span>Chat bloqueado. Apenas líderes podem enviar mensagens.</span>
+            <span>Chat fechado. Somente líderes, colíderes e administradores podem enviar mensagens.</span>
           </div>
         )}
 
@@ -1180,12 +1219,11 @@ const funcoesBase: FuncaoMinisterio[] = ["Líder", "Colíder", "Voluntário(a)"]
 
 // Permissões que fazem sentido no contexto de um canal de ministério
 const PERMISSOES_CANAL = [
-  { key: "enviar_chat"                 as const, label: "Enviar no chat",         desc: "Pode enviar mensagens no chat deste canal" },
-  { key: "fixar_mensagem"              as const, label: "Fixar mensagens",         desc: "Pode fixar mensagens importantes" },
+  { key: "criar_escala"               as const, label: "Gerenciar escalas",       desc: "Pode criar e editar escalas" },
   { key: "criar_evento"               as const, label: "Criar eventos",            desc: "Pode criar novos eventos para o ministério" },
   { key: "editar_evento"              as const, label: "Editar/remover eventos",   desc: "Pode editar e excluir eventos" },
-  { key: "gerenciar_membros_ministerio" as const, label: "Gerenciar membros",     desc: "Pode adicionar, editar e remover membros" },
-  { key: "bloquear_chat"              as const, label: "Bloquear chat",            desc: "Pode bloquear/desbloquear o chat do canal" },
+  { key: "gerenciar_membros_ministerio" as const, label: "Gerenciar membros e equipes", desc: "Pode gerenciar membros, equipes e funções de serviço" },
+  { key: "gerenciar_repertorio"        as const, label: "Gerenciar repertório",   desc: "Pode gerenciar músicas do Louvor" },
 ];
 
 function MembrosTab({
@@ -1196,6 +1234,7 @@ function MembrosTab({
   podeAtribuirPermissoes: boolean;
 }) {
   const [membros, setMembros] = useState<MembroMinisterio[]>([]);
+  const [erroPermissoes, setErroPermissoes] = useState("");
   const funcoes: FuncaoMinisterio[] = ministerio === "Louvor"
     ? ["Líder", "Colíder", "Ministro", "Voluntário(a)"]
     : funcoesBase;
@@ -1207,10 +1246,12 @@ function MembrosTab({
         .contains("ministerios", [ministerio])
         .eq("ativo", true),
       supabase.from("membros_ministerio")
-        .select("usuario_id, funcao")
+        .select("usuario_id, funcao, permissoes_canal")
         .eq("ministerio", ministerio),
-    ]).then(([{ data: perfisData }, { data: mmData }]) => {
+    ]).then(([{ data: perfisData }, { data: mmData, error: erroMembros }]) => {
       if (!perfisData) return;
+      setErroPermissoes(erroMembros ? "Não foi possível carregar as permissões. Atualize a página para tentar novamente." : "");
+      setPermissoesMembro(Object.fromEntries((mmData ?? []).map((r: Record<string, unknown>) => [r.usuario_id as string, (r.permissoes_canal as string[]) ?? []])));
       const funcaoMap = new Map((mmData ?? []).map((r: Record<string, string>) => [r.usuario_id, r.funcao]));
       setMembros(perfisData.map((p: Record<string, unknown>) => {
         const liderMins = (p.lider_ministerios as string[]) ?? [];
@@ -1295,44 +1336,34 @@ function MembrosTab({
   // Per-member canal permissions
   const [permissoesMembro, setPermissoesMembro] = useState<Record<string, string[]>>({});
   const [permExpandido, setPermExpandido] = useState<string | null>(null);
+  const [salvandoPermissoes, setSalvandoPermissoes] = useState(false);
 
-  function togglePermCanal(membroId: string, perm: string) {
-    setPermissoesMembro((prev) => {
-      const atual = prev[membroId] ?? [];
-      const nova = atual.includes(perm)
-        ? atual.filter((p) => p !== perm)
-        : [...atual, perm];
-      return { ...prev, [membroId]: nova };
-    });
+  async function togglePermCanal(membroId: string, perm: string) {
+    if (salvandoPermissoes) return;
+    const atual = (permissoesMembro[membroId] ?? []).filter((p) => PERMISSOES_CANAL.some((item) => item.key === p));
+    const nova = atual.includes(perm) ? atual.filter((p) => p !== perm) : [...atual, perm];
+    setSalvandoPermissoes(true);
+    try {
+      const res = await fetch("/api/ministerio/membro", { method: "PATCH", headers: await authJsonHeaders(), body: JSON.stringify({ usuarioId: membroId, ministerio, permissoes: nova }) });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error);
+      setPermissoesMembro((prev) => ({ ...prev, [membroId]: nova }));
+    } catch (error) { window.alert(error instanceof Error ? error.message : "Não foi possível salvar as permissões."); }
+    finally { setSalvandoPermissoes(false); }
   }
 
   function permAtivaParaMembro(membroId: string, perm: string): boolean {
     return (permissoesMembro[membroId] ?? []).includes(perm);
   }
 
-  function salvarEdicao(id: string) {
-    setMembros((prev) => prev.map((m) => m.id === id ? { ...m, funcao: novaFuncao } : m));
-    setEditandoId(null);
-    // Salva a função em membros_ministerio
-    supabase.from("membros_ministerio").upsert(
-      { usuario_id: id, ministerio, funcao: novaFuncao },
-      { onConflict: "usuario_id,ministerio" }
-    ).then(() => {});
-    // Mantém lider_ministerios em perfis sincronizado
-    supabase.from("perfis").select("lider_ministerios, role").eq("id", id).single().then(({ data }) => {
-      if (!data) return;
-      const atual: string[] = data.lider_ministerios ?? [];
-      let updated: string[];
-      if (novaFuncao === "Líder") {
-        updated = atual.includes(ministerio) ? atual : [...atual, ministerio];
-      } else {
-        updated = atual.filter((m) => m !== ministerio);
-      }
-      const updates: Record<string, unknown> = { lider_ministerios: updated };
-      if (novaFuncao === "Líder" && data.role === "membro") updates.role = "lider";
-      if (novaFuncao !== "Líder" && novaFuncao !== "Colíder" && updated.length === 0 && data.role === "lider") updates.role = "membro";
-      supabase.from("perfis").update(updates).eq("id", id).then(() => {});
-    });
+  async function salvarEdicao(id: string) {
+    try {
+      const res = await fetch("/api/ministerio/membro", { method: "PATCH", headers: await authJsonHeaders(), body: JSON.stringify({ usuarioId: id, ministerio, funcao: novaFuncao }) });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error);
+      setMembros((prev) => prev.map((m) => m.id === id ? { ...m, funcao: novaFuncao } : m));
+      setEditandoId(null);
+    } catch (error) { window.alert(error instanceof Error ? error.message : "Não foi possível alterar a função."); }
   }
 
   async function remover(id: string) {
@@ -1378,6 +1409,9 @@ function MembrosTab({
       setUsuarioSelecionado("");
       setNovaFuncaoForm("Voluntário(a)");
       setShowForm(false);
+    } else {
+      const json = await res.json().catch(() => ({}));
+      window.alert(json.error ?? "Não foi possível adicionar o membro.");
     }
   }
 
@@ -1432,7 +1466,7 @@ function MembrosTab({
               onChange={(e) => setNovaFuncaoForm(e.target.value as FuncaoMinisterio)}
               className="border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-vine-400 bg-white"
             >
-              {funcoes.map((f) => <option key={f}>{f}</option>)}
+              {funcoes.filter((f) => podeAtribuirPermissoes || f === "Voluntário(a)").map((f) => <option key={f}>{f}</option>)}
             </select>
           </div>
           <div className="flex gap-2 justify-end mt-1">
@@ -1537,13 +1571,13 @@ function MembrosTab({
                         )}
                         {isLider && (
                           <>
-                            <button
+                            {podeAtribuirPermissoes && <button
                               onClick={() => { setEditandoId(m.id); setNovaFuncao(m.funcao); }}
                               className="text-gray-400 hover:text-vine-600 transition"
                               title="Editar função"
                             >
                               <Pencil className="w-3.5 h-3.5" />
-                            </button>
+                            </button>}
                             <button
                               onClick={() => remover(m.id)}
                               className="text-gray-400 hover:text-red-500 transition"
@@ -1566,13 +1600,16 @@ function MembrosTab({
                           <ShieldCheck className="w-3.5 h-3.5" />
                           Permissões de {m.nome.split(" ")[0]} neste canal
                         </p>
+                        {erroPermissoes && <p role="alert" className="mb-3 text-xs text-red-700">{erroPermissoes}</p>}
+                        {eLider(m) && <p className="mb-3 text-xs text-vine-700">Líderes e colíderes já têm todas as tarefas deste ministério.</p>}
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-                          {PERMISSOES_CANAL.map((perm) => {
+                          {PERMISSOES_CANAL.filter((perm) => perm.key !== "gerenciar_repertorio" || ministerio === "Louvor").map((perm) => {
                             const ativa = permAtivaParaMembro(m.id, perm.key);
                             return (
                               <button
                                 key={perm.key}
                                 onClick={() => togglePermCanal(m.id, perm.key)}
+                                disabled={eLider(m) || salvandoPermissoes || !!erroPermissoes}
                                 className={clsx(
                                   "flex items-center gap-2.5 px-3 py-2.5 rounded-xl border text-left transition text-xs",
                                   ativa
@@ -1595,7 +1632,7 @@ function MembrosTab({
                           })}
                         </div>
                         <p className="text-[10px] text-vine-500 mt-3">
-                          Essas permissões valem apenas dentro deste canal e sobrescrevem as permissões globais do usuário.
+                          Tarefas adicionais neste ministério. Líderes e colíderes já possuem todas elas.
                         </p>
                       </div>
                     </td>

@@ -84,7 +84,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // O cache do sessionStorage é lido no useEffect abaixo, apenas no cliente.
   const [user, setUser] = useState<User | null>(null);
   const [usuarios, setUsuarios] = useState<User[]>([]);
+  const [acessosMinisterios, setAcessosMinisterios] = useState<Record<string, { funcao: string; permissoes: string[] }>>({});
   const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    if (!user?.id) { setAcessosMinisterios({}); return; }
+    let ativo = true;
+    const carregar = async () => {
+      const { data, error } = await supabase.from("membros_ministerio").select("ministerio,funcao,permissoes_canal,ativo").eq("usuario_id", user.id);
+      if (ativo && !error) setAcessosMinisterios(Object.fromEntries((data ?? []).filter((m) => m.ativo !== false).map((m) => [m.ministerio, { funcao: m.funcao, permissoes: m.permissoes_canal ?? [] }])));
+    };
+    void carregar();
+    const channel = supabase.channel(`acessos-ministerios:${user.id}`).on("postgres_changes", { event: "*", schema: "public", table: "membros_ministerio", filter: `usuario_id=eq.${user.id}` }, () => void carregar()).subscribe();
+    return () => { ativo = false; void supabase.removeChannel(channel); };
+  }, [user?.id]);
 
   // Hidrata instantaneamente do cache — roda só no cliente, após a hidratação
   useEffect(() => {
@@ -313,7 +326,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   function temPermissaoNoMinisterio(p: Permissao, ministerio: string): boolean {
-    return checkPermissaoMin(user, p, ministerio);
+    if (!user?.ativo) return false;
+    if (user.role === "admin" || user.role === "pastor") return checkPermissaoMin(user, p, ministerio);
+    if (!user.ministerios.includes(ministerio as User["ministerios"][number]) && !user.liderMinisterios?.includes(ministerio as User["ministerios"][number])) return false;
+    if (checkPermissaoMin(user, p, ministerio) || user.permissoes?.includes(p)) return true;
+    const acesso = acessosMinisterios[ministerio];
+    return Boolean(acesso && (["Líder", "Colíder"].includes(acesso.funcao) || acesso.permissoes.includes(p)));
   }
 
   async function atualizarUsuario(id: string, dados: Partial<User>) {

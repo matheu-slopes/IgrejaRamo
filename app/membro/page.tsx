@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
+import { authJsonHeaders } from "@/lib/authHeaders";
 import {
   Church,
   User,
@@ -54,7 +55,7 @@ export default function MembroPortalPage() {
     setErroSenha(""); setSalvandoSenha(true); setOkSenha(false);
     const res = await fetch("/api/alterar-senha", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: await authJsonHeaders(),
       body: JSON.stringify({ userId: user.id, novaSenha }),
     });
     const json = await res.json().catch(() => ({}));
