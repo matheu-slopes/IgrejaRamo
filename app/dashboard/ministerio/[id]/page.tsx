@@ -374,6 +374,8 @@ function ChatTab({
 
   const broadcastChRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const mensagensPendentesRef = useRef<Set<string>>(new Set());
+  const [mensagensCarregadas, setMensagensCarregadas] = useState(false);
+  const [erroMensagens, setErroMensagens] = useState(false);
 
   function rowToMsg(m: Record<string, unknown>): MuralMensagem {
     return {
@@ -397,12 +399,14 @@ function ChatTab({
   }
 
   async function fetchAndSync() {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("mural_mensagens")
       .select()
       .eq("ministerio", ministerio)
       .order("criado_em", { ascending: false })
       .limit(200);
+    setMensagensCarregadas(true);
+    setErroMensagens(Boolean(error));
     if (!data) return;
     const fresh = data.map(rowToMsg).reverse();
     setMsgs((prev) => {
@@ -491,7 +495,7 @@ function ChatTab({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ministerio]);
   const [texto, setTexto] = useState("");
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const mensagensRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   // Audio recording
@@ -524,7 +528,8 @@ function ChatTab({
   const podeEnviar = (podeEnviarProp && !chatBloqueado) || podeFixar;
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    const container = mensagensRef.current;
+    if (container) container.scrollTop = container.scrollHeight;
   }, [msgs]);
   useEffect(() => () => { if (timerRef.current) clearInterval(timerRef.current); }, []);
 
@@ -750,9 +755,9 @@ function ChatTab({
   const temMidia = !!imagemPreview || !!audioUrl;
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-4 lg:flex-row">
+    <div className="flex min-w-0 flex-col gap-4 lg:flex-row lg:items-stretch">
       {/* ── Área principal do chat ── */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex h-[max(24rem,calc(100dvh-20rem))] min-h-0 min-w-0 flex-col lg:h-[max(24rem,calc(100dvh-21rem))] lg:flex-1">
         {/* Mensagem fixada */}
         {fixadas.length > 0 && (
           <div className="mb-3 bg-gold-50 border border-gold-200 rounded-xl px-4 py-2 flex items-center gap-2">
@@ -805,9 +810,17 @@ function ChatTab({
 
         {/* Lista de mensagens */}
         <div
-          className="flex-1 overflow-y-auto bg-gray-50 rounded-xl p-4 space-y-3 border border-gray-100"
+          ref={mensagensRef}
+          className="min-h-0 flex-1 overflow-y-auto bg-gray-50 rounded-xl p-4 space-y-3 border border-gray-100"
           onClick={() => { setMenuId(null); setEmojiMenuId(null); }}
         >
+          {msgs.length === 0 && (
+            <div className="flex h-full min-h-32 items-center justify-center text-center" role="status">
+              <p className="max-w-xs text-sm text-gray-500">
+                {!mensagensCarregadas ? "Carregando mensagens..." : erroMensagens ? "Não foi possível carregar as mensagens agora." : "Nenhuma mensagem ainda. As conversas do ministério aparecerão aqui."}
+              </p>
+            </div>
+          )}
           {msgs.map((m) => {
             const isMe = !!user && (m.autorId === user.id || m.autorId === "me" || m.autorNome === user.nome);
             const isFav = favoritos.includes(m.id);
@@ -1017,7 +1030,6 @@ function ChatTab({
               </div>
             );
           })}
-          <div ref={bottomRef} />
         </div>
 
         {/* Preview de imagem */}
@@ -1123,7 +1135,7 @@ function ChatTab({
 
       {/* ── Painel lateral: Mídia / Links / Favoritos ── */}
       {infoPanel && (
-        <div className="w-full min-h-0 lg:w-72 lg:shrink-0 bg-white rounded-2xl border border-gray-100 shadow-sm flex flex-col overflow-hidden">
+        <div className="flex h-64 w-full min-h-0 flex-col overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm lg:h-auto lg:w-72 lg:shrink-0">
           <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
             <p className="text-sm font-semibold text-gray-800">
               {infoPanel === "midia" && "Galeria de Mídia"}
