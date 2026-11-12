@@ -69,13 +69,28 @@ function ProfileDropdown({
 
   function close() { setOpen(false); setView("menu"); setEditingName(false); setNovaSenha(""); setErroSenha(""); setOkSenha(false); }
 
-  function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => onUpdate({ foto: ev.target?.result as string });
-    reader.readAsDataURL(file);
     e.target.value = "";
+    const url = URL.createObjectURL(file);
+    try {
+      const imagem = new window.Image();
+      imagem.src = url;
+      await imagem.decode();
+      const proporcao = Math.min(1, 384 / Math.max(imagem.naturalWidth, imagem.naturalHeight));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(imagem.naturalWidth * proporcao));
+      canvas.height = Math.max(1, Math.round(imagem.naturalHeight * proporcao));
+      const contexto = canvas.getContext("2d");
+      if (!contexto) throw new Error("Não foi possível preparar a imagem.");
+      contexto.drawImage(imagem, 0, 0, canvas.width, canvas.height);
+      onUpdate({ foto: canvas.toDataURL("image/webp", 0.8) });
+    } catch {
+      alert("Não foi possível carregar essa imagem. Tente outra foto.");
+    } finally {
+      URL.revokeObjectURL(url);
+    }
   }
 
   function saveName() {

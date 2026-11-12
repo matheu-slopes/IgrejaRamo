@@ -38,6 +38,7 @@ function rowToUser(row: Record<string, unknown>): User {
 
 // ── Persistência de sessão ──────────────────────────────────────────────────
 const SESSION_KEY = "ramo_user_cache_v2";
+const PERFIL_SEM_FOTO = "id,nome,email,telefone,role,ministerios,lider_ministerios,data_ingresso,data_nascimento,ativo,primeiro_acesso,permissoes";
 
 function isInvalidRefreshTokenError(message?: string): boolean {
   if (!message) return false;
@@ -108,10 +109,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function carregarPerfil(uid: string): Promise<User | null> {
-    const { data, error } = await supabase.from("perfis").select("*").eq("id", uid).single();
+  async function carregarPerfil(uid: string, usarFotoEmCache = false): Promise<User | null> {
+    const cached = usarFotoEmCache ? loadUserCache() : null;
+    const manterFoto = cached?.id === uid;
+    const { data, error } = manterFoto
+      ? await supabase.from("perfis").select(PERFIL_SEM_FOTO).eq("id", uid).single()
+      : await supabase.from("perfis").select("*").eq("id", uid).single();
     if (data) {
       const u = rowToUser(data);
+      if (manterFoto) u.foto = cached?.foto;
       setUser(u);
       saveUserCache(u);
       return u;
@@ -163,7 +169,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function carregarTodosUsuarios() {
-    const { data } = await supabase.from("perfis").select("*").order("nome");
+    // Fotos antigas podem conter imagens inteiras em base64; carregá-las para
+    // todos os usuários em cada atualização aumenta muito o tráfego do banco.
+    const { data } = await supabase.from("perfis").select(PERFIL_SEM_FOTO).order("nome");
     if (data) setUsuarios(data.map(rowToUser));
   }
 
@@ -291,7 +299,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useAppRefresh(async () => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.user) return;
-    await carregarPerfil(session.user.id).catch(() => {});
+    await carregarPerfil(session.user.id, true).catch(() => {});
     carregarTodosUsuarios();
   }, [], { runOnMount: false, minIntervalMs: 3000 });
 

@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useState, useRef, useEffect, ReactNode } from "react";
+import { useState, useRef, useEffect, useMemo, ReactNode } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useChatUnread } from "@/contexts/ChatUnreadContext";
 import { supabase } from "@/lib/supabase";
@@ -1576,7 +1576,22 @@ function UserAvatar({ nome, foto, size = "md" }: { nome: string; foto?: string; 
 // --- Page ---------------------------------------------------------
 
 export default function ChatPage() {
-  const { user, usuarios } = useAuth();
+  const { user, usuarios: usuariosBase } = useAuth();
+  const [fotosUsuarios, setFotosUsuarios] = useState<Record<string, string>>({});
+  const usuarios = useMemo(() => usuariosBase.map((usuario) => ({
+    ...usuario,
+    foto: usuario.foto ?? fotosUsuarios[usuario.id],
+  })), [usuariosBase, fotosUsuarios]);
+
+  useEffect(() => {
+    if (!user?.id) { setFotosUsuarios({}); return; }
+    let ativo = true;
+    void supabase.from("perfis").select("id,foto").not("foto", "is", null).then(({ data, error }) => {
+      if (!ativo || error || !data) return;
+      setFotosUsuarios(Object.fromEntries(data.filter((perfil) => perfil.foto).map((perfil) => [perfil.id, perfil.foto])));
+    });
+    return () => { ativo = false; };
+  }, [user?.id]);
   const { setTotalUnread, setActiveChatId, contextConversaIds } = useChatUnread();
   const [tab, setTab] = useState<ChatTab>("direto");
   const [activeChat, setActiveChat] = useState<ActiveChat>(null);
