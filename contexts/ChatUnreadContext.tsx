@@ -168,8 +168,6 @@ export function ChatUnreadProvider({ children }: { children: ReactNode }) {
     userIdRef.current = user.id;
     // Primeiro mostra o valor local para feedback rápido
     setTotalUnreadState(persistedCount(user.id));
-    // Em seguida, força atualização do servidor
-    refreshUnreadFromServer(user.id);
   }, [user?.id]);
 
   async function refreshUnreadFromServer(uid: string) {
@@ -189,8 +187,6 @@ export function ChatUnreadProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!user?.id) return;
     const uid = user.id;
-    refreshUnreadFromServer(uid);
-
     const onFocus = () => refreshUnreadFromServer(uid);
     const onVisibility = () => {
       if (document.visibilityState === "visible") refreshUnreadFromServer(uid);
@@ -207,7 +203,8 @@ export function ChatUnreadProvider({ children }: { children: ReactNode }) {
 
   // Reconciliacao leve enquanto o dashboard esta aberto. Push pode chegar mesmo
   // quando o JS estava pausado; esse polling mantem o badge de Conversas correto
-  // sem depender de entrar na tela de chat.
+  // sem depender de entrar na tela de chat. Os eventos em tempo real continuam
+  // atualizando o contador; este intervalo é apenas uma recuperação de falhas.
   useEffect(() => {
     if (!user?.id) return;
     const uid = user.id;
@@ -220,7 +217,7 @@ export function ChatUnreadProvider({ children }: { children: ReactNode }) {
     };
 
     sync();
-    const interval = window.setInterval(sync, pathname === "/dashboard/chat" ? 30000 : 8000);
+    const interval = window.setInterval(sync, 60000);
     return () => {
       cancelled = true;
       window.clearInterval(interval);

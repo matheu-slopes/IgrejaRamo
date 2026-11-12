@@ -1978,20 +1978,22 @@ export default function ChatPage() {
     if (!user?.id) return;
     const retry = () => {
       flushOutbox(false);
-      refreshReceipts();
     };
     const retryVisible = () => {
-      if (document.visibilityState === "visible") retry();
+      if (document.visibilityState === "visible") {
+        retry();
+        refreshReceipts();
+      }
     };
 
     window.addEventListener("online", retry);
-    window.addEventListener("focus", retry);
+    window.addEventListener("focus", retryVisible);
     document.addEventListener("visibilitychange", retryVisible);
     const interval = window.setInterval(retry, 10_000);
 
     return () => {
       window.removeEventListener("online", retry);
-      window.removeEventListener("focus", retry);
+      window.removeEventListener("focus", retryVisible);
       document.removeEventListener("visibilitychange", retryVisible);
       window.clearInterval(interval);
     };
@@ -2376,11 +2378,11 @@ export default function ChatPage() {
 
     sincronizarMensagensRecentes();
     // Supabase Realtime é o canal principal; poll HTTP é fallback para quedas do canal.
-    // 8 s: recupera rápido mensagens perdidas sem gerar carga excessiva.
+    // Confere periodicamente enquanto a conversa está visível.
     // (reconexão do canal já dispara sync imediato via SUBSCRIBED handler)
     const interval = window.setInterval(() => {
-      sincronizarMensagensRecentes();
-    }, 8_000);
+      if (document.visibilityState === "visible") sincronizarMensagensRecentes();
+    }, 60_000);
 
     window.addEventListener("focus", onFocus);
     document.addEventListener("visibilitychange", onVisibility);
