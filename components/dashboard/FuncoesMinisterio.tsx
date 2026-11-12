@@ -3,11 +3,13 @@ import { useState } from "react";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { authJsonHeaders } from "@/lib/authHeaders";
 import type { FuncaoConfigurada } from "@/hooks/useFuncoesMinisterio";
+import { correspondePesquisa } from "@/lib/funcoesLista";
 
 export function FuncoesMinisterio({ ministerio, funcoes, atualizar }: { ministerio: string; funcoes: FuncaoConfigurada[]; atualizar: () => Promise<void> }) {
   const [aberto, setAberto] = useState(false);
   const [editando, setEditando] = useState<string | null>(null);
   const [nome, setNome] = useState("");
+  const [busca, setBusca] = useState("");
   const [erro, setErro] = useState("");
   const [salvando, setSalvando] = useState(false);
 
@@ -36,8 +38,11 @@ export function FuncoesMinisterio({ ministerio, funcoes, atualizar }: { minister
     <button type="button" onClick={() => setAberto(!aberto)} aria-expanded={aberto} className="font-semibold text-sm text-gray-900 underline underline-offset-4">{aberto ? "Fechar funções" : "Gerenciar funções"}</button>
     {aberto && <div className="space-y-3"><p className="text-sm text-gray-500">As funções deste ministério aparecem nas equipes e nas escalas. Alterar um nome atualiza as equipes; escalas já salvas mantêm seu histórico.</p>
       {erro && <p role="alert" className="text-sm text-red-700">{erro}</p>}
-      <ul className="space-y-1">{funcoes.map((funcao) => <li key={funcao.id} className="flex items-center justify-between gap-2 rounded-lg bg-gray-50 px-3 py-1"><span className="text-sm">{funcao.nome}</span><span className="flex"><button type="button" aria-label={`Editar ${funcao.nome}`} onClick={() => { setEditando(funcao.id); setNome(funcao.nome); setErro(""); }} className="p-2 text-gray-600"><Pencil className="h-4 w-4" /></button><button type="button" disabled={salvando} aria-label={`Remover ${funcao.nome}`} onClick={() => void remover(funcao)} className="p-2 text-red-600"><Trash2 className="h-4 w-4" /></button></span></li>)}</ul>
       <label className="block text-sm font-medium" htmlFor="nome-funcao">{editando ? "Editar função" : "Nova função"}</label><div className="flex flex-wrap gap-2"><input id="nome-funcao" value={nome} maxLength={80} onChange={(e) => setNome(e.target.value)} placeholder="Nome da função" className="min-w-0 flex-1 rounded-xl border border-gray-300 px-3 py-2 text-sm" /><button type="button" disabled={salvando || !nome.trim()} onClick={() => void salvar()} className="flex items-center gap-1 rounded-xl bg-gray-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"><Plus className="h-4 w-4" /> {editando ? "Salvar" : "Adicionar"}</button>{editando && <button type="button" onClick={() => { setEditando(null); setNome(""); }} className="px-3 py-2 text-sm">Cancelar</button>}</div>
+      <label className="block text-sm font-medium" htmlFor="buscar-funcao">Pesquisar funções</label>
+      <input id="buscar-funcao" type="search" value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar pelo nome" className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm" />
+      <ul className="space-y-1">{funcoes.filter((funcao) => correspondePesquisa(funcao.nome, busca)).map((funcao) => <li key={funcao.id} className="flex items-center justify-between gap-2 rounded-lg bg-gray-50 px-3 py-1"><span className="text-sm">{funcao.nome}</span><span className="flex"><button type="button" aria-label={`Editar ${funcao.nome}`} onClick={() => { setEditando(funcao.id); setNome(funcao.nome); setErro(""); }} className="p-2 text-gray-600"><Pencil className="h-4 w-4" /></button><button type="button" disabled={salvando} aria-label={`Remover ${funcao.nome}`} onClick={() => void remover(funcao)} className="p-2 text-red-600"><Trash2 className="h-4 w-4" /></button></span></li>)}</ul>
+      {!funcoes.some((funcao) => correspondePesquisa(funcao.nome, busca)) && <p className="text-sm text-gray-500">{busca.trim() ? "Nenhuma função encontrada." : "Nenhuma função cadastrada."}</p>}
     </div>}
   </section>;
 }
