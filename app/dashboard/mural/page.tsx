@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
 import { useAppRefresh } from "@/hooks/useAppRefresh";
+import { ImagemDeMensagem, AudioDeMensagem } from "@/components/chat/MidiaPrivada";
 import { Ministerio, MuralMensagem, TipoMensagem } from "@/types";
 import {
   Pin, Send, Music, Video, BookOpen, Baby, HeartHandshake,
@@ -284,15 +285,17 @@ export default function ConversasPage() {
                 )}>
                   {(!msg.tipo || msg.tipo === "texto") && msg.conteudo}
                   {msg.tipo === "imagem" && msg.mediaUrl && (
-                    <img
-                      src={msg.mediaUrl}
+                    <ImagemDeMensagem
+                      referencia={msg.mediaUrl}
+                      mensagemId={msg.id}
+                      tipo="ministerio"
                       alt="imagem"
                       className="max-w-[260px] max-h-[300px] object-cover rounded-2xl"
                     />
                   )}
                   {msg.tipo === "audio" && msg.mediaUrl && (
                     <div className="px-3 py-2">
-                      <audio controls preload="metadata" src={msg.mediaUrl} className="h-9 w-full min-w-0" />
+                      <AudioDeMensagem referencia={msg.mediaUrl} mensagemId={msg.id} tipo="ministerio" className="h-9 w-full min-w-0" />
                     </div>
                   )}
                 </div>
