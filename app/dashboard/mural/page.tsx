@@ -6,6 +6,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
 import { useAppRefresh } from "@/hooks/useAppRefresh";
 import { ImagemDeMensagem, AudioDeMensagem } from "@/components/chat/MidiaPrivada";
+import { authJsonHeaders } from "@/lib/authHeaders";
+import { MIDIAS_R2_ATIVAS } from "@/lib/midiasConfig";
 import { Ministerio, MuralMensagem, TipoMensagem } from "@/types";
 import {
   Pin, Send, Music, Video, BookOpen, Baby, HeartHandshake,
@@ -111,11 +113,37 @@ export default function ConversasPage() {
       return a.criadoEm.localeCompare(b.criadoEm);
     });
 
-  function enviar(tipo: TipoMensagem = "texto", mediaUrl?: string) {
+  async function enviar(tipo: TipoMensagem = "texto", mediaUrl?: string) {
     if (!user) return;
     if (tipo === "texto" && !texto.trim() && !mediaUrl) return;
 
     const conteudo = tipo === "texto" ? texto.trim() : tipo === "imagem" ? "📷 Imagem" : "🎙️ Áudio";
+
+    if (MIDIAS_R2_ATIVAS) {
+      try {
+        const id = crypto.randomUUID();
+        let referencia = mediaUrl;
+        if (mediaUrl) {
+          const blob = await (await fetch(mediaUrl)).blob();
+          if (!blob.size || blob.size > 4 * 1024 * 1024) throw new Error("O arquivo deve ter no máximo 4 MB.");
+          const form = new FormData();
+          form.append("file", blob, tipo === "imagem" ? "imagem" : "audio");
+          form.append("conversa_id", `ministerio_${activeMin}`);
+          form.append("mensagem_id", id);
+          const headers = await authJsonHeaders();
+          delete (headers as Record<string, string>)["Content-Type"];
+          const upload = await fetch("/api/midias/enviar", { method: "POST", headers, body: form });
+          const uploaded = await upload.json();
+          if (!upload.ok || typeof uploaded.referencia !== "string") throw new Error(uploaded.error || "Não foi possível enviar a mídia.");
+          referencia = uploaded.referencia;
+        }
+        const response = await fetch("/api/ministerio/mensagem", { method: "POST", headers: await authJsonHeaders(), body: JSON.stringify({ id, ministerio: activeMin, autor_id: user.id, conteudo, tipo, media_url: referencia ?? null }) });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || "Não foi possível enviar a mensagem.");
+        setTexto(""); setImagemPreview(null); setAudioUrl(null); carregarMensagens();
+      } catch (error) { alert(error instanceof Error ? error.message : "Não foi possível enviar a mensagem."); }
+      return;
+    }
 
     supabase
       .from("mural_mensagens")
