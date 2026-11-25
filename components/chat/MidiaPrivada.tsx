@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type ImgHTMLAttributes, type ReactNode } from "react";
 import { authJsonHeaders } from "@/lib/authHeaders";
+import { AudioPlayer } from "@/components/chat/AudioPlayer";
 
 type Props = {
   referencia?: string;
@@ -67,14 +68,6 @@ export function ImagemDeMensagem({ referencia, mensagemId, tipo, abrir, ...props
   return <MidiaPrivada referencia={referencia} mensagemId={mensagemId} tipo={tipo}>{(url, atualizar, falhou) => <ImagemResolvida {...props} url={url} atualizar={atualizar} falhou={falhou} abrir={abrir} />}</MidiaPrivada>;
 }
 
-function AudioResolvido({ url, atualizar, falhou, className }: { url?: string; atualizar: () => void; falhou: boolean; className?: string }) {
-  const [erro, setErro] = useState(false);
-  useEffect(() => { setErro(false); }, [url]);
-  if (erro || falhou) return <button type="button" onClick={() => { setErro(false); atualizar(); }} className="rounded-lg bg-gray-100 p-2 text-xs text-gray-600">Áudio indisponível. Toque para tentar novamente.</button>;
-  if (!url) return <span className="block p-2 text-xs text-gray-500">Carregando áudio...</span>;
-  return <audio controls preload="metadata" src={url} className={className} onError={() => setErro(true)} />;
-}
-
-export function AudioDeMensagem({ referencia, mensagemId, tipo, className }: ElementoProps & { className?: string }) {
-  return <MidiaPrivada referencia={referencia} mensagemId={mensagemId} tipo={tipo} renovarAutomaticamente={false}>{(url, atualizar, falhou) => <AudioResolvido url={url} atualizar={atualizar} falhou={falhou} className={className} />}</MidiaPrivada>;
+export function AudioDeMensagem({ referencia, mensagemId, tipo, isMe = false }: ElementoProps & { isMe?: boolean }) {
+  return <MidiaPrivada referencia={referencia} mensagemId={mensagemId} tipo={tipo} renovarAutomaticamente={false}>{(url, atualizar, falhou) => url ? <AudioPlayer src={url} isMe={isMe} onRetry={atualizar} /> : falhou ? <button type="button" onClick={atualizar} className="w-[240px] max-w-full rounded-lg bg-gray-100 p-3 text-xs text-gray-600">Áudio indisponível. Toque para tentar novamente.</button> : <span className="block w-[240px] max-w-full p-3 text-xs text-gray-500">Carregando áudio...</span>}</MidiaPrivada>;
 }

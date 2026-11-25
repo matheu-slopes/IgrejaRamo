@@ -323,7 +323,7 @@ export default function ConversasPage() {
                   )}
                   {msg.tipo === "audio" && msg.mediaUrl && (
                     <div className="px-3 py-2">
-                      <AudioDeMensagem referencia={msg.mediaUrl} mensagemId={msg.id} tipo="ministerio" className="h-9 w-full min-w-0" />
+                      <AudioDeMensagem referencia={msg.mediaUrl} mensagemId={msg.id} tipo="ministerio" isMe={isMe} />
                     </div>
                   )}
                 </div>
