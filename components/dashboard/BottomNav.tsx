@@ -7,6 +7,8 @@ import { useChatUnread } from "@/contexts/ChatUnreadContext";
 import { useNotifications } from "@/contexts/NotificationsContext";
 import { usePendingScaleConfirmations } from "@/hooks/usePendingScaleConfirmations";
 import { userMinisterios } from "@/lib/userMinistries";
+import { caminhoMinisterio, ministeriosNoMenu } from "@/lib/navegacaoMinisterios";
+import { supabase } from "@/lib/supabase";
 import {
   LayoutDashboard, CalendarCheck, MessageSquare, CalendarDays,
   MoreHorizontal, X, Users, Shield, Bell, BookOpen, Music, Video,
@@ -22,15 +24,10 @@ const navItems = [
   { href: "/dashboard/eventos", label: "Eventos", icon: CalendarDays    },
 ];
 
-const ministeriosMap: Record<string, { icon: React.ElementType; href: string }> = {
-  "Louvor":      { icon: Music,          href: "/dashboard/ministerio/Louvor" },
-  "Mídias":      { icon: Video,          href: "/dashboard/ministerio/M%C3%ADdias" },
-  "Ensino":      { icon: BookOpen,       href: "/dashboard/ministerio/Ensino" },
-  "Infantil":    { icon: Baby,           href: "/dashboard/ministerio/Infantil" },
-  "Ação Social": { icon: HeartHandshake, href: "/dashboard/ministerio/A%C3%A7%C3%A3o%20Social" },
-  "Jovens":      { icon: Users,          href: "/dashboard/ministerio/Jovens" },
-  "Recepcionamento": { icon: Users,      href: "/dashboard/ministerio/Recepcionamento" },
-  "Limpeza":     { icon: Sparkles,       href: "/dashboard/ministerio/Limpeza" },
+const ministeriosIcones: Record<string, React.ElementType> = {
+  "Louvor": Music, "Mídias": Video, "Ensino": BookOpen, "Infantil": Baby,
+  "Ação Social": HeartHandshake, "Jovens": Users, "Recepcionamento": Users,
+  "Limpeza": Sparkles, "Oração": Shield,
 };
 
 const navAdmin = [
@@ -48,15 +45,27 @@ export default function BottomNav() {
   const { counts, marcarTipo, marcarMinisterio } = useNotifications();
   const { count: escalasPendentes } = usePendingScaleConfirmations(user?.id);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [ministerios, setMinisterios] = useState<string[] | null>(null);
+  const ministeriosCarregados = useRef(false);
   const drawerRef = useRef<HTMLDivElement>(null);
   const touchStartY = useRef<number>(0);
 
 
 
   const isAdmin = user?.role === "admin" || user?.role === "pastor";
-  const meusMinisterios = isAdmin
-    ? Object.keys(ministeriosMap)
-    : userMinisterios(user).filter((m) => ministeriosMap[m]);
+  const associados = userMinisterios(user);
+  const meusMinisterios = ministeriosNoMenu(ministerios, associados, isAdmin);
+
+  useEffect(() => {
+    if (!drawerOpen && ministeriosCarregados.current) return;
+    let ativo = true;
+    supabase.from("canais_ministerio").select("ministerio").order("ministerio").then(({ data, error }) => {
+      if (!ativo || error || !data) return;
+      ministeriosCarregados.current = true;
+      setMinisterios(data.map((item) => item.ministerio).filter((nome): nome is string => typeof nome === "string" && nome.trim().length > 0));
+    });
+    return () => { ativo = false; };
+  }, [drawerOpen]);
 
   const hasExtras = meusMinisterios.length > 0 || isAdmin;
 
@@ -126,11 +135,10 @@ export default function BottomNav() {
           "fixed bottom-0 inset-x-0 z-50 md:hidden bg-white rounded-t-2xl shadow-2xl transition-transform duration-300 ease-out",
           drawerOpen ? "translate-y-0" : "translate-y-full"
         )}
-        onTouchStart={onTouchStart}
-        onTouchEnd={onTouchEnd}
+        inert={!drawerOpen}
       >
         {/* Handle */}
-        <div className="flex justify-center pt-3 pb-2">
+        <div className="flex justify-center pt-3 pb-2" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
           <div className="w-8 h-1 bg-gray-200 rounded-full" />
         </div>
 
@@ -139,13 +147,14 @@ export default function BottomNav() {
           <span className="text-sm font-bold text-gray-800">Menu</span>
           <button
             onClick={() => setDrawerOpen(false)}
+            aria-label="Fechar menu"
             className="nav-item p-1 rounded-full hover:bg-gray-100 transition"
           >
             <X className="w-4 h-4 text-gray-500" />
           </button>
         </div>
 
-        <div className="min-h-0 overflow-y-auto max-h-[60dvh] px-4 py-3 space-y-4">
+        <div className="min-h-0 overflow-y-auto overscroll-contain max-h-[60dvh] px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] space-y-4">
           {/* Meus Ministérios */}
           {meusMinisterios.length > 0 && (
             <div>
@@ -154,15 +163,13 @@ export default function BottomNav() {
               </p>
               <div className="grid grid-cols-2 gap-2">
                 {meusMinisterios.map((nome) => {
-                  const m = ministeriosMap[nome];
-                  if (!m) return null;
-                  const Icon = m.icon;
+                  const Icon = ministeriosIcones[nome] ?? Shield;
                   const active = pathname.includes("/ministerio/") && decodeURIComponent(pathname).includes(nome);
                   const badge = counts.ministerios[nome] ?? 0;
                   return (
                     <Link
                       key={nome}
-                      href={m.href}
+                      href={caminhoMinisterio(nome)}
                       onClick={() => { marcarMinisterio(nome); setDrawerOpen(false); }}
                       className={clsx(
                         "nav-item flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-semibold",
@@ -269,12 +276,11 @@ export default function BottomNav() {
         {meusMinisterios.length === 1 && !isAdmin ? (
           (() => {
             const nome = meusMinisterios[0];
-            const m = ministeriosMap[nome];
-            const active = m ? (pathname.includes("/ministerio/") && decodeURIComponent(pathname).includes(nome)) : false;
+            const active = pathname.includes("/ministerio/") && decodeURIComponent(pathname).includes(nome);
             const badge = counts.ministerios[nome] ?? 0;
             return (
               <NavItem
-                href={m?.href ?? "/dashboard"}
+                href={caminhoMinisterio(nome)}
                 label={nome}
                 icon={Layers}
                 active={active}
@@ -286,6 +292,8 @@ export default function BottomNav() {
         ) : meusMinisterios.length > 1 ? (
           <button
             onClick={() => setDrawerOpen(true)}
+            aria-expanded={drawerOpen}
+            aria-label="Abrir menu de ministérios"
             className={clsx(
               "nav-item flex-1 flex flex-col items-center justify-center gap-1 py-2 relative select-none",
               drawerOpen ? "text-vine-600" : "text-gray-400"
@@ -309,6 +317,8 @@ export default function BottomNav() {
         ) : (
           <button
             onClick={() => setDrawerOpen(true)}
+            aria-expanded={drawerOpen}
+            aria-label="Abrir menu"
             className={clsx(
               "nav-item flex-1 flex flex-col items-center justify-center gap-1 py-2 relative select-none",
               drawerOpen ? "text-gray-900" : "text-gray-400"
