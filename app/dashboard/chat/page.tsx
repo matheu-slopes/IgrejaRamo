@@ -1069,7 +1069,7 @@ function ConversationMessages({
 // --- InfoPanel ----------------------------------------------------
 
 function InfoPanel({
-  name, description, emoji, avatarUrl, avatarUserId, cor, messages, starredIds,
+  name, description, emoji, avatarUrl, avatarUserId, avatarGrupoId, cor, messages, starredIds,
   currentUserId, groupMembers, memberCount, canAddMembers, onAddMembers,
   canRemoveMembers, groupOwnerId, onRemoveMember,
   canEditAvatar, onAvatarFile, onSearchMessages, onClose,
@@ -1079,6 +1079,7 @@ function InfoPanel({
   emoji?: string;
   avatarUrl?: string;
   avatarUserId?: string;
+  avatarGrupoId?: string;
   cor?: string;
   messages: MensagemConversa[];
   starredIds: Set<string>;
@@ -1121,6 +1122,8 @@ function InfoPanel({
         <div className="relative">
           {avatarUrl && avatarUserId ? (
             <ImagemDeMensagem referencia={avatarUrl} mensagemId={avatarUserId} tipo="perfil" alt={name} className="w-14 h-14 rounded-full object-cover border border-gray-100" />
+          ) : avatarUrl && avatarGrupoId ? (
+            <ImagemDeMensagem referencia={avatarUrl} mensagemId={avatarGrupoId} tipo="grupo" alt={name} className="w-14 h-14 rounded-full object-cover border border-gray-100" />
           ) : avatarUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={avatarUrl} alt={name} className="w-14 h-14 rounded-full object-cover border border-gray-100" />
@@ -1554,9 +1557,10 @@ function GrupoAvatar({ grupo, size = "md" }: { grupo: Grupo; size?: "sm" | "md" 
   const sz = size === "sm" ? "w-9 h-9 text-sm" : "w-10 h-10 text-base";
   if (grupo.avatarUrl) {
     return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
-        src={grupo.avatarUrl}
+      <ImagemDeMensagem
+        referencia={grupo.avatarUrl}
+        mensagemId={grupo.id}
+        tipo="grupo"
         alt={grupo.nome}
         className={clsx("rounded-full object-cover border border-gray-100 shrink-0", sz)}
       />
@@ -3313,6 +3317,7 @@ export default function ChatPage() {
       emoji?: string;
       avatarUrl?: string;
       avatarUserId?: string;
+      avatarGrupoId?: string;
       cor?: string;
       currentUserId?: string;
       groupMembers?: User[];
@@ -3365,6 +3370,7 @@ export default function ChatPage() {
         description: activeGrupo.descricao,
         emoji: activeGrupo.emoji,
         avatarUrl: activeGrupo.avatarUrl,
+        avatarGrupoId: activeGrupo.id,
         cor: activeGrupo.cor,
         currentUserId: u.id,
         groupMembers,

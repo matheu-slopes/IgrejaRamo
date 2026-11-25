@@ -3,15 +3,15 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const ts=require('typescript');
 
-function route({auth=true, allowed=true, foto=null}={}) {
+function route({auth=true, allowed=true, foto=null, grupo=null, membro=false}={}) {
   let signed=0;
   const source=fs.readFileSync('app/api/midias/autorizar/route.ts','utf8');
   const js=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
   const m={exports:{}};
   const imports=(name)=>{
     if(name==='next/server') return {NextResponse:{json:(body,options)=>({body,status:options?.status??200,headers:options?.headers})}};
-    if(name==='@/lib/securityAuth') return {securityAuth:async()=>auth?{admin:{from(){return {select(){const q={eq(){return q},maybeSingle:async()=>({data:foto===null?null:{foto},error:null})};return q}}}},user:{id:'u'}}:{error:{status:401}}};
-    if(name==='@/lib/midiaDeMensagem') return {autorizarMidiaDeMensagem:async()=>allowed?{ok:true,chave:'chat/contexto/a.webp'}:{ok:false,status:403,erro:'Acesso negado.'}};
+    if(name==='@/lib/securityAuth') return {securityAuth:async()=>auth?{admin:{from(table){return {select(){const q={eq(){return q},maybeSingle:async()=>({data:table==='chat_conversas'?grupo:table==='chat_participantes'?(membro?{user_id:'u'}:null):foto===null?null:{foto},error:null})};return q}}}},user:{id:'u'}}:{error:{status:401}}};
+    if(name==='@/lib/midiaDeMensagem') return {prefixoDaConversa:()=> 'chat/contexto/',autorizarMidiaDeMensagem:async()=>allowed?{ok:true,chave:'chat/contexto/a.webp'}:{ok:false,status:403,erro:'Acesso negado.'}};
     if(name==='@/lib/armazenamentoMidiasR2') return {urlTemporariaDeMidia:async()=>{signed++;return 'temporary-url'}};
     return require(name);
   };
@@ -21,6 +21,13 @@ function route({auth=true, allowed=true, foto=null}={}) {
 test('exige autenticação e permissão antes de gerar URL',async()=>{
   const semSessao=route({auth:false}); assert.equal((await semSessao.execute({})).status,401); assert.equal(semSessao.signed(),0);
   const negado=route({allowed:false}); assert.equal((await negado.execute({tipo:'conversa',mensagemId:'id'})).status,403); assert.equal(negado.signed(),0);
+});
+test('foto do grupo exige participação e referência vinculada ao grupo',async()=>{
+  const id='00000000-0000-4000-8000-000000000001';
+  const grupo={tipo:'grupo',avatar_url:'r2midia:chat/contexto/avatar/foto.webp'};
+  const negado=route({grupo,membro:false}); assert.equal((await negado.execute({tipo:'grupo',mensagemId:id})).status,404); assert.equal(negado.signed(),0);
+  const certo=route({grupo,membro:true}); assert.equal((await certo.execute({tipo:'grupo',mensagemId:id})).status,200); assert.equal(certo.signed(),1);
+  const errado=route({grupo:{tipo:'grupo',avatar_url:'r2midia:chat/outro/avatar/foto.webp'},membro:true}); assert.equal((await errado.execute({tipo:'grupo',mensagemId:id})).status,404);
 });
 test('não guarda URL privada em cache compartilhado',async()=>{
   const autorizado=route(); const result=await autorizado.execute({tipo:'conversa',mensagemId:'id'});

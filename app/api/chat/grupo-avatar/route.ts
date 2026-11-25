@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { randomUUID } from "node:crypto";
+import { prefixoDaConversa } from "@/lib/midiaDeMensagem";
+import { validarArquivoMidia } from "@/lib/validarArquivoMidia";
+import { reservarMidia, finalizarReservaMidia, CotaMidiasError } from "@/lib/cotaMidiasR2";
+import { salvarMidiaPrivada } from "@/lib/armazenamentoMidiasR2";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -70,6 +75,26 @@ export async function POST(req: NextRequest) {
 
   if (!canManage) {
     return NextResponse.json({ error: "Sem permissao para alterar a foto deste grupo" }, { status: 403 });
+  }
+
+  if (process.env.NEXT_PUBLIC_MIDIAS_R2_ATIVAS === "true") {
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(conversaId)) return NextResponse.json({ error: "Grupo inválido" }, { status: 400 });
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const validado = validarArquivoMidia(file.type, bytes);
+    if (!validado) return NextResponse.json({ error: "Imagem inválida" }, { status: 400 });
+    const id = randomUUID();
+    const chave = `${prefixoDaConversa("conversa", conversaId)}avatar/${id}.${validado.extensao}`;
+    let reservado = false;
+    try {
+      await reservarMidia(admin, id, bytes.byteLength); reservado = true;
+      await salvarMidiaPrivada(chave, bytes, file.type);
+      const url = `r2midia:${chave}`;
+      const { error } = await admin.from("chat_conversas").update({ avatar_url: url, emoji: null }).eq("id", conversaId);
+      if (error) throw new Error("Não foi possível atualizar a foto do grupo");
+      return NextResponse.json({ url });
+    } catch (error) {
+      return NextResponse.json({ error: error instanceof CotaMidiasError ? error.message : "Não foi possível salvar a foto do grupo" }, { status: error instanceof CotaMidiasError ? error.status : 500 });
+    } finally { if (reservado) await finalizarReservaMidia(admin, id); }
   }
 
   const ext = file.type.split("/")[1].replace("jpeg", "jpg");

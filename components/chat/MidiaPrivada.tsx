@@ -6,7 +6,7 @@ import { authJsonHeaders } from "@/lib/authHeaders";
 type Props = {
   referencia?: string;
   mensagemId: string;
-  tipo: "conversa" | "ministerio" | "perfil";
+  tipo: "conversa" | "ministerio" | "perfil" | "grupo";
   renovarAutomaticamente?: boolean;
   children: (url: string | undefined, atualizar: () => void, falhou: boolean) => ReactNode;
 };
