@@ -5,6 +5,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useChatUnread } from "@/contexts/ChatUnreadContext";
 import { supabase } from "@/lib/supabase";
 import { useAppRefresh } from "@/hooks/useAppRefresh";
+import { ImagemDeMensagem, MidiaPrivada } from "@/components/chat/MidiaPrivada";
+import { MIDIAS_R2_ATIVAS } from "@/lib/midiasConfig";
 import { guardarFotosEmCache, obterFotosEmCache } from "@/lib/cacheFotosPerfis";
 import { ConversaDireta, Grupo, MensagemConversa, User } from "@/types";
 import {
@@ -87,7 +89,7 @@ async function fetchWithAuthRetry(input: RequestInfo | URL, init?: RequestInit, 
 // --- AudioPlayer -------------------------------------------------
 // O MediaRecorder n�o escreve dura��o nos metadados do WebM.
 // O hack: seek para 1e101 for�a o browser a varrer o arquivo e calcular a dura��o real.
-function AudioPlayer({ src, isMe }: { src: string; isMe: boolean }) {
+function AudioPlayer({ src, isMe, onRetry }: { src: string; isMe: boolean; onRetry?: () => void }) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [playing, setPlaying]   = useState(false);
   const [current, setCurrent]   = useState(0);
@@ -186,9 +188,9 @@ function AudioPlayer({ src, isMe }: { src: string; isMe: boolean }) {
           )}>
             <MicOff className="w-3.5 h-3.5" />
           </div>
-          <span className={clsx("text-xs flex-1", isMe ? "text-white/60" : "text-gray-400")}>
-            Áudio indisponível
-          </span>
+          <button type="button" onClick={() => { setLoadError(false); onRetry?.(); audioRef.current?.load(); }} className={clsx("text-xs flex-1 text-left", isMe ? "text-white/60" : "text-gray-400")}>
+            Áudio indisponível. Tentar novamente
+          </button>
         </>
       ) : (
         <>
@@ -475,6 +477,7 @@ function ComposeBar({
     if (!raw) return;
     if (!raw.type.startsWith("image/")) { onToast("Apenas imagens são suportadas"); return; }
     const compressed = await compressImage(raw);
+    if (MIDIAS_R2_ATIVAS && compressed.size > 4 * 1024 * 1024) { onToast("Imagem muito grande (máx 4 MB)"); return; }
     setImgPreview({ file: compressed, url: URL.createObjectURL(compressed) });
     setShowAttach(false);
   }
@@ -483,7 +486,8 @@ function ComposeBar({
     const raw = e.target.files?.[0];
     e.target.value = "";
     if (!raw) return;
-    if (raw.size > 20 * 1024 * 1024) { onToast("Documento muito grande (máx 20 MB)"); return; }
+    const maxMb = MIDIAS_R2_ATIVAS ? 4 : 20;
+    if (raw.size > maxMb * 1024 * 1024) { onToast(`Documento muito grande (máx ${maxMb} MB)`); return; }
     setDocPreview(raw);
     setShowAttach(false);
   }
@@ -504,6 +508,7 @@ function ComposeBar({
       rec.onstop = () => {
         stream.getTracks().forEach((t) => t.stop());
         const blob = new Blob(chunksRef.current, { type: rec.mimeType });
+        if (MIDIAS_R2_ATIVAS && blob.size > 4 * 1024 * 1024) { onToast("Áudio muito grande (máx 4 MB)"); setRecording(false); return; }
         const ext = rec.mimeType.includes("ogg") ? "ogg" : "webm";
         const name = `audio_${Date.now()}.${ext}`;
         setAudioPreview({ blob, url: URL.createObjectURL(blob), name });
@@ -829,7 +834,9 @@ function MessageBubble({
           </div>
         ) : msg.tipo === "audio" && msg.mediaUrl ? (
           /* �udio fica fora da bolha para evitar duplo fundo */
-          <AudioPlayer src={msg.mediaUrl} isMe={isMe} />
+          <MidiaPrivada referencia={msg.mediaUrl} mensagemId={msg.id} tipo="conversa" renovarAutomaticamente={false}>
+            {(url, atualizar, falhou) => url ? <AudioPlayer src={url} isMe={isMe} onRetry={atualizar} /> : falhou ? <button type="button" onClick={atualizar} className="p-2 text-xs text-gray-500">Áudio indisponível. Tentar novamente</button> : <span className="p-2 text-xs text-gray-500">Carregando áudio...</span>}
+          </MidiaPrivada>
         ) : (
           <div
             className={clsx(
@@ -840,19 +847,19 @@ function MessageBubble({
           >
             {msg.tipo === "imagem" && msg.mediaUrl ? (
               <div>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={msg.mediaUrl}
+                <ImagemDeMensagem
+                  referencia={msg.mediaUrl}
+                  mensagemId={msg.id}
+                  tipo="conversa"
+                  abrir
                   alt="imagem"
                   className="max-w-[320px] max-h-[400px] object-cover cursor-pointer rounded-2xl"
-                  onClick={() => window.open(msg.mediaUrl, "_blank")}
-                  onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
                 />
                 {msg.conteudo && <p className="px-3.5 py-2 text-sm">{msg.conteudo}</p>}
               </div>
             ) : msg.tipo === "documento" && msg.mediaUrl ? (
-              <a
-                href={msg.mediaUrl}
+              <MidiaPrivada referencia={msg.mediaUrl} mensagemId={msg.id} tipo="conversa">{(url, atualizar, falhou) => url ? <a
+                href={url}
                 target="_blank"
                 rel="noopener noreferrer"
                 className={clsx(
@@ -868,7 +875,7 @@ function MessageBubble({
                   </p>
                 </div>
                 <Download className={clsx("w-3.5 h-3.5 shrink-0", isMe ? "text-gray-300" : "text-gray-400")} />
-              </a>
+              </a> : falhou ? <button type="button" onClick={atualizar} className="p-3 text-xs text-gray-500">Documento indisponível. Tentar novamente</button> : <span className="block p-3 text-xs text-gray-500">Carregando documento...</span>}</MidiaPrivada>
             ) : (
               msg.conteudo
             )}
@@ -1062,7 +1069,7 @@ function ConversationMessages({
 // --- InfoPanel ----------------------------------------------------
 
 function InfoPanel({
-  name, description, emoji, avatarUrl, cor, messages, starredIds,
+  name, description, emoji, avatarUrl, avatarUserId, cor, messages, starredIds,
   currentUserId, groupMembers, memberCount, canAddMembers, onAddMembers,
   canRemoveMembers, groupOwnerId, onRemoveMember,
   canEditAvatar, onAvatarFile, onSearchMessages, onClose,
@@ -1071,6 +1078,7 @@ function InfoPanel({
   description?: string;
   emoji?: string;
   avatarUrl?: string;
+  avatarUserId?: string;
   cor?: string;
   messages: MensagemConversa[];
   starredIds: Set<string>;
@@ -1111,7 +1119,9 @@ function InfoPanel({
       {/* Profile */}
       <div className="flex flex-col items-center gap-2 py-5 px-4 border-b border-gray-100 shrink-0">
         <div className="relative">
-          {avatarUrl ? (
+          {avatarUrl && avatarUserId ? (
+            <ImagemDeMensagem referencia={avatarUrl} mensagemId={avatarUserId} tipo="perfil" alt={name} className="w-14 h-14 rounded-full object-cover border border-gray-100" />
+          ) : avatarUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={avatarUrl} alt={name} className="w-14 h-14 rounded-full object-cover border border-gray-100" />
           ) : grupoEmojiValido(emoji) ? (
@@ -1191,8 +1201,9 @@ function InfoPanel({
                     <div
                       key={m.id}
                       className="aspect-square bg-gray-100 rounded-md cursor-pointer hover:opacity-90 transition"
-                      style={{ backgroundImage: `url(${m.mediaUrl})`, backgroundSize: "cover", backgroundPosition: "center" }}
-                    />
+                    >
+                      <ImagemDeMensagem referencia={m.mediaUrl} mensagemId={m.id} tipo="conversa" abrir alt="Imagem compartilhada" className="w-full h-full rounded-md object-cover" />
+                    </div>
                   ))}
                 </div>
               )}
@@ -1262,7 +1273,7 @@ function InfoPanel({
                 );
                 return (
                   <div key={member.id} className="flex items-center gap-3 py-2">
-                    <UserAvatar nome={member.nome} foto={member.foto} size="sm" />
+                    <UserAvatar nome={member.nome} foto={member.foto} userId={member.id} size="sm" />
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-semibold text-gray-800 truncate">
                         {member.id === currentUserId ? "Você" : member.nome}
@@ -1327,7 +1338,7 @@ function NewDmModal({
             const hasChat = existingIds.has(mu.id);
             return (
               <button key={mu.id} onClick={() => onStart(mu.id, mu.nome)} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition text-left border-b border-gray-50 last:border-0">
-                <UserAvatar nome={mu.nome} foto={mu.foto} size="sm" />
+                <UserAvatar nome={mu.nome} foto={mu.foto} userId={mu.id} size="sm" />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-gray-800 truncate">{mu.nome}</p>
                   <p className="text-xs text-gray-400 capitalize truncate">{mu.role}</p>
@@ -1426,7 +1437,7 @@ function NewGroupModal({
             <div className="max-h-36 overflow-y-auto space-y-1">
               {filtered.map((mu) => (
                 <button key={mu.id} onClick={() => toggle(mu.id)} className="w-full flex items-center gap-3 px-2 py-2 rounded-xl hover:bg-gray-50 transition text-left">
-                  <UserAvatar nome={mu.nome} foto={mu.foto} size="sm" />
+                  <UserAvatar nome={mu.nome} foto={mu.foto} userId={mu.id} size="sm" />
                   <span className="flex-1 text-sm text-gray-700 truncate">{mu.nome}</span>
                   {membros.includes(mu.id) && <Check className="w-4 h-4 text-gray-800 shrink-0" />}
                 </button>
@@ -1514,7 +1525,7 @@ function AddGroupMembersModal({
             <div className="max-h-44 overflow-y-auto space-y-1">
               {filtered.map((mu) => (
                 <button key={mu.id} disabled={saving} onClick={() => toggle(mu.id)} className="w-full flex items-center gap-3 px-2 py-2 rounded-xl hover:bg-gray-50 disabled:opacity-60 transition text-left">
-                  <UserAvatar nome={mu.nome} foto={mu.foto} size="sm" />
+                  <UserAvatar nome={mu.nome} foto={mu.foto} userId={mu.id} size="sm" />
                   <span className="flex-1 text-sm text-gray-700 truncate">{mu.nome}</span>
                   {membros.includes(mu.id) && <Check className="w-4 h-4 text-gray-800 shrink-0" />}
                 </button>
@@ -1559,12 +1570,11 @@ function GrupoAvatar({ grupo, size = "md" }: { grupo: Grupo; size?: "sm" | "md" 
   );
 }
 
-function UserAvatar({ nome, foto, size = "md" }: { nome: string; foto?: string; size?: "sm" | "md" }) {
+function UserAvatar({ nome, foto, userId, size = "md" }: { nome: string; foto?: string; userId: string; size?: "sm" | "md" }) {
   const sz = size === "sm" ? "w-9 h-9 text-sm" : "w-10 h-10 text-base";
   if (foto) {
     return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img src={foto} alt={nome} className={clsx("rounded-full object-cover border border-gray-100 shrink-0", sz)} />
+      <ImagemDeMensagem referencia={foto} mensagemId={userId} tipo="perfil" alt={nome} className={clsx("rounded-full object-cover border border-gray-100 shrink-0", sz)} />
     );
   }
   return (
@@ -3019,12 +3029,15 @@ export default function ChatPage() {
       const fd = new FormData();
       fd.append("file", file);
       fd.append("conversa_id", conversaId);
-      const upRes = await fetchWithAuthRetry("/api/chat/upload-imagem", {
+      fd.append("mensagem_id", msgId);
+      const upRes = await fetchWithAuthRetry(MIDIAS_R2_ATIVAS ? "/api/midias/enviar" : "/api/chat/upload-imagem", {
         method: "POST",
         body: fd,
       });
       if (!upRes.ok) { const j = await upRes.json().catch(() => ({})); throw new Error(j.error ?? "Upload falhou"); }
-      const { url: finalUrl } = await upRes.json();
+      const result = await upRes.json();
+      const finalUrl = MIDIAS_R2_ATIVAS ? result.referencia : result.url;
+      if (typeof finalUrl !== "string" || !finalUrl) throw new Error("A imagem enviada não ficou disponível.");
 
       // Substitui URL local pela URL final
       const updater = (m: MensagemConversa) => m.id === msgId ? { ...m, mediaUrl: finalUrl } : m;
@@ -3069,13 +3082,16 @@ export default function ChatPage() {
       const fd = new FormData();
       fd.append("file", file);
       fd.append("conversa_id", conversaId);
+      fd.append("mensagem_id", msgId);
       fd.append("file_type", tipoMsg);
-      const upRes = await fetchWithAuthRetry("/api/chat/upload-arquivo", {
+      const upRes = await fetchWithAuthRetry(MIDIAS_R2_ATIVAS ? "/api/midias/enviar" : "/api/chat/upload-arquivo", {
         method: "POST",
         body: fd,
       });
       if (!upRes.ok) { const j = await upRes.json().catch(() => ({})); throw new Error(j.error ?? "Upload falhou"); }
-      const { url: finalUrl } = await upRes.json();
+      const result = await upRes.json();
+      const finalUrl = MIDIAS_R2_ATIVAS ? result.referencia : result.url;
+      if (typeof finalUrl !== "string" || !finalUrl) throw new Error("O arquivo enviado não ficou disponível.");
 
       const updater = (m: MensagemConversa) => m.id === msgId ? { ...m, mediaUrl: finalUrl } : m;
       if (tipo === "direto") setDms(prev => prev.map(dm => dm.id === conversaId ? { ...dm, mensagens: dm.mensagens.map(updater) } : dm));
@@ -3296,6 +3312,7 @@ export default function ChatPage() {
       description?: string;
       emoji?: string;
       avatarUrl?: string;
+      avatarUserId?: string;
       cor?: string;
       currentUserId?: string;
       groupMembers?: User[];
@@ -3314,12 +3331,13 @@ export default function ChatPage() {
     if (activeChat.tipo === "direto" && activeDm) {
       const other = otherParticipant(activeDm);
       const otherUser = usuarios.find((mu) => mu.id === other.id);
-      const avatarEl = <UserAvatar nome={other.nome} foto={otherUser?.foto} size="sm" />;
+      const avatarEl = <UserAvatar nome={other.nome} foto={otherUser?.foto} userId={other.id} size="sm" />;
       headerEl = renderChatHeader(other.nome, otherUser?.role ?? "membro", avatarEl);
       infoProps = {
         name: other.nome,
         description: otherUser?.role,
         avatarUrl: otherUser?.foto,
+        avatarUserId: other.id,
         onSearchMessages: () => {
           setChatSearchOpen(true);
           setInfoOpen(false);
@@ -3531,7 +3549,7 @@ export default function ChatPage() {
                     onClick={() => openChat({ tipo: "direto", id: dm.id })}
                   >
                     <div className="relative shrink-0">
-                      <UserAvatar nome={other.nome} foto={otherUser?.foto} />
+                      <UserAvatar nome={other.nome} foto={otherUser?.foto} userId={other.id} />
                       {unread > 0 && <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center">{unread}</span>}
                     </div>
                     <div className="flex-1 min-w-0">

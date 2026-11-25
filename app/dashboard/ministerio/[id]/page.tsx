@@ -23,6 +23,8 @@ import { LouvorStudioTab, type AnaliseStudioInicial } from "@/components/dashboa
 import { RepertorioTab } from "@/components/dashboard/RepertorioTab";
 import { useAppRefresh } from "@/hooks/useAppRefresh";
 import { EquipesTab } from "@/components/dashboard/EquipesTab";
+import { AudioDeMensagem, ImagemDeMensagem } from "@/components/chat/MidiaPrivada";
+import { MIDIAS_R2_ATIVAS } from "@/lib/midiasConfig";
 
 type Tab = "chat" | "membros" | "equipes" | "eventos" | "escalas" | "studio" | "repertorio";
 
@@ -587,13 +589,15 @@ function ChatTab({
         const fd = new FormData();
         fd.append("file", imagemFile);
         fd.append("conversa_id", `ministerio_${ministerio}`);
-        const res = await muralFetchWithRetry("/api/chat/upload-imagem", {
+        fd.append("mensagem_id", msgId);
+        const res = await muralFetchWithRetry(MIDIAS_R2_ATIVAS ? "/api/midias/enviar" : "/api/chat/upload-imagem", {
           method: "POST", headers: { authorization: `Bearer ${token}` }, body: fd,
         });
         const json = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(json.error ?? "Upload falhou");
-        if (typeof json.url !== "string" || !json.url) throw new Error("O arquivo enviado não ficou disponível.");
-        uploadedUrl = json.url;
+        const url = MIDIAS_R2_ATIVAS ? json.referencia : json.url;
+        if (typeof url !== "string" || !url) throw new Error("O arquivo enviado não ficou disponível.");
+        uploadedUrl = url;
         setMsgs((prev) => prev.map((m) => m.id === msgId ? { ...m, mediaUrl: uploadedUrl ?? undefined } : m));
       } else if (tipo === "audio" && blobParaUpload) {
         const mimeAudio = blobParaUpload.type.split(";")[0] || "audio/webm";
@@ -602,14 +606,16 @@ function ChatTab({
         const fd = new FormData();
         fd.append("file", audioFile);
         fd.append("conversa_id", `ministerio_${ministerio}`);
+        fd.append("mensagem_id", msgId);
         fd.append("file_type", "audio");
-        const res = await muralFetchWithRetry("/api/chat/upload-arquivo", {
+        const res = await muralFetchWithRetry(MIDIAS_R2_ATIVAS ? "/api/midias/enviar" : "/api/chat/upload-arquivo", {
           method: "POST", headers: { authorization: `Bearer ${token}` }, body: fd,
         });
         const json = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(json.error ?? "Upload falhou");
-        if (typeof json.url !== "string" || !json.url) throw new Error("O arquivo enviado não ficou disponível.");
-        uploadedUrl = json.url;
+        const url = MIDIAS_R2_ATIVAS ? json.referencia : json.url;
+        if (typeof url !== "string" || !url) throw new Error("O arquivo enviado não ficou disponível.");
+        uploadedUrl = url;
         setMsgs((prev) => prev.map((m) => m.id === msgId ? { ...m, mediaUrl: uploadedUrl ?? undefined } : m));
       } else if (tipo === "audio" || tipo === "imagem") throw new Error("A mídia não está disponível. Grave ou selecione novamente.");
     } catch (err) {
@@ -680,6 +686,7 @@ function ChatTab({
       canvas.toBlob((blob) => {
         if (!blob) return;
         const compressed = new File([blob], file.name.replace(/\.[^.]+$/, ".jpg"), { type: "image/jpeg" });
+        if (MIDIAS_R2_ATIVAS && compressed.size > 4 * 1024 * 1024) { alert("Imagem muito grande (máximo 4 MB)."); return; }
         setImagemFile(compressed);
         setImagemPreview(URL.createObjectURL(compressed));
       }, "image/jpeg", 0.8);
@@ -696,6 +703,7 @@ function ChatTab({
       mr.onstop = () => {
         const primeiroTrecho = chunksRef.current[0];
         const blob = new Blob(chunksRef.current, { type: mr.mimeType || (primeiroTrecho instanceof Blob ? primeiroTrecho.type : "") || "audio/webm" });
+        if (MIDIAS_R2_ATIVAS && blob.size > 4 * 1024 * 1024) { stream.getTracks().forEach((t) => t.stop()); alert("Áudio muito grande (máximo 4 MB)."); return; }
         setAudioBlob(blob);
         setAudioUrl(URL.createObjectURL(blob)); // preview local
         stream.getTracks().forEach((t) => t.stop());
@@ -995,8 +1003,10 @@ function ChatTab({
                     {/* Imagem — sem borda/fundo, cobre o bubble inteiro */}
                     {m.tipo === "imagem" && m.mediaUrl && (
                       <div className="relative">
-                        <img
-                          src={m.mediaUrl}
+                        <ImagemDeMensagem
+                          referencia={m.mediaUrl}
+                          mensagemId={m.id}
+                          tipo="ministerio"
                           alt="imagem"
                           className="w-full block rounded-2xl"
                           style={{ display: "block" }}
@@ -1012,7 +1022,7 @@ function ChatTab({
                     {m.tipo === "audio" && m.mediaUrl && (
                       <div className={clsx("min-w-0 max-w-full px-3 py-2 rounded-2xl border", isMe ? "bg-vine-50 border-vine-200" : "bg-gray-100 border-gray-200")}>
                         {!isMe && <p className="text-xs font-semibold text-vine-600 mb-1">{m.autorNome}</p>}
-                        <audio controls preload="metadata" src={m.mediaUrl} className="h-7 w-full min-w-0 rounded-full" />
+                        <AudioDeMensagem referencia={m.mediaUrl} mensagemId={m.id} tipo="ministerio" className="h-7 w-full min-w-0 rounded-full" />
                         <p className={clsx("text-xs text-right mt-0.5", isMe ? "text-vine-400" : "text-gray-400")}>
                           {new Date(m.criadoEm).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
                         </p>
@@ -1172,13 +1182,16 @@ function ChatTab({
                 ? <p className="text-xs text-gray-400 text-center mt-8">Nenhuma imagem enviada ainda.</p>
                 : <div className="grid grid-cols-3 gap-1.5">
                     {midiaMsgs.map((m) => (
-                      <a key={m.id} href={m.mediaUrl} target="_blank" rel="noopener noreferrer">
-                        <img
-                          src={m.mediaUrl}
+                      <div key={m.id}>
+                        <ImagemDeMensagem
+                          referencia={m.mediaUrl}
+                          mensagemId={m.id}
+                          tipo="ministerio"
+                          abrir
                           alt="mídia"
                           className="w-full aspect-square object-cover rounded-lg hover:opacity-90 transition"
                         />
-                      </a>
+                      </div>
                     ))}
                   </div>
             )}
@@ -1220,10 +1233,10 @@ function ChatTab({
                           <p className="text-xs text-gray-700 leading-relaxed line-clamp-3">{m.conteudo}</p>
                         )}
                         {m.tipo === "imagem" && m.mediaUrl && (
-                          <img src={m.mediaUrl} alt="" className="w-full rounded-lg object-cover max-h-32" />
+                          <ImagemDeMensagem referencia={m.mediaUrl} mensagemId={m.id} tipo="ministerio" alt="" className="w-full rounded-lg object-cover max-h-32" />
                         )}
                         {m.tipo === "audio" && m.mediaUrl && (
-                          <audio controls preload="metadata" src={m.mediaUrl} className="w-full h-8" />
+                          <AudioDeMensagem referencia={m.mediaUrl} mensagemId={m.id} tipo="ministerio" className="w-full h-8" />
                         )}
                         <p className="text-[10px] text-amber-400 mt-1.5">
                           {new Date(m.criadoEm).toLocaleString("pt-BR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}

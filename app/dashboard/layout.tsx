@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { authJsonHeaders } from "@/lib/authHeaders";
+import { ImagemDeMensagem } from "@/components/chat/MidiaPrivada";
 import { ChatUnreadProvider } from "@/contexts/ChatUnreadContext";
 import { NotificationsProvider } from "@/contexts/NotificationsContext";
 import Sidebar from "@/components/Sidebar";
@@ -44,7 +45,7 @@ function AvatarDisplay({
     ? "w-16 h-16 text-2xl ring-4 ring-white/20"
     : "w-8 h-8 text-sm ring-2 ring-[#0a0a0a] ring-offset-1";
   return user.foto
-    ? <img src={user.foto} alt={user.nome} className={clsx("rounded-full object-cover", cls)} />
+    ? <ImagemDeMensagem referencia={user.foto} mensagemId={user.id} tipo="perfil" alt={user.nome} className={clsx("rounded-full object-cover", cls)} />
     : <div className={clsx("rounded-full bg-[#0a0a0a] flex items-center justify-center text-white font-bold", cls)}>{initials}</div>;
 }
 
@@ -53,7 +54,7 @@ function ProfileDropdown({
 }: {
   user: User;
   onLogout: () => void;
-  onUpdate: (dados: Partial<User>) => void;
+  onUpdate: (dados: Partial<User>) => Promise<void>;
 }) {
   const [open, setOpen] = useState(false);
   const [view, setView] = useState<"menu" | "perfil" | "dados" | "senha">("menu");
@@ -85,9 +86,9 @@ function ProfileDropdown({
       const contexto = canvas.getContext("2d");
       if (!contexto) throw new Error("Não foi possível preparar a imagem.");
       contexto.drawImage(imagem, 0, 0, canvas.width, canvas.height);
-      onUpdate({ foto: canvas.toDataURL("image/webp", 0.8) });
-    } catch {
-      alert("Não foi possível carregar essa imagem. Tente outra foto.");
+      await onUpdate({ foto: canvas.toDataURL("image/webp", 0.8) });
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Não foi possível salvar essa foto. Tente novamente.");
     } finally {
       URL.revokeObjectURL(url);
     }

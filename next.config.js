@@ -6,7 +6,7 @@ const withPWA = require("next-pwa")({
   disable: process.env.NODE_ENV === "development",
   runtimeCaching: [
     {
-      urlPattern: ({ url }) => url.hostname.endsWith(".supabase.co"),
+      urlPattern: ({ url }) => url.hostname.endsWith(".supabase.co") || url.hostname.endsWith(".r2.cloudflarestorage.com"),
       handler: "NetworkOnly",
       options: {
         cacheName: "ramo-supabase-network",

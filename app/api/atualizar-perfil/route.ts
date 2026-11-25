@@ -1,6 +1,8 @@
 ﻿import { createClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
 import { forbidden, securityAuth } from "@/lib/securityAuth";
+import { salvarFotoPerfil } from "@/lib/salvarFotoPerfilR2";
+import { CotaMidiasError } from "@/lib/cotaMidiasR2";
 
 export async function POST(req: NextRequest) {
   const auth = await securityAuth(req);
@@ -54,7 +56,15 @@ export async function POST(req: NextRequest) {
   if (dados.nome        !== undefined) payload.nome          = dados.nome;
   if (dados.email       !== undefined) payload.email         = dados.email;
   if (dados.telefone    !== undefined) payload.telefone      = dados.telefone;
-  if (dados.foto        !== undefined) payload.foto          = dados.foto;
+  if (dados.foto !== undefined) {
+    if (process.env.NEXT_PUBLIC_MIDIAS_R2_ATIVAS === "true" && dados.foto !== null) {
+      try { payload.foto = await salvarFotoPerfil(admin, String(id), dados.foto); }
+      catch (error) {
+        const motivo = error instanceof CotaMidiasError ? error : new CotaMidiasError("Não foi possível salvar a foto.", 503);
+        return NextResponse.json({ error: motivo.message }, { status: motivo.status });
+      }
+    } else payload.foto = dados.foto;
+  }
   if (dados.role        !== undefined) payload.role          = dados.role;
   if (dados.ministerios !== undefined) payload.ministerios   = dados.ministerios;
   if (dados.liderMinisterios !== undefined) payload.lider_ministerios = dados.liderMinisterios ?? [];
