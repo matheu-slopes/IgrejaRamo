@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { useChatUnread } from "@/contexts/ChatUnreadContext";
 import { useNotifications } from "@/contexts/NotificationsContext";
@@ -40,12 +40,15 @@ const navAdmin = [
 
 export default function BottomNav() {
   const pathname = usePathname();
-  const { user } = useAuth();
+  const searchParams = useSearchParams();
+  const { user, temPermissao } = useAuth();
   const { totalUnread } = useChatUnread();
   const { counts, marcarTipo, marcarMinisterio } = useNotifications();
   const { count: escalasPendentes } = usePendingScaleConfirmations(user?.id);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [ministerios, setMinisterios] = useState<string[] | null>(null);
+  const [estadoMinisterios, setEstadoMinisterios] = useState<"carregando" | "pronto" | "erro">("carregando");
+  const [tentativaMinisterios, setTentativaMinisterios] = useState(0);
   const ministeriosCarregados = useRef(false);
   const drawerRef = useRef<HTMLDivElement>(null);
   const touchStartY = useRef<number>(0);
@@ -53,6 +56,7 @@ export default function BottomNav() {
 
 
   const isAdmin = user?.role === "admin" || user?.role === "pastor";
+  const podeGerenciarMinisterios = isAdmin && temPermissao("gerenciar_usuarios");
   const associados = userMinisterios(user);
   const meusMinisterios = ministeriosNoMenu(ministerios, associados, isAdmin);
 
@@ -60,12 +64,14 @@ export default function BottomNav() {
     if (!drawerOpen && ministeriosCarregados.current) return;
     let ativo = true;
     supabase.from("canais_ministerio").select("ministerio").order("ministerio").then(({ data, error }) => {
-      if (!ativo || error || !data) return;
+      if (!ativo) return;
+      if (error || !data) { setEstadoMinisterios("erro"); return; }
       ministeriosCarregados.current = true;
       setMinisterios(data.map((item) => item.ministerio).filter((nome): nome is string => typeof nome === "string" && nome.trim().length > 0));
-    });
+      setEstadoMinisterios("pronto");
+    }, () => { if (ativo) setEstadoMinisterios("erro"); });
     return () => { ativo = false; };
-  }, [drawerOpen]);
+  }, [drawerOpen, tentativaMinisterios]);
 
   const hasExtras = meusMinisterios.length > 0 || isAdmin;
 
@@ -143,12 +149,12 @@ export default function BottomNav() {
         </div>
 
         {/* Header */}
-        <div className="flex items-center justify-between px-5 pb-3 border-b border-gray-100">
-          <span className="text-sm font-bold text-gray-800">Menu</span>
+        <div className="flex items-center justify-between px-5 pb-4 border-b border-gray-100">
+          <div><span className="block text-base font-bold text-gray-900">Menu</span><span className="block text-xs text-gray-500">Acesse seus ministérios e recursos</span></div>
           <button
             onClick={() => setDrawerOpen(false)}
             aria-label="Fechar menu"
-            className="nav-item p-1 rounded-full hover:bg-gray-100 transition"
+            className="nav-item h-10 w-10 flex items-center justify-center rounded-full bg-gray-50 hover:bg-gray-100 transition"
           >
             <X className="w-4 h-4 text-gray-500" />
           </button>
@@ -156,11 +162,16 @@ export default function BottomNav() {
 
         <div className="min-h-0 overflow-y-auto overscroll-contain max-h-[60dvh] px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] space-y-4">
           {/* Meus Ministérios */}
-          {meusMinisterios.length > 0 && (
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 px-1 mb-2">
-                Meus Ministérios
-              </p>
+          <div>
+              <div className="flex items-center justify-between px-1 mb-2"><p className="text-xs font-bold uppercase tracking-wide text-gray-600">Meus ministérios</p>{estadoMinisterios === "pronto" && <span className="text-xs text-gray-500">{meusMinisterios.length}</span>}</div>
+              {estadoMinisterios === "erro" && <div role="status" className="mb-2 rounded-xl bg-amber-50 px-3 py-3 text-sm text-amber-900">Não foi possível atualizar os ministérios. <button type="button" onClick={() => { ministeriosCarregados.current = false; setEstadoMinisterios("carregando"); setTentativaMinisterios((n) => n + 1); }} className="font-semibold underline">Tentar novamente</button></div>}
+              {ministerios === null && estadoMinisterios === "carregando" ? <p role="status" className="rounded-xl bg-gray-50 px-3 py-4 text-sm text-gray-600">Carregando ministérios...</p> : meusMinisterios.length === 0 && estadoMinisterios === "pronto" ? (
+                <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 px-4 py-4 text-sm text-gray-600">
+                  <p className="font-semibold text-gray-800">{isAdmin ? "Nenhum ministério cadastrado" : "Você ainda não participa de um ministério"}</p>
+                  <p className="mt-1 text-xs leading-relaxed">{podeGerenciarMinisterios ? "Cadastre o primeiro ministério para começar a organizar sua igreja." : isAdmin ? "Quando um ministério for cadastrado, ele aparecerá aqui." : "Quando você for adicionado a um ministério, ele aparecerá aqui."}</p>
+                  {podeGerenciarMinisterios && <Link href="/dashboard/admin?tab=ministerios" onClick={() => setDrawerOpen(false)} className="mt-3 inline-flex min-h-10 items-center font-semibold text-vine-700 underline">Gerenciar ministérios</Link>}
+                </div>
+              ) : meusMinisterios.length > 0 && (
               <div className="grid grid-cols-2 gap-2">
                 {meusMinisterios.map((nome) => {
                   const Icon = ministeriosIcones[nome] ?? Shield;
@@ -172,8 +183,8 @@ export default function BottomNav() {
                       href={caminhoMinisterio(nome)}
                       onClick={() => { marcarMinisterio(nome); setDrawerOpen(false); }}
                       className={clsx(
-                        "nav-item flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-semibold",
-                        active ? "bg-gray-50 text-gray-900" : "bg-gray-50 text-gray-700"
+                        "nav-item min-h-11 flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-semibold",
+                        active ? "bg-vine-100 text-vine-900 ring-1 ring-vine-300" : "bg-gray-50 text-gray-700 hover:bg-gray-100"
                       )}
                     >
                       <div className="relative shrink-0">
@@ -189,26 +200,27 @@ export default function BottomNav() {
                   );
                 })}
               </div>
-            </div>
-          )}
+              )}
+          </div>
 
           {/* Painel Admin */}
           {isAdmin && (
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 px-1 mb-2">
+              <p className="text-xs font-bold uppercase tracking-wide text-gray-600 px-1 mb-2">
                 Painel Admin
               </p>
-              <div className="space-y-1">
+              <div className="grid grid-cols-2 gap-2">
                 {navAdmin.map(({ href, label, icon: Icon }) => {
-                  const active = pathname.startsWith("/dashboard/admin") && href.includes(pathname.split("?")[0]);
+                  const params = new URLSearchParams(href.split("?")[1]);
+                  const active = pathname === "/dashboard/admin" && [...params.entries()].every(([key, value]) => searchParams.get(key) === value);
                   return (
                     <Link
                       key={href}
                       href={href}
                       onClick={() => setDrawerOpen(false)}
                       className={clsx(
-                        "nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold",
-                        active ? "bg-gray-50 text-gray-900" : "text-gray-700"
+                        "nav-item min-h-11 flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold",
+                        active ? "bg-vine-100 text-vine-900" : "bg-gray-50 text-gray-700 hover:bg-gray-100"
                       )}
                     >
                       <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center shrink-0">
@@ -223,7 +235,7 @@ export default function BottomNav() {
           )}
 
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 px-1 mb-2">
+            <p className="text-xs font-bold uppercase tracking-wide text-gray-600 px-1 mb-2">
               Sistema
             </p>
             <Link

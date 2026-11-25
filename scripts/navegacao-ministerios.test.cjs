@@ -19,5 +19,9 @@ test('membro vê apenas seus ministérios cadastrados, inclusive nomes novos',()
 });
 test('em falha de carregamento mantém ministérios associados acessíveis',()=>{
   assert.deepEqual(ministeriosNoMenu(null,['Oração','Novo Ministério'],false),['Novo Ministério','Oração']);
-  assert.ok(ministeriosNoMenu(null,[],true).includes('Oração'));
+  assert.deepEqual(ministeriosNoMenu(null,[],true),[]);
+});
+test('igreja sem ministérios não apresenta nomes fictícios',()=>{
+  assert.deepEqual(ministeriosNoMenu([],[],true),[]);
+  assert.deepEqual(ministeriosNoMenu([],['Louvor'],false),[]);
 });
