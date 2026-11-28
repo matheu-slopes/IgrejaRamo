@@ -1,5 +1,6 @@
 ﻿import { NextRequest, NextResponse } from "next/server";
 import * as cheerio from "cheerio";
+import { getLouvorStudioUser } from "@/lib/louvorStudioServer";
 
 const HEADERS = {
   "User-Agent":
@@ -21,6 +22,9 @@ function toSlug(text: string) {
 
 /** GET /api/buscar-letra?artista=<slug>&musica=<slug> */
 export async function GET(req: NextRequest) {
+  if (!(await getLouvorStudioUser(req))) {
+    return NextResponse.json({ error: "Entre no sistema para buscar a letra." }, { status: 401 });
+  }
   const { searchParams } = req.nextUrl;
   const artista = searchParams.get("artista")?.trim();
   const musica  = searchParams.get("musica")?.trim();

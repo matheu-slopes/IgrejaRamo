@@ -199,7 +199,15 @@ function MusicasSection({ musicas }: { musicas: EscalaMusica[] }) {
     try {
       const artista = m.artistaSlug ?? m.artista;
       const musica  = m.musicaSlug  ?? m.titulo;
-      const res = await fetch(`/api/buscar-letra?artista=${encodeURIComponent(artista)}&musica=${encodeURIComponent(musica)}`);
+      const { data: sessao } = await supabase.auth.getSession();
+      const token = sessao.session?.access_token;
+      if (!token) {
+        alert("Sua sessão expirou. Entre novamente.");
+        return;
+      }
+      const res = await fetch(`/api/buscar-letra?artista=${encodeURIComponent(artista)}&musica=${encodeURIComponent(musica)}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       const data = await res.json();
       if (data.letra) {
         await navigator.clipboard.writeText(data.letra);

@@ -10,65 +10,13 @@ const HEADERS = {
   "Cache-Control": "no-cache",
 };
 
-function slugOficial(text: string) {
-  // Preserve the canonical route returned by Cifra Club, including `--`.
-  return text.trim().toLowerCase();
-}
-
-function inferirTomDaCifra(cifra: string) {
-  // Fallback honesto para páginas cujo HTML não expõe o metadado de tom.
-  // A primeira linha de acordes costuma indicar a tonalidade da cifra.
-  const primeirasLinhas = cifra.split("\n").slice(0, 16).join(" ");
-  const encontrado = primeirasLinhas.match(/(?:^|\s)([A-G](?:#|b)?m?)(?=(?:\s|\||$))/);
-  return encontrado?.[1] ?? "";
-}
-
-async function criarOuReusarJob(
-  req: NextRequest,
-  artistaSlug: string,
-  musicaSlug: string,
-  versao: "principal" | "simplificada",
-  cifraUrl: string,
-) {
-  const user = await getLouvorStudioUser(req);
-  if (!user) {
-    return NextResponse.json({
-      code: "CIFRACLUB_BLOCKED",
-      error: "O Cifra Club bloqueou a consulta e sua sessao expirou. Entre novamente ou importe pelo navegador.",
-      cifraUrl,
-    }, { status: 403 });
-  }
-  const { data: existente } = await supabaseAdmin.from("cifra_jobs")
-    .select("id,status").eq("user_id", user.id).eq("artista_slug", artistaSlug)
-    .eq("musica_slug", musicaSlug).eq("versao", versao)
-    .in("status", ["aguardando", "processando", "concluido"])
-    .gt("expira_em", new Date().toISOString()).order("criado_em", { ascending: false })
-    .limit(1).maybeSingle();
-  if (existente) {
-    return NextResponse.json({ code: "CIFRA_QUEUED", jobId: existente.id, status: existente.status, cifraUrl }, { status: 202 });
-  }
-  const { data: job, error } = await supabaseAdmin.from("cifra_jobs").insert({
-    user_id: user.id, artista_slug: artistaSlug, musica_slug: musicaSlug, versao,
-  }).select("id").single();
-  if (error || !job) {
-    console.error("[buscar-cifra] fila", error?.message ?? "sem retorno");
-    return NextResponse.json({
-      code: "CIFRACLUB_BLOCKED",
-      error: "O Cifra Club bloqueou a consulta e a fila local ainda nao esta disponivel.",
-      cifraUrl,
-    }, { status: 503 });
-  }
-  return NextResponse.json({ code: "CIFRA_QUEUED", jobId: job.id, status: "aguardando", cifraUrl }, { status: 202 });
-}
-
-/** GET /api/buscar-cifra?artista=hillsong&musica=oceans  → busca cifra */
-/** GET /api/buscar-cifra?q=oceans hillsong               → sugestões de busca */
+/** GET /api/buscar-cifra?q=oceans hillsong → sugestões de busca (a cifra é colada manualmente) */
 export async function GET(req: NextRequest) {
+  if (!(await getLouvorStudioUser(req))) {
+    return NextResponse.json({ error: "Entre no sistema para buscar músicas." }, { status: 401 });
+  }
   const { searchParams } = req.nextUrl;
   const q       = searchParams.get("q")?.trim();
-  const artista = searchParams.get("artista")?.trim();
-  const musica  = searchParams.get("musica")?.trim();
-  const versao = searchParams.get("versao") === "simplificada" ? "simplificada" : "principal";
 
   // ── Modo busca de sugestões ───────────────────────────────────────
   if (q) {
@@ -355,146 +303,8 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  // ── Modo busca de cifra ───────────────────────────────────────────
-  if (!artista || !musica) {
-    return NextResponse.json(
-      { error: "Informe 'artista' e 'musica' ou o parâmetro 'q' para busca." },
-      { status: 400 }
-    );
-  }
-
-  const artistaSlug = slugOficial(artista);
-  const musicaSlug  = slugOficial(musica);
-  if (!/^[a-z0-9-]+$/.test(artistaSlug) || !/^[a-z0-9-]+$/.test(musicaSlug)) {
-    return NextResponse.json(
-      { error: "Link de cifra invalido. Pesquise a musica novamente." },
-      { status: 400 },
-    );
-  }
-  const cifraUrl    = `https://www.cifraclub.com.br/${artistaSlug}/${musicaSlug}/${versao === "simplificada" ? "simplificada/" : ""}`;
-  if (versao === "principal") {
-    const { data: salva } = await supabaseAdmin.from("musicas")
-      .select("titulo,artista,tom,link_youtube,cifra,cifra_url,forma_da_cifra,capotraste")
-      .eq("cifra_artista_slug", artistaSlug)
-      .eq("cifra_musica_slug", musicaSlug)
-      .not("cifra", "is", null)
-      .limit(1)
-      .maybeSingle();
-    if (salva?.cifra && salva.cifra.trim().length >= 20) {
-      return NextResponse.json({
-        artist: salva.artista || artista,
-        name: salva.titulo || musica,
-        tom_original: salva.tom || null,
-        youtube_url: salva.link_youtube || null,
-        forma_da_cifra: salva.forma_da_cifra || null,
-        capotraste: salva.capotraste || null,
-        cifraclub_url: salva.cifra_url || cifraUrl,
-        cifra: salva.cifra.split("\n"),
-        versao,
-        versoes: [{ id: "principal", label: "Principal" }],
-        tom_origem: salva.tom ? "cifraclub" : null,
-        cached: true,
-      });
-    }
-  }
-
-  let res: Response | null = null;
-  try {
-    res = await fetch(cifraUrl, { headers: HEADERS, signal: AbortSignal.timeout(15000) });
-  } catch {
-    return criarOuReusarJob(req, artistaSlug, musicaSlug, versao, cifraUrl);
-  }
-
-  if (!res || !res.ok) {
-    const status = res?.status || 500;
-    if (!res || status === 403 || status === 429 || status === 503)
-      return criarOuReusarJob(req, artistaSlug, musicaSlug, versao, cifraUrl);
-    return NextResponse.json(
-      { error: `Música não encontrada. Verifique o nome do artista ("${artista}") e da música ("${musica}").` },
-      { status: 404 }
-    );
-  }
-
-
-  const html = await res.text();
-  const $ = cheerio.load(html);
-
-  // Cifra fica dentro de #cifra_cnt > pre
-  let cifraTexto = $("#cifra_cnt pre").first().text();
-
-  // Fallback: qualquer <pre> com conteúdo de acordes
-  if (!cifraTexto) {
-    $("pre").each((_, el) => {
-      const t = $(el).text();
-      if (t.length > 100 && !cifraTexto) cifraTexto = t;
-    });
-  }
-
-  if (!cifraTexto || cifraTexto.trim().length < 20) {
-    return NextResponse.json(
-      { error: "Cifra não encontrada. A música pode não ter cifra disponível ou o nome está incorreto." },
-      { status: 404 }
-    );
-  }
-
-  // Metadados
-  const titulo      = $("h1.t1").text().trim() || $("h1").first().text().trim() || musica;
-  const artistaNome = $("h2.t3 a").first().text().trim() || $(".bread a").last().text().trim() || artista;
-
-  // YouTube e Tom (vêm em JSON embutido no HTML)
-  let youtubeUrl = "";
-  let tomOriginal = "";
-  let formaDaCifra = "";
-  let capotraste = "";
-  const scripts = $("script:not([src])").map((_, el) => $(el).html() ?? "").get().join("\n");
-  const textoDaPagina = $("body").text().replace(/\s+/g, " ");
-
-  // O Cifra Club hoje envia o id em payloads React Server Components como
-  // `youtubeID` (e com aspas escapadas); as versões antigas usam youtubeId.
-  const ytMatch = scripts.match(/(?:youtube_id|youtubeId|youtubeID)\\?["']?\s*:\s*\\?["']([A-Za-z0-9_-]{10,12})/i);
-  if (ytMatch) youtubeUrl = `https://www.youtube.com/watch?v=${ytMatch[1]}`;
-
-  // Tom: tenta extrair do HTML (vários seletores + variáveis JS)
-  const tomNoTexto = textoDaPagina.match(/Tom\s*:\s*([A-G][#b]?m?)(?:\s*\(com forma de\s*([A-G][#b]?m?)\))?/i);
-  const capoNoTexto = textoDaPagina.match(/Capotraste\s*:\s*(\d+)\D*?casa/i);
-  const tomEl = $(
-    ".cifra_tom a, .tom_atual, [data-cy='cifra-tom'] a, " +
-    "#cifra_tom, .g-song-key, [class*='tom'] a, " +
-    "[class*='key'] a, [data-key], .cifra-tom"
-  ).first().text().trim().replace(/^tom:?\s*/i, "");
-  if (tomNoTexto) {
-    tomOriginal = tomNoTexto[1];
-    formaDaCifra = tomNoTexto[2] ?? "";
-  } else if (tomEl && /^[A-G][#b]?m?$/.test(tomEl)) {
-    tomOriginal = tomEl;
-  } else {
-    // Tenta regex no JSON embutido no HTML
-    const tomMatch =
-      scripts.match(/"tom"\s*:\s*"([A-G][#b]?m?[0-9]*)"/) ||
-      scripts.match(/"key"\s*:\s*"([A-G][#b]?m?)"/) ||
-      scripts.match(/tom:\s*["']([A-G][#b]?m?[0-9]*)["']/);
-    if (tomMatch) tomOriginal = tomMatch[1].replace(/[0-9]+$/, "");
-  }
-
-  if (capoNoTexto) capotraste = `${capoNoTexto[1]}\u00AA casa`;
-
-  const temSimplificada = versao === "simplificada" || $("a[href*='/simplificada']").length > 0;
-  const tomInferido = tomOriginal ? "" : inferirTomDaCifra(cifraTexto);
-  if (!tomOriginal && tomInferido) tomOriginal = tomInferido;
-
-  return NextResponse.json({
-    artist:       artistaNome,
-    name:         titulo,
-    tom_original: tomOriginal || null,
-    forma_da_cifra: formaDaCifra || null,
-    capotraste: capotraste || null,
-    youtube_url:  youtubeUrl || null,
-    cifraclub_url: cifraUrl,
-    cifra:        cifraTexto.split("\n"),
-    versao,
-    versoes: temSimplificada
-      ? [{ id: "principal", label: "Principal" }, { id: "simplificada", label: "Simplificada" }]
-      : [{ id: "principal", label: "Principal" }],
-    tom_origem: tomOriginal ? (tomInferido ? "inferido" : "cifraclub") : null,
-  });
+  return NextResponse.json(
+    { error: "Informe o parâmetro 'q' para buscar sugestões." },
+    { status: 400 },
+  );
 }
