@@ -7,11 +7,31 @@ import { signedPaths, uuidValid } from "@/lib/louvorStudioHqServer";
 import { stemNames } from "@/lib/louvorStudioMusic";
 import { criarUrlDeEnvio, existeAudio, removerAudios } from "@/lib/louvorStudioStorage";
 import { EspacoStudioError, reservarEspacoStudio, finalizarReservaStudio, RESERVA_PREPARACAO_BYTES } from "@/lib/louvorStudioQuota";
+
+function idDoWorker(req: NextRequest): string {
+  return req.headers.get("x-worker-id")?.trim().slice(0, 100) || "worker-local";
+}
+
+function nomeDoWorker(req: NextRequest, workerId: string): string {
+  const nome = req.headers.get("x-worker-label")?.replace(/[\u0000-\u001F\u007F]/g, "").trim().slice(0, 100);
+  return nome || workerId;
+}
+
+async function registrarWorker(workerId: string, nome: string): Promise<void> {
+  const { error } = await db.from("louvor_studio_workers").upsert({
+    worker_id: workerId,
+    nome,
+    visto_em: new Date().toISOString(),
+  }, { onConflict: "worker_id" });
+  // A fila continua funcionando durante a implantação inicial da migração.
+  if (error) console.warn("Não foi possível registrar o status do worker:", error.message);
+}
+
 export async function GET(req: NextRequest) {
   if (!validarWorker(req))
     return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
-  const worker =
-    req.headers.get("x-worker-id")?.slice(0, 100) || "worker-local";
+  const worker = idDoWorker(req);
+  await registrarWorker(worker, nomeDoWorker(req, worker));
   const { data: job, error } = await db.rpc("claim_louvor_hq", {
     p_worker: worker,
   });
@@ -31,6 +51,8 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   if (!validarWorker(req))
     return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+  const worker = idDoWorker(req);
+  await registrarWorker(worker, nomeDoWorker(req, worker));
   const body = await req.json().catch(() => null);
   if (
     !body ||
@@ -46,7 +68,7 @@ export async function POST(req: NextRequest) {
     .select("*")
     .eq("id", body.id)
     .eq("claim_token", body.claimToken)
-    .eq("worker_id", req.headers.get("x-worker-id")?.slice(0, 100) || "worker-local")
+    .eq("worker_id", worker)
     .maybeSingle();
   if (
     !row ||

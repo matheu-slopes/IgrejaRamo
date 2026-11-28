@@ -27,6 +27,14 @@ import { AudioDeMensagem, ImagemDeMensagem } from "@/components/chat/MidiaPrivad
 import { MIDIAS_R2_ATIVAS } from "@/lib/midiasConfig";
 
 type Tab = "chat" | "membros" | "equipes" | "eventos" | "escalas" | "studio" | "repertorio";
+type ProcessadorStudio = { id: string; nome: string; vistoEm: string; online: boolean };
+
+function ehProcessadorStudio(value: unknown): value is ProcessadorStudio {
+  if (!value || typeof value !== "object") return false;
+  const processador = value as Partial<ProcessadorStudio>;
+  return typeof processador.id === "string" && typeof processador.nome === "string"
+    && typeof processador.vistoEm === "string" && typeof processador.online === "boolean";
+}
 
 const corMap: Record<string, string> = {
   Louvor:        "bg-rose-700",
@@ -55,11 +63,21 @@ export default function CanalMinisterioPage() {
   const [chatBloqueado, setChatBloqueado] = useState(false);
   const [acessoCanal, setAcessoCanal] = useState<{ lider: boolean; permissoes: string[] }>({ lider: false, permissoes: [] });
   const [alterandoChat, setAlterandoChat] = useState(false);
-  const [studioAccess, setStudioAccess] = useState({
+  const [studioAccess, setStudioAccess] = useState<{
+    autorizado: boolean;
+    podeGerenciar: boolean;
+    podePrepararEnsaio: boolean;
+    workerConfigurado: boolean;
+    workerOnline: boolean | null;
+    workers: ProcessadorStudio[] | null;
+    youtubeConfigurado: boolean;
+  }>({
     autorizado: false,
     podeGerenciar: false,
     podePrepararEnsaio: false,
     workerConfigurado: false,
+    workerOnline: null,
+    workers: null,
     youtubeConfigurado: false,
   });
   const [analiseStudioInicial, setAnaliseStudioInicial] = useState<AnaliseStudioInicial | null>(null);
@@ -138,29 +156,33 @@ export default function CanalMinisterioPage() {
     let ativo = true;
     if (isLoading) return () => { ativo = false; };
     if (slug !== "Louvor" || !user?.id) {
-      setStudioAccess({ autorizado: false, podeGerenciar: false, podePrepararEnsaio: false, workerConfigurado: false, youtubeConfigurado: false });
+      setStudioAccess({ autorizado: false, podeGerenciar: false, podePrepararEnsaio: false, workerConfigurado: false, workerOnline: null, workers: null, youtubeConfigurado: false });
       return;
     }
-    supabase.auth.getSession().then(({ data }) => {
+    const carregarStatusStudio = async () => {
+      const { data } = await supabase.auth.getSession();
       const accessToken = data.session?.access_token;
       if (!accessToken) return;
-      fetch("/api/louvor-studio/access", {
+      try {
+        const response = await fetch("/api/louvor-studio/access", {
         cache: "no-store",
         headers: { Authorization: `Bearer ${accessToken}` },
-      })
-        .then((response) => response.json())
-        .then((result) => {
-          if (ativo) setStudioAccess({
-            autorizado: Boolean(result.autorizado),
-            podeGerenciar: Boolean(result.podeGerenciar),
-            podePrepararEnsaio: Boolean(result.podePrepararEnsaio),
-            workerConfigurado: Boolean(result.workerConfigurado),
-            youtubeConfigurado: Boolean(result.youtubeConfigurado),
-          });
-        })
-        .catch(() => {});
-    });
-    return () => { ativo = false; };
+        });
+        const result = await response.json();
+        if (ativo) setStudioAccess({
+          autorizado: Boolean(result.autorizado),
+          podeGerenciar: Boolean(result.podeGerenciar),
+          podePrepararEnsaio: Boolean(result.podePrepararEnsaio),
+          workerConfigurado: Boolean(result.workerConfigurado),
+          workerOnline: typeof result.workerOnline === "boolean" ? result.workerOnline : null,
+          workers: Array.isArray(result.workers) ? result.workers.filter(ehProcessadorStudio) : null,
+          youtubeConfigurado: Boolean(result.youtubeConfigurado),
+        });
+      } catch { /* mantém o último status conhecido */ }
+    };
+    void carregarStatusStudio();
+    const timer = window.setInterval(() => void carregarStatusStudio(), 15_000);
+    return () => { ativo = false; window.clearInterval(timer); };
   }, [isLoading, slug, user?.id]);
 
   useEffect(() => {
@@ -277,6 +299,8 @@ export default function CanalMinisterioPage() {
           podeGerenciar={studioAccess.podeGerenciar}
           podePrepararEnsaio={studioAccess.podePrepararEnsaio}
           workerConfigurado={studioAccess.workerConfigurado}
+          workerOnline={studioAccess.workerOnline}
+          workers={studioAccess.workers}
           analiseInicial={analiseStudioInicial}
           projetoInicialId={projetoStudioInicial}
           origem={origemStudio}

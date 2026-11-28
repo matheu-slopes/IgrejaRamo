@@ -54,6 +54,7 @@ type MusicaDaFilaStudio = {
   artista: string;
   youtubeUrl?: string;
 };
+type ProcessadorStudio = { id: string; nome: string; vistoEm: string; online: boolean };
 
 export type AnaliseStudioInicial = MusicaDaFilaStudio & {
   id: string;
@@ -107,6 +108,8 @@ export function LouvorStudioTab({
   podeGerenciar,
   podePrepararEnsaio,
   workerConfigurado,
+  workerOnline,
+  workers,
   analiseInicial,
   projetoInicialId,
   onVoltarParaEscalas,
@@ -116,6 +119,8 @@ export function LouvorStudioTab({
   podeGerenciar: boolean;
   podePrepararEnsaio: boolean;
   workerConfigurado: boolean;
+  workerOnline: boolean | null;
+  workers: ProcessadorStudio[] | null;
   analiseInicial?: AnaliseStudioInicial | null;
   projetoInicialId?: string | null;
   onVoltarParaEscalas?: (escalaId: string) => void;
@@ -141,6 +146,7 @@ export function LouvorStudioTab({
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [indiceDaFila, setIndiceDaFila] = useState(0);
   const podePreparar = podeGerenciar || podePrepararEnsaio;
+  const processadorDisponivel = workerConfigurado && workerOnline !== false;
 
   const filaDaEscala = analiseInicial
     ? (analiseInicial.fila?.length ? analiseInicial.fila : [analiseInicial])
@@ -396,6 +402,12 @@ export function LouvorStudioTab({
         </button>
         <h2 className="flex items-center gap-2 text-lg font-semibold text-gray-900"><Sparkles className="h-5 w-5 text-rose-700" />Louvor Studio</h2>
         <p className="mt-1 text-sm text-gray-500">{selected ? "Ouça e ajuste as faixas para ensaiar." : "Confirme a gravação para preparar o ensaio desta música."}</p>
+        {workers && workers.length > 0 && <div className="mt-3 flex flex-wrap gap-2" role="status" aria-label="Status dos processadores">
+          {workers.map((worker) => <span key={worker.id} className={worker.online ? "inline-flex items-center gap-2 rounded-lg bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800" : "inline-flex items-center gap-2 rounded-lg bg-gray-100 px-3 py-2 text-xs font-semibold text-gray-600"}>
+            <span className={worker.online ? "h-2 w-2 rounded-full bg-emerald-500" : "h-2 w-2 rounded-full bg-gray-400"} />{worker.nome}: {worker.online ? "online" : "offline"}
+          </span>)}
+        </div>}
+        {workerOnline === false && <p role="status" className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">Nenhum processador está online. Ligue o PC do trabalho ou o notebook pessoal e inicie o Louvor Studio Worker.</p>}
         {carregando && <p role="status" className="mt-4 flex items-center gap-2 text-sm text-gray-500"><LoaderCircle className="h-4 w-4 animate-spin" />Carregando ensaio…</p>}
         {erroCarregamento && <div className="mt-4 rounded-xl border border-red-100 bg-red-50 p-3"><p role="alert" className="text-sm text-red-700">{erroCarregamento}</p><button type="button" onClick={() => void loadProjects()} className="mt-2 rounded-lg border border-rose-200 px-3 py-2 text-xs font-semibold text-rose-700">Recarregar ensaio</button></div>}
         {!carregando && !erroCarregamento && !selected && !analiseAtual && <p className="mt-4 text-sm text-gray-500">Este ensaio não está disponível. Volte à música para conferir a preparação.</p>}
@@ -444,7 +456,7 @@ export function LouvorStudioTab({
                     </div>
                     <div className="flex flex-wrap gap-2">
                       <a href={videoSugeridoDoRepertorio.url} target="_blank" rel="noopener noreferrer" className="rounded-lg border border-emerald-300 bg-white px-3 py-2 text-xs font-semibold text-emerald-800 hover:bg-emerald-100">Abrir e conferir</a>
-                      <button type="button" disabled={!workerConfigurado || preparando || Boolean(selected)} onClick={() => void processar(videoSugeridoDoRepertorio)} className="rounded-lg bg-emerald-700 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-40">{selected ? "Análise iniciada" : preparando ? "Preparando…" : "Preparar análise"}</button>
+                      <button type="button" disabled={!processadorDisponivel || preparando || Boolean(selected)} onClick={() => void processar(videoSugeridoDoRepertorio)} className="rounded-lg bg-emerald-700 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-40">{selected ? "Análise iniciada" : preparando ? "Preparando…" : "Preparar análise"}</button>
                       <button type="button" onClick={() => setBuscandoOutraVersao(true)} className="rounded-lg border border-emerald-300 bg-white px-3 py-2 text-xs font-semibold text-emerald-800 hover:bg-emerald-100">Buscar outra versão</button>
                     </div>
                   </div>
@@ -479,7 +491,7 @@ export function LouvorStudioTab({
                     <strong className="block text-gray-800">Preparação completa</strong>
                     Voz, bateria, baixo e outros instrumentos serão separados para a equipe ensaiar.
                   </div>
-                  <button type="button" disabled={!workerConfigurado || preparando} onClick={() => void processar(videoConfirmado)} className="mt-4 inline-flex items-center gap-2 rounded-xl bg-rose-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-rose-600 disabled:cursor-not-allowed disabled:opacity-40">
+                  <button type="button" disabled={!processadorDisponivel || preparando} onClick={() => void processar(videoConfirmado)} className="mt-4 inline-flex items-center gap-2 rounded-xl bg-rose-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-rose-600 disabled:cursor-not-allowed disabled:opacity-40">
                     {preparando ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />} {preparando ? "Criando análise…" : "Preparar para análise"}
                   </button>
                   {message && <p role="alert" className="mt-3 text-xs font-medium text-red-700">{message}</p>}
@@ -513,7 +525,7 @@ export function LouvorStudioTab({
                 </div>
                 <button
                   onClick={() => selecionarVideo(result)}
-                  disabled={!workerConfigurado}
+                  disabled={!processadorDisponivel}
                   className="flex shrink-0 items-center gap-1.5 rounded-lg bg-rose-700 px-3 py-2 text-xs font-semibold text-white hover:bg-rose-600 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   <CheckCircle2 className="h-3.5 w-3.5" /> Selecionar
@@ -559,7 +571,7 @@ export function LouvorStudioTab({
               {selected.status === "erro" && podeGerenciar && (
                 <button
                   type="button"
-                  disabled={!workerConfigurado || retryingId === selected.id}
+                  disabled={!processadorDisponivel || retryingId === selected.id}
                   onClick={() => void tentarNovamente(selected)}
                   className="mt-4 inline-flex items-center gap-2 rounded-xl bg-rose-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-rose-600 disabled:cursor-not-allowed disabled:opacity-40"
                 >

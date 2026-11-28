@@ -23,7 +23,16 @@ load_dotenv(ROOT/".env.worker",override=True)
 SITE=os.environ.get("LOUVOR_STUDIO_SITE_URL","").rstrip("/")
 SECRET=os.environ.get("LOUVOR_STUDIO_WORKER_SECRET","")
 WORKER=os.environ.get("LOUVOR_STUDIO_WORKER_ID",socket.gethostname())+"-hq"
-HEADERS={"X-Worker-Secret":SECRET,"X-Worker-Id":WORKER}
+def worker_label():
+    configured=os.environ.get("LOUVOR_STUDIO_WORKER_LABEL","").strip()
+    if configured:return configured[:100]
+    try:
+        import torch
+        accelerator="GPU" if torch.cuda.is_available() else "CPU"
+    except Exception:
+        accelerator="CPU"
+    return f"{socket.gethostname()} ({accelerator})"[:100]
+HEADERS={"X-Worker-Secret":SECRET,"X-Worker-Id":WORKER,"X-Worker-Label":worker_label()}
 TIMEOUT=int(os.environ.get("HQ_TIMEOUT_SECONDS","7200"))
 
 class JobCancelled(Exception):

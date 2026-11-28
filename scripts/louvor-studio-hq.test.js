@@ -148,9 +148,9 @@ test('failed versions have bounded retries',async()=>{
 const versionId='11111111-1111-4111-8111-111111111111';
 const claimToken='22222222-2222-4222-8222-222222222222';
 function workerRoute({authorized=true,missing=false}={}){
- const uploads=[];let update;
+ const uploads=[];const presences=[];let update;
  const row={id:versionId,projeto_id:projectId,claim_token:claimToken,worker_id:'worker',status:'processando',progresso:20};
- const db={from(table){const filters={};return {select(){return update?Promise.resolve({data:[{id:versionId}]}):this;},eq(k,v){filters[k]=v;return this;},update(value){update=value;return this;},async maybeSingle(){return {data:table==='louvor_studio_projetos'&&!filters.claim_token?{id:projectId,separation_mode:'bs_roformer',expira_em:'2099-01-01'}:filters.claim_token===claimToken&&filters.worker_id==='worker'?row:null};}};},storage:{from(){return {
+ const db={from(table){if(table==='louvor_studio_workers')return {upsert(value){presences.push(value);return Promise.resolve({error:null});}};const filters={};return {select(){return update?Promise.resolve({data:[{id:versionId}]}):this;},eq(k,v){filters[k]=v;return this;},update(value){update=value;return this;},async maybeSingle(){return {data:table==='louvor_studio_projetos'&&!filters.claim_token?{id:projectId,separation_mode:'bs_roformer',expira_em:'2099-01-01'}:filters.claim_token===claimToken&&filters.worker_id==='worker'?row:null};}};},storage:{from(){return {
   async createSignedUploadUrl(path){uploads.push(path);return {data:{signedUrl:'https://storage.example/'+path}};},
   async list(){return {data:missing?[]:uploads.map(path=>({name:path.split('/').pop(),metadata:{size:123}}))};},
   async remove(){return {};}
@@ -167,7 +167,7 @@ function workerRoute({authorized=true,missing=false}={}){
   },
  });
  return {call:(action,extra={},kind='pitch')=>POST(new Request('http://localhost/worker/hq',{method:'POST',headers:{'x-worker-id':'worker'},body:JSON.stringify({kind,id:versionId,claimToken,action,
-   ...(action==='uploads'?{sizes:kind==='pitch'?{vocals:123,instrumental:123,mix_mp3:123,mix_wav:123}:{vocals:123,instrumental:123,vocals_wav:123,instrumental_wav:123}}:{}),...extra})})),uploads,update:()=>update};
+   ...(action==='uploads'?{sizes:kind==='pitch'?{vocals:123,instrumental:123,mix_mp3:123,mix_wav:123}:{vocals:123,instrumental:123,vocals_wav:123,instrumental_wav:123}}:{}),...extra})})),uploads,presences,update:()=>update};
 }
 test('worker rejects unauthorized/stale claims and isolates upload paths by attempt',async()=>{
  assert.equal((await workerRoute({authorized:false}).call('uploads')).status,401);
@@ -178,6 +178,7 @@ test('worker rejects unauthorized/stale claims and isolates upload paths by atte
 test('worker cannot complete missing files and preserves monotonic progress',async()=>{
  assert.equal((await workerRoute({missing:true}).call('complete')).status,409);
  const r=workerRoute();assert.equal((await r.call('heartbeat',{progress:10})).status,200);assert.equal(r.update().progresso,20);
+ assert.equal(r.presences[0].worker_id,'worker');
  const done=workerRoute();assert.equal((await done.call('uploads',{},'separate')).status,200);assert.equal((await done.call('complete',{bpm:120,beat_offset_seg:.18},'separate')).status,200);assert.equal(done.update().status,'concluido');assert.equal(done.update().beat_offset_seg,.18);assert.equal(done.update().claim_token,null);
 });
 test('worker refuses missing, invalid or oversized upload manifests before signing any URL',async()=>{
